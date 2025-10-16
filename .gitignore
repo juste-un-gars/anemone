@@ -1,3 +1,23 @@
+# Configuration locale (contient mots de passe et clés)
+.env
+config/config.yaml
+config/wireguard/
+config/ssh/
+config/restic-password
+config/samba/
+
+# Données et backups
+data/
+backups/
+restore/
+
+# Logs
+logs/
+*.log
+
+# Docker
+docker-compose.override.yml
+
 # Python
 __pycache__/
 *.py[cod]
@@ -6,25 +26,27 @@ __pycache__/
 .Python
 venv/
 env/
+.venv
 
-# Database
-*.db
-*.sqlite3
-
-# Config locale
-config/local.yaml
-config/*.key
-
-# Node
+# Node.js
 node_modules/
-dist/
-build/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
 
 # IDE
 .vscode/
 .idea/
-*.swp
+*.sublime-*
 
-# Logs
-*.log
-logs/
+# Temporaires
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup

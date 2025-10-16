@@ -1,0 +1,131 @@
+version: '3.8'
+
+services:
+  wireguard:
+    image: linuxserver/wireguard:latest
+    container_name: anemone-wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE:-Europe/Paris}
+    volumes:
+      - ./config/wireguard:/config
+      - /lib/modules:/lib/modules:ro
+    ports:
+      - "51820:51820/udp"
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv4.ip_forward=1
+    restart: unless-stopped
+    networks:
+      anemone-net:
+        ipv4_address: 172.20.0.2
+    healthcheck:
+      test: ["CMD", "wg", "show"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  samba:
+    image: dperson/samba:latest
+    container_name: anemone-samba
+    environment:
+      - USERID=${PUID:-1000}
+      - GROUPID=${PGID:-1000}
+      - TZ=${TIMEZONE:-Europe/Paris}
+      - WORKGROUP=${SMB_WORKGROUP:-WORKGROUP}
+    volumes:
+      - ${DATA_PATH:-./data}:/mount
+      - ./config/samba:/config
+    ports:
+      - "445:445"
+    command: >
+      -u "${SMB_USER:-anemone};${SMB_PASSWORD:-changeme}"
+      -s "data;/mount;yes;no;no;${SMB_USER:-anemone};${SMB_USER:-anemone}"
+    restart: unless-stopped
+    networks:
+      - anemone-net
+
+  webdav:
+    image: bytemark/webdav:latest
+    container_name: anemone-webdav
+    environment:
+      - AUTH_TYPE=Basic
+      - USERNAME=${WEBDAV_USER:-anemone}
+      - PASSWORD=${WEBDAV_PASSWORD:-changeme}
+      - TZ=${TIMEZONE:-Europe/Paris}
+    volumes:
+      - ${DATA_PATH:-./data}:/var/lib/dav
+    ports:
+      - "${WEBDAV_PORT:-8080}:80"
+    restart: unless-stopped
+    networks:
+      - anemone-net
+
+  sftp:
+    image: atmoz/sftp:latest
+    container_name: anemone-sftp
+    volumes:
+      - ${BACKUP_PATH:-./backups}:/home/restic/backups
+      - ./config/ssh/authorized_keys:/home/restic/.ssh/keys/authorized_keys:ro
+    ports:
+      - "${SFTP_PORT:-2222}:22"
+    command: restic:restic:1000:1000:backups
+    restart: unless-stopped
+    networks:
+      - anemone-net
+    profiles:
+      - sftp-enabled
+
+  restic:
+    build: 
+      context: ./services/restic
+      dockerfile: Dockerfile
+    container_name: anemone-restic
+    environment:
+      - RESTIC_PASSWORD_FILE=/config/restic-password
+      - CONFIG_PATH=/config/config.yaml
+      - TZ=${TIMEZONE:-Europe/Paris}
+    volumes:
+      - ${DATA_PATH:-./data}:/data:ro
+      - ./config:/config:ro
+      - ./logs:/logs
+      - ./services/restic/scripts:/scripts:ro
+    depends_on:
+      wireguard:
+        condition: service_healthy
+    network_mode: "service:wireguard"
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: anemone-api
+    environment:
+      - CONFIG_PATH=/config/config.yaml
+      - LOG_PATH=/logs
+      - TZ=${TIMEZONE:-Europe/Paris}
+    volumes:
+      - ./config:/config:ro
+      - ./logs:/logs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "${API_PORT:-3000}:3000"
+    depends_on:
+      - wireguard
+      - samba
+      - webdav
+    restart: unless-stopped
+    networks:
+      - anemone-net
+
+networks:
+  anemone-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
