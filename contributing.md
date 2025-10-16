@@ -13,7 +13,7 @@ Merci de votre intérêt pour contribuer à Anemone ! Ce document vous guidera p
 
 ## 🌟 Code de conduite
 
-Soyez respectueux, inclusif et constructif dans vos interactions. Nous voulons une communauté accueillante pour tous.
+Soyez respectueux et constructif dans vos interactions. Nous voulons une communauté accueillante pour tous.
 
 ## 🚀 Comment contribuer
 
