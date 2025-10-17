@@ -219,57 +219,63 @@ J'ai sauvegardé ma clé</label>
 function copyKey() {{
   const text = document.getElementById('key').textContent;
 
-  // Méthode moderne (HTTPS ou localhost uniquement)
-  if (navigator.clipboard && window.isSecureContext) {{
-    navigator.clipboard.writeText(text).then(() => {{
-      alert('Clé copiée dans le presse-papier !');
-    }}).catch(() => {{
-      fallbackCopy(text);
-    }});
+  // Vérifier si on est en contexte sécurisé (HTTPS ou localhost)
+  const isSecure = window.isSecureContext ||
+                   window.location.hostname === 'localhost' ||
+                   window.location.hostname === '127.0.0.1';
+
+  if (isSecure && navigator.clipboard) {{
+    // Méthode moderne pour HTTPS/localhost
+    navigator.clipboard.writeText(text)
+      .then(() => {{
+        alert('✅ Clé copiée dans le presse-papier !');
+      }})
+      .catch(() => {{
+        // Si ça échoue, afficher le modal
+        showCopyDialog(text);
+      }});
   }} else {{
-    // Fallback pour HTTP via IP
-    fallbackCopy(text);
-  }}
-}}
-
-function fallbackCopy(text) {{
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-  textarea.select();
-
-  try {{
-    const success = document.execCommand('copy');
-    if (success) {{
-      alert('Clé copiée dans le presse-papier !');
-    }} else {{
-      showCopyDialog(text);
-    }}
-  }} catch (err) {{
+    // Pour HTTP via IP, afficher directement le modal
     showCopyDialog(text);
-  }} finally {{
-    document.body.removeChild(textarea);
   }}
 }}
 
 function showCopyDialog(text) {{
   const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; display:flex; align-items:center; justify-content:center';
+  overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px';
+  overlay.onclick = (e) => {{ if (e.target === overlay) overlay.remove(); }};
 
   const dialog = document.createElement('div');
-  dialog.style.cssText = 'background:white; padding:30px; border-radius:16px; box-shadow:0 10px 40px rgba(0,0,0,0.3); max-width:90%; max-height:90vh; overflow:auto';
-  dialog.innerHTML = `
-    <h3 style="margin-bottom:16px; color:#333">📋 Copiez cette clé</h3>
-    <p style="margin-bottom:12px; color:#666">La copie automatique n'est pas disponible. Sélectionnez et copiez manuellement :</p>
-    <textarea readonly style="width:100%; min-width:300px; height:100px; padding:12px; font-family:monospace; font-size:14px; border:2px solid #667eea; border-radius:8px; resize:vertical">` + text + `</textarea>
-    <button onclick="this.parentElement.parentElement.remove()" style="width:100%; margin-top:16px; padding:14px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border:none; border-radius:8px; font-size:1em; cursor:pointer">Fermer</button>
-  `;
+  dialog.style.cssText = 'background:white; padding:30px; border-radius:16px; box-shadow:0 10px 40px rgba(0,0,0,0.3); max-width:600px; width:100%';
 
+  const title = document.createElement('h3');
+  title.style.cssText = 'margin-bottom:16px; color:#333; text-align:center';
+  title.textContent = '📋 Copiez cette clé manuellement';
+
+  const info = document.createElement('p');
+  info.style.cssText = 'margin-bottom:12px; color:#666; text-align:center';
+  info.innerHTML = '⚠️ La copie automatique nécessite HTTPS ou localhost<br>Sélectionnez le texte ci-dessous et utilisez Ctrl+C (ou Cmd+C sur Mac)';
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.readOnly = true;
+  textarea.style.cssText = 'width:100%; height:120px; padding:12px; font-family:monospace; font-size:13px; border:2px solid #667eea; border-radius:8px; resize:vertical; margin:12px 0';
+
+  const button = document.createElement('button');
+  button.textContent = 'Fermer';
+  button.style.cssText = 'width:100%; padding:14px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border:none; border-radius:8px; font-size:1em; cursor:pointer';
+  button.onclick = () => overlay.remove();
+
+  dialog.appendChild(title);
+  dialog.appendChild(info);
+  dialog.appendChild(textarea);
+  dialog.appendChild(button);
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);
-  dialog.querySelector('textarea').select();
+
+  // Sélectionner automatiquement le texte
+  textarea.focus();
+  textarea.select();
 }}
 
 function dl() {{
