@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 from typing import Optional, List, Dict
 from datetime import datetime
-from .crypto_utils import encrypt_invitation_with_pin, decrypt_invitation_with_pin
+from crypto_utils import encrypt_invitation_with_pin, decrypt_invitation_with_pin
 
 
 class PeerManager:
