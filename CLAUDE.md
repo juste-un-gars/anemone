@@ -28,16 +28,18 @@ The most critical security component is the Restic encryption key lifecycle:
 - User accesses `http://localhost:3000/setup` on first run
 - Choose "New server" (generates key) or "Restore" (import existing key)
 - Key is immediately encrypted using AES-256-CBC with PBKDF2 (100k iterations)
-- Encryption password derives from system UUID + random salt
+- Encryption password derives from **container HOSTNAME** (persistent) + random salt
 - Encrypted key saved to `/config/.restic.encrypted`, salt to `/config/.restic.salt`
 - Marker file `/config/.setup-completed` prevents re-setup
 
 **Decryption Flow (Container Startup)**:
 - Restic entrypoint.sh calls Python script `/scripts/decrypt_key.py`
-- Script reads system UUID, salt, and encrypted key file
-- Derives same encryption key via PBKDF2
+- Script reads container HOSTNAME, salt, and encrypted key file
+- Derives same encryption key via PBKDF2 (HOSTNAME is constant across restarts)
 - Decrypts and exports as `RESTIC_PASSWORD` environment variable
 - If decryption fails, container refuses to start
+
+**Critical**: HOSTNAME (from `container_name` in docker-compose.yml) is used instead of UUID because Docker assigns a new UUID on each container restart, which would break decryption.
 
 **Key Files**:
 - `services/api/main.py`: Encryption logic in `encrypt_restic_key()`
@@ -116,6 +118,18 @@ docker logs anemone-sftp
 
 ## Important Implementation Details
 
+### Recent Critical Fixes (2025-10-17)
+
+Three major issues were identified and fixed during deployment testing:
+
+1. **UUID vs HOSTNAME** (most critical): Changed system key from `/proc/sys/kernel/random/uuid` (changes on restart) to `HOSTNAME` environment variable (persistent). This was causing complete decryption failure after container restart.
+
+2. **Read-only /config volume**: API service had `/config:ro` which prevented writing encrypted keys. Changed to read-write for API service only.
+
+3. **OpenSSL → Python cryptography**: Migrated from subprocess openssl calls to native Python cryptography library for better error handling and no external dependencies.
+
+**See** `CORRECTIONS_APPLIQUEES.md` for detailed history and `TROUBLESHOOTING.md` for diagnostic steps.
+
 ### Python Cryptography Migration
 
 **Recent change**: All OpenSSL subprocess calls have been replaced with Python's `cryptography` library.
@@ -135,9 +149,51 @@ docker logs anemone-sftp
 - Padding: PKCS7 (manual implementation)
 - Format: IV (16 bytes) + encrypted_data
 
+### Enhanced Logging and Error Handling
+
+The `encrypt_restic_key()` function now includes:
+- **Detailed debug logging** at each step (system key, salt, derivation, encryption, file writes)
+- **Permission checks** before attempting encryption
+- **Full traceback** on errors with `flush=True` for immediate visibility in Docker logs
+
+To view detailed encryption process:
+```bash
+docker logs anemone-api 2>&1 | grep -E "DEBUG|ERROR"
+```
+
+Expected debug output during successful setup:
+```
+DEBUG: System key obtained (length: 15)
+DEBUG: Salt generated
+DEBUG: Key derived
+DEBUG: Cipher initialized
+DEBUG: Key padded (length: 48)
+DEBUG: Encryption complete
+DEBUG: Encrypted key saved to /config/.restic.encrypted
+DEBUG: Salt saved to /config/.restic.salt
+DEBUG: Setup marker created at /config/.setup-completed
+```
+
 ### Configuration Volumes
 
-The `/config` volume is mounted as **read-only** in most containers EXCEPT the API service which needs write access during setup. The Restic service can read encrypted keys but cannot modify them.
+**IMPORTANT**: The `/config` volume mount configuration in `docker-compose.yml`:
+
+```yaml
+# Restic service - read-only (can only decrypt, not modify)
+restic:
+  volumes:
+    - ./config:/config:ro
+
+# API service - read-write (needs to write encrypted key during setup)
+api:
+  volumes:
+    - ./config:/config     # NO :ro flag!
+```
+
+**Common error**: If the API volume has `:ro`, you'll get:
+```
+Encryption error: Can't open "/config/.restic.encrypted" for writing, Read-only file system
+```
 
 This separation ensures only the web interface can perform setup, while Restic can only decrypt and use keys.
 
@@ -203,10 +259,11 @@ Based on CONTRIBUTING.md:
 ## Security Principles
 
 1. **Key never stored in plaintext** after initial setup
-2. **Encryption key derives from system UUID** - tied to specific machine
+2. **Encryption key derives from container HOSTNAME** - persistent across container restarts (HOSTNAME from `container_name` in docker-compose.yml)
 3. **Setup interface is one-time-use** - marker file prevents re-access
 4. **Backups are encrypted before leaving the system** - peers only store ciphertext
 5. **No network exposure of sensitive services** - SMB/WebDAV only on local network, VPN required for backup access
+6. **Separation of concerns** - API can encrypt (write), Restic can only decrypt (read-only /config)
 
 ## Common Pitfalls
 
