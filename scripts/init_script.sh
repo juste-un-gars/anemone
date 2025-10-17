@@ -65,7 +65,7 @@ echo ""
 echo -e "${BLUE}[4/7]${NC} Génération du mot de passe Restic..."
 
 if [ ! -f config/restic-password ]; then
-    openssl rand -base64 32 > config/restic-password
+    python3 -c "import secrets; print(secrets.token_urlsafe(32))" > config/restic-password
     chmod 600 config/restic-password
     echo -e "${GREEN}✓ Mot de passe Restic généré${NC}"
 else

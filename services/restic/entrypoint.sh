@@ -25,22 +25,8 @@ if [ ! -f /config/.restic.encrypted ] || [ ! -f /config/.restic.salt ]; then
     exit 1
 fi
 
-# Obtenir la clé système
-if [ -f /proc/sys/kernel/random/uuid ]; then
-    SYSTEM_KEY=$(cat /proc/sys/kernel/random/uuid)
-else
-    SYSTEM_KEY="${HOSTNAME:-anemone}-$$"
-fi
-
-SALT=$(cat /config/.restic.salt)
-
-# Déchiffrer
-export RESTIC_PASSWORD=$(
-    openssl enc -aes-256-cbc -d \
-    -pbkdf2 -iter 100000 \
-    -pass pass:"${SYSTEM_KEY}:${SALT}" \
-    -in /config/.restic.encrypted 2>/dev/null
-)
+# Déchiffrer avec Python cryptography
+export RESTIC_PASSWORD=$(python3 /scripts/decrypt_key.py)
 
 if [ -z "$RESTIC_PASSWORD" ]; then
     echo "❌ Failed to decrypt key"

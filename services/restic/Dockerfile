@@ -14,12 +14,15 @@ RUN apk add --no-cache \
     inotify-tools \
     tzdata
 
-RUN pip3 install --no-cache-dir watchdog pyyaml
+RUN pip3 install --no-cache-dir watchdog pyyaml cryptography
 
 RUN mkdir -p /data /config /logs /scripts /root/.ssh
 
 COPY scripts/ /scripts/
 RUN chmod +x /scripts/*.sh
+
+COPY decrypt_key.py /scripts/decrypt_key.py
+RUN chmod +x /scripts/decrypt_key.py
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
