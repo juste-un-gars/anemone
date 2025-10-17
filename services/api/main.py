@@ -33,19 +33,35 @@ def is_setup_completed() -> bool:
     return SETUP_COMPLETED.exists()
 
 def get_system_key() -> str:
-    try:
-        with open('/proc/sys/kernel/random/uuid') as f:
-            return f.read().strip()
-    except:
-        return os.getenv('HOSTNAME', 'anemone')
+    # IMPORTANT : Utiliser le HOSTNAME (fixe et persistant) au lieu de UUID
+    # L'UUID change à chaque redémarrage du conteneur, rendant le déchiffrement impossible
+    return os.getenv('HOSTNAME', 'anemone')
 
 def generate_restic_key() -> str:
     return secrets.token_urlsafe(32)
 
 def encrypt_restic_key(key: str) -> bool:
     try:
+        # Vérifier que le dossier config existe et est accessible en écriture
+        config_dir = Path('/config')
+        if not config_dir.exists():
+            print(f"ERROR: Config directory does not exist: {config_dir}", flush=True)
+            return False
+
+        # Test d'écriture
+        try:
+            test_file = config_dir / '.test_write'
+            test_file.touch()
+            test_file.unlink()
+        except Exception as e:
+            print(f"ERROR: Cannot write to config directory: {e}", flush=True)
+            return False
+
         system_key = get_system_key()
+        print(f"DEBUG: System key obtained (length: {len(system_key)})", flush=True)
+
         salt = secrets.token_bytes(32)
+        print(f"DEBUG: Salt generated", flush=True)
 
         # Derive encryption key using PBKDF2
         kdf = PBKDF2HMAC(
@@ -56,6 +72,7 @@ def encrypt_restic_key(key: str) -> bool:
             backend=default_backend()
         )
         derived_key = kdf.derive(f"{system_key}".encode())
+        print(f"DEBUG: Key derived", flush=True)
 
         # Generate IV for AES-CBC
         iv = secrets.token_bytes(16)
@@ -67,24 +84,34 @@ def encrypt_restic_key(key: str) -> bool:
             backend=default_backend()
         )
         encryptor = cipher.encryptor()
+        print(f"DEBUG: Cipher initialized", flush=True)
 
         # Pad the key to be multiple of 16 bytes (AES block size)
         key_bytes = key.encode()
         padding_length = 16 - (len(key_bytes) % 16)
         padded_key = key_bytes + bytes([padding_length] * padding_length)
+        print(f"DEBUG: Key padded (length: {len(padded_key)})", flush=True)
 
         # Encrypt
         encrypted = encryptor.update(padded_key) + encryptor.finalize()
+        print(f"DEBUG: Encryption complete", flush=True)
 
         # Save encrypted data (IV + encrypted data)
         RESTIC_ENCRYPTED.write_bytes(iv + encrypted)
+        print(f"DEBUG: Encrypted key saved to {RESTIC_ENCRYPTED}", flush=True)
 
         # Save salt as hex for compatibility
         RESTIC_SALT.write_text(salt.hex())
+        print(f"DEBUG: Salt saved to {RESTIC_SALT}", flush=True)
+
         SETUP_COMPLETED.touch()
+        print(f"DEBUG: Setup marker created at {SETUP_COMPLETED}", flush=True)
+
         return True
     except Exception as e:
-        print(f"Error encrypting key: {e}")
+        import traceback
+        print(f"ERROR encrypting key: {e}", flush=True)
+        print(f"Traceback: {traceback.format_exc()}", flush=True)
         return False
 
 # ===== Middleware =====

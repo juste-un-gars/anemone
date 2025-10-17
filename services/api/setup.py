@@ -21,12 +21,9 @@ def generate_restic_key():
 
 def encrypt_restic_key(key: str):
     """Chiffrer la clé Restic"""
-    try:
-        # Récupérer l'UUID système
-        with open("/proc/sys/kernel/random/uuid") as f:
-            system_key = f.read().strip()
-    except:
-        system_key = os.getenv('HOSTNAME', 'anemone')
+    # IMPORTANT : Utiliser le HOSTNAME (fixe et persistant) au lieu de UUID
+    # L'UUID change à chaque redémarrage du conteneur, rendant le déchiffrement impossible
+    system_key = os.getenv('HOSTNAME', 'anemone')
 
     # Générer un salt
     salt = secrets.token_bytes(32)

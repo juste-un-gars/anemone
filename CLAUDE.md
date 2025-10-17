@@ -210,16 +210,46 @@ Based on CONTRIBUTING.md:
 
 ## Common Pitfalls
 
+### ⚠️ CRITICAL: UUID vs HOSTNAME (Container Restart Problem)
+
+**The #1 Problem**: Using `/proc/sys/kernel/random/uuid` as the system key causes decryption to fail after container restart because Docker assigns a new UUID each time.
+
+**Symptom**: Setup works initially, but after `docker-compose restart`, Restic fails with "Failed to decrypt key".
+
+**Root Cause**: The encryption key is derived from:
+```python
+# ❌ WRONG - UUID changes on restart!
+with open('/proc/sys/kernel/random/uuid') as f:
+    return f.read().strip()
+
+# ✅ CORRECT - HOSTNAME persists
+return os.getenv('HOSTNAME', 'anemone')
+```
+
+**Solution**: All three files MUST use `HOSTNAME`:
+- `services/api/main.py:get_system_key()`
+- `services/api/setup.py:encrypt_restic_key()`
+- `services/restic/decrypt_key.py:get_system_key()`
+
+This is already fixed in the current codebase, but if you encounter this error, verify with:
+```bash
+grep -A3 "def get_system_key" services/api/main.py
+# Should show: return os.getenv('HOSTNAME', 'anemone')
+```
+
 ### Restic Won't Start - Decryption Failed
 
 **Symptom**: `docker logs anemone-restic` shows "❌ Failed to decrypt key"
 
 **Causes**:
-1. Setup not completed - check for `/config/.setup-completed`
-2. Encrypted key or salt file missing
-3. System UUID changed (VM migration, hardware change)
+1. **UUID vs HOSTNAME mismatch** (see above - most common!)
+2. Setup not completed - check for `/config/.setup-completed`
+3. Encrypted key or salt file missing
+4. Wrong key used during restoration
 
-**Fix**: Complete setup via web interface or use manual decryption script.
+**Fix**:
+- First, check the UUID/HOSTNAME issue above
+- If that's correct, complete setup via web interface
 
 ### Setup Page Won't Load
 

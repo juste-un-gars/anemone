@@ -12,12 +12,9 @@ from cryptography.hazmat.backends import default_backend
 
 
 def get_system_key():
-    """Get system key from UUID or fallback"""
-    try:
-        with open('/proc/sys/kernel/random/uuid') as f:
-            return f.read().strip()
-    except:
-        return os.getenv('HOSTNAME', 'anemone')
+    """Get system key from HOSTNAME (persistent across container restarts)"""
+    # IMPORTANT : Ne PAS utiliser UUID qui change à chaque redémarrage
+    return os.getenv('HOSTNAME', 'anemone')
 
 
 def decrypt_restic_key(encrypted_path: str, salt_path: str) -> str:

@@ -110,7 +110,7 @@ services:
       - LOG_PATH=/logs
       - TZ=${TIMEZONE:-Europe/Paris}
     volumes:
-      - ./config:/config:ro
+      - ./config:/config
       - ./logs:/logs:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
