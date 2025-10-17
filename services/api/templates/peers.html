@@ -289,10 +289,57 @@
             }
         }
 
-        // Copier l'invitation
+        // Copier l'invitation (compatible HTTP non-localhost)
         function copyInvitation() {
-            navigator.clipboard.writeText(JSON.stringify(currentInvitation));
-            alert('Code copié dans le presse-papier');
+            const text = JSON.stringify(currentInvitation);
+
+            // Méthode moderne (HTTPS ou localhost uniquement)
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('Code copié dans le presse-papier');
+                }).catch(() => {
+                    fallbackCopy(text);
+                });
+            } else {
+                // Fallback pour HTTP via IP
+                fallbackCopy(text);
+            }
+        }
+
+        // Fallback de copie pour contextes non sécurisés
+        function fallbackCopy(text) {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+
+            try {
+                const success = document.execCommand('copy');
+                if (success) {
+                    alert('Code copié dans le presse-papier');
+                } else {
+                    showCopyDialog(text);
+                }
+            } catch (err) {
+                showCopyDialog(text);
+            } finally {
+                document.body.removeChild(textarea);
+            }
+        }
+
+        // Dialog de copie manuel si tout échoue
+        function showCopyDialog(text) {
+            const dialog = document.createElement('div');
+            dialog.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:white; padding:20px; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.3); z-index:10000; max-width:90%';
+            dialog.innerHTML = `
+                <h3 style="margin-bottom:12px">📋 Copiez ce code</h3>
+                <textarea readonly style="width:100%; min-width:400px; height:120px; padding:8px; font-family:monospace; font-size:12px; border:2px solid #667eea; border-radius:4px">${text}</textarea>
+                <button class="btn" onclick="this.parentElement.remove()" style="margin-top:12px">Fermer</button>
+            `;
+            document.body.appendChild(dialog);
+            dialog.querySelector('textarea').select();
         }
 
         // Télécharger le QR code en PNG
@@ -316,6 +363,23 @@
 
         // Scanner QR code
         function showScanner() {
+            // Vérifier si on est en contexte sécurisé
+            if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                document.getElementById('add-result').innerHTML = `
+                    <div class="warning">
+                        ⚠️ <strong>Accès caméra impossible</strong><br><br>
+                        Pour des raisons de sécurité, les navigateurs bloquent l'accès à la caméra sur HTTP.<br><br>
+                        <strong>Solutions :</strong><br>
+                        • Utilisez <code>http://localhost:3000</code> ou <code>http://127.0.0.1:3000</code><br>
+                        • Utilisez HTTPS avec un certificat valide<br>
+                        • Ou cliquez sur "Saisie manuelle" pour coller le code JSON
+                    </div>
+                `;
+                // Basculer automatiquement vers saisie manuelle
+                setTimeout(() => showManual(), 2000);
+                return;
+            }
+
             document.getElementById('scanner-section').classList.remove('hidden');
             document.getElementById('manual-section').classList.add('hidden');
 
@@ -329,7 +393,22 @@
                 onScanSuccess
             ).catch(err => {
                 console.error(err);
-                alert('Impossible d\'accéder à la caméra');
+                let errorMsg = 'Impossible d\'accéder à la caméra.';
+
+                if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                    errorMsg += '<br><br>Vous devez autoriser l\'accès à la caméra dans les paramètres de votre navigateur.';
+                } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+                    errorMsg += '<br><br>Aucune caméra détectée sur cet appareil.';
+                } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+                    errorMsg += '<br><br>La caméra est déjà utilisée par une autre application.';
+                }
+
+                document.getElementById('add-result').innerHTML = `
+                    <div class="warning">❌ ${errorMsg}<br><br>
+                    Utilisez plutôt la <strong>saisie manuelle</strong> ci-dessous.</div>
+                `;
+                hideScanner();
+                showManual();
             });
         }
 
