@@ -7,6 +7,7 @@ import os
 import yaml
 import subprocess
 import secrets
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Dict
@@ -292,24 +293,179 @@ async def root():
     config = load_config()
     name = config.get('node', {}).get('name', 'Anemone')
     html = f"""<!DOCTYPE html>
-<html><head><title>🪸 {name}</title><meta charset="utf-8">
+<html><head><title>🪸 {name}</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-body {{ font-family: -apple-system, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh; padding: 20px; }}
+* {{ margin: 0; padding: 0; box-sizing: border-box; }}
+body {{
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+}}
 .container {{ max-width: 1200px; margin: 0 auto; }}
 .header {{ text-align: center; color: white; margin-bottom: 40px; }}
-.card {{ background: white; border-radius: 12px; padding: 24px; margin-bottom: 20px; }}
-a {{ color: #667eea; text-decoration: none; }}
-</style></head><body>
+.header h1 {{ font-size: 2.5em; margin-bottom: 10px; }}
+.nav {{
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 30px;
+}}
+.nav a {{
+    background: rgba(255,255,255,0.2);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 0.3s;
+}}
+.nav a:hover {{ background: rgba(255,255,255,0.3); transform: translateY(-2px); }}
+.grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }}
+.card {{
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}}
+.card h2 {{ color: #333; margin-bottom: 16px; }}
+.stat {{ display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #eee; }}
+.stat:last-child {{ border-bottom: none; }}
+.stat-label {{ color: #666; }}
+.stat-value {{ font-weight: 600; color: #333; }}
+.status {{ padding: 4px 12px; border-radius: 12px; font-size: 0.9em; }}
+.status-up {{ background: #d4edda; color: #155724; }}
+.status-down {{ background: #f8d7da; color: #721c24; }}
+.progress {{
+    background: #e0e0e0;
+    border-radius: 8px;
+    height: 8px;
+    margin-top: 8px;
+    overflow: hidden;
+}}
+.progress-bar {{
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    height: 100%;
+    transition: width 0.3s;
+}}
+.loading {{ text-align: center; color: #999; padding: 20px; }}
+</style>
+</head><body>
 <div class="container">
-<div class="header"><h1>🪸 {name}</h1><p>Serveur de fichiers distribué</p></div>
-<div class="card">
-<h2>📊 État du système</h2>
-<ul style="line-height:2">
-<li><a href="/peers">👥 Gestion des pairs</a></li>
-<li><a href="/api/status">État général</a></li>
-<li><a href="/docs">Documentation API</a></li>
-</ul></div></div></body></html>"""
+    <div class="header">
+        <h1>🪸 {name}</h1>
+        <p>Serveur de fichiers distribué et chiffré</p>
+    </div>
+
+    <div class="nav">
+        <a href="/peers">👥 Pairs</a>
+        <a href="/api/status">📊 API Status</a>
+        <a href="/docs">📚 Documentation</a>
+    </div>
+
+    <div class="grid">
+        <!-- VPN Status -->
+        <div class="card">
+            <h2>🔒 Statut VPN</h2>
+            <div id="vpn-status" class="loading">Chargement...</div>
+        </div>
+
+        <!-- Storage -->
+        <div class="card">
+            <h2>💾 Stockage</h2>
+            <div id="storage-stats" class="loading">Chargement...</div>
+        </div>
+
+        <!-- Disk Usage -->
+        <div class="card">
+            <h2>💿 Disque</h2>
+            <div id="disk-stats" class="loading">Chargement...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadStats() {{
+    try {{
+        const res = await fetch('/api/system/stats');
+        const data = await res.json();
+
+        // VPN Status
+        const vpnHtml = `
+            <div class="stat">
+                <span class="stat-label">État</span>
+                <span class="status ${{data.vpn.status === 'up' ? 'status-up' : 'status-down'}}">
+                    ${{data.vpn.status === 'up' ? '🟢 Actif' : '🔴 Inactif'}}
+                </span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Pairs connectés</span>
+                <span class="stat-value">${{data.vpn.peers_connected}}</span>
+            </div>
+        `;
+        document.getElementById('vpn-status').innerHTML = vpnHtml;
+
+        // Storage Stats
+        const storageHtml = `
+            <div class="stat">
+                <span class="stat-label">📁 Data (local)</span>
+                <span class="stat-value">${{data.storage.data.formatted}}</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">💼 Backup (sauvegardé)</span>
+                <span class="stat-value">${{data.storage.backup.formatted}}</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">📦 Backups (reçus)</span>
+                <span class="stat-value">${{data.storage.backups.formatted}}</span>
+            </div>
+            <div class="stat" style="margin-top:8px; padding-top:16px; border-top:2px solid #eee">
+                <span class="stat-label"><strong>Total</strong></span>
+                <span class="stat-value"><strong>${{data.storage.total.formatted}}</strong></span>
+            </div>
+        `;
+        document.getElementById('storage-stats').innerHTML = storageHtml;
+
+        // Disk Stats
+        const diskPercent = data.disk.percent;
+        const diskHtml = `
+            <div class="stat">
+                <span class="stat-label">Utilisé</span>
+                <span class="stat-value">${{data.disk.used.formatted}}</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Libre</span>
+                <span class="stat-value">${{data.disk.free.formatted}}</span>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Total</span>
+                <span class="stat-value">${{data.disk.total.formatted}}</span>
+            </div>
+            <div class="progress">
+                <div class="progress-bar" style="width: ${{diskPercent}}%"></div>
+            </div>
+            <div style="text-align:center; margin-top:8px; color:#666; font-size:0.9em">
+                ${{diskPercent}}% utilisé
+            </div>
+        `;
+        document.getElementById('disk-stats').innerHTML = diskHtml;
+
+    }} catch (err) {{
+        console.error(err);
+        document.getElementById('vpn-status').innerHTML = '<p style="color:red">Erreur de chargement</p>';
+        document.getElementById('storage-stats').innerHTML = '<p style="color:red">Erreur de chargement</p>';
+        document.getElementById('disk-stats').innerHTML = '<p style="color:red">Erreur de chargement</p>';
+    }}
+}}
+
+// Charger au démarrage
+loadStats();
+
+// Rafraîchir toutes les 30 secondes
+setInterval(loadStats, 30000);
+</script>
+</body></html>"""
     return HTMLResponse(html)
 
 @app.get("/health")
@@ -445,6 +601,162 @@ async def get_next_ip():
         }
     except Exception as e:
         raise HTTPException(500, f"Erreur: {str(e)}")
+
+# ===== API Statistiques Système =====
+
+def get_directory_size(path: str) -> int:
+    """Calcule la taille d'un répertoire en octets"""
+    try:
+        if not os.path.exists(path):
+            return 0
+        total = 0
+        for dirpath, dirnames, filenames in os.walk(path):
+            for filename in filenames:
+                filepath = os.path.join(dirpath, filename)
+                if os.path.exists(filepath):
+                    total += os.path.getsize(filepath)
+        return total
+    except:
+        return 0
+
+def format_bytes(bytes_size: int) -> str:
+    """Formate une taille en octets vers une unité lisible"""
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if bytes_size < 1024.0:
+            return f"{bytes_size:.2f} {unit}"
+        bytes_size /= 1024.0
+    return f"{bytes_size:.2f} PB"
+
+@app.get("/api/system/stats")
+async def get_system_stats():
+    """Récupère les statistiques système"""
+    try:
+        # Taille des répertoires
+        data_size = get_directory_size("/data")
+        backup_size = get_directory_size("/backup")
+        backups_size = get_directory_size("/backups")
+
+        # Espace disque total
+        disk_usage = shutil.disk_usage("/")
+
+        # Statut VPN
+        vpn_status = "unknown"
+        try:
+            result = subprocess.run(
+                ["docker", "exec", "anemone-wireguard", "wg", "show"],
+                capture_output=True,
+                timeout=5
+            )
+            vpn_status = "up" if result.returncode == 0 else "down"
+        except:
+            vpn_status = "down"
+
+        # Nombre de pairs connectés
+        peers_connected = 0
+        try:
+            peers = peer_manager.list_peers()
+            for peer in peers:
+                status = peer_manager.get_peer_status(peer["name"])
+                if status.get("status") == "connected":
+                    peers_connected += 1
+        except:
+            pass
+
+        return {
+            "success": True,
+            "storage": {
+                "data": {
+                    "bytes": data_size,
+                    "formatted": format_bytes(data_size)
+                },
+                "backup": {
+                    "bytes": backup_size,
+                    "formatted": format_bytes(backup_size)
+                },
+                "backups": {
+                    "bytes": backups_size,
+                    "formatted": format_bytes(backups_size)
+                },
+                "total": {
+                    "bytes": data_size + backup_size + backups_size,
+                    "formatted": format_bytes(data_size + backup_size + backups_size)
+                }
+            },
+            "disk": {
+                "total": {
+                    "bytes": disk_usage.total,
+                    "formatted": format_bytes(disk_usage.total)
+                },
+                "used": {
+                    "bytes": disk_usage.used,
+                    "formatted": format_bytes(disk_usage.used)
+                },
+                "free": {
+                    "bytes": disk_usage.free,
+                    "formatted": format_bytes(disk_usage.free)
+                },
+                "percent": round((disk_usage.used / disk_usage.total) * 100, 1)
+            },
+            "vpn": {
+                "status": vpn_status,
+                "peers_connected": peers_connected
+            }
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Erreur: {str(e)}")
+
+@app.get("/api/vpn/status")
+async def get_vpn_status():
+    """Récupère le statut détaillé du VPN WireGuard"""
+    try:
+        result = subprocess.run(
+            ["docker", "exec", "anemone-wireguard", "wg", "show"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode != 0:
+            return {
+                "status": "down",
+                "message": "VPN non actif"
+            }
+
+        # Parser la sortie de wg show
+        output = result.stdout
+        peers_info = []
+        current_peer = None
+
+        for line in output.split('\n'):
+            line = line.strip()
+            if line.startswith('peer:'):
+                if current_peer:
+                    peers_info.append(current_peer)
+                current_peer = {"public_key": line.split(':')[1].strip()}
+            elif current_peer and ':' in line:
+                key, value = line.split(':', 1)
+                key = key.strip()
+                value = value.strip()
+                if key == 'endpoint':
+                    current_peer['endpoint'] = value
+                elif key == 'latest handshake':
+                    current_peer['latest_handshake'] = value
+                elif key == 'transfer':
+                    current_peer['transfer'] = value
+
+        if current_peer:
+            peers_info.append(current_peer)
+
+        return {
+            "status": "up",
+            "peers": peers_info,
+            "peers_count": len(peers_info)
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 if __name__ == "__main__":
     import uvicorn

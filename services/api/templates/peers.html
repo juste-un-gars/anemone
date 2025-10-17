@@ -133,6 +133,12 @@
             <p><a href="/">← Retour au dashboard</a></p>
         </div>
 
+        <!-- Statut VPN -->
+        <div class="card" style="margin-bottom:20px">
+            <h2>🔒 Statut du VPN WireGuard</h2>
+            <div id="vpn-status-card" class="loading">Chargement...</div>
+        </div>
+
         <div class="grid">
             <!-- Section: Mon invitation -->
             <div class="card">
@@ -484,8 +490,64 @@
             }
         }
 
+        // Charger le statut VPN
+        async function loadVPNStatus() {
+            try {
+                const res = await fetch('/api/vpn/status');
+                const data = await res.json();
+
+                const vpnCard = document.getElementById('vpn-status-card');
+
+                if (data.status === 'up') {
+                    let peersHtml = '';
+                    if (data.peers && data.peers.length > 0) {
+                        peersHtml = '<div style="margin-top:16px"><strong>Tunnels actifs:</strong></div>';
+                        data.peers.forEach(peer => {
+                            peersHtml += `
+                                <div style="background:#f8f9fa; padding:12px; margin-top:8px; border-radius:8px">
+                                    <div style="font-size:0.9em">
+                                        <strong>Endpoint:</strong> ${peer.endpoint || 'N/A'}<br>
+                                        <strong>Dernier handshake:</strong> ${peer.latest_handshake || 'Jamais'}<br>
+                                        <strong>Transfert:</strong> ${peer.transfer || 'Aucun'}
+                                    </div>
+                                </div>
+                            `;
+                        });
+                    }
+
+                    vpnCard.innerHTML = `
+                        <div class="stat">
+                            <span class="stat-label">État du VPN</span>
+                            <span class="status status-connected">🟢 Actif</span>
+                        </div>
+                        <div class="stat">
+                            <span class="stat-label">Tunnels configurés</span>
+                            <span class="stat-value">${data.peers_count || 0}</span>
+                        </div>
+                        ${peersHtml}
+                    `;
+                } else {
+                    vpnCard.innerHTML = `
+                        <div class="stat">
+                            <span class="stat-label">État du VPN</span>
+                            <span class="status status-disconnected">🔴 Inactif</span>
+                        </div>
+                        <div class="warning" style="margin-top:12px">
+                            Le VPN WireGuard n'est pas actif. Vérifiez les logs du conteneur wireguard.
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                document.getElementById('vpn-status-card').innerHTML = '<div class="warning">Erreur de chargement du statut VPN</div>';
+            }
+        }
+
         // Charger les pairs au démarrage
         loadPeers();
+        loadVPNStatus();
+
+        // Rafraîchir le statut VPN toutes les 30 secondes
+        setInterval(loadVPNStatus, 30000);
     </script>
 </body>
 </html>
