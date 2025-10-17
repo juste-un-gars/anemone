@@ -4,7 +4,7 @@
     <title>🪸 Anemone - Gestion des Pairs</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -265,11 +265,15 @@
                 const qrcodeDiv = document.getElementById('qrcode');
                 qrcodeDiv.innerHTML = '';
 
-                new QRCode(qrcodeDiv, {
-                    text: JSON.stringify(data.invitation),
-                    width: 300,
-                    height: 300
-                });
+                const qr = qrcode(0, 'M');
+                qr.addData(JSON.stringify(data.invitation));
+                qr.make();
+
+                const img = document.createElement('img');
+                img.src = qr.createDataURL(8); // 8 = taille des modules
+                img.style.width = '300px';
+                img.style.height = '300px';
+                qrcodeDiv.appendChild(img);
 
                 // Afficher le PIN si protégé
                 if (data.protected && data.pin) {
@@ -293,25 +297,21 @@
 
         // Télécharger le QR code en PNG
         function downloadQRCode() {
-            const canvas = document.querySelector('#qrcode canvas');
-            if (!canvas) {
+            const img = document.querySelector('#qrcode img');
+            if (!img) {
                 alert('Aucun QR code à télécharger');
                 return;
             }
 
-            // Convertir le canvas en blob
-            canvas.toBlob((blob) => {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `anemone-invitation-${new Date().getTime()}.png`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+            // Télécharger l'image directement
+            const a = document.createElement('a');
+            a.href = img.src;
+            a.download = `anemone-invitation-${new Date().getTime()}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
 
-                alert('QR code téléchargé ! Vous pouvez l\'envoyer par email/WhatsApp en toute sécurité.');
-            }, 'image/png');
+            alert('QR code téléchargé ! Vous pouvez l\'envoyer par email/WhatsApp en toute sécurité.');
         }
 
         // Scanner QR code
