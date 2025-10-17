@@ -112,6 +112,7 @@ services:
     volumes:
       - ./config:/config
       - ./logs:/logs:ro
+      - ./scripts:/scripts:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "${API_PORT:-3000}:3000"

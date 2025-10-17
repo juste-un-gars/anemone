@@ -90,6 +90,27 @@ while true; do
 done
 echo ""
 
+# Demander l'adresse IP VPN locale
+echo -e "${BLUE}🔢 Adresse IP VPN locale${NC}"
+echo -e "${YELLOW}   Chaque serveur Anemone doit avoir une IP unique dans le réseau VPN${NC}"
+echo -e "${YELLOW}   Format: 10.8.0.X/24 (où X est unique pour chaque serveur)${NC}"
+echo -e "${YELLOW}   Premier serveur: 10.8.0.1/24, Deuxième: 10.8.0.2/24, etc.${NC}"
+while true; do
+    read -p "   IP VPN [10.8.0.1/24]: " VPN_ADDRESS
+    VPN_ADDRESS=${VPN_ADDRESS:-10.8.0.1/24}
+
+    # Valider le format IP/masque
+    if [[ "$VPN_ADDRESS" =~ ^10\.8\.0\.[0-9]{1,3}/24$ ]]; then
+        # Extraire l'octet final
+        VPN_OCTET=$(echo "$VPN_ADDRESS" | cut -d'.' -f4 | cut -d'/' -f1)
+        if [ "$VPN_OCTET" -ge 1 ] && [ "$VPN_OCTET" -le 254 ]; then
+            break
+        fi
+    fi
+    echo -e "${RED}   ⚠  Format invalide. Utilisez 10.8.0.X/24 (X entre 1 et 254)${NC}"
+done
+echo ""
+
 # Demander l'endpoint public
 echo -e "${BLUE}🌍 Endpoint public (optionnel)${NC}"
 echo -e "${YELLOW}   Adresse pour que les autres serveurs puissent vous joindre${NC}"
@@ -144,6 +165,9 @@ if [ -f config/config.yaml ]; then
     # Mettre à jour le nom du node
     sed -i "s/^  name: .*/  name: \"${NODE_NAME}\"/" config/config.yaml
 
+    # Mettre à jour l'adresse IP VPN
+    sed -i "s|^  address: .*|  address: \"${VPN_ADDRESS}\"|" config/config.yaml
+
     # Mettre à jour l'endpoint public WireGuard
     if [ -n "$ENDPOINT" ]; then
         sed -i "s|^  public_endpoint: .*|  public_endpoint: \"${ENDPOINT}\"|" config/config.yaml
@@ -169,6 +193,7 @@ echo -e "${GREEN}✅ Configuration terminée !${NC}"
 echo ""
 echo -e "${CYAN}Récapitulatif :${NC}"
 echo -e "  Node name     : ${GREEN}${NODE_NAME}${NC}"
+echo -e "  IP VPN        : ${GREEN}${VPN_ADDRESS}${NC}"
 echo -e "  Utilisateur   : ${GREEN}${USERNAME}${NC}"
 echo -e "  Mot de passe  : ${GREEN}********${NC}"
 if [ -n "$ENDPOINT" ]; then
@@ -179,6 +204,15 @@ fi
 echo -e "  Mode backup   : ${GREEN}${BACKUP_MODE}${NC}"
 echo -e "  Timezone      : ${GREEN}${TIMEZONE}${NC}"
 echo ""
+
+echo ""
+echo -e "${BLUE}🔧 Génération de la configuration WireGuard...${NC}"
+if [ -f config/config.yaml ] && [ -f config/wireguard/private.key ]; then
+    python3 scripts/generate-wireguard-config.py config/config.yaml config/wireguard/wg0.conf
+    echo -e "${GREEN}✓ wg0.conf généré${NC}"
+else
+    echo -e "${YELLOW}⚠  Clés manquantes, wg0.conf sera généré au premier démarrage${NC}"
+fi
 
 echo ""
 echo -e "${CYAN}🔨 Construction des images Docker...${NC}"

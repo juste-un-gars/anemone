@@ -205,16 +205,34 @@ class PeerManager:
         with open(authorized_keys_path, 'a') as f:
             f.write(f"\n{ssh_pubkey}\n")
 
+    def _regenerate_wireguard_config(self):
+        """Régénère le fichier wg0.conf depuis config.yaml"""
+        try:
+            subprocess.run(
+                ["python3", "/scripts/generate-wireguard-config.py", self.config_path],
+                check=True,
+                capture_output=True
+            )
+            print("✓ WireGuard configuration regenerated")
+        except subprocess.CalledProcessError as e:
+            print(f"ERROR regenerating WireGuard config: {e}")
+            print(f"stderr: {e.stderr.decode() if e.stderr else 'N/A'}")
+
     def _restart_wireguard(self):
-        """Redémarre le conteneur WireGuard pour appliquer les changements"""
+        """Régénère la config et redémarre le conteneur WireGuard"""
+        # Régénérer wg0.conf
+        self._regenerate_wireguard_config()
+
+        # Redémarrer le conteneur
         try:
             subprocess.run(
                 ["docker", "restart", "anemone-wireguard"],
                 check=True,
                 capture_output=True
             )
+            print("✓ WireGuard restarted")
         except subprocess.CalledProcessError as e:
-            print(f"Error restarting WireGuard: {e}")
+            print(f"ERROR restarting WireGuard: {e}")
 
     def list_peers(self) -> List[dict]:
         """Liste tous les pairs configurés"""
