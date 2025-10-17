@@ -2,7 +2,36 @@
 
 Ce guide explique comment connecter plusieurs serveurs Anemone ensemble pour qu'ils se sauvegardent mutuellement leurs données.
 
-## 📋 Vue d'ensemble
+---
+
+## 🚀 **NOUVELLE MÉTHODE RECOMMANDÉE : Interface Web avec QR Code**
+
+**La façon la plus simple et rapide d'ajouter des pairs !**
+
+### ✨ Avantages
+- 📱 **Scanner un QR code** au lieu de copier/coller des clés
+- 🔐 **Protection par PIN** (4-8 chiffres) optionnelle
+- 🤖 **Configuration automatique** WireGuard + SSH
+- 🎯 **Attribution automatique** des IPs VPN
+- ⚡ **En 30 secondes** chrono !
+
+### 📖 Documentation complète
+👉 **Consultez [PEERS_GUIDE.md](PEERS_GUIDE.md) pour le guide complet**
+
+### Aperçu rapide
+
+**Sur serveur B (qui partage)** :
+1. Accédez à `http://localhost:3000/peers`
+2. Générez un QR code (avec PIN optionnel)
+
+**Sur serveur A (qui ajoute)** :
+1. Accédez à `http://localhost:3000/peers`
+2. Scannez le QR code
+3. Entrez le PIN → Terminé ! ✅
+
+---
+
+## 📋 Méthode Manuelle (Classique)
 
 **Scénario typique** : Vous (Alice) et votre ami (Bob) voulez vous échanger des backups.
 

@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🪸 Anemone - Gestion des Pairs</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header a { color: white; text-decoration: none; opacity: 0.9; }
+        .header a:hover { opacity: 1; }
+
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; }
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .card h2 { margin-bottom: 20px; color: #333; }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        .btn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+
+        .peer-list { list-style: none; }
+        .peer-item {
+            padding: 16px;
+            margin-bottom: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .peer-info { flex: 1; }
+        .peer-name { font-weight: 600; color: #333; }
+        .peer-ip { color: #666; font-size: 0.9em; }
+        .peer-status {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            margin-left: 10px;
+        }
+        .status-connected { background: #d4edda; color: #155724; }
+        .status-disconnected { background: #f8d7da; color: #721c24; }
+
+        .input-group { margin-bottom: 16px; }
+        .input-group label { display: block; margin-bottom: 8px; font-weight: 500; color: #555; }
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        .input-group input:focus { outline: none; border-color: #667eea; }
+
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+        }
+        #reader { border-radius: 8px; overflow: hidden; }
+
+        .pin-display {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .pin-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #856404;
+            font-family: monospace;
+            letter-spacing: 4px;
+        }
+        .warning {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 16px 0;
+            font-size: 0.9em;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+        .hidden { display: none; }
+        .actions { display: flex; gap: 10px; }
+        .actions button { flex: 1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🪸 Anemone - Gestion des Pairs</h1>
+            <p><a href="/">← Retour au dashboard</a></p>
+        </div>
+
+        <div class="grid">
+            <!-- Section: Mon invitation -->
+            <div class="card">
+                <h2>🔑 Mon Code d'Invitation</h2>
+                <p style="color:#666; margin-bottom:20px">Partagez ce code pour permettre à d'autres serveurs de se connecter</p>
+
+                <div class="input-group">
+                    <label>
+                        <input type="checkbox" id="use-pin"> Protéger avec un PIN
+                    </label>
+                </div>
+
+                <div id="pin-options" class="hidden">
+                    <div class="input-group">
+                        <label>PIN (4-8 chiffres)</label>
+                        <input type="text" id="custom-pin" placeholder="Laissez vide pour générer automatiquement" maxlength="8">
+                    </div>
+                </div>
+
+                <button class="btn" onclick="generateInvitation()">Générer le QR Code</button>
+
+                <div id="invitation-result" class="hidden">
+                    <div id="qrcode"></div>
+                    <div id="pin-info" class="hidden pin-display">
+                        <p style="margin-bottom:8px">📱 PIN à communiquer :</p>
+                        <div class="pin-number" id="pin-value"></div>
+                        <p style="margin-top:8px; color:#856404; font-size:0.9em">
+                            ⚠️ Communiquez ce PIN par téléphone, SMS ou autre canal sécurisé
+                        </p>
+                    </div>
+                    <div class="actions" style="margin-top:16px">
+                        <button class="btn" onclick="downloadQRCode()">💾 Télécharger QR Code</button>
+                        <button class="btn btn-secondary" onclick="copyInvitation()">📋 Copier JSON</button>
+                    </div>
+                    <div style="background:#e7f3ff; border-left:4px solid #2196f3; padding:12px; margin-top:16px; border-radius:4px">
+                        <p style="margin:0; color:#1976d2; font-size:0.9em">
+                            💡 <strong>Astuce :</strong> Envoyez le QR code par email/WhatsApp,
+                            puis communiquez le PIN par téléphone pour une sécurité maximale !
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Section: Ajouter un pair -->
+            <div class="card">
+                <h2>➕ Ajouter un Pair</h2>
+
+                <div class="actions" style="margin-bottom:20px">
+                    <button class="btn" onclick="showScanner()">📷 Scanner QR Code</button>
+                    <button class="btn btn-secondary" onclick="showManual()">✏️ Saisie manuelle</button>
+                </div>
+
+                <div id="scanner-section" class="hidden">
+                    <div id="reader" style="width:100%"></div>
+                    <button class="btn btn-secondary" onclick="hideScanner()" style="margin-top:10px">Annuler</button>
+                </div>
+
+                <div id="manual-section" class="hidden">
+                    <div class="input-group">
+                        <label>Code JSON</label>
+                        <textarea id="manual-code" rows="6" style="width:100%; padding:12px; border:2px solid #dee2e6; border-radius:8px"></textarea>
+                    </div>
+                    <div class="input-group">
+                        <label>PIN (si protégé)</label>
+                        <input type="text" id="manual-pin" placeholder="Saisissez le PIN">
+                    </div>
+                    <div class="actions">
+                        <button class="btn" onclick="addPeerManually()">Ajouter</button>
+                        <button class="btn btn-secondary" onclick="hideManual()">Annuler</button>
+                    </div>
+                </div>
+
+                <div id="add-result"></div>
+            </div>
+
+            <!-- Section: Pairs connectés -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <h2>👥 Pairs Connectés</h2>
+                <ul class="peer-list" id="peer-list">
+                    <li style="text-align:center; color:#999; padding:20px">Chargement...</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let html5QrCode = null;
+        let currentInvitation = null;
+
+        // Toggle PIN options
+        document.getElementById('use-pin').addEventListener('change', (e) => {
+            document.getElementById('pin-options').classList.toggle('hidden', !e.target.checked);
+        });
+
+        // Générer une invitation
+        async function generateInvitation() {
+            const usePin = document.getElementById('use-pin').checked;
+            const customPin = document.getElementById('custom-pin').value.trim();
+
+            const payload = {};
+            if (usePin) {
+                if (customPin) {
+                    if (!/^\d{4,8}$/.test(customPin)) {
+                        alert('Le PIN doit contenir entre 4 et 8 chiffres');
+                        return;
+                    }
+                    payload.pin = customPin;
+                } else {
+                    payload.pin_length = 6; // Générer un PIN de 6 chiffres
+                }
+            }
+
+            try {
+                const res = await fetch('/api/peers/generate-invitation', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+
+                const data = await res.json();
+                currentInvitation = data.invitation;
+
+                // Générer le QR code
+                document.getElementById('qrcode').innerHTML = '';
+                QRCode.toCanvas(document.getElementById('qrcode'), JSON.stringify(data.invitation), {
+                    width: 300,
+                    margin: 2
+                });
+
+                // Afficher le PIN si protégé
+                if (data.protected && data.pin) {
+                    document.getElementById('pin-value').textContent = data.pin;
+                    document.getElementById('pin-info').classList.remove('hidden');
+                } else {
+                    document.getElementById('pin-info').classList.add('hidden');
+                }
+
+                document.getElementById('invitation-result').classList.remove('hidden');
+            } catch (err) {
+                alert('Erreur: ' + err.message);
+            }
+        }
+
+        // Copier l'invitation
+        function copyInvitation() {
+            navigator.clipboard.writeText(JSON.stringify(currentInvitation));
+            alert('Code copié dans le presse-papier');
+        }
+
+        // Télécharger le QR code en PNG
+        function downloadQRCode() {
+            const canvas = document.querySelector('#qrcode canvas');
+            if (!canvas) {
+                alert('Aucun QR code à télécharger');
+                return;
+            }
+
+            // Convertir le canvas en blob
+            canvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `anemone-invitation-${new Date().getTime()}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                alert('QR code téléchargé ! Vous pouvez l\'envoyer par email/WhatsApp en toute sécurité.');
+            }, 'image/png');
+        }
+
+        // Scanner QR code
+        function showScanner() {
+            document.getElementById('scanner-section').classList.remove('hidden');
+            document.getElementById('manual-section').classList.add('hidden');
+
+            if (!html5QrCode) {
+                html5QrCode = new Html5Qrcode("reader");
+            }
+
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: 250 },
+                onScanSuccess
+            ).catch(err => {
+                console.error(err);
+                alert('Impossible d\'accéder à la caméra');
+            });
+        }
+
+        function hideScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop();
+            }
+            document.getElementById('scanner-section').classList.add('hidden');
+        }
+
+        async function onScanSuccess(decodedText) {
+            hideScanner();
+
+            try {
+                const invitation = JSON.parse(decodedText);
+
+                // Vérifier si protégé par PIN
+                if (invitation.encrypted) {
+                    const pin = prompt('Cette invitation est protégée.\nEntrez le PIN:');
+                    if (!pin) return;
+                    await addPeer(invitation, pin);
+                } else {
+                    await addPeer(invitation);
+                }
+            } catch (err) {
+                alert('QR code invalide: ' + err.message);
+            }
+        }
+
+        // Saisie manuelle
+        function showManual() {
+            document.getElementById('manual-section').classList.remove('hidden');
+            hideScanner();
+        }
+
+        function hideManual() {
+            document.getElementById('manual-section').classList.add('hidden');
+        }
+
+        async function addPeerManually() {
+            const code = document.getElementById('manual-code').value.trim();
+            const pin = document.getElementById('manual-pin').value.trim();
+
+            if (!code) {
+                alert('Veuillez saisir le code JSON');
+                return;
+            }
+
+            try {
+                const invitation = JSON.parse(code);
+                await addPeer(invitation, pin || null);
+            } catch (err) {
+                alert('Code invalide: ' + err.message);
+            }
+        }
+
+        // Ajouter un pair
+        async function addPeer(invitationData, pin = null) {
+            try {
+                const res = await fetch('/api/peers/add', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        invitation_data: invitationData,
+                        pin: pin
+                    })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    document.getElementById('add-result').innerHTML = `
+                        <div class="success">
+                            ✅ Pair ajouté avec succès !<br>
+                            <strong>${data.peer.name}</strong> (${data.peer.vpn_ip})
+                        </div>
+                    `;
+                    hideManual();
+                    loadPeers();
+
+                    // Effacer après 5s
+                    setTimeout(() => {
+                        document.getElementById('add-result').innerHTML = '';
+                    }, 5000);
+                } else {
+                    throw new Error(data.message || 'Erreur inconnue');
+                }
+            } catch (err) {
+                document.getElementById('add-result').innerHTML = `
+                    <div class="warning">❌ ${err.message}</div>
+                `;
+            }
+        }
+
+        // Charger la liste des pairs
+        async function loadPeers() {
+            try {
+                const res = await fetch('/api/peers/list');
+                const data = await res.json();
+
+                const list = document.getElementById('peer-list');
+
+                if (data.peers.length === 0) {
+                    list.innerHTML = '<li style="text-align:center; color:#999; padding:20px">Aucun pair configuré</li>';
+                    return;
+                }
+
+                list.innerHTML = '';
+                for (const peer of data.peers) {
+                    const status = await getPeerStatus(peer.name);
+                    const statusClass = status.status === 'connected' ? 'status-connected' : 'status-disconnected';
+                    const statusText = status.status === 'connected' ? '🟢 Connecté' : '🔴 Déconnecté';
+
+                    const li = document.createElement('li');
+                    li.className = 'peer-item';
+                    li.innerHTML = `
+                        <div class="peer-info">
+                            <div class="peer-name">${peer.name}</div>
+                            <div class="peer-ip">${peer.vpn_ip} ${peer.endpoint !== 'N/A' ? '• ' + peer.endpoint : ''}</div>
+                        </div>
+                        <div>
+                            <span class="peer-status ${statusClass}">${statusText}</span>
+                            <button class="btn btn-secondary" onclick="removePeer('${peer.name}')" style="margin-left:10px; width:auto; padding:8px 16px">Supprimer</button>
+                        </div>
+                    `;
+                    list.appendChild(li);
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById('peer-list').innerHTML = '<li style="color:red">Erreur de chargement</li>';
+            }
+        }
+
+        // Récupérer le statut d'un pair
+        async function getPeerStatus(peerName) {
+            try {
+                const res = await fetch(`/api/peers/${encodeURIComponent(peerName)}/status`);
+                return await res.json();
+            } catch {
+                return { status: 'unknown' };
+            }
+        }
+
+        // Supprimer un pair
+        async function removePeer(peerName) {
+            if (!confirm(`Supprimer le pair "${peerName}" ?`)) return;
+
+            try {
+                const res = await fetch(`/api/peers/${encodeURIComponent(peerName)}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await res.json();
+                if (data.success) {
+                    loadPeers();
+                } else {
+                    alert('Erreur: ' + (data.message || 'Suppression impossible'));
+                }
+            } catch (err) {
+                alert('Erreur: ' + err.message);
+            }
+        }
+
+        // Charger les pairs au démarrage
+        loadPeers();
+    </script>
+</body>
+</html>

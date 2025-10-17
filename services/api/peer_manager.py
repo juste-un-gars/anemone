@@ -1,0 +1,276 @@
+"""
+Gestionnaire de pairs pour Anemone
+Gestion des invitations, configuration WireGuard et SSH
+"""
+
+import yaml
+import os
+import subprocess
+from pathlib import Path
+from typing import Optional, List, Dict
+from datetime import datetime
+from .crypto_utils import encrypt_invitation_with_pin, decrypt_invitation_with_pin
+
+
+class PeerManager:
+    def __init__(self, config_path: str = "/config/config.yaml"):
+        self.config_path = config_path
+        self.config = self._load_config()
+
+    def _load_config(self) -> dict:
+        """Charge la configuration depuis le fichier YAML"""
+        try:
+            with open(self.config_path, 'r') as f:
+                return yaml.safe_load(f)
+        except Exception as e:
+            print(f"Error loading config: {e}")
+            return {}
+
+    def _save_config(self):
+        """Sauvegarde la configuration dans le fichier YAML"""
+        with open(self.config_path, 'w') as f:
+            yaml.dump(self.config, f, default_flow_style=False)
+
+    def get_local_info(self) -> dict:
+        """Récupère les informations locales du serveur"""
+        # Lire la clé publique WireGuard
+        wg_pubkey_path = "/config/wireguard/public.key"
+        with open(wg_pubkey_path, 'r') as f:
+            wg_pubkey = f.read().strip()
+
+        # Lire la clé publique SSH
+        ssh_pubkey_path = "/config/ssh/id_rsa.pub"
+        with open(ssh_pubkey_path, 'r') as f:
+            ssh_pubkey = f.read().strip()
+
+        # Informations depuis config.yaml
+        node_name = self.config.get('node', {}).get('name', 'anemone')
+        vpn_address = self.config.get('wireguard', {}).get('address', '10.8.0.1/24')
+        endpoint = self.config.get('wireguard', {}).get('public_endpoint', '')
+
+        # Extraire l'IP sans le masque
+        vpn_ip = vpn_address.split('/')[0]
+
+        return {
+            "node_name": node_name,
+            "vpn_ip": vpn_ip,
+            "wireguard_pubkey": wg_pubkey,
+            "ssh_pubkey": ssh_pubkey,
+            "endpoint": endpoint,
+            "version": "1.0"
+        }
+
+    def generate_invitation(self, pin: Optional[str] = None) -> dict:
+        """
+        Génère une invitation pour ce serveur
+
+        Args:
+            pin: PIN optionnel pour chiffrer l'invitation
+
+        Returns:
+            Dictionnaire contenant l'invitation (chiffrée ou non)
+        """
+        local_info = self.get_local_info()
+        local_info["timestamp"] = datetime.now().isoformat()
+
+        # Chiffrer avec le PIN si fourni
+        return encrypt_invitation_with_pin(local_info, pin)
+
+    def get_used_vpn_ips(self) -> List[str]:
+        """Récupère la liste des IPs VPN déjà utilisées"""
+        ips = []
+
+        # IP locale
+        local_ip = self.config.get('wireguard', {}).get('address', '10.8.0.1/24').split('/')[0]
+        ips.append(local_ip)
+
+        # IPs des pairs
+        peers = self.config.get('peers', [])
+        for peer in peers:
+            allowed_ips = peer.get('allowed_ips', '')
+            if allowed_ips:
+                # Format: "10.8.0.2/32"
+                ip = allowed_ips.split('/')[0]
+                ips.append(ip)
+
+        return ips
+
+    def get_next_available_vpn_ip(self) -> str:
+        """Trouve la prochaine IP VPN disponible dans le subnet 10.8.0.0/24"""
+        used_ips = self.get_used_vpn_ips()
+        base = "10.8.0."
+
+        for i in range(2, 255):  # 10.8.0.1 réservé au premier serveur
+            ip = f"{base}{i}"
+            if ip not in used_ips:
+                return ip
+
+        raise Exception("Aucune IP disponible dans le subnet 10.8.0.0/24")
+
+    def add_peer_from_invitation(self, invitation_data: dict, pin: Optional[str] = None) -> dict:
+        """
+        Ajoute un pair depuis une invitation (chiffrée ou non)
+
+        Args:
+            invitation_data: Données du QR code
+            pin: PIN pour déchiffrer (si nécessaire)
+
+        Returns:
+            Informations du pair ajouté
+
+        Raises:
+            ValueError: Si le PIN est incorrect ou données invalides
+        """
+        # Déchiffrer si nécessaire
+        if invitation_data.get("encrypted"):
+            if not pin:
+                raise ValueError("PIN requis pour déchiffrer cette invitation")
+            peer_info = decrypt_invitation_with_pin(invitation_data, pin)
+        else:
+            peer_info = invitation_data if not invitation_data.get("data") else invitation_data
+
+        # Valider les champs requis
+        required_fields = ["node_name", "vpn_ip", "wireguard_pubkey", "ssh_pubkey"]
+        for field in required_fields:
+            if field not in peer_info:
+                raise ValueError(f"Champ manquant dans l'invitation: {field}")
+
+        # Vérifier que l'IP VPN n'est pas déjà utilisée
+        used_ips = self.get_used_vpn_ips()
+        if peer_info["vpn_ip"] in used_ips:
+            raise ValueError(f"L'IP VPN {peer_info['vpn_ip']} est déjà utilisée")
+
+        # Ajouter le pair à la configuration WireGuard
+        new_peer = {
+            "name": peer_info["node_name"],
+            "public_key": peer_info["wireguard_pubkey"],
+            "allowed_ips": f"{peer_info['vpn_ip']}/32",
+            "persistent_keepalive": 25
+        }
+
+        if peer_info.get("endpoint"):
+            new_peer["endpoint"] = peer_info["endpoint"]
+
+        # Ajouter à la liste des pairs
+        if 'peers' not in self.config:
+            self.config['peers'] = []
+
+        self.config['peers'].append(new_peer)
+        self._save_config()
+
+        # Ajouter la clé SSH aux authorized_keys
+        self._add_ssh_key(peer_info["ssh_pubkey"])
+
+        # Redémarrer WireGuard pour appliquer les changements
+        self._restart_wireguard()
+
+        return {
+            "name": peer_info["node_name"],
+            "vpn_ip": peer_info["vpn_ip"],
+            "endpoint": peer_info.get("endpoint", "N/A"),
+            "status": "added"
+        }
+
+    def _add_ssh_key(self, ssh_pubkey: str):
+        """Ajoute une clé SSH publique aux authorized_keys"""
+        authorized_keys_path = "/config/ssh/authorized_keys"
+
+        # Créer le fichier s'il n'existe pas
+        Path(authorized_keys_path).touch(mode=0o600, exist_ok=True)
+
+        # Lire les clés existantes
+        with open(authorized_keys_path, 'r') as f:
+            existing_keys = f.read()
+
+        # Vérifier si la clé existe déjà
+        if ssh_pubkey in existing_keys:
+            return
+
+        # Ajouter la nouvelle clé
+        with open(authorized_keys_path, 'a') as f:
+            f.write(f"\n{ssh_pubkey}\n")
+
+    def _restart_wireguard(self):
+        """Redémarre le conteneur WireGuard pour appliquer les changements"""
+        try:
+            subprocess.run(
+                ["docker", "restart", "anemone-wireguard"],
+                check=True,
+                capture_output=True
+            )
+        except subprocess.CalledProcessError as e:
+            print(f"Error restarting WireGuard: {e}")
+
+    def list_peers(self) -> List[dict]:
+        """Liste tous les pairs configurés"""
+        peers = self.config.get('peers', [])
+        peer_list = []
+
+        for peer in peers:
+            peer_list.append({
+                "name": peer.get("name", "Unknown"),
+                "vpn_ip": peer.get("allowed_ips", "").split('/')[0],
+                "endpoint": peer.get("endpoint", "N/A"),
+                "public_key": peer.get("public_key", "")
+            })
+
+        return peer_list
+
+    def remove_peer(self, peer_name: str) -> bool:
+        """
+        Supprime un pair par son nom
+
+        Args:
+            peer_name: Nom du pair à supprimer
+
+        Returns:
+            True si supprimé, False si non trouvé
+        """
+        peers = self.config.get('peers', [])
+        initial_count = len(peers)
+
+        # Filtrer pour retirer le pair
+        self.config['peers'] = [p for p in peers if p.get('name') != peer_name]
+
+        if len(self.config['peers']) < initial_count:
+            self._save_config()
+            self._restart_wireguard()
+            return True
+
+        return False
+
+    def get_peer_status(self, peer_name: str) -> dict:
+        """
+        Récupère le statut d'un pair (connecté ou non)
+
+        Args:
+            peer_name: Nom du pair
+
+        Returns:
+            Dictionnaire avec le statut
+        """
+        # Trouver le pair
+        peers = self.config.get('peers', [])
+        peer = next((p for p in peers if p.get('name') == peer_name), None)
+
+        if not peer:
+            return {"status": "unknown", "error": "Pair non trouvé"}
+
+        vpn_ip = peer.get("allowed_ips", "").split('/')[0]
+
+        # Tester la connectivité via ping
+        try:
+            result = subprocess.run(
+                ["docker", "exec", "anemone-wireguard", "ping", "-c", "1", "-W", "2", vpn_ip],
+                capture_output=True,
+                timeout=5
+            )
+            connected = result.returncode == 0
+        except:
+            connected = False
+
+        return {
+            "name": peer_name,
+            "vpn_ip": vpn_ip,
+            "status": "connected" if connected else "disconnected"
+        }

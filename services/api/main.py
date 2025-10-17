@@ -10,14 +10,18 @@ import secrets
 from datetime import datetime
 from pathlib import Path
 from typing import Dict
-from fastapi import FastAPI, HTTPException, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, HTTPException, Form, Request, Body
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
+from typing import Optional, List
+from .peer_manager import PeerManager
+from .crypto_utils import generate_random_pin, validate_pin
 
 # Configuration
 CONFIG_PATH = os.getenv('CONFIG_PATH', '/config/config.yaml')
@@ -26,6 +30,12 @@ RESTIC_ENCRYPTED = Path('/config/.restic.encrypted')
 RESTIC_SALT = Path('/config/.restic.salt')
 
 app = FastAPI(title="Anemone API", version="1.0.0")
+
+# Initialiser le gestionnaire de pairs
+peer_manager = PeerManager(config_path=CONFIG_PATH)
+
+# Templates
+templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 # ===== Utilitaires =====
 
@@ -296,6 +306,7 @@ a {{ color: #667eea; text-decoration: none; }}
 <div class="card">
 <h2>📊 État du système</h2>
 <ul style="line-height:2">
+<li><a href="/peers">👥 Gestion des pairs</a></li>
 <li><a href="/api/status">État général</a></li>
 <li><a href="/docs">Documentation API</a></li>
 </ul></div></div></body></html>"""
@@ -316,6 +327,124 @@ async def get_status():
         "timestamp": datetime.now().isoformat(),
         "setup_completed": is_setup_completed()
     }
+
+@app.get("/peers", response_class=HTMLResponse)
+async def peers_page(request: Request):
+    """Page de gestion des pairs"""
+    return templates.TemplateResponse("peers.html", {"request": request})
+
+# ===== API Gestion des pairs =====
+
+class InvitationRequest(BaseModel):
+    pin: Optional[str] = None
+    pin_length: Optional[int] = 6
+
+class AddPeerRequest(BaseModel):
+    invitation_data: dict
+    pin: Optional[str] = None
+
+@app.post("/api/peers/generate-invitation")
+async def generate_invitation(request: InvitationRequest):
+    """Génère une invitation avec PIN optionnel"""
+    try:
+        pin = request.pin
+
+        # Si aucun PIN fourni mais protection demandée, générer automatiquement
+        if pin is None and request.pin_length:
+            pin = generate_random_pin(request.pin_length)
+
+        # Valider le PIN si fourni
+        if pin and not validate_pin(pin):
+            raise HTTPException(400, "PIN invalide (doit être 4-8 chiffres)")
+
+        invitation = peer_manager.generate_invitation(pin)
+
+        return {
+            "success": True,
+            "invitation": invitation,
+            "pin": pin if pin else None,
+            "protected": invitation.get("encrypted", False)
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Erreur lors de la génération: {str(e)}")
+
+@app.post("/api/peers/add")
+async def add_peer(request: AddPeerRequest):
+    """Ajoute un pair depuis une invitation"""
+    try:
+        result = peer_manager.add_peer_from_invitation(
+            request.invitation_data,
+            request.pin
+        )
+        return {
+            "success": True,
+            "peer": result
+        }
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Erreur lors de l'ajout: {str(e)}")
+
+@app.get("/api/peers/list")
+async def list_peers():
+    """Liste tous les pairs configurés"""
+    try:
+        peers = peer_manager.list_peers()
+        return {
+            "success": True,
+            "peers": peers,
+            "count": len(peers)
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Erreur: {str(e)}")
+
+@app.delete("/api/peers/{peer_name}")
+async def remove_peer(peer_name: str):
+    """Supprime un pair"""
+    try:
+        success = peer_manager.remove_peer(peer_name)
+        if not success:
+            raise HTTPException(404, "Pair non trouvé")
+        return {"success": True, "message": f"Pair {peer_name} supprimé"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur: {str(e)}")
+
+@app.get("/api/peers/{peer_name}/status")
+async def get_peer_status(peer_name: str):
+    """Récupère le statut d'un pair"""
+    try:
+        status = peer_manager.get_peer_status(peer_name)
+        return status
+    except Exception as e:
+        raise HTTPException(500, f"Erreur: {str(e)}")
+
+@app.get("/api/peers/local-info")
+async def get_local_info():
+    """Récupère les informations locales du serveur"""
+    try:
+        info = peer_manager.get_local_info()
+        return {
+            "success": True,
+            "info": info
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Erreur: {str(e)}")
+
+@app.get("/api/peers/next-ip")
+async def get_next_ip():
+    """Récupère la prochaine IP VPN disponible"""
+    try:
+        next_ip = peer_manager.get_next_available_vpn_ip()
+        used_ips = peer_manager.get_used_vpn_ips()
+        return {
+            "success": True,
+            "next_ip": next_ip,
+            "used_ips": used_ips
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Erreur: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
