@@ -262,10 +262,19 @@
                 currentInvitation = data.invitation;
 
                 // Générer le QR code
-                document.getElementById('qrcode').innerHTML = '';
-                QRCode.toCanvas(document.getElementById('qrcode'), JSON.stringify(data.invitation), {
+                const qrcodeDiv = document.getElementById('qrcode');
+                qrcodeDiv.innerHTML = '';
+
+                const canvas = document.createElement('canvas');
+                qrcodeDiv.appendChild(canvas);
+
+                QRCode.toCanvas(canvas, JSON.stringify(data.invitation), {
                     width: 300,
                     margin: 2
+                }, (error) => {
+                    if (error) {
+                        alert('Erreur lors de la génération du QR code: ' + error);
+                    }
                 });
 
                 // Afficher le PIN si protégé
