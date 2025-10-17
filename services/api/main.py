@@ -204,7 +204,7 @@ button:disabled {{ background: #ccc; }}
 <div class="warning">⚠️ SAUVEGARDEZ CETTE CLÉ MAINTENANT</div>
 <div class="key" id="key">{key}</div>
 <div class="actions">
-<button onclick="navigator.clipboard.writeText(document.getElementById('key').textContent);alert('Copié!')">📋 Copier</button>
+<button onclick="copyKey()">📋 Copier</button>
 <button onclick="dl()">💾 Télécharger</button>
 </div>
 <label style="display:block; margin:20px 0;">
@@ -216,6 +216,62 @@ J'ai sauvegardé ma clé</label>
 </form>
 </div>
 <script>
+function copyKey() {{
+  const text = document.getElementById('key').textContent;
+
+  // Méthode moderne (HTTPS ou localhost uniquement)
+  if (navigator.clipboard && window.isSecureContext) {{
+    navigator.clipboard.writeText(text).then(() => {{
+      alert('Clé copiée dans le presse-papier !');
+    }}).catch(() => {{
+      fallbackCopy(text);
+    }});
+  }} else {{
+    // Fallback pour HTTP via IP
+    fallbackCopy(text);
+  }}
+}}
+
+function fallbackCopy(text) {{
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+
+  try {{
+    const success = document.execCommand('copy');
+    if (success) {{
+      alert('Clé copiée dans le presse-papier !');
+    }} else {{
+      showCopyDialog(text);
+    }}
+  }} catch (err) {{
+    showCopyDialog(text);
+  }} finally {{
+    document.body.removeChild(textarea);
+  }}
+}}
+
+function showCopyDialog(text) {{
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; display:flex; align-items:center; justify-content:center';
+
+  const dialog = document.createElement('div');
+  dialog.style.cssText = 'background:white; padding:30px; border-radius:16px; box-shadow:0 10px 40px rgba(0,0,0,0.3); max-width:90%; max-height:90vh; overflow:auto';
+  dialog.innerHTML = `
+    <h3 style="margin-bottom:16px; color:#333">📋 Copiez cette clé</h3>
+    <p style="margin-bottom:12px; color:#666">La copie automatique n'est pas disponible. Sélectionnez et copiez manuellement :</p>
+    <textarea readonly style="width:100%; min-width:300px; height:100px; padding:12px; font-family:monospace; font-size:14px; border:2px solid #667eea; border-radius:8px; resize:vertical">` + text + `</textarea>
+    <button onclick="this.parentElement.parentElement.remove()" style="width:100%; margin-top:16px; padding:14px; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border:none; border-radius:8px; font-size:1em; cursor:pointer">Fermer</button>
+  `;
+
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+  dialog.querySelector('textarea').select();
+}}
+
 function dl() {{
   const blob = new Blob([document.getElementById('key').textContent], {{type: 'text/plain'}});
   const url = URL.createObjectURL(blob);
