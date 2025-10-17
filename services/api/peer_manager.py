@@ -126,8 +126,13 @@ class PeerManager:
             if not pin:
                 raise ValueError("PIN requis pour déchiffrer cette invitation")
             peer_info = decrypt_invitation_with_pin(invitation_data, pin)
+        elif invitation_data.get("version") == 2 and "data" in invitation_data:
+            # Format v2 non chiffré - extraire les données JSON
+            import json
+            peer_info = json.loads(invitation_data["data"])
         else:
-            peer_info = invitation_data if not invitation_data.get("data") else invitation_data
+            # Format legacy ou déjà parsé
+            peer_info = invitation_data
 
         # Valider les champs requis
         required_fields = ["node_name", "vpn_ip", "wireguard_pubkey", "ssh_pubkey"]
