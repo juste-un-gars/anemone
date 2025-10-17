@@ -7,7 +7,7 @@ import secrets
 import base64
 import json
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 
 
@@ -35,7 +35,7 @@ def encrypt_invitation_with_pin(data: dict, pin: str = None) -> dict:
     salt = secrets.token_bytes(16)
 
     # Dériver une clé du PIN avec PBKDF2
-    kdf = PBKDF2(
+    kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
         salt=salt,
@@ -87,7 +87,7 @@ def decrypt_invitation_with_pin(payload: dict, pin: str) -> dict:
         ciphertext = base64.b64decode(payload["data"])
 
         # Dériver la clé du PIN
-        kdf = PBKDF2(
+        kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=salt,
