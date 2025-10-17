@@ -6,8 +6,12 @@ node:
   description: "Mon serveur personnel"
 
 storage:
-  data_path: "/mnt/data"
-  backup_path: "/mnt/backup"
+  # Chemin des données à sauvegarder (sera sauvegardé chez les pairs)
+  backup_data_path: "/mnt/backup"
+  # Chemin des données locales uniquement (non sauvegardé)
+  local_data_path: "/mnt/data"
+  # Chemin de réception des backups des autres serveurs
+  backup_receive_path: "/mnt/backups"
   max_backup_size: "2TB"
   disk_alert_threshold: 90
 

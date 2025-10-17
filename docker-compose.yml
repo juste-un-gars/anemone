@@ -35,13 +35,15 @@ services:
       - TZ=${TIMEZONE:-Europe/Paris}
       - WORKGROUP=${SMB_WORKGROUP:-WORKGROUP}
     volumes:
-      - ${DATA_PATH:-./data}:/mount
+      - ${DATA_PATH:-./data}:/mount/data
+      - ${BACKUP_DATA_PATH:-./backup}:/mount/backup
       - ./config/samba:/config
     ports:
       - "445:445"
     command: >
       -u "${SMB_USER:-anemone};${SMB_PASSWORD:-changeme}"
-      -s "data;/mount;yes;no;no;${SMB_USER:-anemone};${SMB_USER:-anemone}"
+      -s "data;/mount/data;yes;no;no;${SMB_USER:-anemone};${SMB_USER:-anemone}"
+      -s "backup;/mount/backup;yes;no;no;${SMB_USER:-anemone};${SMB_USER:-anemone}"
     restart: unless-stopped
     networks:
       - anemone-net
@@ -55,7 +57,8 @@ services:
       - PASSWORD=${WEBDAV_PASSWORD:-changeme}
       - TZ=${TIMEZONE:-Europe/Paris}
     volumes:
-      - ${DATA_PATH:-./data}:/var/lib/dav
+      - ${DATA_PATH:-./data}:/var/lib/dav/data
+      - ${BACKUP_DATA_PATH:-./backup}:/var/lib/dav/backup
     ports:
       - "${WEBDAV_PORT:-8080}:80"
     restart: unless-stopped
@@ -66,7 +69,7 @@ services:
     image: atmoz/sftp:latest
     container_name: anemone-sftp
     volumes:
-      - ${BACKUP_PATH:-./backups}:/home/restic/backups
+      - ${BACKUP_RECEIVE_PATH:-./backups}:/home/restic/backups
       - ./config/ssh/authorized_keys:/home/restic/.ssh/keys/authorized_keys:ro
     ports:
       - "${SFTP_PORT:-2222}:22"
@@ -78,7 +81,7 @@ services:
       - sftp-enabled
 
   restic:
-    build: 
+    build:
       context: ./services/restic
       dockerfile: Dockerfile
     container_name: anemone-restic
@@ -87,7 +90,7 @@ services:
       - CONFIG_PATH=/config/config.yaml
       - TZ=${TIMEZONE:-Europe/Paris}
     volumes:
-      - ${DATA_PATH:-./data}:/data:ro
+      - ${BACKUP_DATA_PATH:-./backup}:/backup:ro
       - ./config:/config:ro
       - ./logs:/logs
       - ./services/restic/scripts:/scripts:ro

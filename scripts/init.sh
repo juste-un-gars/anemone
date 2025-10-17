@@ -29,7 +29,7 @@ echo ""
 
 echo -e "${BLUE}[2/5]${NC} Création de la structure..."
 mkdir -p config/{wireguard,ssh,samba}
-mkdir -p data backups logs services/{restic,api}
+mkdir -p data backup backups logs services/{restic,api}
 echo -e "${GREEN}✓ Structure créée${NC}"
 echo ""
 

@@ -55,6 +55,43 @@ if [ "$NEED_INIT" = true ]; then
     read -r
 fi
 
+# Vérifier les mots de passe par défaut
+echo ""
+echo -e "${BLUE}🔐 Vérification des mots de passe...${NC}"
+
+if [ -f .env ]; then
+    DEFAULT_PASS_FOUND=false
+
+    if grep -q "SMB_PASSWORD=changeme" .env; then
+        echo -e "${RED}⚠  Le mot de passe SMB est encore 'changeme'${NC}"
+        DEFAULT_PASS_FOUND=true
+    fi
+
+    if grep -q "WEBDAV_PASSWORD=changeme" .env; then
+        echo -e "${RED}⚠  Le mot de passe WebDAV est encore 'changeme'${NC}"
+        DEFAULT_PASS_FOUND=true
+    fi
+
+    if [ "$DEFAULT_PASS_FOUND" = true ]; then
+        echo ""
+        echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${RED}   DANGER : Mots de passe par défaut détectés !${NC}"
+        echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo -e "${YELLOW}Veuillez modifier les mots de passe dans le fichier .env${NC}"
+        echo -e "${YELLOW}avant de démarrer le serveur pour des raisons de sécurité.${NC}"
+        echo ""
+        echo -e "${CYAN}Voulez-vous continuer quand même ? (o/N)${NC}"
+        read -r response
+        if [[ ! "$response" =~ ^[oO]$ ]]; then
+            echo -e "${RED}Démarrage annulé. Veuillez éditer .env et relancer.${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}✓ Mots de passe personnalisés${NC}"
+    fi
+fi
+
 echo ""
 echo -e "${CYAN}🚀 Démarrage des conteneurs Docker...${NC}"
 docker compose up -d
