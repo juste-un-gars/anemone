@@ -15,17 +15,32 @@ def generate_wg_config(config_path="/config/config.yaml", output_path="/config/w
         config_path: Chemin vers config.yaml
         output_path: Chemin de sortie pour wg0.conf
     """
+    # Vérifier que config.yaml existe
+    config_path = Path(config_path)
+    if not config_path.exists():
+        print(f"ERROR: {config_path} does not exist", file=sys.stderr)
+        sys.exit(1)
+
     # Charger la configuration
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
 
+    if not config:
+        print("ERROR: config.yaml is empty or invalid", file=sys.stderr)
+        sys.exit(1)
+
     wireguard_config = config.get('wireguard', {})
     peers = config.get('peers', [])
 
-    # Lire la clé privée
-    private_key_path = Path("/config/wireguard/private.key")
-    if not private_key_path.exists():
-        print(f"ERROR: {private_key_path} does not exist", file=sys.stderr)
+    # Lire la clé privée (essayer chemin relatif et absolu)
+    private_key_path = None
+    for path in [Path("config/wireguard/private.key"), Path("/config/wireguard/private.key")]:
+        if path.exists():
+            private_key_path = path
+            break
+
+    if not private_key_path:
+        print(f"ERROR: private.key not found in config/wireguard/ or /config/wireguard/", file=sys.stderr)
         sys.exit(1)
 
     private_key = private_key_path.read_text().strip()
