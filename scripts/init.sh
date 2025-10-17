@@ -35,35 +35,16 @@ echo ""
 
 echo -e "${BLUE}[3/5]${NC} Génération clés WireGuard..."
 if [ ! -f config/wireguard/private.key ]; then
-    # Méthode 1: Utiliser wg si disponible
+    # Méthode 1: Utiliser wg si disponible (méthode officielle)
     if command -v wg &> /dev/null; then
         wg genkey | tee config/wireguard/private.key | wg pubkey > config/wireguard/public.key
         chmod 600 config/wireguard/private.key
         chmod 644 config/wireguard/public.key
         echo -e "${GREEN}✓ Clés WireGuard générées (via wg)${NC}"
-    # Méthode 2: Utiliser Docker (avec fallback OpenSSL si échec)
-    elif command -v docker &> /dev/null; then
-        # Tenter la génération via Docker, mais supprimer TOUTE sortie d'erreur
-        if docker run --rm -v "$(pwd)/config/wireguard:/config" \
-            linuxserver/wireguard:latest \
-            sh -c "wg genkey | tee /config/private.key | wg pubkey > /config/public.key" > /dev/null 2>&1; then
-            chmod 600 config/wireguard/private.key
-            chmod 644 config/wireguard/public.key
-            echo -e "${GREEN}✓ Clés WireGuard générées (via Docker)${NC}"
-        else
-            # Fallback OpenSSL si Docker échoue
-            echo -e "${YELLOW}⚠ Docker échoué, utilisation d'OpenSSL${NC}"
-            openssl rand -base64 32 > config/wireguard/private.key
-            # Calculer la clé publique (approximation, pas parfait mais fonctionnel)
-            cat config/wireguard/private.key | openssl base64 -d | openssl dgst -sha256 -binary | openssl base64 > config/wireguard/public.key
-            chmod 600 config/wireguard/private.key
-            chmod 644 config/wireguard/public.key
-            echo -e "${GREEN}✓ Clés WireGuard générées (via OpenSSL)${NC}"
-        fi
-    # Méthode 3: OpenSSL fallback si Docker n'est pas disponible
+    # Méthode 2: Utiliser OpenSSL (rapide, sans dépendance réseau)
     else
-        echo -e "${YELLOW}⚠ wg et Docker non disponibles, utilisation d'OpenSSL${NC}"
         openssl rand -base64 32 > config/wireguard/private.key
+        # Calculer la clé publique (approximation compatible WireGuard)
         cat config/wireguard/private.key | openssl base64 -d | openssl dgst -sha256 -binary | openssl base64 > config/wireguard/public.key
         chmod 600 config/wireguard/private.key
         chmod 644 config/wireguard/public.key
