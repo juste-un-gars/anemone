@@ -204,11 +204,12 @@ To connect multiple Anemone servers for mutual backups:
 ### Building and Running
 
 ```bash
-# Initial setup (generates WireGuard/SSH keys)
-./scripts/init.sh
+# Recommended: Use the all-in-one startup script
+./start.sh                    # Auto-checks init, then starts Docker
 
-# Build and start all services
-docker-compose up --build
+# OR manually:
+./scripts/init.sh             # Initial setup (generates WireGuard/SSH keys)
+docker compose up --build     # Build and start all services
 
 # Rebuild single service after code changes
 docker-compose build api

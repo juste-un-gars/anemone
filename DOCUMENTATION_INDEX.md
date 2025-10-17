@@ -5,7 +5,8 @@ Ce fichier vous guide vers la bonne documentation selon votre besoin.
 ## 🚀 Démarrage rapide
 
 - **Nouveau utilisateur ?** → Lisez [README.md](README.md) pour une vue d'ensemble et l'installation
-- **Premier setup ?** → Suivez la section "Configuration initiale sécurisée" du [README.md](README.md)
+- **Premier setup ?** → [ORDRE_INITIALISATION.md](ORDRE_INITIALISATION.md) explique l'ordre des opérations
+- **Installation rapide ?** → Utilisez `./start.sh` (tout-en-un automatique)
 
 ## 🔧 Problèmes et dépannage
 
@@ -46,6 +47,7 @@ Ce fichier vous guide vers la bonne documentation selon votre besoin.
 | Fichier | Public cible | Contenu |
 |---------|--------------|---------|
 | [README.md](README.md) | Utilisateurs finaux | Vue d'ensemble, installation, utilisation, sécurité |
+| [ORDRE_INITIALISATION.md](ORDRE_INITIALISATION.md) | Nouveaux utilisateurs | Ordre des étapes d'installation et explication |
 | [INTERCONNEXION_GUIDE.md](INTERCONNEXION_GUIDE.md) | Utilisateurs multi-serveurs | Connecter plusieurs serveurs Anemone ensemble |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Utilisateurs avec problèmes | Guide de dépannage complet, erreurs courantes |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contributeurs | Comment contribuer, structure, standards de code |
@@ -64,7 +66,8 @@ Ce fichier vous guide vers la bonne documentation selon votre besoin.
 
 ### Installation
 - Prérequis : [README.md](README.md#prérequis)
-- Installation rapide : [README.md](README.md#installation)
+- Installation rapide : [README.md](README.md#installation) ou `./start.sh`
+- Ordre d'initialisation : [ORDRE_INITIALISATION.md](ORDRE_INITIALISATION.md)
 - Configuration : [README.md](README.md#éditer-la-configuration)
 
 ### Développement

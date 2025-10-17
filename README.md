@@ -15,6 +15,22 @@
 
 ### Installation
 
+#### Méthode recommandée (script tout-en-un)
+
+```bash
+# 1. Cloner le dépôt
+git clone https://github.com/juste-un-gars/anemone.git
+cd anemone
+
+# 2. Lancer le script de démarrage (initialise et démarre automatiquement)
+./start.sh
+
+# 3. Suivre les instructions affichées
+# Le script vérifie l'initialisation et démarre Docker
+```
+
+#### Méthode manuelle (contrôle total)
+
 ```bash
 # 1. Cloner le dépôt
 git clone https://github.com/juste-un-gars/anemone.git
@@ -28,12 +44,14 @@ nano .env                    # Mots de passe SMB/WebDAV
 nano config/config.yaml      # Configuration générale
 
 # 4. Démarrer Anemone
-docker-compose up -d
-
-# 5. Configuration sécurisée (IMPORTANT !)
-# Ouvrir http://localhost:3000/setup dans votre navigateur
-# Suivre l'assistant de configuration
+docker compose up -d
 ```
+
+**Dans les deux cas**, après le démarrage :
+
+- Ouvrez http://localhost:3000/setup dans votre navigateur
+- Suivez l'assistant de configuration
+- **⚠️ SAUVEGARDEZ VOTRE CLÉ DANS BITWARDEN !**
 
 ## 🔐 Configuration initiale sécurisée
 

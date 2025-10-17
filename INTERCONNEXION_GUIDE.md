@@ -24,10 +24,18 @@ Ce guide explique comment connecter plusieurs serveurs Anemone ensemble pour qu'
 ### Prérequis
 
 Les deux serveurs doivent avoir :
-- ✅ Anemone installé et démarré (`docker compose up -d`)
-- ✅ Setup web complété (clé Restic configurée)
+- ✅ Anemone installé et initialisé (`./scripts/init.sh` ou `./start.sh`)
+- ✅ Services démarrés (`docker compose up -d` ou via `./start.sh`)
+- ✅ Setup web complété (clé Restic configurée via http://localhost:3000/setup)
 - ✅ Un nom de domaine DynDNS ou IP publique fixe
 - ✅ Port 51820/UDP ouvert sur le routeur (port-forwarding)
+
+**Important** : Si vous n'avez pas encore de clés WireGuard/SSH, exécutez d'abord :
+```bash
+./scripts/init.sh    # Génère les clés
+# OU
+./start.sh          # Vérifie et génère automatiquement si nécessaire
+```
 
 ---
 
