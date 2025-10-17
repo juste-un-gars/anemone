@@ -181,6 +181,10 @@ echo -e "  Timezone      : ${GREEN}${TIMEZONE}${NC}"
 echo ""
 
 echo ""
+echo -e "${CYAN}🔨 Construction des images Docker...${NC}"
+docker compose build --no-cache
+
+echo ""
 echo -e "${CYAN}🚀 Démarrage des conteneurs Docker...${NC}"
 docker compose up -d
 
