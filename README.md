@@ -197,8 +197,11 @@ R : Oui, mais il faudra refaire tous les backups. Procédure :
 4. Refaire le setup avec une nouvelle clé
 5. Les nouveaux backups utiliseront la nouvelle clé
 
-**Q : Comment partager l'accès aux fichiers sans partager la clé ?**  
+**Q : Comment partager l'accès aux fichiers sans partager la clé ?**
 R : Utilisez SMB/WebDAV avec des comptes séparés. La clé Restic reste privée et sert uniquement aux backups.
+
+**Q : Comment connecter plusieurs serveurs Anemone ensemble ?**
+R : Consultez le guide complet [INTERCONNEXION_GUIDE.md](INTERCONNEXION_GUIDE.md) ou utilisez le script `./scripts/add-peer.sh` pour un ajout interactif.
 
 ## 🤝 Contribuer
 

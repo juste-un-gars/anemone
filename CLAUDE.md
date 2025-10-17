@@ -185,6 +185,20 @@ When updating from older versions:
 - Old installs can use "Restore" mode with existing key
 - Never delete `.restic.encrypted` without backing up the original key first
 
+## Interconnecting Anemone Servers
+
+To connect multiple Anemone servers for mutual backups:
+
+1. **Read the complete guide**: `INTERCONNEXION_GUIDE.md` contains step-by-step instructions
+2. **Use the helper script**: `./scripts/add-peer.sh` for interactive peer addition
+3. **Key information to exchange** between peers:
+   - WireGuard public key (`config/wireguard/public.key`)
+   - SSH public key (`config/ssh/id_rsa.pub`)
+   - VPN IP address (from `config/config.yaml`)
+   - Public endpoint (DynDNS or static IP + port 51820)
+
+**Security note**: Only public keys are exchanged. Private keys and Restic passwords remain secret on each server.
+
 ## Development Workflow
 
 ### Building and Running

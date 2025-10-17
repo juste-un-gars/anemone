@@ -20,9 +20,17 @@ Ce fichier vous guide vers la bonne documentation selon votre besoin.
 - **Comprendre la structure du code** → [CONTRIBUTING.md](CONTRIBUTING.md#structure-du-projet)
 - **Standards de code** → [CONTRIBUTING.md](CONTRIBUTING.md#standards-de-code)
 
+## 🔗 Interconnexion entre serveurs
+
+- **Connecter plusieurs serveurs Anemone** → [INTERCONNEXION_GUIDE.md](INTERCONNEXION_GUIDE.md)
+- **Ajouter un pair facilement** → `./scripts/add-peer.sh`
+- **Obtenir vos clés publiques** → [INTERCONNEXION_GUIDE.md](INTERCONNEXION_GUIDE.md#étape-1--échange-des-informations)
+- **Tester la connexion VPN** → [INTERCONNEXION_GUIDE.md](INTERCONNEXION_GUIDE.md#étape-6--vérification-de-la-connexion)
+
 ## 🔄 Migration et historique
 
 - **Migration depuis ancienne version** → [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)
+- **Changement réseau Docker** → [NETWORK_AUTO_ALLOCATION.md](NETWORK_AUTO_ALLOCATION.md)
 - **Historique des corrections** → [CORRECTIONS_APPLIQUEES.md](CORRECTIONS_APPLIQUEES.md)
 - **Comprendre les problèmes résolus** → [CORRECTIONS_APPLIQUEES.md](CORRECTIONS_APPLIQUEES.md)
 
@@ -38,9 +46,11 @@ Ce fichier vous guide vers la bonne documentation selon votre besoin.
 | Fichier | Public cible | Contenu |
 |---------|--------------|---------|
 | [README.md](README.md) | Utilisateurs finaux | Vue d'ensemble, installation, utilisation, sécurité |
+| [INTERCONNEXION_GUIDE.md](INTERCONNEXION_GUIDE.md) | Utilisateurs multi-serveurs | Connecter plusieurs serveurs Anemone ensemble |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Utilisateurs avec problèmes | Guide de dépannage complet, erreurs courantes |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contributeurs | Comment contribuer, structure, standards de code |
 | [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) | Utilisateurs existants | Migration depuis anciennes versions |
+| [NETWORK_AUTO_ALLOCATION.md](NETWORK_AUTO_ALLOCATION.md) | Développeurs | Explication du système de subnet automatique |
 | [CORRECTIONS_APPLIQUEES.md](CORRECTIONS_APPLIQUEES.md) | Développeurs/curieux | Historique des bugs et corrections |
 | [CLAUDE.md](CLAUDE.md) | IA/Développeurs avancés | Architecture technique détaillée |
 | [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md) | Tout le monde | Ce fichier - index de navigation |
@@ -64,10 +74,11 @@ Ce fichier vous guide vers la bonne documentation selon votre besoin.
 - Architecture Docker : [CLAUDE.md](CLAUDE.md#multi-service-docker-architecture)
 
 ### Erreurs spécifiques
+- "Address already in use" : [TROUBLESHOOTING.md](TROUBLESHOOTING.md#erreur--address-already-in-use-au-démarrage-de-wireguard)
 - "Erreur lors du chiffrement" : [TROUBLESHOOTING.md](TROUBLESHOOTING.md#erreur--erreur-lors-du-chiffrement-lors-du-setup)
 - "Failed to decrypt key" : [TROUBLESHOOTING.md](TROUBLESHOOTING.md#erreur--le-service-restic-ne-démarre-pas)
 - Problème UUID/HOSTNAME : [CLAUDE.md](CLAUDE.md#critical-uuid-vs-hostname-container-restart-problem)
-- Permission denied : [TROUBLESHOOTING.md](TROUBLESHOOTING.md#erreur--permission-denied-sur-procsyskernelrandomuuid)
+- Conflit réseau Docker : [NETWORK_AUTO_ALLOCATION.md](NETWORK_AUTO_ALLOCATION.md)
 
 ### Concepts avancés
 - Gestion des clés de chiffrement : [CLAUDE.md](CLAUDE.md#encryption-key-management-system)
