@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Anemone is a distributed, encrypted file server with redundancy between peers. It combines WireGuard VPN, Restic encrypted backups, SMB/WebDAV file sharing, and SFTP in a Docker-based architecture. The system enables family/friends to back up each other's data securely without cloud dependencies.
 
+**Core Services**: 5 interconnected Docker containers (WireGuard VPN, Restic backups, Samba/WebDAV file sharing, SFTP backup receiver, FastAPI web interface)
+
 ## Key Architecture Concepts
 
 ### Multi-Service Docker Architecture
@@ -56,65 +58,6 @@ Three operational modes controlled via `config/config.yaml`:
 
 The entrypoint.sh switches between modes using bash case statement and exec.
 
-## Essential Commands
-
-### Development & Testing
-
-```bash
-# Initial setup (generates WireGuard/SSH keys, creates structure)
-./scripts/init.sh
-
-# Build and start all services
-docker-compose up --build
-
-# Rebuild single service after code changes
-docker-compose build api
-docker-compose restart api
-
-# View logs
-docker-compose logs -f restic          # Backup service logs
-docker-compose logs -f api             # Web interface logs
-docker-compose logs -f wireguard       # VPN logs
-
-# Manual backup trigger
-docker exec anemone-restic /scripts/backup-now.sh
-
-# Access Restic CLI directly (requires setup completed)
-docker exec -it anemone-restic sh
-restic snapshots
-restic check
-```
-
-### Testing Key Encryption/Decryption
-
-```bash
-# Test encryption (API must be running)
-curl -X POST http://localhost:3000/setup/complete -F "key=test-key-12345"
-
-# Verify encrypted files exist
-ls -la config/.restic.encrypted config/.restic.salt config/.setup-completed
-
-# Test decryption (simulates Restic startup)
-docker exec anemone-restic python3 /scripts/decrypt_key.py
-
-# Force re-setup (DESTRUCTIVE - only for testing)
-rm config/.setup-completed
-docker-compose restart api
-# Access http://localhost:3000/setup
-```
-
-### Debugging Network Issues
-
-```bash
-# Check WireGuard status
-docker exec anemone-wireguard wg show
-
-# Test peer connectivity from Restic container (shares WireGuard network)
-docker exec anemone-restic ping 10.8.0.2  # Replace with peer IP
-
-# Verify SFTP server is receiving connections
-docker logs anemone-sftp
-```
 
 ## Important Implementation Details
 
@@ -207,35 +150,30 @@ The following files are in `.gitignore` and must NEVER be committed:
 
 These files contain or protect the encryption key. The repository only contains example config files.
 
-## Testing the Setup Flow
-
-Complete test scenario:
+## Testing Setup Flow End-to-End
 
 ```bash
 # 1. Clean slate
 rm -f config/.setup-completed config/.restic.* config/restic-password
 docker-compose restart api
 
-# 2. Should redirect to setup
-curl -v http://localhost:3000/  # Expect 302 to /setup
+# 2. Verify redirect to setup (expect 302)
+curl -v http://localhost:3000/
 
-# 3. Access setup in browser
-# Go to http://localhost:3000/setup
-# Choose "New server"
-# Copy the generated key to clipboard
+# 3. Access http://localhost:3000/setup in browser
+# - Choose "New server" or "Restore"
+# - Save the generated key
+# - Check "I saved my key" and submit
 
-# 4. Complete setup
-# Check "I saved my key" and submit
-
-# 5. Verify files created
+# 4. Verify files created
 ls -la config/.restic.encrypted config/.restic.salt config/.setup-completed
 
-# 6. Restart Restic to test decryption
+# 5. Test decryption survives restart
 docker-compose restart restic
 docker-compose logs restic  # Should see "✅ Restic key decrypted"
 
-# 7. Verify dashboard accessible
-curl http://localhost:3000/  # Expect 200 OK, not redirect
+# 6. Verify dashboard accessible (expect 200)
+curl http://localhost:3000/
 ```
 
 ## Migration Notes
@@ -247,9 +185,61 @@ When updating from older versions:
 - Old installs can use "Restore" mode with existing key
 - Never delete `.restic.encrypted` without backing up the original key first
 
-## Code Style Conventions
+## Development Workflow
 
-Based on CONTRIBUTING.md:
+### Building and Running
+
+```bash
+# Initial setup (generates WireGuard/SSH keys)
+./scripts/init.sh
+
+# Build and start all services
+docker-compose up --build
+
+# Rebuild single service after code changes
+docker-compose build api
+docker-compose restart api
+
+# View logs
+docker-compose logs -f restic          # Backup service logs
+docker-compose logs -f api             # Web interface logs
+docker-compose logs -f wireguard       # VPN logs
+```
+
+### Testing Changes
+
+```bash
+# Manual backup trigger
+docker exec anemone-restic /scripts/backup-now.sh
+
+# Access Restic CLI directly (requires setup completed)
+docker exec -it anemone-restic sh
+restic snapshots
+restic check
+
+# Test encryption/decryption
+curl -X POST http://localhost:3000/setup/complete -F "key=test-key-12345"
+docker exec anemone-restic python3 /scripts/decrypt_key.py
+
+# Force re-setup (DESTRUCTIVE - testing only)
+rm config/.setup-completed
+docker-compose restart api
+```
+
+### Network Debugging
+
+```bash
+# Check WireGuard status
+docker exec anemone-wireguard wg show
+
+# Test peer connectivity from Restic container
+docker exec anemone-restic ping 10.8.0.2
+
+# Verify SFTP server
+docker logs anemone-sftp
+```
+
+## Code Style Conventions
 
 - **Python**: PEP 8, type hints required, Black formatting
 - **Bash**: Always use `set -e`, 4-space indent, `${VAR}` syntax
@@ -330,21 +320,31 @@ grep -A3 "def get_system_key" services/api/main.py
 
 ## File Locations Reference
 
-- **Config**: `./config/config.yaml` (main configuration)
-- **Encrypted Key**: `./config/.restic.encrypted` (AES-256-CBC encrypted)
-- **Key Salt**: `./config/.restic.salt` (hex-encoded)
-- **Setup Marker**: `./config/.setup-completed` (empty file)
+- **Config**: `./config/config.yaml` (main configuration, YAML format)
+- **Encrypted Key**: `./config/.restic.encrypted` (AES-256-CBC encrypted, binary)
+- **Key Salt**: `./config/.restic.salt` (hex-encoded string)
+- **Setup Marker**: `./config/.setup-completed` (empty file, presence indicates setup done)
+- **WireGuard Keys**: `./config/wireguard/private.key` and `public.key`
+- **SSH Keys**: `./config/ssh/id_rsa` and `id_rsa.pub`
 - **Logs**: `./logs/` (persistent, rotated)
 - **Data**: `./data/` (user files to be backed up)
 - **Backups**: `./backups/` (received from peers, encrypted)
 
+## Key File Paths in Code
+
+When modifying encryption/decryption logic, these files must stay synchronized:
+- `services/api/main.py` - Encryption logic (`encrypt_restic_key()`, `get_system_key()`)
+- `services/api/setup.py` - Key generation (`generate_restic_key()`)
+- `services/restic/decrypt_key.py` - Decryption logic (standalone Python script)
+- `services/restic/entrypoint.sh` - Orchestrates decryption at startup
+
 ## API Endpoints
 
-- `GET /setup` - Initial setup wizard (only accessible if not completed)
-- `GET /setup/new` - Generate new key
-- `GET /setup/restore` - Restore with existing key
+- `GET /setup` - Initial setup wizard (redirects to `/` if completed)
+- `GET /setup/new` - Generate new key page
+- `GET /setup/restore` - Restore with existing key page
 - `POST /setup/complete` - Finalize setup with key
-- `GET /` - Dashboard (only accessible after setup)
+- `GET /` - Dashboard (redirects to `/setup` if not completed)
 - `GET /health` - Health check endpoint
 - `GET /api/status` - System status JSON
 
@@ -363,9 +363,33 @@ If you need to change encryption/decryption:
 Located in `services/restic/scripts/`:
 
 - `backup-now.sh`: One-shot backup to all configured targets
-- `backup-live.sh`: Watches filesystem with inotify, triggers backups
+- `backup-live.sh`: Watches filesystem with inotify, triggers backups on changes
 - `backup-periodic.sh`: Loop with sleep interval
 - `setup-cron.sh`: Generates crontab from config schedule
 - `init-repos.sh`: Initializes Restic repositories on first run
 
-All scripts source `/config/config.yaml` via Python for YAML parsing.
+Scripts read `/config/config.yaml` via Python YAML parsing.
+
+## Important Architecture Details
+
+### Network Mode: service:wireguard
+
+The Restic container uses `network_mode: "service:wireguard"` in docker-compose.yml, which means:
+- Restic shares the WireGuard container's network stack
+- Restic can access VPN peers without exposing additional ports
+- When debugging network from Restic, you're testing through the VPN
+
+### Volume Mount Permissions
+
+Critical volume configuration in docker-compose.yml:
+```yaml
+restic:
+  volumes:
+    - ./config:/config:ro        # Read-only (can only decrypt)
+
+api:
+  volumes:
+    - ./config:/config           # Read-write (needs to write encrypted key during setup)
+```
+
+If API has `:ro`, setup will fail with "Read-only file system" error.
