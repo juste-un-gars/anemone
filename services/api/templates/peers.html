@@ -4,7 +4,7 @@
     <title>🪸 Anemone - Gestion des Pairs</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -265,16 +265,13 @@
                 const qrcodeDiv = document.getElementById('qrcode');
                 qrcodeDiv.innerHTML = '';
 
-                const canvas = document.createElement('canvas');
-                qrcodeDiv.appendChild(canvas);
-
-                QRCode.toCanvas(canvas, JSON.stringify(data.invitation), {
+                new QRCode(qrcodeDiv, {
+                    text: JSON.stringify(data.invitation),
                     width: 300,
-                    margin: 2
-                }, (error) => {
-                    if (error) {
-                        alert('Erreur lors de la génération du QR code: ' + error);
-                    }
+                    height: 300,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H
                 });
 
                 // Afficher le PIN si protégé
