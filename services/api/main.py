@@ -21,8 +21,8 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
 from typing import Optional, List
-from .peer_manager import PeerManager
-from .crypto_utils import generate_random_pin, validate_pin
+from peer_manager import PeerManager
+from crypto_utils import generate_random_pin, validate_pin
 
 # Configuration
 CONFIG_PATH = os.getenv('CONFIG_PATH', '/config/config.yaml')
