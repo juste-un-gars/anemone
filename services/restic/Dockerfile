@@ -11,10 +11,12 @@ RUN apk add --no-cache \
     python3 \
     py3-pip \
     py3-yaml \
+    py3-cryptography \
     inotify-tools \
     tzdata
 
-RUN pip3 install --no-cache-dir watchdog pyyaml cryptography
+# watchdog n'est pas disponible via apk, donc on utilise pip avec --break-system-packages
+RUN pip3 install --no-cache-dir --break-system-packages watchdog
 
 RUN mkdir -p /data /config /logs /scripts /root/.ssh
 
