@@ -590,6 +590,10 @@ async def generate_invitation(request: InvitationRequest):
 async def add_peer(request: AddPeerRequest):
     """Ajoute un pair depuis une invitation"""
     try:
+        # Log détaillé pour debug
+        print(f"DEBUG: Received invitation_data: {request.invitation_data}", flush=True)
+        print(f"DEBUG: PIN provided: {'Yes' if request.pin else 'No'}", flush=True)
+
         result = peer_manager.add_peer_from_invitation(
             request.invitation_data,
             request.pin
@@ -599,8 +603,12 @@ async def add_peer(request: AddPeerRequest):
             "peer": result
         }
     except ValueError as e:
+        print(f"ERROR (ValueError): {str(e)}", flush=True)
         raise HTTPException(400, str(e))
     except Exception as e:
+        import traceback
+        print(f"ERROR (Exception): {str(e)}", flush=True)
+        print(f"Traceback: {traceback.format_exc()}", flush=True)
         raise HTTPException(500, f"Erreur lors de l'ajout: {str(e)}")
 
 @app.get("/api/peers/list")

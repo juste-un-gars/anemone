@@ -122,22 +122,32 @@ class PeerManager:
             ValueError: Si le PIN est incorrect ou données invalides
         """
         # Déchiffrer si nécessaire
+        print(f"DEBUG: invitation_data keys: {invitation_data.keys()}", flush=True)
+        print(f"DEBUG: encrypted={invitation_data.get('encrypted')}, version={invitation_data.get('version')}", flush=True)
+
         if invitation_data.get("encrypted"):
             if not pin:
                 raise ValueError("PIN requis pour déchiffrer cette invitation")
             peer_info = decrypt_invitation_with_pin(invitation_data, pin)
+            print(f"DEBUG: Decrypted peer_info keys: {peer_info.keys()}", flush=True)
         elif invitation_data.get("version") == 2 and "data" in invitation_data:
             # Format v2 non chiffré - extraire les données JSON
             import json
+            print(f"DEBUG: Parsing v2 non-encrypted format", flush=True)
+            print(f"DEBUG: data field content: {invitation_data['data'][:100]}...", flush=True)
             peer_info = json.loads(invitation_data["data"])
+            print(f"DEBUG: Parsed peer_info keys: {peer_info.keys()}", flush=True)
         else:
             # Format legacy ou déjà parsé
+            print(f"DEBUG: Using legacy format or already parsed", flush=True)
             peer_info = invitation_data
 
         # Valider les champs requis
         required_fields = ["node_name", "vpn_ip", "wireguard_pubkey", "ssh_pubkey"]
+        print(f"DEBUG: peer_info keys before validation: {peer_info.keys()}", flush=True)
         for field in required_fields:
             if field not in peer_info:
+                print(f"DEBUG: Missing field '{field}' in peer_info. Available: {list(peer_info.keys())}", flush=True)
                 raise ValueError(f"Champ manquant dans l'invitation: {field}")
 
         # Vérifier que l'IP VPN n'est pas déjà utilisée
