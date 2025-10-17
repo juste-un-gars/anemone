@@ -2,37 +2,29 @@
 
 Ce guide explique comment mettre à jour votre projet Anemone avec le nouveau système de configuration sécurisée.
 
-## 📋 Fichiers modifiés
+## 📋 Changements récents
 
-### Fichiers à REMPLACER complètement
+### Version actuelle : Allocation automatique de subnet
 
-1. **services/api/main.py**
-   - Nouveau : Interface de setup avec génération/restauration de clé
+**Changement important** : Anemone n'utilise plus de subnet Docker fixe pour éviter les conflits "Address already in use".
+
+**Fichiers modifiés** :
+1. **docker-compose.yml**
+   - Suppression de l'attribut obsolète `version: '3.8'`
+   - Suppression de l'IP statique WireGuard (`ipv4_address: 172.XX.0.2`)
+   - Suppression du subnet fixe (`subnet: 172.XX.0.0/16`)
+   - Docker choisit automatiquement un subnet libre
+
+2. **services/api/main.py**
+   - Interface de setup avec génération/restauration de clé
    - Middleware de redirection automatique
-   - Chiffrement/déchiffrement de la clé Restic
+   - Chiffrement via Python cryptography (plus d'openssl)
 
-2. **services/api/requirements.txt**
-   - Ajout de `qrcode==7.4.2` pour générer les QR codes
+3. **services/restic/decrypt_key.py**
+   - Script Python pour déchiffrement (utilise HOSTNAME au lieu d'UUID)
 
-3. **services/restic/entrypoint.sh**
-   - Déchiffrement automatique de la clé au démarrage
-   - Vérification du setup complété
-
-4. **scripts/init.sh**
-   - Suppression de la génération de clé Restic
-   - Instructions pour accéder au setup web
-
-5. **scripts/restore.sh**
-   - Vérification que le setup est complété
-   - Meilleurs messages d'erreur
-
-6. **.gitignore**
-   - Ajout des fichiers de chiffrement critiques
-
-7. **README.md (section sécurité)**
-   - Documentation complète du système de setup
-   - FAQ sécurité
-   - Checklist
+4. **TROUBLESHOOTING.md**
+   - Documentation du problème réseau et solution
 
 ## 🚀 Procédure de migration
 

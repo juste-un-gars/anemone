@@ -393,3 +393,17 @@ api:
 ```
 
 If API has `:ro`, setup will fail with "Read-only file system" error.
+
+### Docker Network Configuration
+
+**Important**: Anemone uses automatic subnet allocation by Docker to avoid conflicts.
+
+The `anemone-net` network is defined with just `driver: bridge`, without specifying a subnet:
+```yaml
+networks:
+  anemone-net:
+    driver: bridge
+    # No ipam/subnet config - Docker chooses automatically
+```
+
+**Do NOT add static IPs or subnets** unless absolutely necessary, as this causes "Address already in use" errors on machines with multiple Docker projects.

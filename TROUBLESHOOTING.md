@@ -1,5 +1,47 @@
 # 🔧 Guide de dépannage Anemone
 
+## Erreur : "Address already in use" au démarrage de WireGuard
+
+### Symptôme
+```
+Error response from daemon: failed to set up container networking: Address already in use
+```
+
+### Cause
+Cette erreur apparaissait dans les anciennes versions d'Anemone qui spécifiaient un subnet fixe (172.20.0.0/16).
+
+### Solution
+
+**Anemone utilise maintenant l'allocation automatique de subnet par Docker**. Ce problème ne devrait plus se produire.
+
+Si vous rencontrez toujours cette erreur :
+
+```bash
+# 1. Nettoyer complètement les réseaux Docker
+docker compose down
+docker network prune -f
+
+# 2. Redémarrer
+docker compose up -d
+```
+
+Si le problème persiste, c'est qu'un réseau Docker du même nom existe déjà :
+
+```bash
+# Lister tous les réseaux
+docker network ls
+
+# Si vous voyez "anemone_anemone-net" ou similaire, supprimez-le
+docker network rm anemone_anemone-net
+
+# Puis redémarrer
+docker compose up -d
+```
+
+**Note pour les anciennes installations** : Si vous migrez depuis une version antérieure avec un subnet fixe, le docker-compose.yml a été simplifié. Docker choisit automatiquement un subnet libre.
+
+---
+
 ## Erreur : "Erreur lors du chiffrement" lors du setup
 
 ### Symptôme
