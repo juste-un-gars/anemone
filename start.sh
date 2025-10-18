@@ -93,21 +93,32 @@ echo ""
 # Demander l'adresse IP VPN locale
 echo -e "${BLUE}🔢 Adresse IP VPN locale${NC}"
 echo -e "${YELLOW}   Chaque serveur Anemone doit avoir une IP unique dans le réseau VPN${NC}"
-echo -e "${YELLOW}   Format: 10.8.0.X/24 (où X est unique pour chaque serveur)${NC}"
-echo -e "${YELLOW}   Premier serveur: 10.8.0.1/24, Deuxième: 10.8.0.2/24, etc.${NC}"
+echo -e "${YELLOW}   Format: 10.X.Y.Z/24 (réseau privé en /24)${NC}"
+echo -e "${YELLOW}   Exemples: 10.8.0.1/24, 10.9.0.1/24, 192.168.100.1/24${NC}"
 while true; do
     read -p "   IP VPN [10.8.0.1/24]: " VPN_ADDRESS
     VPN_ADDRESS=${VPN_ADDRESS:-10.8.0.1/24}
 
-    # Valider le format IP/masque
-    if [[ "$VPN_ADDRESS" =~ ^10\.8\.0\.[0-9]{1,3}/24$ ]]; then
-        # Extraire l'octet final
-        VPN_OCTET=$(echo "$VPN_ADDRESS" | cut -d'.' -f4 | cut -d'/' -f1)
-        if [ "$VPN_OCTET" -ge 1 ] && [ "$VPN_OCTET" -le 254 ]; then
+    # Valider le format IP/masque (accepter 10.x.x.x/24, 192.168.x.x/24, 172.16-31.x.x/24)
+    if [[ "$VPN_ADDRESS" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/[0-9]{1,2}$ ]]; then
+        # Extraire les octets
+        IFS='.' read -r O1 O2 O3 O4_MASK <<< "$VPN_ADDRESS"
+        O4=$(echo "$O4_MASK" | cut -d'/' -f1)
+        MASK=$(echo "$O4_MASK" | cut -d'/' -f2)
+
+        # Vérifier que c'est une IP privée valide
+        if ([ "$O1" -eq 10 ] || \
+            ([ "$O1" -eq 192 ] && [ "$O2" -eq 168 ]) || \
+            ([ "$O1" -eq 172 ] && [ "$O2" -ge 16 ] && [ "$O2" -le 31 ])) && \
+           [ "$O1" -ge 0 ] && [ "$O1" -le 255 ] && \
+           [ "$O2" -ge 0 ] && [ "$O2" -le 255 ] && \
+           [ "$O3" -ge 0 ] && [ "$O3" -le 255 ] && \
+           [ "$O4" -ge 1 ] && [ "$O4" -le 254 ] && \
+           [ "$MASK" -ge 8 ] && [ "$MASK" -le 30 ]; then
             break
         fi
     fi
-    echo -e "${RED}   ⚠  Format invalide. Utilisez 10.8.0.X/24 (X entre 1 et 254)${NC}"
+    echo -e "${RED}   ⚠  Format invalide. Utilisez une IP privée avec masque (ex: 10.9.0.1/24)${NC}"
 done
 echo ""
 
