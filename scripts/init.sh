@@ -35,20 +35,22 @@ echo ""
 
 echo -e "${BLUE}[3/5]${NC} Génération clés WireGuard..."
 if [ ! -f config/wireguard/private.key ]; then
-    # Méthode 1: Utiliser wg si disponible (méthode officielle)
+    # Méthode 1: Utiliser wg si disponible sur le host (méthode officielle)
     if command -v wg &> /dev/null; then
         wg genkey | tee config/wireguard/private.key | wg pubkey > config/wireguard/public.key
         chmod 600 config/wireguard/private.key
         chmod 644 config/wireguard/public.key
         echo -e "${GREEN}✓ Clés WireGuard générées (via wg)${NC}"
-    # Méthode 2: Utiliser OpenSSL (rapide, sans dépendance réseau)
+    # Méthode 2: Utiliser l'image Docker WireGuard (toujours correct)
     else
-        openssl rand -base64 32 > config/wireguard/private.key
-        # Calculer la clé publique (approximation compatible WireGuard)
-        cat config/wireguard/private.key | openssl base64 -d | openssl dgst -sha256 -binary | openssl base64 > config/wireguard/public.key
+        echo -e "${YELLOW}⚠ 'wg' non disponible sur le host, utilisation de Docker...${NC}"
+        # Générer la clé privée
+        docker run --rm linuxserver/wireguard:latest wg genkey > config/wireguard/private.key
+        # Générer la clé publique correspondante
+        cat config/wireguard/private.key | docker run --rm -i linuxserver/wireguard:latest wg pubkey > config/wireguard/public.key
         chmod 600 config/wireguard/private.key
         chmod 644 config/wireguard/public.key
-        echo -e "${GREEN}✓ Clés WireGuard générées (via OpenSSL)${NC}"
+        echo -e "${GREEN}✓ Clés WireGuard générées (via Docker)${NC}"
     fi
 else
     echo -e "${YELLOW}⚠ Clés déjà présentes${NC}"
