@@ -218,11 +218,14 @@ echo ""
 
 echo ""
 echo -e "${BLUE}🔧 Génération de la configuration WireGuard...${NC}"
+# Créer le répertoire wg_confs si nécessaire
+mkdir -p config/wg_confs
+
 # Vérifier si les clés existent
 if [ -f config/wireguard/private.key ]; then
-    # Générer wg0.conf depuis config.yaml
-    if python3 scripts/generate-wireguard-config.py config/config.yaml config/wireguard/wg0.conf 2>/dev/null; then
-        echo -e "${GREEN}✓ wg0.conf généré${NC}"
+    # Générer wg0.conf depuis config.yaml (dans wg_confs pour linuxserver/wireguard)
+    if python3 scripts/generate-wireguard-config.py config/config.yaml config/wg_confs/wg0.conf 2>/dev/null; then
+        echo -e "${GREEN}✓ wg0.conf généré dans config/wg_confs/${NC}"
     else
         echo -e "${YELLOW}⚠  Erreur lors de la génération de wg0.conf (sera régénéré automatiquement)${NC}"
     fi

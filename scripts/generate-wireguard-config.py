@@ -32,9 +32,16 @@ def generate_wg_config(config_path="/config/config.yaml", output_path="/config/w
     wireguard_config = config.get('wireguard', {})
     peers = config.get('peers', [])
 
-    # Lire la clé privée (essayer chemin relatif et absolu)
+    # Lire la clé privée (chercher dans les chemins possibles)
     private_key_path = None
-    for path in [Path("config/wireguard/private.key"), Path("/config/wireguard/private.key")]:
+    possible_paths = [
+        Path("config/wireguard/private.key"),
+        Path("/config/wireguard/private.key"),
+        Path("config/wg_confs/privatekey"),  # Parfois stocké ici aussi
+        Path("/config/wg_confs/privatekey")
+    ]
+
+    for path in possible_paths:
         if path.exists():
             private_key_path = path
             break
@@ -87,7 +94,8 @@ def generate_wg_config(config_path="/config/config.yaml", output_path="/config/w
 
 if __name__ == "__main__":
     config_file = sys.argv[1] if len(sys.argv) > 1 else "/config/config.yaml"
-    output_file = sys.argv[2] if len(sys.argv) > 2 else "/config/wireguard/wg0.conf"
+    # L'image linuxserver/wireguard lit depuis /config/wg_confs/
+    output_file = sys.argv[2] if len(sys.argv) > 2 else "/config/wg_confs/wg0.conf"
 
     try:
         generate_wg_config(config_file, output_file)

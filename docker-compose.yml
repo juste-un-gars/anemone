@@ -10,7 +10,7 @@ services:
       - PGID=1000
       - TZ=${TIMEZONE:-Europe/Paris}
     volumes:
-      - ./config/wireguard:/config
+      - ./config:/config
       - /lib/modules:/lib/modules:ro
     ports:
       - "51820:51820/udp"

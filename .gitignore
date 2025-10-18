@@ -2,6 +2,7 @@
 .env
 config/config.yaml
 config/wireguard/
+config/wg_confs/
 config/ssh/
 config/samba/
 
