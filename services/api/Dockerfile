@@ -1,6 +1,6 @@
 FROM python:3.11-alpine
 
-RUN apk add --no-cache gcc musl-dev libffi-dev openssl-dev curl
+RUN apk add --no-cache gcc musl-dev libffi-dev openssl-dev curl docker-cli
 
 WORKDIR /app
 
