@@ -112,6 +112,8 @@ services:
       - CONFIG_PATH=/config/config.yaml
       - LOG_PATH=/logs
       - TZ=${TIMEZONE:-Europe/Paris}
+      - WEB_LANGUAGE=${WEB_LANGUAGE:-fr}
+      - WEB_PASSWORD=${WEB_PASSWORD:-}
     volumes:
       - ./config:/config
       - ./logs:/logs:ro

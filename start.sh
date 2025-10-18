@@ -157,6 +157,43 @@ read -p "   Timezone [Europe/Paris]: " TIMEZONE
 TIMEZONE=${TIMEZONE:-Europe/Paris}
 echo ""
 
+# Demander la langue de l'interface web
+echo -e "${BLUE}🌍 Langue de l'interface web${NC}"
+echo -e "${YELLOW}   1) Français${NC}"
+echo -e "${YELLOW}   2) English${NC}"
+read -p "   Choix [1]: " LANG_CHOICE
+LANG_CHOICE=${LANG_CHOICE:-1}
+case $LANG_CHOICE in
+    2) WEB_LANGUAGE="en" ;;
+    *) WEB_LANGUAGE="fr" ;;
+esac
+echo ""
+
+# Demander si protection par mot de passe
+echo -e "${BLUE}🔒 Protection de l'interface web (optionnel)${NC}"
+echo -e "${YELLOW}   Voulez-vous protéger l'accès au dashboard web avec un mot de passe ?${NC}"
+echo -e "${YELLOW}   (Recommandé si accessible depuis Internet)${NC}"
+read -p "   Activer la protection ? [o/N]: " WEB_PROTECT
+WEB_PASSWORD=""
+if [[ "$WEB_PROTECT" =~ ^[oOyY]$ ]]; then
+    while true; do
+        read -s -p "   Mot de passe web: " WEB_PASSWORD
+        echo ""
+        if [ -z "$WEB_PASSWORD" ]; then
+            echo -e "${RED}   ⚠  Le mot de passe ne peut pas être vide${NC}"
+            continue
+        fi
+        read -s -p "   Confirmer le mot de passe: " WEB_PASSWORD_CONFIRM
+        echo ""
+        if [ "$WEB_PASSWORD" = "$WEB_PASSWORD_CONFIRM" ]; then
+            break
+        else
+            echo -e "${RED}   ⚠  Les mots de passe ne correspondent pas${NC}"
+        fi
+    done
+fi
+echo ""
+
 # Mettre à jour .env
 echo -e "${BLUE}💾 Mise à jour de la configuration...${NC}"
 if [ -f .env ]; then
@@ -166,6 +203,8 @@ if [ -f .env ]; then
     sed -i "s/^WEBDAV_USER=.*/WEBDAV_USER=${USERNAME}/" .env
     sed -i "s/^WEBDAV_PASSWORD=.*/WEBDAV_PASSWORD=${PASSWORD}/" .env
     sed -i "s|^TIMEZONE=.*|TIMEZONE=${TIMEZONE}|" .env
+    sed -i "s|^WEB_LANGUAGE=.*|WEB_LANGUAGE=${WEB_LANGUAGE}|" .env
+    sed -i "s|^WEB_PASSWORD=.*|WEB_PASSWORD=${WEB_PASSWORD}|" .env
     echo -e "${GREEN}✓ Fichier .env mis à jour${NC}"
 else
     echo -e "${RED}✗ Fichier .env introuvable${NC}"
@@ -214,6 +253,12 @@ else
 fi
 echo -e "  Mode backup   : ${GREEN}${BACKUP_MODE}${NC}"
 echo -e "  Timezone      : ${GREEN}${TIMEZONE}${NC}"
+echo -e "  Langue web    : ${GREEN}${WEB_LANGUAGE}${NC}"
+if [ -n "$WEB_PASSWORD" ]; then
+    echo -e "  Protection web: ${GREEN}activée${NC}"
+else
+    echo -e "  Protection web: ${YELLOW}désactivée${NC}"
+fi
 echo ""
 
 echo ""

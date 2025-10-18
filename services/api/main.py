@@ -8,11 +8,12 @@ import yaml
 import subprocess
 import secrets
 import shutil
+import base64
 from datetime import datetime
 from pathlib import Path
 from typing import Dict
 from fastapi import FastAPI, HTTPException, Form, Request, Body
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse, Response
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -23,9 +24,13 @@ from cryptography.hazmat.backends import default_backend
 from typing import Optional, List
 from peer_manager import PeerManager
 from crypto_utils import generate_random_pin, validate_pin
+from translations import get_all_texts
 
 # Configuration
 CONFIG_PATH = os.getenv('CONFIG_PATH', '/config/config.yaml')
+WEB_LANGUAGE = os.getenv('WEB_LANGUAGE', 'fr').lower()
+if WEB_LANGUAGE not in ['fr', 'en']:
+    WEB_LANGUAGE = 'fr'
 SETUP_COMPLETED = Path('/config/.setup-completed')
 RESTIC_ENCRYPTED = Path('/config/.restic.encrypted')
 RESTIC_SALT = Path('/config/.restic.salt')
@@ -127,19 +132,57 @@ def encrypt_restic_key(key: str) -> bool:
 
 # ===== Middleware =====
 
+class BasicAuthMiddleware(BaseHTTPMiddleware):
+    """HTTP Basic Authentication (optionnel, activé si WEB_PASSWORD est défini)"""
+    async def dispatch(self, request: Request, call_next):
+        web_password = os.getenv('WEB_PASSWORD', '').strip()
+
+        # Si pas de mot de passe configuré, passer
+        if not web_password:
+            return await call_next(request)
+
+        # Vérifier l'en-tête Authorization
+        auth_header = request.headers.get('Authorization')
+
+        if not auth_header or not auth_header.startswith('Basic '):
+            return Response(
+                content='Authentication required',
+                status_code=401,
+                headers={'WWW-Authenticate': 'Basic realm="Anemone"'}
+            )
+
+        try:
+            # Décoder les credentials (format: "Basic base64(username:password)")
+            credentials = base64.b64decode(auth_header[6:]).decode('utf-8')
+            username, password = credentials.split(':', 1)
+
+            # Vérifier le mot de passe (username ignoré, seul le mot de passe compte)
+            if password == web_password:
+                return await call_next(request)
+        except:
+            pass
+
+        # Credentials invalides
+        return Response(
+            content='Invalid credentials',
+            status_code=401,
+            headers={'WWW-Authenticate': 'Basic realm="Anemone"'}
+        )
+
 class SetupMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
-        
+
         if not is_setup_completed() and not path.startswith('/setup'):
             return RedirectResponse('/setup', status_code=302)
-        
+
         if is_setup_completed() and path.startswith('/setup'):
             return RedirectResponse('/', status_code=302)
-        
+
         return await call_next(request)
 
 app.add_middleware(SetupMiddleware)
+app.add_middleware(BasicAuthMiddleware)
 
 # ===== Routes Setup =====
 
@@ -354,6 +397,7 @@ def load_config() -> Dict:
 async def root():
     config = load_config()
     name = config.get('node', {}).get('name', 'Anemone')
+    t = get_all_texts(WEB_LANGUAGE)
     html = f"""<!DOCTYPE html>
 <html><head><title>🪸 {name}</title>
 <meta charset="utf-8">
@@ -367,13 +411,14 @@ body {{
     padding: 20px;
 }}
 .container {{ max-width: 1200px; margin: 0 auto; }}
-.header {{ text-align: center; color: white; margin-bottom: 40px; }}
+.header {{ text-align: center; color: white; margin-bottom: 30px; }}
 .header h1 {{ font-size: 2.5em; margin-bottom: 10px; }}
 .nav {{
     display: flex;
     gap: 10px;
     justify-content: center;
     margin-bottom: 30px;
+    flex-wrap: wrap;
 }}
 .nav a {{
     background: rgba(255,255,255,0.2);
@@ -382,8 +427,10 @@ body {{
     border-radius: 8px;
     text-decoration: none;
     transition: all 0.3s;
+    font-weight: 500;
 }}
 .nav a:hover {{ background: rgba(255,255,255,0.3); transform: translateY(-2px); }}
+.nav a.active {{ background: rgba(255,255,255,0.4); font-weight: 600; }}
 .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }}
 .card {{
     background: white;
@@ -417,37 +464,52 @@ body {{
 <div class="container">
     <div class="header">
         <h1>🪸 {name}</h1>
-        <p>Serveur de fichiers distribué et chiffré</p>
+        <p>{t['dashboard_title']}</p>
     </div>
 
     <div class="nav">
-        <a href="/peers">👥 Pairs</a>
-        <a href="/api/status">📊 API Status</a>
-        <a href="/docs">📚 Documentation</a>
+        <a href="/" class="active">🏠 {t['home']}</a>
+        <a href="/peers">👥 {t['peers']}</a>
+        <a href="/api/status">📊 {t['api_status']}</a>
     </div>
 
     <div class="grid">
         <!-- VPN Status -->
         <div class="card">
-            <h2>🔒 Statut VPN</h2>
-            <div id="vpn-status" class="loading">Chargement...</div>
+            <h2>🔒 {t['vpn_status']}</h2>
+            <div id="vpn-status" class="loading">{t['loading']}</div>
         </div>
 
         <!-- Storage -->
         <div class="card">
-            <h2>💾 Stockage</h2>
-            <div id="storage-stats" class="loading">Chargement...</div>
+            <h2>💾 {t['storage']}</h2>
+            <div id="storage-stats" class="loading">{t['loading']}</div>
         </div>
 
         <!-- Disk Usage -->
         <div class="card">
-            <h2>💿 Disque</h2>
-            <div id="disk-stats" class="loading">Chargement...</div>
+            <h2>💿 {t['disk']}</h2>
+            <div id="disk-stats" class="loading">{t['loading']}</div>
         </div>
     </div>
 </div>
 
 <script>
+// Traductions injectées côté serveur
+const t = {{
+    status: "{t['status']}",
+    active: "{t['active']}",
+    inactive: "{t['inactive']}",
+    connected_peers: "{t['connected_peers']}",
+    data_local: "{t['data_local']}",
+    backup_saved: "{t['backup_saved']}",
+    backups_received: "{t['backups_received']}",
+    total: "{t['total']}",
+    used: "{t['used']}",
+    free: "{t['free']}",
+    loading_error: "{t['loading_error']}"
+}};
+
 async function loadStats() {{
     try {{
         const res = await fetch('/api/system/stats');
@@ -456,13 +518,13 @@ async function loadStats() {{
         // VPN Status
         const vpnHtml = `
             <div class="stat">
-                <span class="stat-label">État</span>
+                <span class="stat-label">${{t.status}}</span>
                 <span class="status ${{data.vpn.status === 'up' ? 'status-up' : 'status-down'}}">
-                    ${{data.vpn.status === 'up' ? '🟢 Actif' : '🔴 Inactif'}}
+                    ${{data.vpn.status === 'up' ? '🟢 ' + t.active : '🔴 ' + t.inactive}}
                 </span>
             </div>
             <div class="stat">
-                <span class="stat-label">Pairs connectés</span>
+                <span class="stat-label">${{t.connected_peers}}</span>
                 <span class="stat-value">${{data.vpn.peers_connected}}</span>
             </div>
         `;
@@ -471,19 +533,19 @@ async function loadStats() {{
         // Storage Stats
         const storageHtml = `
             <div class="stat">
-                <span class="stat-label">📁 Data (local)</span>
+                <span class="stat-label">📁 ${{t.data_local}}</span>
                 <span class="stat-value">${{data.storage.data.formatted}}</span>
             </div>
             <div class="stat">
-                <span class="stat-label">💼 Backup (sauvegardé)</span>
+                <span class="stat-label">💼 ${{t.backup_saved}}</span>
                 <span class="stat-value">${{data.storage.backup.formatted}}</span>
             </div>
             <div class="stat">
-                <span class="stat-label">📦 Backups (reçus)</span>
+                <span class="stat-label">📦 ${{t.backups_received}}</span>
                 <span class="stat-value">${{data.storage.backups.formatted}}</span>
             </div>
             <div class="stat" style="margin-top:8px; padding-top:16px; border-top:2px solid #eee">
-                <span class="stat-label"><strong>Total</strong></span>
+                <span class="stat-label"><strong>${{t.total}}</strong></span>
                 <span class="stat-value"><strong>${{data.storage.total.formatted}}</strong></span>
             </div>
         `;
@@ -493,31 +555,32 @@ async function loadStats() {{
         const diskPercent = data.disk.percent;
         const diskHtml = `
             <div class="stat">
-                <span class="stat-label">Utilisé</span>
+                <span class="stat-label">${{t.used}}</span>
                 <span class="stat-value">${{data.disk.used.formatted}}</span>
             </div>
             <div class="stat">
-                <span class="stat-label">Libre</span>
+                <span class="stat-label">${{t.free}}</span>
                 <span class="stat-value">${{data.disk.free.formatted}}</span>
             </div>
             <div class="stat">
-                <span class="stat-label">Total</span>
+                <span class="stat-label">${{t.total}}</span>
                 <span class="stat-value">${{data.disk.total.formatted}}</span>
             </div>
             <div class="progress">
                 <div class="progress-bar" style="width: ${{diskPercent}}%"></div>
             </div>
             <div style="text-align:center; margin-top:8px; color:#666; font-size:0.9em">
-                ${{diskPercent}}% utilisé
+                ${{diskPercent}}% ${{t.used.toLowerCase()}}
             </div>
         `;
         document.getElementById('disk-stats').innerHTML = diskHtml;
 
     }} catch (err) {{
         console.error(err);
-        document.getElementById('vpn-status').innerHTML = '<p style="color:red">Erreur de chargement</p>';
-        document.getElementById('storage-stats').innerHTML = '<p style="color:red">Erreur de chargement</p>';
-        document.getElementById('disk-stats').innerHTML = '<p style="color:red">Erreur de chargement</p>';
+        const errorMsg = '<p style="color:red">' + t.loading_error + '</p>';
+        document.getElementById('vpn-status').innerHTML = errorMsg;
+        document.getElementById('storage-stats').innerHTML = errorMsg;
+        document.getElementById('disk-stats').innerHTML = errorMsg;
     }}
 }}
 
@@ -549,7 +612,8 @@ async def get_status():
 @app.get("/peers", response_class=HTMLResponse)
 async def peers_page(request: Request):
     """Page de gestion des pairs"""
-    return templates.TemplateResponse("peers.html", {"request": request})
+    t = get_all_texts(WEB_LANGUAGE)
+    return templates.TemplateResponse("peers.html", {"request": request, "t": t})
 
 # ===== API Gestion des pairs =====
 

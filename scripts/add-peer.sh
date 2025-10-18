@@ -91,8 +91,29 @@ echo -e "${BLUE}[3/4]${NC} Création du dossier de backup..."
 mkdir -p backups/${PEER_NAME}
 echo -e "${GREEN}✓ Dossier backups/${PEER_NAME} créé${NC}"
 
+# Ajouter le peer au wg0.conf (CRITIQUE : c'est ce qui manquait !)
+echo -e "${BLUE}[4/5]${NC} Ajout dans wg0.conf..."
+if [ -f config/wg_confs/wg0.conf ]; then
+    # Backup du wg0.conf
+    cp config/wg_confs/wg0.conf config/wg_confs/wg0.conf.backup.$(date +%Y%m%d_%H%M%S)
+
+    # Ajouter la section [Peer]
+    cat >> config/wg_confs/wg0.conf <<EOFWG
+
+# Peer: ${PEER_NAME}
+[Peer]
+PublicKey = ${PEER_PUBKEY}
+AllowedIPs = ${PEER_IP}/32
+Endpoint = ${PEER_ENDPOINT}
+PersistentKeepalive = 25
+EOFWG
+    echo -e "${GREEN}✓ Peer ajouté dans wg0.conf${NC}"
+else
+    echo -e "${YELLOW}⚠ wg0.conf non trouvé - lancez d'abord init.sh${NC}"
+fi
+
 # Afficher les prochaines étapes
-echo -e "${BLUE}[4/4]${NC} Finalisation..."
+echo -e "${BLUE}[5/5]${NC} Finalisation..."
 echo ""
 echo -e "${GREEN}✅ Pair ${PEER_NAME} ajouté avec succès !${NC}"
 echo ""
@@ -110,8 +131,10 @@ echo "         port: 2222"
 echo "         user: \"restic\""
 echo "         path: \"/backups/$(whoami)\""
 echo ""
-echo "2. ${YELLOW}Redémarrer les services${NC} :"
-echo "   docker compose down && docker compose up -d"
+echo "2. ${YELLOW}Redémarrer WireGuard (OBLIGATOIRE pour appliquer wg0.conf)${NC} :"
+echo "   docker-compose restart wireguard"
+echo "   # Ou pour tout redémarrer :"
+echo "   # docker-compose down && docker-compose up -d"
 echo ""
 echo "3. ${YELLOW}Tester la connexion VPN${NC} :"
 echo "   docker exec anemone-wireguard wg show"

@@ -28,7 +28,7 @@ echo -e "${GREEN}✓ Docker installé${NC}"
 echo ""
 
 echo -e "${BLUE}[2/5]${NC} Création de la structure..."
-mkdir -p config/{wireguard,ssh,samba}
+mkdir -p config/{wireguard,wg_confs,ssh,samba}
 mkdir -p data backup backups logs services/{restic,api}
 echo -e "${GREEN}✓ Structure créée${NC}"
 echo ""
@@ -52,8 +52,51 @@ if [ ! -f config/wireguard/private.key ]; then
         chmod 644 config/wireguard/public.key
         echo -e "${GREEN}✓ Clés WireGuard générées (via Docker)${NC}"
     fi
+
+    # Créer le fichier wg0.conf avec les clés générées
+    echo -e "${BLUE}   → Création de wg0.conf...${NC}"
+    PRIVATE_KEY=$(cat config/wireguard/private.key)
+    cat > config/wg_confs/wg0.conf <<EOF
+[Interface]
+PrivateKey = ${PRIVATE_KEY}
+Address = 10.8.0.1/24
+ListenPort = 51820
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth+ -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth+ -j MASQUERADE
+
+# Ajoutez vos peers ici avec le format suivant :
+# [Peer]
+# PublicKey = CLE_PUBLIQUE_DU_PEER
+# AllowedIPs = 10.8.0.2/32
+# Endpoint = peer.duckdns.org:51820
+# PersistentKeepalive = 25
+EOF
+    chmod 600 config/wg_confs/wg0.conf
+    echo -e "${GREEN}   ✓ wg0.conf créé${NC}"
 else
     echo -e "${YELLOW}⚠ Clés déjà présentes${NC}"
+    # Vérifier si wg0.conf existe, sinon le créer
+    if [ ! -f config/wg_confs/wg0.conf ]; then
+        echo -e "${BLUE}   → Création de wg0.conf avec clés existantes...${NC}"
+        PRIVATE_KEY=$(cat config/wireguard/private.key)
+        cat > config/wg_confs/wg0.conf <<EOF
+[Interface]
+PrivateKey = ${PRIVATE_KEY}
+Address = 10.8.0.1/24
+ListenPort = 51820
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth+ -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth+ -j MASQUERADE
+
+# Ajoutez vos peers ici avec le format suivant :
+# [Peer]
+# PublicKey = CLE_PUBLIQUE_DU_PEER
+# AllowedIPs = 10.8.0.2/32
+# Endpoint = peer.duckdns.org:51820
+# PersistentKeepalive = 25
+EOF
+        chmod 600 config/wg_confs/wg0.conf
+        echo -e "${GREEN}   ✓ wg0.conf créé${NC}"
+    fi
 fi
 echo ""
 
