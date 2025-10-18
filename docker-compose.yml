@@ -21,10 +21,11 @@ services:
     networks:
       - anemone-net
     healthcheck:
-      test: ["CMD", "wg", "show"]
+      test: ["CMD", "sh", "-c", "wg show && ip addr show wg0 | grep -q 'inet '"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
 
   samba:
     image: dperson/samba:latest

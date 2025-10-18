@@ -13,6 +13,7 @@ RUN apk add --no-cache \
     py3-yaml \
     py3-cryptography \
     inotify-tools \
+    iproute2 \
     tzdata
 
 # watchdog n'est pas disponible via apk, donc on utilise pip avec --break-system-packages
