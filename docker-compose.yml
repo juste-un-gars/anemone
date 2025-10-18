@@ -86,6 +86,7 @@ services:
       context: ./services/restic
       dockerfile: Dockerfile
     container_name: anemone-restic
+    hostname: anemone-restic
     environment:
       - RESTIC_PASSWORD_FILE=/config/restic-password
       - CONFIG_PATH=/config/config.yaml
@@ -106,6 +107,7 @@ services:
       context: ./services/api
       dockerfile: Dockerfile
     container_name: anemone-api
+    hostname: anemone-api
     environment:
       - CONFIG_PATH=/config/config.yaml
       - LOG_PATH=/logs
