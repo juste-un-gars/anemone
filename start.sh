@@ -145,6 +145,31 @@ case $BACKUP_MODE_CHOICE in
 esac
 echo ""
 
+# Demander l'espace disque alloué par pair
+echo -e "${BLUE}💿 Espace disque alloué par pair pour les backups${NC}"
+echo -e "${YELLOW}   Chaque pair pourra stocker ses backups chez vous jusqu'à cette limite${NC}"
+echo -e "${YELLOW}   1)   5 GB${NC}"
+echo -e "${YELLOW}   2)  10 GB${NC}"
+echo -e "${YELLOW}   3)  20 GB${NC}"
+echo -e "${YELLOW}   4)  50 GB${NC}"
+echo -e "${YELLOW}   5) 100 GB${NC}"
+echo -e "${YELLOW}   6) 200 GB${NC}"
+echo -e "${YELLOW}   7) 500 GB${NC}"
+echo -e "${YELLOW}   8) Illimité (non recommandé)${NC}"
+read -p "   Choix [2]: " DISK_QUOTA_CHOICE
+DISK_QUOTA_CHOICE=${DISK_QUOTA_CHOICE:-2}
+case $DISK_QUOTA_CHOICE in
+    1) MAX_SIZE_PER_PEER="5GB" ;;
+    3) MAX_SIZE_PER_PEER="20GB" ;;
+    4) MAX_SIZE_PER_PEER="50GB" ;;
+    5) MAX_SIZE_PER_PEER="100GB" ;;
+    6) MAX_SIZE_PER_PEER="200GB" ;;
+    7) MAX_SIZE_PER_PEER="500GB" ;;
+    8) MAX_SIZE_PER_PEER="0" ;;  # 0 = illimité
+    *) MAX_SIZE_PER_PEER="10GB" ;;
+esac
+echo ""
+
 # Demander la timezone
 echo -e "${BLUE}🕐 Fuseau horaire (timezone)${NC}"
 echo -e "${YELLOW}   Exemples courants:${NC}"
@@ -230,6 +255,9 @@ if [ -f config/config.yaml ]; then
     # Mettre à jour le mode de backup
     sed -i "s/^  mode: .*/  mode: \"${BACKUP_MODE}\"/" config/config.yaml
 
+    # Mettre à jour l'espace disque maximum par pair
+    sed -i "s/^  max_size_per_peer: .*/  max_size_per_peer: \"${MAX_SIZE_PER_PEER}\"/" config/config.yaml
+
     # Mettre à jour la timezone
     sed -i "s|^  timezone: .*|  timezone: \"${TIMEZONE}\"|" config/config.yaml
 
@@ -252,6 +280,7 @@ else
     echo -e "  Endpoint      : ${YELLOW}non configuré${NC}"
 fi
 echo -e "  Mode backup   : ${GREEN}${BACKUP_MODE}${NC}"
+echo -e "  Quota/pair    : ${GREEN}${MAX_SIZE_PER_PEER}${NC}"
 echo -e "  Timezone      : ${GREEN}${TIMEZONE}${NC}"
 echo -e "  Langue web    : ${GREEN}${WEB_LANGUAGE}${NC}"
 if [ -n "$WEB_PASSWORD" ]; then

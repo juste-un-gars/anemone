@@ -92,6 +92,7 @@ restic_server:
   port: 2222
   username: "restic"
   authorized_keys: []
+  max_size_per_peer: "10GB"  # Espace disque maximum par pair (5GB/10GB/20GB/50GB/100GB/200GB/500GB ou 0 pour illimité)
 
 monitoring:
   health_check_interval: 300
