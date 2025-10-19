@@ -95,7 +95,6 @@ services:
       - ${BACKUP_DATA_PATH:-./backup}:/backup:ro
       - ./config:/config:ro
       - ./logs:/logs
-      - ./services/restic/scripts:/scripts:ro
     depends_on:
       wireguard:
         condition: service_healthy
