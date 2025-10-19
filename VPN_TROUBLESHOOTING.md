@@ -34,6 +34,44 @@ Le script de diagnostic vous indiquera le problème exact. Voici les cas les plu
 
 ## 🛠️ Solutions par problème
 
+### Problème 0 : VPN fonctionne depuis WireGuard mais pas depuis Restic après restart
+
+**Symptôme** :
+```bash
+docker exec anemone-wireguard ping 10.8.0.2  # ✅ Fonctionne
+docker exec anemone-restic ping 10.8.0.2     # ❌ Network unreachable
+```
+
+**Cause** : Restic utilise `network_mode: "service:wireguard"` et partage le namespace réseau de WireGuard. Quand WireGuard redémarre, il crée un nouveau namespace réseau, mais Restic continue d'utiliser l'ancien namespace qui n'existe plus.
+
+**Solution rapide - Script** :
+```bash
+./scripts/restart-vpn.sh
+```
+
+**Solution rapide - Interface web** :
+1. Allez sur http://localhost:3000/
+2. Cliquez sur "Redémarrer VPN" (bouton en haut à droite)
+3. Attendez la confirmation
+
+**Solution manuelle** :
+```bash
+docker compose restart wireguard
+sleep 5
+docker compose restart restic
+
+# Vérifier
+docker exec anemone-restic ping -c 3 10.8.0.2
+```
+
+**Quand redémarrer le VPN** :
+- ✅ Après ajout d'un peer via l'interface web
+- ✅ Après modification manuelle de `config/wg_confs/wg0.conf`
+- ✅ Après changement d'endpoint d'un peer
+- ❌ Pas nécessaire après un simple `docker compose up -d` (démarrage normal)
+
+---
+
 ### Problème 1 : `wg0.conf` manquant
 
 **Symptôme** :

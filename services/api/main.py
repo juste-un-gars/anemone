@@ -892,6 +892,64 @@ async def get_vpn_status():
             "message": str(e)
         }
 
+@app.post("/api/vpn/restart")
+async def restart_vpn():
+    """Redémarre WireGuard puis Restic pour reconnecter au VPN
+
+    Nécessaire après ajout de peers ou modification de configuration WireGuard
+    car Restic utilise network_mode: "service:wireguard" et doit se reconnecter
+    au nouveau namespace réseau après un restart de WireGuard.
+    """
+    try:
+        import time
+
+        # Étape 1 : Redémarrer WireGuard
+        result_wg = subprocess.run(
+            ["docker", "restart", "anemone-wireguard"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result_wg.returncode != 0:
+            return {
+                "success": False,
+                "message": f"Erreur lors du redémarrage de WireGuard: {result_wg.stderr}"
+            }
+
+        # Étape 2 : Attendre 5 secondes que WireGuard soit complètement prêt
+        time.sleep(5)
+
+        # Étape 3 : Redémarrer Restic pour reconnecter au nouveau namespace
+        result_restic = subprocess.run(
+            ["docker", "restart", "anemone-restic"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result_restic.returncode != 0:
+            return {
+                "success": False,
+                "message": f"WireGuard redémarré, mais erreur lors du redémarrage de Restic: {result_restic.stderr}"
+            }
+
+        return {
+            "success": True,
+            "message": "VPN redémarré avec succès. WireGuard et Restic sont reconnectés."
+        }
+
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "message": "Timeout lors du redémarrage (>30s)"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Erreur inattendue: {str(e)}"
+        }
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=3000)
