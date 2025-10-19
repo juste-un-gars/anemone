@@ -18,22 +18,41 @@ if [ ! -f /config/.setup-completed ]; then
 fi
 
 # Déchiffrer la clé Restic
-echo "🔓 Decrypting Restic key..."
+echo "🔓 Loading Restic password..."
 
-if [ ! -f /config/.restic.encrypted ] || [ ! -f /config/.restic.salt ]; then
-    echo "❌ Encrypted key or salt not found"
+# Option 1: Mot de passe en clair (pour tests ou migration)
+if [ -f /config/restic-password ]; then
+    echo "📄 Using plaintext password file (legacy/test mode)"
+    export RESTIC_PASSWORD=$(cat /config/restic-password)
+
+    if [ -z "$RESTIC_PASSWORD" ]; then
+        echo "❌ Password file is empty"
+        exit 1
+    fi
+
+    echo "✅ Restic password loaded from plaintext file"
+
+# Option 2: Clé chiffrée (mode normal)
+elif [ -f /config/.restic.encrypted ] && [ -f /config/.restic.salt ]; then
+    echo "🔐 Decrypting encrypted password..."
+    export RESTIC_PASSWORD=$(python3 /scripts/decrypt_key.py)
+
+    if [ -z "$RESTIC_PASSWORD" ]; then
+        echo "❌ Failed to decrypt key"
+        echo "   If you need to use plaintext password, create: /config/restic-password"
+        exit 1
+    fi
+
+    echo "✅ Restic password decrypted"
+
+# Aucune méthode disponible
+else
+    echo "❌ No password found"
+    echo "   - Encrypted: /config/.restic.encrypted (not found)"
+    echo "   - Plaintext: /config/restic-password (not found)"
+    echo "   Please complete setup at http://localhost:3000/setup"
     exit 1
 fi
-
-# Déchiffrer avec Python cryptography
-export RESTIC_PASSWORD=$(python3 /scripts/decrypt_key.py)
-
-if [ -z "$RESTIC_PASSWORD" ]; then
-    echo "❌ Failed to decrypt key"
-    exit 1
-fi
-
-echo "✅ Restic key decrypted"
 
 # Copier clé SSH
 if [ -f /config/ssh/id_rsa ]; then
