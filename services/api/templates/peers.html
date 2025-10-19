@@ -261,6 +261,28 @@
                 <div id="add-result"></div>
             </div>
 
+            <!-- Section: Configuration Quota Global -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <h2>💾 Configuration du Quota Disque</h2>
+                <p style="color:#666; margin-bottom:16px">Espace disque maximum alloué par pair pour stocker leurs backups</p>
+
+                <div style="display:flex; gap:12px; align-items:center">
+                    <select id="quota-select" style="padding:10px; border:2px solid #dee2e6; border-radius:8px; font-size:14px">
+                        <option value="5GB">5 GB</option>
+                        <option value="10GB" selected>10 GB</option>
+                        <option value="20GB">20 GB</option>
+                        <option value="50GB">50 GB</option>
+                        <option value="100GB">100 GB</option>
+                        <option value="200GB">200 GB</option>
+                        <option value="500GB">500 GB</option>
+                        <option value="0">Illimité (non recommandé)</option>
+                    </select>
+                    <button class="btn" onclick="updateQuota()" style="width:auto; padding:10px 20px">Appliquer</button>
+                </div>
+
+                <div id="quota-result" style="margin-top:12px"></div>
+            </div>
+
             <!-- Section: Pairs connectés -->
             <div class="card" style="grid-column: 1 / -1;">
                 <h2>👥 {{ t['connected_peers_list'] }}</h2>
@@ -426,11 +448,42 @@
                     return;
                 }
 
+                // Charger les quotas de tous les pairs
+                const quotaRes = await fetch('/api/quotas/check');
+                const quotaData = await quotaRes.json();
+                const quotas = {};
+                if (quotaData.success && quotaData.quotas) {
+                    quotaData.quotas.forEach(q => {
+                        quotas[q.peer_name] = q;
+                    });
+                }
+
                 list.innerHTML = '';
                 for (const peer of data.peers) {
                     const status = await getPeerStatus(peer.name);
                     const statusClass = status.status === 'connected' ? 'status-connected' : 'status-disconnected';
                     const statusText = status.status === 'connected' ? '🟢 ' + t.connected : '🔴 ' + t.disconnected;
+
+                    // Récupérer les informations de quota pour ce pair
+                    const quota = quotas[peer.name];
+                    let quotaHtml = '';
+                    if (quota) {
+                        const percentage = quota.percentage || 0;
+                        const barColor = percentage > 90 ? '#dc3545' : percentage > 75 ? '#ffc107' : '#28a745';
+                        const quotaLabel = quota.unlimited ? 'Illimité' : `${quota.used_formatted} / ${quota.quota_formatted}`;
+
+                        quotaHtml = `
+                            <div style="margin-top:8px; font-size:0.85em">
+                                <div style="color:#666; margin-bottom:4px">💾 Stockage utilisé: ${quotaLabel}</div>
+                                ${!quota.unlimited ? `
+                                    <div style="background:#e9ecef; border-radius:4px; height:8px; overflow:hidden">
+                                        <div style="background:${barColor}; height:100%; width:${Math.min(percentage, 100)}%; transition:width 0.3s"></div>
+                                    </div>
+                                    <div style="color:${barColor}; font-size:0.9em; margin-top:2px">${percentage.toFixed(1)}%</div>
+                                ` : ''}
+                            </div>
+                        `;
+                    }
 
                     const li = document.createElement('li');
                     li.className = 'peer-item';
@@ -438,6 +491,7 @@
                         <div class="peer-info">
                             <div class="peer-name">${peer.name}</div>
                             <div class="peer-ip">${peer.vpn_ip} ${peer.endpoint !== 'N/A' ? '• ' + peer.endpoint : ''}</div>
+                            ${quotaHtml}
                         </div>
                         <div>
                             <span class="peer-status ${statusClass}">${statusText}</span>
@@ -590,9 +644,63 @@
             }
         }
 
+        // Charger la configuration du quota
+        async function loadQuotaConfig() {
+            try {
+                const res = await fetch('/api/quotas/config');
+                const data = await res.json();
+
+                if (data.success) {
+                    const select = document.getElementById('quota-select');
+                    select.value = data.max_size_per_peer;
+                }
+            } catch (err) {
+                console.error('Error loading quota config:', err);
+            }
+        }
+
+        // Mettre à jour le quota
+        async function updateQuota() {
+            try {
+                const select = document.getElementById('quota-select');
+                const maxSize = select.value;
+
+                const formData = new FormData();
+                formData.append('max_size_per_peer', maxSize);
+
+                const res = await fetch('/api/quotas/config', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await res.json();
+
+                const resultDiv = document.getElementById('quota-result');
+                if (data.success) {
+                    resultDiv.innerHTML = `<div style="color:#28a745; padding:12px; background:#d4edda; border-radius:8px">✓ ${data.message}</div>`;
+
+                    // Recharger la liste des pairs pour afficher les nouvelles barres de progression
+                    setTimeout(() => {
+                        loadPeers();
+                    }, 500);
+                } else {
+                    resultDiv.innerHTML = `<div style="color:#dc3545; padding:12px; background:#f8d7da; border-radius:8px">✗ Erreur: ${data.message || 'Mise à jour échouée'}</div>`;
+                }
+
+                // Effacer le message après 5 secondes
+                setTimeout(() => {
+                    resultDiv.innerHTML = '';
+                }, 5000);
+            } catch (err) {
+                const resultDiv = document.getElementById('quota-result');
+                resultDiv.innerHTML = `<div style="color:#dc3545; padding:12px; background:#f8d7da; border-radius:8px">✗ Erreur: ${err.message}</div>`;
+            }
+        }
+
         // Charger les pairs au démarrage
         loadPeers();
         loadVPNStatus();
+        loadQuotaConfig();
 
         // Rafraîchir le statut VPN toutes les 30 secondes
         setInterval(loadVPNStatus, 30000);

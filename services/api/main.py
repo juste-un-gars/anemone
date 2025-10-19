@@ -23,6 +23,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
 from typing import Optional, List
 from peer_manager import PeerManager
+from quota_manager import QuotaManager
 from crypto_utils import generate_random_pin, validate_pin
 from translations import get_all_texts
 
@@ -39,6 +40,9 @@ app = FastAPI(title="Anemone API", version="1.0.0")
 
 # Initialiser le gestionnaire de pairs
 peer_manager = PeerManager(config_path=CONFIG_PATH)
+
+# Initialiser le gestionnaire de quotas
+quota_manager = QuotaManager(config_path=CONFIG_PATH)
 
 # Templates
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -732,6 +736,111 @@ async def get_next_ip():
             "success": True,
             "next_ip": next_ip,
             "used_ips": used_ips
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Erreur: {str(e)}")
+
+# ===== API Quotas Disque =====
+
+@app.get("/api/quotas/check")
+async def check_quotas():
+    """Vérifie les quotas de tous les pairs"""
+    try:
+        quota_info = quota_manager.check_all_quotas()
+        return {
+            "success": True,
+            "quotas": quota_info
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Erreur: {str(e)}")
+
+@app.get("/api/quotas/check/{peer_name}")
+async def check_peer_quota(peer_name: str):
+    """Vérifie le quota d'un pair spécifique"""
+    try:
+        within_quota, info = quota_manager.check_peer_quota(peer_name)
+        return {
+            "success": True,
+            "quota": info
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Erreur: {str(e)}")
+
+@app.post("/api/quotas/enforce")
+async def enforce_quotas():
+    """Applique les quotas pour tous les pairs qui les dépassent"""
+    try:
+        quota_info = quota_manager.check_all_quotas()
+        enforced = []
+
+        for quota in quota_info:
+            if not quota['within_quota'] and not quota['unlimited']:
+                success = quota_manager.enforce_quota(quota['peer_name'])
+                if success:
+                    enforced.append(quota['peer_name'])
+
+        return {
+            "success": True,
+            "enforced_peers": enforced,
+            "message": f"{len(enforced)} pair(s) bloqué(s) pour dépassement de quota"
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Erreur: {str(e)}")
+
+@app.post("/api/quotas/restore/{peer_name}")
+async def restore_peer_access(peer_name: str):
+    """Restaure l'accès SSH pour un pair"""
+    try:
+        success = quota_manager.restore_access(peer_name)
+        return {
+            "success": success,
+            "message": f"Accès restauré pour {peer_name}" if success else "Aucune modification nécessaire"
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Erreur: {str(e)}")
+
+@app.get("/api/quotas/config")
+async def get_quota_config():
+    """Récupère la configuration actuelle du quota"""
+    try:
+        with open(CONFIG_PATH, 'r') as f:
+            config = yaml.safe_load(f)
+
+        max_size = config.get('restic_server', {}).get('max_size_per_peer', '10GB')
+        return {
+            "success": True,
+            "max_size_per_peer": max_size
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Erreur: {str(e)}")
+
+@app.post("/api/quotas/config")
+async def update_quota_config(max_size_per_peer: str = Form(...)):
+    """Met à jour la configuration du quota global"""
+    try:
+        # Valider la valeur
+        valid_values = ["5GB", "10GB", "20GB", "50GB", "100GB", "200GB", "500GB", "0"]
+        if max_size_per_peer not in valid_values:
+            raise ValueError(f"Valeur invalide. Doit être l'une de: {', '.join(valid_values)}")
+
+        # Charger la config actuelle
+        with open(CONFIG_PATH, 'r') as f:
+            config = yaml.safe_load(f)
+
+        # Mettre à jour
+        if 'restic_server' not in config:
+            config['restic_server'] = {}
+
+        config['restic_server']['max_size_per_peer'] = max_size_per_peer
+
+        # Sauvegarder
+        with open(CONFIG_PATH, 'w') as f:
+            yaml.dump(config, f, default_flow_style=False)
+
+        return {
+            "success": True,
+            "message": f"Quota mis à jour: {max_size_per_peer}",
+            "max_size_per_peer": max_size_per_peer
         }
     except Exception as e:
         raise HTTPException(500, f"Erreur: {str(e)}")

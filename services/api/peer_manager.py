@@ -176,8 +176,14 @@ class PeerManager:
         # Ajouter la clé SSH aux authorized_keys
         self._add_ssh_key(peer_info["ssh_pubkey"])
 
+        # Auto-créer le target de backup pour ce pair
+        self._add_backup_target(peer_info["node_name"], peer_info["vpn_ip"])
+
         # Redémarrer WireGuard pour appliquer les changements
         self._restart_wireguard()
+
+        # Redémarrer Restic pour qu'il prenne en compte les nouveaux targets
+        self._restart_restic()
 
         return {
             "name": peer_info["node_name"],
@@ -204,6 +210,86 @@ class PeerManager:
         # Ajouter la nouvelle clé
         with open(authorized_keys_path, 'a') as f:
             f.write(f"\n{ssh_pubkey}\n")
+
+    def _add_backup_target(self, peer_name: str, peer_vpn_ip: str):
+        """
+        Ajoute automatiquement un target de backup pour un pair
+
+        Args:
+            peer_name: Nom du pair
+            peer_vpn_ip: IP VPN du pair
+        """
+        # Récupérer le nom local du serveur
+        local_name = self.config.get('node', {}).get('name', 'anemone')
+
+        # Créer l'entrée de backup target
+        backup_target = {
+            "name": f"{peer_name}-backup",
+            "enabled": True,
+            "type": "sftp",
+            "host": peer_vpn_ip,
+            "port": 2222,
+            "user": "restic",
+            "path": f"/backups/{local_name}"
+        }
+
+        # Initialiser la section backup si nécessaire
+        if 'backup' not in self.config:
+            self.config['backup'] = {}
+
+        if 'targets' not in self.config['backup']:
+            self.config['backup']['targets'] = []
+
+        # Vérifier si le target existe déjà (éviter les doublons)
+        existing_targets = self.config['backup']['targets']
+        for target in existing_targets:
+            if target.get('name') == backup_target['name']:
+                print(f"✓ Backup target '{backup_target['name']}' already exists")
+                return
+
+        # Ajouter le nouveau target
+        self.config['backup']['targets'].append(backup_target)
+        self._save_config()
+
+        # Créer le répertoire pour recevoir les backups de ce pair
+        backup_receive_path = self.config.get('storage', {}).get('backup_receive_path', '/mnt/backups')
+        peer_backup_dir = Path(backup_receive_path) / peer_name
+        peer_backup_dir.mkdir(parents=True, exist_ok=True)
+
+        print(f"✓ Backup target '{backup_target['name']}' added")
+        print(f"✓ Backup directory created: {peer_backup_dir}")
+
+        # S'assurer que le conteneur SFTP est démarré
+        self._ensure_sftp_running()
+
+    def _ensure_sftp_running(self):
+        """Démarre le conteneur SFTP s'il n'est pas déjà en cours d'exécution"""
+        try:
+            # Vérifier si le conteneur SFTP existe et est en cours d'exécution
+            result = subprocess.run(
+                ["docker", "ps", "--filter", "name=anemone-sftp", "--format", "{{.Names}}"],
+                check=True,
+                capture_output=True,
+                text=True
+            )
+
+            if "anemone-sftp" in result.stdout:
+                print("✓ SFTP container already running")
+                return
+
+            # Le conteneur n'est pas en cours d'exécution, le démarrer
+            print("Starting SFTP container...")
+            subprocess.run(
+                ["docker", "compose", "up", "-d", "sftp"],
+                check=True,
+                capture_output=True,
+                cwd="/app"  # Le docker-compose.yml est à la racine du projet
+            )
+            print("✓ SFTP container started")
+
+        except subprocess.CalledProcessError as e:
+            print(f"ERROR starting SFTP container: {e}")
+            print(f"stderr: {e.stderr.decode() if e.stderr else 'N/A'}")
 
     def _regenerate_wireguard_config(self):
         """Régénère le fichier wg0.conf depuis config.yaml"""
@@ -233,6 +319,18 @@ class PeerManager:
             print("✓ WireGuard restarted")
         except subprocess.CalledProcessError as e:
             print(f"ERROR restarting WireGuard: {e}")
+
+    def _restart_restic(self):
+        """Redémarre le conteneur Restic pour qu'il prenne en compte les changements de config"""
+        try:
+            subprocess.run(
+                ["docker", "restart", "anemone-restic"],
+                check=True,
+                capture_output=True
+            )
+            print("✓ Restic restarted")
+        except subprocess.CalledProcessError as e:
+            print(f"ERROR restarting Restic: {e}")
 
     def list_peers(self) -> List[dict]:
         """Liste tous les pairs configurés"""
