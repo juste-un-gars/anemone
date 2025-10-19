@@ -128,6 +128,51 @@
         .hidden { display: none; }
         .actions { display: flex; gap: 10px; }
         .actions button { flex: 1; }
+
+        .vpn-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .vpn-header h2 { margin: 0; }
+        .btn-restart-vpn {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-restart-vpn:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(245,87,108,0.4); }
+        .btn-restart-vpn:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+        .spinner {
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 2px solid white;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .restart-message {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            animation: fadeIn 0.3s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body>
@@ -145,8 +190,15 @@
 
         <!-- Statut VPN -->
         <div class="card" style="margin-bottom:20px">
-            <h2>🔒 {{ t['wireguard_vpn_status'] }}</h2>
+            <div class="vpn-header">
+                <h2>🔒 {{ t['wireguard_vpn_status'] }}</h2>
+                <button class="btn-restart-vpn" onclick="restartVPN()" id="restart-vpn-btn">
+                    <span>🔄</span>
+                    <span id="restart-btn-text">{{ t.get('restart_vpn', 'Redémarrer VPN') }}</span>
+                </button>
+            </div>
             <div id="vpn-status-card" class="loading">{{ t['loading'] }}</div>
+            <div id="restart-message" class="hidden"></div>
         </div>
 
         <div class="grid">
@@ -479,6 +531,62 @@
                 }
             } catch (err) {
                 document.getElementById('vpn-status-card').innerHTML = `<div class="warning">${t.vpn_status_error}</div>`;
+            }
+        }
+
+        // Redémarrer le VPN (WireGuard + Restic)
+        async function restartVPN() {
+            const btn = document.getElementById('restart-vpn-btn');
+            const btnText = document.getElementById('restart-btn-text');
+            const messageDiv = document.getElementById('restart-message');
+
+            // Désactiver le bouton et afficher le spinner
+            btn.disabled = true;
+            btnText.innerHTML = '<div class="spinner"></div>';
+
+            // Afficher un message d'attente
+            messageDiv.className = 'restart-message';
+            messageDiv.style.background = '#fff3cd';
+            messageDiv.style.color = '#856404';
+            messageDiv.innerHTML = '⏳ Redémarrage en cours... (~10 secondes)';
+
+            try {
+                const response = await fetch('/api/vpn/restart', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Succès
+                    messageDiv.className = 'restart-message success';
+                    messageDiv.innerHTML = '✅ ' + data.message;
+
+                    // Recharger le statut VPN après 2 secondes
+                    setTimeout(() => {
+                        loadVPNStatus();
+                    }, 2000);
+                } else {
+                    // Erreur
+                    messageDiv.className = 'restart-message warning';
+                    messageDiv.innerHTML = '❌ ' + data.message;
+                }
+            } catch (error) {
+                messageDiv.className = 'restart-message warning';
+                messageDiv.innerHTML = '❌ Erreur de connexion: ' + error.message;
+            } finally {
+                // Réactiver le bouton
+                btn.disabled = false;
+                btnText.textContent = t.restart_vpn || 'Redémarrer VPN';
+
+                // Effacer le message après 10 secondes
+                setTimeout(() => {
+                    messageDiv.className = 'hidden';
+                    messageDiv.innerHTML = '';
+                }, 10000);
             }
         }
 

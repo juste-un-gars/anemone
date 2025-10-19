@@ -63,6 +63,7 @@ TRANSLATIONS = {
         "configured_tunnels": "Tunnels configurés",
         "vpn_inactive": "Le VPN WireGuard n'est pas actif. Vérifiez les logs du conteneur wireguard.",
         "vpn_status_error": "Erreur de chargement du statut VPN",
+        "restart_vpn": "Redémarrer VPN",
 
         # Alerts & Messages
         "pin_must_be_4_8": "Le PIN doit contenir entre 4 et 8 chiffres",
@@ -158,6 +159,7 @@ TRANSLATIONS = {
         "configured_tunnels": "Configured tunnels",
         "vpn_inactive": "WireGuard VPN is not active. Check wireguard container logs.",
         "vpn_status_error": "VPN status loading error",
+        "restart_vpn": "Restart VPN",
 
         # Alerts & Messages
         "pin_must_be_4_8": "PIN must contain between 4 and 8 digits",
