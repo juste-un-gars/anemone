@@ -21,9 +21,9 @@ def generate_restic_key():
 
 def encrypt_restic_key(key: str):
     """Chiffrer la clé Restic"""
-    # IMPORTANT : Utiliser le HOSTNAME (fixe et persistant) au lieu de UUID
-    # L'UUID change à chaque redémarrage du conteneur, rendant le déchiffrement impossible
-    system_key = os.getenv('HOSTNAME', 'anemone')
+    # IMPORTANT : Utiliser ANEMONE_SYSTEM_ID (partagé entre API et Restic) au lieu de HOSTNAME
+    # HOSTNAME diffère entre conteneurs à cause de network_mode: "service:wireguard"
+    system_key = os.getenv('ANEMONE_SYSTEM_ID', 'anemone')
 
     # Générer un salt
     salt = secrets.token_bytes(32)

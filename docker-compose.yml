@@ -90,6 +90,7 @@ services:
       - RESTIC_PASSWORD_FILE=/config/restic-password
       - CONFIG_PATH=/config/config.yaml
       - TZ=${TIMEZONE:-Europe/Paris}
+      - ANEMONE_SYSTEM_ID=${ANEMONE_SYSTEM_ID:-anemone}
     volumes:
       - ${BACKUP_DATA_PATH:-./backup}:/backup:ro
       - ./config:/config:ro
@@ -113,6 +114,7 @@ services:
       - TZ=${TIMEZONE:-Europe/Paris}
       - WEB_LANGUAGE=${WEB_LANGUAGE:-fr}
       - WEB_PASSWORD=${WEB_PASSWORD:-}
+      - ANEMONE_SYSTEM_ID=${ANEMONE_SYSTEM_ID:-anemone}
     volumes:
       - ./config:/config
       - ./logs:/logs:ro

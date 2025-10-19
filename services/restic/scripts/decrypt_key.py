@@ -12,9 +12,10 @@ from cryptography.hazmat.backends import default_backend
 
 
 def get_system_key():
-    """Get system key from HOSTNAME (persistent across container restarts)"""
-    # IMPORTANT : Ne PAS utiliser UUID qui change à chaque redémarrage
-    return os.getenv('HOSTNAME', 'anemone')
+    """Get system key from ANEMONE_SYSTEM_ID (shared between API and Restic containers)"""
+    # IMPORTANT : Utiliser ANEMONE_SYSTEM_ID (partagé entre API et Restic)
+    # HOSTNAME diffère entre conteneurs à cause de network_mode: "service:wireguard"
+    return os.getenv('ANEMONE_SYSTEM_ID', 'anemone')
 
 
 def decrypt_restic_key(encrypted_path: str, salt_path: str) -> str:

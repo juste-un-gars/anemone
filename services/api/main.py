@@ -49,9 +49,9 @@ def is_setup_completed() -> bool:
     return SETUP_COMPLETED.exists()
 
 def get_system_key() -> str:
-    # IMPORTANT : Utiliser le HOSTNAME (fixe et persistant) au lieu de UUID
-    # L'UUID change à chaque redémarrage du conteneur, rendant le déchiffrement impossible
-    return os.getenv('HOSTNAME', 'anemone')
+    # IMPORTANT : Utiliser ANEMONE_SYSTEM_ID (partagé entre API et Restic) au lieu de HOSTNAME
+    # HOSTNAME diffère entre conteneurs à cause de network_mode: "service:wireguard"
+    return os.getenv('ANEMONE_SYSTEM_ID', 'anemone')
 
 def generate_restic_key() -> str:
     return secrets.token_urlsafe(32)
