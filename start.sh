@@ -286,6 +286,26 @@ echo ""
 echo -e "${CYAN}🚀 Démarrage des conteneurs Docker...${NC}"
 docker compose up -d
 
+# Vérifier si la clé publique WireGuard est un placeholder et l'extraire du conteneur
+if [ -f config/wireguard/public.key ]; then
+    if grep -q "# Clé publique sera générée" config/wireguard/public.key 2>/dev/null; then
+        echo ""
+        echo -e "${YELLOW}⚠ Extraction de la clé publique WireGuard depuis le conteneur...${NC}"
+        sleep 3  # Attendre que le conteneur démarre complètement
+
+        if docker ps | grep -q anemone-wireguard; then
+            PUBKEY=$(docker exec anemone-wireguard sh -c "cat /config/wireguard/private.key | wg pubkey" 2>/dev/null || echo "")
+            if [ -n "$PUBKEY" ]; then
+                echo "$PUBKEY" > config/wireguard/public.key
+                echo -e "${GREEN}✓ Clé publique extraite : ${PUBKEY}${NC}"
+            else
+                echo -e "${YELLOW}⚠ Impossible d'extraire la clé publique maintenant${NC}"
+                echo -e "${YELLOW}  Vous pouvez l'extraire plus tard avec: ./scripts/extract-wireguard-pubkey.sh${NC}"
+            fi
+        fi
+    fi
+fi
+
 echo ""
 echo -e "${GREEN}✅ Anemone démarré !${NC}"
 echo ""

@@ -41,16 +41,25 @@ if [ ! -f config/wireguard/private.key ]; then
         chmod 600 config/wireguard/private.key
         chmod 644 config/wireguard/public.key
         echo -e "${GREEN}✓ Clés WireGuard générées (via wg)${NC}"
-    # Méthode 2: Utiliser l'image Docker WireGuard (toujours correct)
+    # Méthode 2: Utiliser l'image Docker WireGuard avec entrypoint spécifique
     else
         echo -e "${YELLOW}⚠ 'wg' non disponible sur le host, utilisation de Docker...${NC}"
-        # Générer la clé privée
-        docker run --rm linuxserver/wireguard:latest wg genkey > config/wireguard/private.key
+        # Générer la clé privée (contourner l'entrypoint par défaut)
+        docker run --rm --entrypoint wg linuxserver/wireguard:latest genkey > config/wireguard/private.key 2>/dev/null || {
+            # Si ça échoue, utiliser Python comme fallback
+            echo -e "${YELLOW}   → Fallback sur Python...${NC}"
+            python3 -c "import base64, os; print(base64.b64encode(os.urandom(32)).decode())" > config/wireguard/private.key
+        }
+
         # Générer la clé publique correspondante
-        cat config/wireguard/private.key | docker run --rm -i linuxserver/wireguard:latest wg pubkey > config/wireguard/public.key
+        docker run --rm --entrypoint wg -i linuxserver/wireguard:latest pubkey < config/wireguard/private.key > config/wireguard/public.key 2>/dev/null || {
+            # Si ça échoue aussi, créer un placeholder
+            echo "# Clé publique sera générée au démarrage du conteneur" > config/wireguard/public.key
+        }
+
         chmod 600 config/wireguard/private.key
         chmod 644 config/wireguard/public.key
-        echo -e "${GREEN}✓ Clés WireGuard générées (via Docker)${NC}"
+        echo -e "${GREEN}✓ Clés WireGuard générées${NC}"
     fi
 
     # Créer le fichier wg0.conf avec les clés générées
