@@ -34,7 +34,7 @@ services:
     
   sftp:
     enabled: false
-    port: 2222
+    port: 22222
     username: "anemone"
 
 wireguard:
@@ -66,7 +66,7 @@ backup:
     #   enabled: true
     #   type: "sftp"
     #   host: "10.8.0.2"
-    #   port: 2222
+    #   port: 22222
     #   user: "restic"
     #   path: "/backups/home"
   
@@ -89,7 +89,7 @@ backup:
 
 restic_server:
   enabled: true
-  port: 2222
+  port: 22222
   username: "restic"
   authorized_keys: []
   max_size_per_peer: "10GB"  # Espace disque maximum par pair (5GB/10GB/20GB/50GB/100GB/200GB/500GB ou 0 pour illimité)

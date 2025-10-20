@@ -223,12 +223,15 @@ class PeerManager:
         local_name = self.config.get('node', {}).get('name', 'anemone')
 
         # Créer l'entrée de backup target
+        # Utiliser le port configuré dans restic_server, sinon 22222 par défaut
+        sftp_port = self.config.get('restic_server', {}).get('port', 22222)
+
         backup_target = {
             "name": f"{peer_name}-backup",
             "enabled": True,
             "type": "sftp",
             "host": peer_vpn_ip,
-            "port": 2222,
+            "port": sftp_port,
             "user": "restic",
             "path": f"/backups/{local_name}"
         }
