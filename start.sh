@@ -170,6 +170,31 @@ case $DISK_QUOTA_CHOICE in
 esac
 echo ""
 
+# Demander si l'utilisateur veut les partages intégrés
+echo -e "${BLUE}📁 Partages de fichiers${NC}"
+echo -e "${YELLOW}   Voulez-vous utiliser les partages intégrés (Samba/WebDAV) ?${NC}"
+echo -e "${YELLOW}   - OUI : Anemone fournira les partages SMB et WebDAV${NC}"
+echo -e "${YELLOW}   - NON : Vous pourrez monter vos propres partages réseau externes${NC}"
+echo -e "${YELLOW}           (ex: \\\\serveur\\backup, NFS, etc.)${NC}"
+read -p "   Utiliser les partages intégrés ? [O/n]: " USE_INTEGRATED_SHARES
+USE_INTEGRATED_SHARES=${USE_INTEGRATED_SHARES:-O}
+
+if [[ "$USE_INTEGRATED_SHARES" =~ ^[Oo]$ ]]; then
+    ENABLE_SHARES="true"
+    COMPOSE_PROFILES="--profile shares"
+    echo -e "   ${GREEN}✓${NC} Partages intégrés activés (SMB sur port 445, WebDAV sur port 8080)"
+else
+    ENABLE_SHARES="false"
+    COMPOSE_PROFILES=""
+    echo -e "   ${GREEN}✓${NC} Partages intégrés désactivés"
+    echo -e "${YELLOW}   Vous devrez monter manuellement vos partages réseau sur :${NC}"
+    echo -e "${YELLOW}   - ./data (données locales uniquement)${NC}"
+    echo -e "${YELLOW}   - ./backup (données à sauvegarder)${NC}"
+    echo -e "${YELLOW}   - ./backups (backups reçus des pairs)${NC}"
+    echo -e "${YELLOW}   Documentation : voir EXTERNAL_SHARES.md${NC}"
+fi
+echo ""
+
 # Demander la timezone
 echo -e "${BLUE}🕐 Fuseau horaire (timezone)${NC}"
 echo -e "${YELLOW}   Exemples courants:${NC}"
@@ -313,7 +338,7 @@ docker compose build --no-cache
 
 echo ""
 echo -e "${CYAN}🚀 Démarrage des conteneurs Docker...${NC}"
-docker compose up -d
+docker compose $COMPOSE_PROFILES up -d
 
 # Vérifier si la clé publique WireGuard est un placeholder et l'extraire du conteneur
 if [ -f config/wireguard/public.key ]; then

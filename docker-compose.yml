@@ -1,20 +1,27 @@
 services:
-  wireguard:
-    image: linuxserver/wireguard:latest
-    container_name: anemone-wireguard
+  # ===== CORE : WireGuard VPN + SFTP Server + Restic Backup =====
+  core:
+    build:
+      context: ./services/core
+      dockerfile: Dockerfile
+    container_name: anemone-core
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
     environment:
-      - PUID=1000
-      - PGID=1000
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
       - TZ=${TIMEZONE:-Europe/Paris}
+      - CONFIG_PATH=/config/config.yaml
     volumes:
       - ./config:/config
+      - ${BACKUP_DATA_PATH:-./backup}:/mnt/backup
+      - ${BACKUP_RECEIVE_PATH:-./backups}:/home/restic/backups
+      - ./logs:/logs
       - /lib/modules:/lib/modules:ro
     ports:
-      - "51820:51820/udp"
-      - "${SFTP_PORT:-2222}:22"
+      - "51820:51820/udp"  # WireGuard VPN
+      - "${SFTP_PORT:-22222}:22"  # SFTP for receiving backups
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
       - net.ipv4.ip_forward=1
@@ -22,96 +29,54 @@ services:
     networks:
       - anemone-net
     healthcheck:
-      test: ["CMD", "sh", "-c", "wg show && ip addr show wg0 | grep -q 'inet '"]
+      test: ["CMD", "sh", "-c", "wg show && ss -tlnp | grep -q ':22'"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
 
-  samba:
-    image: dperson/samba:latest
-    container_name: anemone-samba
-    environment:
-      - USERID=${PUID:-1000}
-      - GROUPID=${PGID:-1000}
-      - TZ=${TIMEZONE:-Europe/Paris}
-      - WORKGROUP=${SMB_WORKGROUP:-WORKGROUP}
-    volumes:
-      - ${DATA_PATH:-./data}:/mount/data
-      - ${BACKUP_DATA_PATH:-./backup}:/mount/backup
-      - ./config/samba:/config
-    ports:
-      - "445:445"
-    command: >
-      -u "${SMB_USER:-anemone};${SMB_PASSWORD:-changeme}"
-      -s "data;/mount/data;yes;no;no;${SMB_USER:-anemone};${SMB_USER:-anemone}"
-      -s "backup;/mount/backup;yes;no;no;${SMB_USER:-anemone};${SMB_USER:-anemone}"
-    restart: unless-stopped
-    networks:
-      - anemone-net
-
-  webdav:
-    image: bytemark/webdav:latest
-    container_name: anemone-webdav
-    environment:
-      - AUTH_TYPE=Basic
-      - USERNAME=${WEBDAV_USER:-anemone}
-      - PASSWORD=${WEBDAV_PASSWORD:-changeme}
-      - TZ=${TIMEZONE:-Europe/Paris}
-    volumes:
-      - ${DATA_PATH:-./data}:/var/lib/dav/data
-      - ${BACKUP_DATA_PATH:-./backup}:/var/lib/dav/backup
-    ports:
-      - "${WEBDAV_PORT:-8080}:80"
-    restart: unless-stopped
-    networks:
-      - anemone-net
-
-  sftp:
-    image: atmoz/sftp:latest
-    container_name: anemone-sftp
-    volumes:
-      - ${BACKUP_RECEIVE_PATH:-./backups}:/home/restic/backups
-      - ./config/ssh/authorized_keys:/home/restic/.ssh/keys/authorized_keys:ro
-    command: restic:restic:1000:1000:backups
-    restart: unless-stopped
-    network_mode: "service:wireguard"
-    depends_on:
-      - wireguard
-
-  restic:
+  # ===== SHARES : Samba SMB + WebDAV (OPTIONNEL) =====
+  shares:
     build:
-      context: ./services/restic
+      context: ./services/shares
       dockerfile: Dockerfile
-    container_name: anemone-restic
+    container_name: anemone-shares
     environment:
-      - RESTIC_PASSWORD_FILE=/config/restic-password
-      - CONFIG_PATH=/config/config.yaml
       - TZ=${TIMEZONE:-Europe/Paris}
-      - ANEMONE_SYSTEM_ID=${ANEMONE_SYSTEM_ID:-anemone}
+      - SMB_USER=${SMB_USER:-anemone}
+      - SMB_PASSWORD=${SMB_PASSWORD:-changeme}
+      - SMB_WORKGROUP=${SMB_WORKGROUP:-WORKGROUP}
+      - WEBDAV_USER=${WEBDAV_USER:-anemone}
+      - WEBDAV_PASSWORD=${WEBDAV_PASSWORD:-changeme}
+      - WEBDAV_PORT=${WEBDAV_PORT:-8080}
     volumes:
-      - ${BACKUP_DATA_PATH:-./backup}:/backup:ro
-      - ./config:/config:ro
+      - ${DATA_PATH:-./data}:/mnt/data
+      - ${BACKUP_DATA_PATH:-./backup}:/mnt/backup
       - ./logs:/logs
-    depends_on:
-      wireguard:
-        condition: service_healthy
-    network_mode: "service:wireguard"
+    ports:
+      - "445:445"        # Samba SMB
+      - "139:139"        # Samba NetBIOS
+      - "${WEBDAV_PORT:-8080}:${WEBDAV_PORT:-8080}"  # WebDAV
     restart: unless-stopped
+    networks:
+      - anemone-net
+    profiles:
+      - shares  # Ce service ne démarre que si le profile 'shares' est activé
+    healthcheck:
+      test: ["CMD", "sh", "-c", "smbclient -L localhost -U% > /dev/null && wget -q --spider http://localhost:${WEBDAV_PORT:-8080}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
+  # ===== API : Interface Web =====
   api:
     build:
       context: ./services/api
       dockerfile: Dockerfile
     container_name: anemone-api
-    hostname: anemone-api
     environment:
       - CONFIG_PATH=/config/config.yaml
-      - LOG_PATH=/logs
-      - TZ=${TIMEZONE:-Europe/Paris}
       - WEB_LANGUAGE=${WEB_LANGUAGE:-fr}
       - WEB_PASSWORD=${WEB_PASSWORD:-}
-      - ANEMONE_SYSTEM_ID=${ANEMONE_SYSTEM_ID:-anemone}
     volumes:
       - ./config:/config
       - ./logs:/logs:ro
@@ -119,13 +84,16 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "${API_PORT:-3000}:3000"
-    depends_on:
-      - wireguard
-      - samba
-      - webdav
     restart: unless-stopped
+    depends_on:
+      - core
     networks:
       - anemone-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   anemone-net:
