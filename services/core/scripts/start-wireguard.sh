@@ -21,9 +21,8 @@ fi
 cp /config/wireguard/wg0.conf /etc/wireguard/wg0.conf
 chmod 600 /etc/wireguard/wg0.conf
 
-# Activer le forwarding IP
-sysctl -w net.ipv4.ip_forward=1
-sysctl -w net.ipv4.conf.all.src_valid_mark=1
+# Note: net.ipv4.ip_forward et net.ipv4.conf.all.src_valid_mark sont déjà configurés
+# par Docker via sysctls dans docker-compose.yml, pas besoin de sysctl -w ici
 
 # Démarrer WireGuard
 wg-quick up wg0
