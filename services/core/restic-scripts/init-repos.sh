@@ -15,47 +15,87 @@ fi
 
 CONFIG_PATH=${CONFIG_PATH:-/config/config.yaml}
 
-# Lire la configuration
-TARGETS=$(python3 -c "
+# Lire et initialiser les repositories
+python3 << 'PYTHON_SCRIPT'
 import yaml
+import subprocess
 import sys
+import os
+
+config_path = os.getenv('CONFIG_PATH', '/config/config.yaml')
+restic_password = os.getenv('RESTIC_PASSWORD')
+
+if not restic_password:
+    print('⚠️  RESTIC_PASSWORD not set, skipping repository initialization')
+    sys.exit(0)
 
 try:
-    with open('$CONFIG_PATH') as f:
+    with open(config_path) as f:
         config = yaml.safe_load(f)
         targets = config.get('backup', {}).get('targets', [])
-        for target in targets:
-            if target.get('enabled', True):
-                print(target['repository'])
+        enabled_targets = [t for t in targets if t.get('enabled', True)]
+
+    if not enabled_targets:
+        print('⚠️  No backup targets configured')
+        sys.exit(0)
+
+    print(f'  Found {len(enabled_targets)} target(s) to initialize')
+
+    for target in enabled_targets:
+        name = target.get('name', 'unknown')
+        host = target.get('host')
+        port = target.get('port', 22)
+        user = target.get('user', 'restic')
+        path = target.get('path', '/backups')
+
+        # Construire l'URL du repository
+        repo_url = f'sftp:{user}@{host}:{port}{path}'
+
+        print(f'\\n  Checking repository: {name}')
+        print(f'    URL: {repo_url}')
+
+        # Vérifier si le repository existe déjà
+        check_cmd = ['restic', '-r', repo_url, 'snapshots']
+
+        try:
+            result = subprocess.run(
+                check_cmd,
+                env={**os.environ, 'RESTIC_PASSWORD': restic_password},
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode == 0:
+                print(f'    ✓ Repository already initialized')
+            else:
+                # Repository n'existe pas, l'initialiser
+                print(f'    Initializing new repository...')
+                init_cmd = ['restic', '-r', repo_url, 'init']
+
+                result = subprocess.run(
+                    init_cmd,
+                    env={**os.environ, 'RESTIC_PASSWORD': restic_password},
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+
+                if result.returncode == 0:
+                    print(f'    ✓ Repository initialized successfully')
+                else:
+                    print(f'    ⚠️  Failed to initialize: {result.stderr}')
+                    print(f'    (will retry during backup)')
+
+        except subprocess.TimeoutExpired:
+            print(f'    ⏱️  Connection timeout (peer may not be reachable yet)')
+        except Exception as e:
+            print(f'    ⚠️  Error: {e}')
+
+    print('\\n✅ Repository initialization complete')
+
 except Exception as e:
-    print(f'Error reading config: {e}', file=sys.stderr)
+    print(f'❌ Error reading config: {e}', file=sys.stderr)
     sys.exit(1)
-")
 
-if [ -z "$TARGETS" ]; then
-    echo "⚠️  No backup targets configured"
-    exit 0
-fi
-
-# Initialiser chaque repository
-echo "$TARGETS" | while read -r REPO; do
-    if [ -z "$REPO" ]; then
-        continue
-    fi
-
-    echo "  Checking repository: $REPO"
-
-    # Vérifier si le repository existe déjà
-    if restic -r "$REPO" snapshots &>/dev/null; then
-        echo "  ✓ Repository already initialized: $REPO"
-    else
-        echo "  Initializing new repository: $REPO"
-        if restic -r "$REPO" init; then
-            echo "  ✓ Repository initialized: $REPO"
-        else
-            echo "  ⚠️  Failed to initialize: $REPO (will retry during backup)"
-        fi
-    fi
-done
-
-echo "✅ Repository initialization complete"
+PYTHON_SCRIPT

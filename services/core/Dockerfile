@@ -11,6 +11,7 @@ RUN apk add --no-cache \
     iproute2 \
     openrc \
     openssh-server \
+    openssh-client \
     restic \
     bash \
     curl \
@@ -30,7 +31,13 @@ RUN ssh-keygen -A && \
     adduser -D -s /bin/sh -u 1000 restic && \
     echo "restic:*" | chpasswd -e && \
     mkdir -p /home/restic/backups && \
-    chown -R restic:restic /home/restic
+    chown -R restic:restic /home/restic && \
+    mkdir -p /root/.ssh && \
+    chmod 700 /root/.ssh && \
+    echo "Host *" > /root/.ssh/config && \
+    echo "    StrictHostKeyChecking accept-new" >> /root/.ssh/config && \
+    echo "    UserKnownHostsFile /root/.ssh/known_hosts" >> /root/.ssh/config && \
+    chmod 600 /root/.ssh/config
 
 # Configuration SSHD pour SFTP
 RUN echo "Port 22" >> /etc/ssh/sshd_config && \
