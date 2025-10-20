@@ -1033,7 +1033,7 @@ async def restart_vpn():
         # Dans la v2.0, WireGuard, SFTP et Restic sont tous dans anemone-core
         # Le redémarrage du conteneur core suffit
         result_restic = subprocess.run(
-            ["docker", "exec", "anemone-core", "supervisorctl", "restart", "restic"],
+            ["docker", "exec", "anemone-core", "supervisorctl", "-c", "/etc/supervisord.conf", "restart", "restic"],
             capture_output=True,
             text=True,
             timeout=30
