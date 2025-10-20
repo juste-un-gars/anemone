@@ -54,6 +54,10 @@ RUN mkdir -p /data /config /logs /scripts /root/.ssh /var/run/wireguard
 COPY restic-scripts/ /scripts/
 RUN chmod +x /scripts/*.sh /scripts/*.py
 
+# Copier le script de génération WireGuard depuis la racine
+COPY ../../scripts/generate-wireguard-config.py /scripts/
+RUN chmod +x /scripts/generate-wireguard-config.py
+
 # Copier les scripts spécifiques à core
 COPY scripts/ /scripts/core/
 RUN chmod +x /scripts/core/*.sh

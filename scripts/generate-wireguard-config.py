@@ -94,8 +94,8 @@ def generate_wg_config(config_path="/config/config.yaml", output_path="/config/w
 
 if __name__ == "__main__":
     config_file = sys.argv[1] if len(sys.argv) > 1 else "/config/config.yaml"
-    # L'image linuxserver/wireguard lit depuis /config/wg_confs/
-    output_file = sys.argv[2] if len(sys.argv) > 2 else "/config/wg_confs/wg0.conf"
+    # Architecture v2.0 : WireGuard natif (Alpine) lit depuis /config/wireguard/
+    output_file = sys.argv[2] if len(sys.argv) > 2 else "/config/wireguard/wg0.conf"
 
     try:
         generate_wg_config(config_file, output_file)

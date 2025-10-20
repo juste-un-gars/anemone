@@ -3,10 +3,17 @@ set -e
 
 echo "🌐 Starting WireGuard VPN..."
 
-# Vérifier que la configuration existe
+# Générer la configuration WireGuard depuis config.yaml
+echo "📝 Generating WireGuard configuration from config.yaml..."
+if ! python3 /scripts/generate-wireguard-config.py /config/config.yaml /config/wireguard/wg0.conf; then
+    echo "❌ Failed to generate WireGuard configuration"
+    exit 1
+fi
+
+# Vérifier que la configuration existe maintenant
 if [ ! -f /config/wireguard/wg0.conf ]; then
     echo "❌ WireGuard configuration not found: /config/wireguard/wg0.conf"
-    echo "   Please run the initialization script first"
+    echo "   Configuration generation failed"
     exit 1
 fi
 
