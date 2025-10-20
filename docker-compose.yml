@@ -78,8 +78,6 @@ services:
     network_mode: "service:wireguard"
     depends_on:
       - wireguard
-    profiles:
-      - sftp-enabled
 
   restic:
     build:
