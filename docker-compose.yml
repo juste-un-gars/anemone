@@ -2,8 +2,8 @@ services:
   # ===== CORE : WireGuard VPN + SFTP Server + Restic Backup =====
   core:
     build:
-      context: ./services/core
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/core/Dockerfile
     container_name: anemone-core
     cap_add:
       - NET_ADMIN

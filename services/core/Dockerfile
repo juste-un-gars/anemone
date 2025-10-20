@@ -50,23 +50,23 @@ RUN echo "Port 22" >> /etc/ssh/sshd_config && \
 # Créer les répertoires nécessaires
 RUN mkdir -p /data /config /logs /scripts /root/.ssh /var/run/wireguard
 
-# Copier les scripts Restic existants
-COPY restic-scripts/ /scripts/
+# Copier les scripts Restic existants (depuis services/core/restic-scripts/)
+COPY services/core/restic-scripts/ /scripts/
 RUN chmod +x /scripts/*.sh /scripts/*.py
 
-# Copier le script de génération WireGuard depuis la racine
-COPY ../../scripts/generate-wireguard-config.py /scripts/
+# Copier le script de génération WireGuard depuis la racine du projet
+COPY scripts/generate-wireguard-config.py /scripts/
 RUN chmod +x /scripts/generate-wireguard-config.py
 
-# Copier les scripts spécifiques à core
-COPY scripts/ /scripts/core/
+# Copier les scripts spécifiques à core (depuis services/core/scripts/)
+COPY services/core/scripts/ /scripts/core/
 RUN chmod +x /scripts/core/*.sh
 
 # Copier la configuration supervisord
-COPY supervisord.conf /etc/supervisord.conf
+COPY services/core/supervisord.conf /etc/supervisord.conf
 
 # Copier l'entrypoint
-COPY entrypoint.sh /entrypoint.sh
+COPY services/core/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 WORKDIR /scripts
