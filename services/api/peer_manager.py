@@ -266,32 +266,27 @@ class PeerManager:
         self._ensure_sftp_running()
 
     def _ensure_sftp_running(self):
-        """Démarre le conteneur SFTP s'il n'est pas déjà en cours d'exécution"""
+        """Vérifie que le conteneur Core (qui contient SFTP) est en cours d'exécution"""
         try:
-            # Vérifier si le conteneur SFTP existe et est en cours d'exécution
+            # Dans la v2.0, SFTP est intégré dans anemone-core (avec WireGuard et Restic)
+            # Vérifier si le conteneur Core existe et est en cours d'exécution
             result = subprocess.run(
-                ["docker", "ps", "--filter", "name=anemone-sftp", "--format", "{{.Names}}"],
+                ["docker", "ps", "--filter", "name=anemone-core", "--format", "{{.Names}}"],
                 check=True,
                 capture_output=True,
                 text=True
             )
 
-            if "anemone-sftp" in result.stdout:
-                print("✓ SFTP container already running")
+            if "anemone-core" in result.stdout:
+                print("✓ Core container running (SFTP service integrated)")
                 return
 
-            # Le conteneur n'est pas en cours d'exécution, le démarrer
-            print("Starting SFTP container...")
-            subprocess.run(
-                ["docker", "compose", "up", "-d", "sftp"],
-                check=True,
-                capture_output=True,
-                cwd="/app"  # Le docker-compose.yml est à la racine du projet
-            )
-            print("✓ SFTP container started")
+            # Si le conteneur Core n'est pas en cours d'exécution, c'est un problème majeur
+            print("⚠️ WARNING: Core container is not running! SFTP service unavailable.")
+            print("   Please start the core container with: docker compose up -d core")
 
         except subprocess.CalledProcessError as e:
-            print(f"ERROR starting SFTP container: {e}")
+            print(f"ERROR checking Core container: {e}")
             print(f"stderr: {e.stderr.decode() if e.stderr else 'N/A'}")
 
     def _regenerate_wireguard_config(self):
@@ -315,25 +310,25 @@ class PeerManager:
         # Redémarrer le conteneur
         try:
             subprocess.run(
-                ["docker", "restart", "anemone-wireguard"],
+                ["docker", "restart", "anemone-core"],
                 check=True,
                 capture_output=True
             )
-            print("✓ WireGuard restarted")
+            print("✓ Core (WireGuard) restarted")
         except subprocess.CalledProcessError as e:
-            print(f"ERROR restarting WireGuard: {e}")
+            print(f"ERROR restarting Core: {e}")
 
     def _restart_restic(self):
-        """Redémarre le conteneur Restic pour qu'il prenne en compte les changements de config"""
+        """Redémarre le conteneur Core (qui contient Restic) pour qu'il prenne en compte les changements de config"""
         try:
             subprocess.run(
-                ["docker", "restart", "anemone-restic"],
+                ["docker", "restart", "anemone-core"],
                 check=True,
                 capture_output=True
             )
-            print("✓ Restic restarted")
+            print("✓ Core (Restic) restarted")
         except subprocess.CalledProcessError as e:
-            print(f"ERROR restarting Restic: {e}")
+            print(f"ERROR restarting Core: {e}")
 
     def list_peers(self) -> List[dict]:
         """Liste tous les pairs configurés"""
@@ -395,7 +390,7 @@ class PeerManager:
         # Tester la connectivité via ping
         try:
             result = subprocess.run(
-                ["docker", "exec", "anemone-wireguard", "ping", "-c", "1", "-W", "2", vpn_ip],
+                ["docker", "exec", "anemone-core", "ping", "-c", "1", "-W", "2", vpn_ip],
                 capture_output=True,
                 timeout=5
             )

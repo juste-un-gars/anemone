@@ -886,7 +886,7 @@ async def get_system_stats():
         vpn_status = "unknown"
         try:
             result = subprocess.run(
-                ["docker", "exec", "anemone-wireguard", "wg", "show"],
+                ["docker", "exec", "anemone-core", "wg", "show"],
                 capture_output=True,
                 timeout=5
             )
@@ -953,7 +953,7 @@ async def get_vpn_status():
     """Récupère le statut détaillé du VPN WireGuard"""
     try:
         result = subprocess.run(
-            ["docker", "exec", "anemone-wireguard", "wg", "show"],
+            ["docker", "exec", "anemone-core", "wg", "show"],
             capture_output=True,
             text=True,
             timeout=5
@@ -1012,9 +1012,9 @@ async def restart_vpn():
     try:
         import time
 
-        # Étape 1 : Redémarrer WireGuard
+        # Étape 1 : Redémarrer Core (WireGuard)
         result_wg = subprocess.run(
-            ["docker", "restart", "anemone-wireguard"],
+            ["docker", "restart", "anemone-core"],
             capture_output=True,
             text=True,
             timeout=30
@@ -1026,12 +1026,14 @@ async def restart_vpn():
                 "message": f"Erreur lors du redémarrage de WireGuard: {result_wg.stderr}"
             }
 
-        # Étape 2 : Attendre 5 secondes que WireGuard soit complètement prêt
+        # Étape 2 : Attendre 5 secondes que Core soit complètement prêt
         time.sleep(5)
 
-        # Étape 3 : Redémarrer Restic pour reconnecter au nouveau namespace
+        # Étape 3 : Note - Plus besoin de redémarrer Restic séparément car maintenant dans le même conteneur
+        # Dans la v2.0, WireGuard, SFTP et Restic sont tous dans anemone-core
+        # Le redémarrage du conteneur core suffit
         result_restic = subprocess.run(
-            ["docker", "restart", "anemone-restic"],
+            ["docker", "exec", "anemone-core", "supervisorctl", "restart", "restic"],
             capture_output=True,
             text=True,
             timeout=30
