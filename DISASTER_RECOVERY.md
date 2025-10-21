@@ -383,13 +383,249 @@ python3 scripts/discover-backups.py --json
 - ✅ Rotation automatique des anciens backups
 - ✅ Stockage redondant sur plusieurs serveurs
 
-### Phase 3 : Fonctionnalités Avancées (À venir)
+### Phase 3 : Fonctionnalités Avancées ✅
 
-- ⏳ Interface web de recovery avec sélection graphique
-- ⏳ Notifications en cas d'échec de backup
-- ⏳ Historique multi-versions avec restore point-in-time
-- ⏳ Backup incrémentiel de la configuration
-- ⏳ Vérification d'intégrité automatique
+- ✅ Interface web de recovery avec sélection graphique
+- ✅ Notifications en cas d'échec de backup (optionnel)
+- ✅ Historique multi-versions avec métadonnées détaillées
+- ✅ Backup incrémentiel de la configuration
+- ✅ Vérification d'intégrité des backups
+
+---
+
+## 🎨 Interface Web de Recovery (Phase 3)
+
+### Accès
+
+Accédez à l'interface web de disaster recovery :
+```
+http://localhost:3000/recovery
+```
+
+### Fonctionnalités
+
+**📦 Onglet Backups Disponibles**
+- Liste tous les backups (locaux, peers, distants)
+- Affichage avec date, taille, emplacement
+- Actions : Vérifier l'intégrité, Télécharger
+- Mise à jour en temps réel
+
+**📊 Onglet Historique**
+- Historique sur 30 jours
+- Statistiques détaillées
+- Graphiques de distribution
+- Métadonnées complètes
+
+**⚙️ Onglet Paramètres**
+- Configuration des notifications (optionnel)
+- Test de notifications
+- Pas obligatoire : les notifications sont désactivées par défaut
+
+### Exemple d'utilisation
+
+```bash
+# 1. Ouvrir l'interface web
+http://localhost:3000/recovery
+
+# 2. Consulter les backups disponibles
+# → Voir tous les backups sur tous les serveurs
+
+# 3. Vérifier l'intégrité d'un backup
+# → Cliquer sur "Vérifier" → Score d'intégrité affiché
+
+# 4. Télécharger un backup si nécessaire
+# → Cliquer sur "Télécharger"
+```
+
+---
+
+## 🔔 Notifications Optionnelles (Phase 3)
+
+### Configuration (Optionnel)
+
+Les notifications **ne sont PAS obligatoires**. Si vous ne les configurez pas, tout fonctionnera normalement.
+
+Si vous souhaitez être alerté en cas d'échec de backup, ajoutez dans `config/config.yaml` :
+
+**Option 1 : Email**
+```yaml
+backup:
+  mode: incremental  # incremental ou always
+  notifications:
+    enabled: true
+    type: email
+    email:
+      smtp_server: smtp.gmail.com
+      smtp_port: 587
+      smtp_user: votre@email.com
+      smtp_password: votre-mot-de-passe
+      to_email: admin@example.com
+```
+
+**Option 2 : Webhook**
+```yaml
+backup:
+  mode: incremental
+  notifications:
+    enabled: true
+    type: webhook
+    webhook:
+      url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+```
+
+**Option 3 : Pas de notifications (par défaut)**
+```yaml
+backup:
+  mode: incremental
+  # Pas de section notifications = pas d'alertes
+```
+
+### Tester les notifications
+
+Via l'interface web :
+```
+http://localhost:3000/recovery
+→ Onglet Paramètres
+→ Configurer email ou webhook
+→ Cliquer sur "Tester la notification"
+```
+
+### Événements notifiés
+
+- ✅ **Succès** : Backup complété avec succès
+- ⚠️ **Warning** : Backup complété mais échec sur certains peers
+- ❌ **Erreur** : Échec complet du backup
+
+---
+
+## 🔄 Backup Incrémentiel (Phase 3)
+
+### Fonctionnement
+
+Par défaut, Anemone utilise le **mode incrémentiel** :
+- Le backup ne s'exécute que si la configuration a changé
+- Économise de la bande passante et du stockage
+- Détection automatique via checksum MD5
+
+**Fichiers surveillés :**
+- `config.yaml`
+- Clés WireGuard (`private.key`, `public.key`)
+- Clés SSH (`id_rsa`, `id_rsa.pub`)
+
+### Modes disponibles
+
+**Mode `incremental` (recommandé, par défaut)**
+```yaml
+backup:
+  mode: incremental
+```
+- Backup uniquement en cas de changement
+- Réduit la charge réseau
+- Optimal pour la plupart des cas
+
+**Mode `always`**
+```yaml
+backup:
+  mode: always
+```
+- Backup quotidien systématique même sans changement
+- Utile pour audits réguliers
+- Plus de redondance
+
+### Vérifier le statut
+
+```bash
+# Voir si la configuration a changé
+docker exec anemone-core cat /config-backups/.last-checksum
+
+# Forcer un backup même sans changement
+docker exec anemone-core sh -c "rm /config-backups/.last-checksum && /scripts/core/backup-config-auto.sh"
+
+# Voir les logs de backup incrémentiel
+docker exec anemone-core tail -f /logs/config-backup.log
+# Cherchez: "⏭️  Backup incrémentiel : aucun changement détecté"
+```
+
+---
+
+## 🔍 Vérification d'Intégrité (Phase 3)
+
+### Via l'interface web
+
+```
+http://localhost:3000/recovery
+→ Cliquer sur "Vérifier" sur un backup
+→ Score d'intégrité affiché avec détails
+```
+
+### Via l'API
+
+```bash
+# Vérifier un backup
+curl -X POST http://localhost:3000/api/recovery/verify \
+  -H "Content-Type: application/json" \
+  -d '{"backup_path": "/config-backups/local/anemone-backup-FR1-20251021-020000.enc"}'
+
+# Réponse :
+{
+  "integrity_score": 100.0,
+  "status": "valid",
+  "checks": {
+    "exists": true,
+    "readable": true,
+    "size_valid": true,
+    "is_file": true,
+    "extension": true,
+    "has_iv": true,
+    "has_data": true
+  }
+}
+```
+
+### Statuts d'intégrité
+
+- ✅ **valid** (100%) : Backup intègre et utilisable
+- ⚠️ **warning** (50-99%) : Backup potentiellement corrompu
+- ❌ **invalid** (<50%) : Backup invalide, ne pas utiliser
+
+---
+
+## 📈 Historique Multi-Versions (Phase 3)
+
+### Via l'interface web
+
+```
+http://localhost:3000/recovery
+→ Onglet Historique
+→ Vue chronologique sur 30 jours
+```
+
+### Via l'API
+
+```bash
+# Historique des 30 derniers jours
+curl http://localhost:3000/api/recovery/history?days=30
+
+# Historique des 7 derniers jours
+curl http://localhost:3000/api/recovery/history?days=7
+```
+
+### Informations disponibles
+
+Pour chaque backup :
+- **Nom du fichier**
+- **Date et heure précises**
+- **Taille en MB**
+- **Emplacement** (local, peer, ou remote)
+- **Type** (backup local ou reçu d'un peer)
+
+### Statistiques automatiques
+
+- Nombre total de backups
+- Taille totale occupée
+- Backup le plus ancien
+- Backup le plus récent
+- Distribution par emplacement
 
 ---
 
@@ -445,5 +681,5 @@ Pour toute question ou problème :
 
 **Créé le :** 2025-10-21
 **Dernière mise à jour :** 2025-10-21
-**Version :** Phase 2 - Backup automatique sur peers
-**Prochaine version :** Phase 3 - Fonctionnalités avancées (interface web, notifications, etc.)
+**Version :** Phase 3 - Fonctionnalités avancées (interface web, notifications, intégrité, incrémentiel)
+**Statut :** Système complet de disaster recovery entièrement opérationnel

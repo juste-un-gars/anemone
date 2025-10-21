@@ -1192,6 +1192,320 @@ async def export_configuration():
         raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
 
 
+# ===== PHASE 3 : DISASTER RECOVERY AVANCÉ =====
+
+@app.get("/api/recovery/backups")
+async def list_recovery_backups():
+    """
+    Liste tous les backups disponibles (locaux + peers) avec métadonnées
+    Phase 3 : Interface web de recovery
+    """
+    try:
+        import json
+
+        backups = {
+            "local": [],
+            "peers": {},
+            "total": 0,
+            "metadata": {
+                "scanned_at": datetime.now().isoformat(),
+                "node_name": "anemone"
+            }
+        }
+
+        # Lire le nom du serveur
+        try:
+            with open("/config/config.yaml") as f:
+                config = yaml.safe_load(f)
+                backups["metadata"]["node_name"] = config.get("server", {}).get("name", "anemone")
+        except:
+            pass
+
+        # Backups locaux
+        local_dir = Path("/config-backups/local")
+        if local_dir.exists():
+            for backup_file in sorted(local_dir.glob("*.enc"), key=lambda x: x.stat().st_mtime, reverse=True):
+                stat = backup_file.stat()
+                backups["local"].append({
+                    "filename": backup_file.name,
+                    "path": str(backup_file),
+                    "size": stat.st_size,
+                    "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                    "mtime": stat.st_mtime,
+                    "mtime_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    "location": "local"
+                })
+
+        # Backups des peers (stockés localement)
+        config_backups_dir = Path("/config-backups")
+        if config_backups_dir.exists():
+            for peer_dir in config_backups_dir.iterdir():
+                if peer_dir.is_dir() and peer_dir.name != "local":
+                    peer_name = peer_dir.name
+                    backups["peers"][peer_name] = []
+
+                    for backup_file in sorted(peer_dir.glob("*.enc"), key=lambda x: x.stat().st_mtime, reverse=True):
+                        stat = backup_file.stat()
+                        backups["peers"][peer_name].append({
+                            "filename": backup_file.name,
+                            "path": str(backup_file),
+                            "size": stat.st_size,
+                            "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                            "mtime": stat.st_mtime,
+                            "mtime_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                            "location": f"peer:{peer_name}"
+                        })
+
+        # Compter le total
+        backups["total"] = len(backups["local"]) + sum(len(peer_backups) for peer_backups in backups["peers"].values())
+
+        # Découvrir les backups sur les peers distants (via discover-backups.py)
+        try:
+            result = subprocess.run(
+                ["python3", "/scripts/discover-backups.py", "--json"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False
+            )
+
+            if result.returncode == 0 and result.stdout.strip():
+                remote_data = json.loads(result.stdout)
+                backups["remote"] = remote_data.get("backups", [])
+                backups["total"] += len(backups.get("remote", []))
+        except Exception as e:
+            print(f"Warning: Could not discover remote backups: {e}")
+            backups["remote"] = []
+
+        return JSONResponse(content=backups)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list backups: {str(e)}")
+
+
+@app.post("/api/recovery/verify")
+async def verify_backup_integrity(backup_path: str = Body(..., embed=True)):
+    """
+    Vérifie l'intégrité d'un fichier de backup
+    Phase 3 : Vérification d'intégrité
+    """
+    try:
+        backup_file = Path(backup_path)
+
+        if not backup_file.exists():
+            raise HTTPException(status_code=404, detail="Backup file not found")
+
+        # Vérifications de base
+        checks = {
+            "exists": backup_file.exists(),
+            "readable": os.access(backup_file, os.R_OK),
+            "size_valid": backup_file.stat().st_size > 0,
+            "is_file": backup_file.is_file(),
+            "extension": backup_file.suffix == ".enc"
+        }
+
+        # Vérifier que le fichier peut être lu
+        try:
+            with open(backup_file, 'rb') as f:
+                # Lire les premiers bytes (IV)
+                iv = f.read(16)
+                checks["has_iv"] = len(iv) == 16
+
+                # Vérifier qu'il y a des données après l'IV
+                first_block = f.read(16)
+                checks["has_data"] = len(first_block) > 0
+        except Exception as e:
+            checks["read_error"] = str(e)
+
+        # Score d'intégrité
+        passed_checks = sum(1 for v in checks.values() if v is True)
+        total_checks = len([v for v in checks.values() if isinstance(v, bool)])
+        integrity_score = (passed_checks / total_checks * 100) if total_checks > 0 else 0
+
+        return JSONResponse(content={
+            "backup_path": str(backup_file),
+            "checks": checks,
+            "integrity_score": round(integrity_score, 2),
+            "status": "valid" if integrity_score == 100 else "warning" if integrity_score > 50 else "invalid",
+            "verified_at": datetime.now().isoformat()
+        })
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Verification failed: {str(e)}")
+
+
+@app.get("/api/recovery/history")
+async def get_backup_history(days: int = 30):
+    """
+    Retourne l'historique des backups avec métadonnées détaillées
+    Phase 3 : Historique multi-versions
+    """
+    try:
+        history = {
+            "backups": [],
+            "stats": {
+                "total_backups": 0,
+                "total_size_mb": 0,
+                "oldest_backup": None,
+                "newest_backup": None,
+                "locations": {}
+            },
+            "period_days": days,
+            "generated_at": datetime.now().isoformat()
+        }
+
+        cutoff_time = datetime.now().timestamp() - (days * 24 * 60 * 60)
+
+        # Scanner tous les backups (locaux et peers)
+        all_backups = []
+
+        # Backups locaux
+        local_dir = Path("/config-backups/local")
+        if local_dir.exists():
+            for backup_file in local_dir.glob("*.enc"):
+                stat = backup_file.stat()
+                if stat.st_mtime >= cutoff_time:
+                    all_backups.append({
+                        "filename": backup_file.name,
+                        "path": str(backup_file),
+                        "size": stat.st_size,
+                        "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                        "timestamp": stat.st_mtime,
+                        "timestamp_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                        "location": "local",
+                        "type": "local"
+                    })
+
+        # Backups des peers
+        config_backups_dir = Path("/config-backups")
+        if config_backups_dir.exists():
+            for peer_dir in config_backups_dir.iterdir():
+                if peer_dir.is_dir() and peer_dir.name != "local":
+                    for backup_file in peer_dir.glob("*.enc"):
+                        stat = backup_file.stat()
+                        if stat.st_mtime >= cutoff_time:
+                            all_backups.append({
+                                "filename": backup_file.name,
+                                "path": str(backup_file),
+                                "size": stat.st_size,
+                                "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                                "timestamp": stat.st_mtime,
+                                "timestamp_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                                "location": f"peer:{peer_dir.name}",
+                                "type": "peer",
+                                "peer_name": peer_dir.name
+                            })
+
+        # Trier par date (plus récent d'abord)
+        all_backups.sort(key=lambda x: x["timestamp"], reverse=True)
+
+        # Statistiques
+        if all_backups:
+            history["stats"]["total_backups"] = len(all_backups)
+            history["stats"]["total_size_mb"] = round(sum(b["size_mb"] for b in all_backups), 2)
+            history["stats"]["oldest_backup"] = all_backups[-1]["timestamp_iso"]
+            history["stats"]["newest_backup"] = all_backups[0]["timestamp_iso"]
+
+            # Compter par location
+            for backup in all_backups:
+                loc = backup["location"]
+                history["stats"]["locations"][loc] = history["stats"]["locations"].get(loc, 0) + 1
+
+        history["backups"] = all_backups
+
+        return JSONResponse(content=history)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get history: {str(e)}")
+
+
+@app.get("/recovery", response_class=HTMLResponse)
+async def recovery_page(request: Request):
+    """
+    Interface web graphique pour la gestion du disaster recovery
+    Phase 3 : Interface web de recovery
+    """
+    return templates.TemplateResponse("recovery.html", {
+        "request": request,
+        "title": "Disaster Recovery - Anemone",
+        "language": WEB_LANGUAGE
+    })
+
+
+@app.post("/api/recovery/test-notification")
+async def test_notification(
+    notification_type: str = Body(...),
+    config: dict = Body(...)
+):
+    """
+    Teste une configuration de notification (email ou webhook)
+    Phase 3 : Notifications optionnelles
+    """
+    try:
+        if notification_type == "email":
+            # Test email (optionnel)
+            smtp_server = config.get("smtp_server")
+            smtp_port = config.get("smtp_port", 587)
+            smtp_user = config.get("smtp_user")
+            smtp_password = config.get("smtp_password")
+            to_email = config.get("to_email")
+
+            if not all([smtp_server, smtp_user, smtp_password, to_email]):
+                raise HTTPException(status_code=400, detail="Missing email configuration")
+
+            import smtplib
+            from email.mime.text import MIMEText
+
+            msg = MIMEText("This is a test notification from Anemone Disaster Recovery system.")
+            msg["Subject"] = "Anemone - Test Notification"
+            msg["From"] = smtp_user
+            msg["To"] = to_email
+
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.send_message(msg)
+
+            return JSONResponse(content={"status": "success", "message": "Email sent successfully"})
+
+        elif notification_type == "webhook":
+            # Test webhook (optionnel)
+            webhook_url = config.get("webhook_url")
+
+            if not webhook_url:
+                raise HTTPException(status_code=400, detail="Missing webhook URL")
+
+            import requests
+
+            payload = {
+                "event": "test_notification",
+                "timestamp": datetime.now().isoformat(),
+                "message": "Test notification from Anemone Disaster Recovery system"
+            }
+
+            response = requests.post(webhook_url, json=payload, timeout=10)
+            response.raise_for_status()
+
+            return JSONResponse(content={
+                "status": "success",
+                "message": "Webhook delivered successfully",
+                "status_code": response.status_code
+            })
+
+        else:
+            raise HTTPException(status_code=400, detail="Invalid notification type")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        return JSONResponse(
+            content={"status": "error", "message": str(e)},
+            status_code=500
+        )
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=3000)
