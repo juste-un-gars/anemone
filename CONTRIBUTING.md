@@ -51,20 +51,29 @@ Soyez respectueux et constructif dans vos interactions. Nous voulons une communa
 
 ```
 anemone/
-├── config/              # Configuration
+├── config/                   # Configuration
 ├── services/
-│   ├── restic/         # Service de backup
+│   ├── core/                # Service principal (VPN + SFTP + Restic)
 │   │   ├── Dockerfile
 │   │   ├── entrypoint.sh
-│   │   └── scripts/    # Scripts de backup
-│   └── api/            # API & Dashboard
+│   │   ├── supervisord.conf
+│   │   ├── restic-scripts/  # Scripts de backup Restic
+│   │   └── scripts/         # Scripts de backup config auto
+│   ├── shares/              # SMB + WebDAV (optionnel)
+│   └── api/                 # API & Dashboard
 │       ├── Dockerfile
 │       ├── requirements.txt
-│       └── main.py
-├── scripts/            # Scripts utilitaires
-│   ├── init.sh
-│   ├── add-peer.sh
-│   └── restore.sh
+│       ├── main.py
+│       └── templates/       # Templates web (dont recovery.html)
+├── scripts/                 # Scripts utilitaires
+│   ├── init.sh             # Initialisation
+│   ├── add-peer.sh         # Ajout de peer interactif
+│   ├── restore-config.py   # Restauration de configuration
+│   ├── discover-backups.py # Découverte backups sur peers
+│   └── test-*.sh           # Suites de tests
+├── docs/
+│   └── archive/            # Documentation historique
+├── DISASTER_RECOVERY.md    # Guide disaster recovery complet
 └── docker-compose.yml
 ```
 

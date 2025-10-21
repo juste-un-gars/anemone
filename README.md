@@ -2,6 +2,24 @@
 
 **Serveur de fichiers distribué, simple et chiffré, avec redondance entre proches**
 
+## ✨ Fonctionnalités Principales
+
+- 🔐 **Chiffrement de bout en bout** - Vos données sont chiffrées avant de quitter votre serveur
+- 🌐 **VPN WireGuard** - Connexion sécurisée entre tous vos serveurs
+- 📦 **Backups automatiques** - Sauvegarde incrémentale quotidienne vers vos pairs
+- 🔄 **Disaster Recovery complet** - Interface web pour gérer et restaurer vos backups
+- 📱 **Configuration par QR Code** - Ajoutez des serveurs en scannant un QR code
+- 💾 **Partage SMB/WebDAV** - Accédez à vos fichiers depuis n'importe quel appareil
+- 🎨 **Interface web moderne** - Gestion complète via navigateur
+- 🔔 **Notifications optionnelles** - Alertes email/webhook en cas de problème (optionnel)
+
+## 🎯 Cas d'Usage
+
+- **Famille** : Sauvegardez les photos/vidéos de famille entre plusieurs maisons
+- **Amis** : Partagez et sauvegardez mutuellement vos données importantes
+- **Multi-sites** : Redondance automatique entre plusieurs localisations
+- **Disaster Recovery** : Récupérez votre configuration complète depuis n'importe quel serveur pair
+
 [Contenu identique jusqu'à la section Installation...]
 
 ## 🚀 Installation rapide
@@ -69,11 +87,28 @@ docker compose up -d
 
 ### Restauration après incident
 
-1. Accédez à `http://localhost:3000/setup`
-2. Choisissez **"Restauration"**
-3. Collez votre clé depuis Bitwarden
-4. Validez
-5. Utilisez `./scripts/restore.sh` pour récupérer vos données
+Anemone dispose d'un système complet de disaster recovery (3 méthodes) :
+
+**Méthode 1 : Restauration depuis backup local**
+```bash
+./start.sh --restore-from=anemone-backup-SERVEUR-DATE.enc
+# Le script demandera votre clé Restic
+```
+
+**Méthode 2 : Restauration automatique depuis les peers** (recommandé)
+```bash
+./start.sh --auto-restore
+# Découvre automatiquement les backups sur vos peers
+# Vous choisissez lequel restaurer
+```
+
+**Méthode 3 : Interface web de recovery**
+```
+http://localhost:3000/recovery
+# Interface graphique pour gérer tous vos backups
+```
+
+Consultez le [Guide de Disaster Recovery](DISASTER_RECOVERY.md) pour plus de détails.
 
 ## 🔒 Sécurité de la clé de chiffrement
 
@@ -146,35 +181,38 @@ Si vous avez oublié de sauvegarder votre clé lors du setup initial, vous pouve
 
 ```bash
 # ⚠️ À utiliser UNIQUEMENT en urgence
-docker exec anemone-restic sh -c '
-  SYSTEM_KEY=$(cat /proc/sys/kernel/random/uuid)
-  SALT=$(cat /config/.restic.salt)
-  openssl enc -aes-256-cbc -d \
-    -pbkdf2 -iter 100000 \
-    -pass pass:"$SYSTEM_KEY:$SALT" \
-    -in /config/.restic.encrypted
-'
+docker exec anemone-core python3 /scripts/decrypt_key.py
 ```
 
 **Ensuite sauvegardez-la IMMÉDIATEMENT dans Bitwarden !**
 
 ### Vérifier l'intégrité des backups
 
-```bash
-# Vérifier tous les backups
-docker exec anemone-restic restic -r sftp:user@host:/path check
+**Via l'interface web** (recommandé) :
+```
+http://localhost:3000/recovery
+→ Cliquer sur "Vérifier" sur un backup
+```
 
-# Vérifier un backup spécifique
-docker exec anemone-restic restic -r sftp:user@host:/path snapshots
+**Via ligne de commande** :
+```bash
+# Vérifier l'intégrité d'un backup de configuration
+curl -X POST http://localhost:3000/api/recovery/verify \
+  -H "Content-Type: application/json" \
+  -d '{"backup_path": "/config-backups/local/backup.enc"}'
+
+# Vérifier les backups Restic (données)
+docker exec anemone-core restic -r sftp:user@host:/path check
 ```
 
 ### Tester une restauration
 
 ```bash
-# Utiliser le script de restauration
-./scripts/restore.sh
+# Méthode automatique : découvre les backups sur vos peers
+./start.sh --auto-restore
 
-# Suivre les instructions interactives
+# Méthode manuelle : depuis un fichier local
+./start.sh --restore-from=backup.enc
 ```
 
 ## 📋 Checklist de sécurité
