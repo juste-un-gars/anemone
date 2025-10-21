@@ -1751,13 +1751,21 @@ async def test_restic_connection(peer_name: str):
                 timeout=10
             )
 
+            error_msg = ssh_result.stderr if ssh_result.stderr else ssh_result.stdout
+
+            # Succès si on obtient "OK" OU si le serveur répond qu'il n'accepte que SFTP
+            # "This service allows sftp connections only" = SSH fonctionne, juste restreint à SFTP (BIEN pour sécurité)
             if ssh_result.returncode == 0 and "OK" in ssh_result.stdout:
                 results["tests"]["ssh"] = {
                     "status": "ok",
                     "message": "SSH connection successful"
                 }
+            elif "sftp connections only" in error_msg.lower() or "sftp connections only" in ssh_result.stdout.lower():
+                results["tests"]["ssh"] = {
+                    "status": "ok",
+                    "message": "SSH connection OK (SFTP-only mode, secure)"
+                }
             else:
-                error_msg = ssh_result.stderr if ssh_result.stderr else ssh_result.stdout
                 if "Permission denied" in error_msg:
                     results["tests"]["ssh"] = {
                         "status": "error",
