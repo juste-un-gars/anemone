@@ -59,9 +59,11 @@ for target in targets:
     path = target.get('path', '/backups')
 
     # Construire l'URL du repository Restic
-    # Format: sftp:user@host:port/path
-    # Note: Restic utilise un seul / après le port pour un chemin absolu
-    repo_url = f'sftp:{user}@{host}:{port}{path}'
+    # Format SFTP pour Restic : sftp:user@host:/path (port 22 par défaut)
+    # Note : Restic ne supporte pas le port dans l'URL SFTP
+    # Pour un port non-standard, il faudrait configurer SSH
+    # Via VPN, on utilise toujours le port 22 (port interne du conteneur)
+    repo_url = f'sftp:{user}@{host}:{path}'
 
     print(f'\\n📤 Backing up to: {name} ({repo_url})')
 
