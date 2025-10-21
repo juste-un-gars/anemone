@@ -49,5 +49,11 @@ echo "   User: restic (UID: $PUID)"
 echo "   Timezone: $TZ"
 echo ""
 
-# Lancer supervisord qui gérera WireGuard, SSHD et Restic
+# Configurer le cron job pour le backup automatique de configuration (2h du matin)
+echo "0 2 * * * /scripts/core/backup-config-auto.sh >> /logs/config-backup.log 2>&1" > /etc/crontabs/root
+chmod 600 /etc/crontabs/root
+echo "✅ Cron job configured (daily config backup at 2:00 AM)"
+echo ""
+
+# Lancer supervisord qui gérera WireGuard, SSHD, Restic et Cron
 exec /usr/bin/supervisord -c /etc/supervisord.conf

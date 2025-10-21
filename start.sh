@@ -11,12 +11,16 @@ NC='\033[0m'
 echo -e "${CYAN}🪸 Démarrage d'Anemone...${NC}"
 echo ""
 
-# Gérer l'option --restore-from
+# Gérer les options de restauration
 RESTORE_FILE=""
+AUTO_RESTORE=false
+
 if [[ "$1" == "--restore-from="* ]]; then
     RESTORE_FILE="${1#--restore-from=}"
 elif [[ "$1" == "--restore-from" ]] && [[ -n "$2" ]]; then
     RESTORE_FILE="$2"
+elif [[ "$1" == "--auto-restore" ]]; then
+    AUTO_RESTORE=true
 fi
 
 # Si un fichier de restauration est spécifié
@@ -61,6 +65,162 @@ if [ -n "$RESTORE_FILE" ]; then
         echo ""
         exit 0
     else
+        echo -e "${RED}❌ Échec de la restauration${NC}"
+        exit 1
+    fi
+fi
+
+# Mode auto-restore : découvrir les backups sur les peers
+if [ "$AUTO_RESTORE" = true ]; then
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}   🔍 Mode Auto-Restore - Découverte des Backups${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "${YELLOW}⚠️  PRÉREQUIS:${NC}"
+    echo -e "  - Configuration réseau minimale (config.yaml avec liste des peers)"
+    echo -e "  - Clés SSH présentes (config/ssh/id_rsa)"
+    echo -e "  - Connectivité réseau vers les peers"
+    echo ""
+    echo -e "${CYAN}Recherche des backups disponibles sur les peers...${NC}"
+    echo ""
+
+    # Vérifier que config.yaml existe
+    if [ ! -f config/config.yaml ]; then
+        echo -e "${RED}❌ Fichier config.yaml manquant${NC}"
+        echo -e "${YELLOW}Le mode auto-restore nécessite au minimum config.yaml avec la liste des peers${NC}"
+        echo -e "${YELLOW}Utilisez --restore-from si vous avez un fichier de backup local${NC}"
+        exit 1
+    fi
+
+    # Vérifier que les clés SSH existent
+    if [ ! -f config/ssh/id_rsa ]; then
+        echo -e "${RED}❌ Clés SSH manquantes${NC}"
+        echo -e "${YELLOW}Le mode auto-restore nécessite les clés SSH pour se connecter aux peers${NC}"
+        echo -e "${YELLOW}Utilisez --restore-from si vous avez un fichier de backup local${NC}"
+        exit 1
+    fi
+
+    # Lancer le script de découverte en mode JSON
+    DISCOVERY_OUTPUT=$(python3 scripts/discover-backups.py --json 2>/dev/null)
+
+    if [ $? -ne 0 ] || [ -z "$DISCOVERY_OUTPUT" ]; then
+        echo -e "${RED}❌ Échec de la découverte des backups${NC}"
+        echo -e "${YELLOW}Vérifiez que:${NC}"
+        echo -e "  - Les peers sont accessibles via le VPN"
+        echo -e "  - Les clés SSH sont correctes"
+        echo -e "  - Les peers ont des backups disponibles"
+        exit 1
+    fi
+
+    # Parser le JSON et extraire les backups
+    BACKUP_COUNT=$(echo "$DISCOVERY_OUTPUT" | python3 -c "import sys, json; data=json.load(sys.stdin); print(data['total'])")
+
+    if [ "$BACKUP_COUNT" -eq 0 ]; then
+        echo -e "${YELLOW}⚠️  Aucun backup trouvé sur les peers${NC}"
+        echo ""
+        echo -e "${CYAN}Cela peut signifier que:${NC}"
+        echo -e "  - C'est une première installation (pas de backup précédent)"
+        echo -e "  - Les peers n'ont pas encore de backup de ce serveur"
+        echo -e "  - Les backups ont été supprimés ou expirés"
+        echo ""
+        echo -e "${CYAN}Vous pouvez:${NC}"
+        echo -e "  - Continuer avec une nouvelle installation (./start.sh)"
+        echo -e "  - Utiliser --restore-from avec un backup local"
+        exit 0
+    fi
+
+    echo -e "${GREEN}✅ ${BACKUP_COUNT} backup(s) trouvé(s)${NC}"
+    echo ""
+
+    # Afficher les backups disponibles
+    echo -e "${CYAN}Backups disponibles:${NC}"
+    echo ""
+
+    echo "$DISCOVERY_OUTPUT" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+backups = sorted(data['backups'], key=lambda x: x['timestamp'], reverse=True)
+for i, backup in enumerate(backups, 1):
+    size_mb = backup['size'] / (1024 * 1024)
+    print(f\"  {i}. {backup['filename']}\")
+    print(f\"     Peer: {backup['peer_name']} ({backup['peer_ip']})\")
+    print(f\"     Date: {backup['timestamp']}\")
+    print(f\"     Taille: {size_mb:.2f} MB\")
+    print()
+"
+
+    # Demander à l'utilisateur de choisir
+    echo -e "${YELLOW}Choisissez un backup à restaurer (1-${BACKUP_COUNT}) ou 'q' pour annuler:${NC}"
+    read -p "Choix: " CHOICE
+    echo ""
+
+    if [ "$CHOICE" = "q" ] || [ "$CHOICE" = "Q" ]; then
+        echo -e "${YELLOW}Restauration annulée${NC}"
+        exit 0
+    fi
+
+    # Valider le choix
+    if ! [[ "$CHOICE" =~ ^[0-9]+$ ]] || [ "$CHOICE" -lt 1 ] || [ "$CHOICE" -gt "$BACKUP_COUNT" ]; then
+        echo -e "${RED}❌ Choix invalide${NC}"
+        exit 1
+    fi
+
+    # Extraire les informations du backup choisi
+    SELECTED_BACKUP=$(echo "$DISCOVERY_OUTPUT" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+backups = sorted(data['backups'], key=lambda x: x['timestamp'], reverse=True)
+backup = backups[$CHOICE - 1]
+print(f\"{backup['peer_ip']}|{backup['path']}|{backup['filename']}\")
+")
+
+    IFS='|' read -r PEER_IP REMOTE_PATH FILENAME <<< "$SELECTED_BACKUP"
+
+    echo -e "${CYAN}Téléchargement du backup depuis ${PEER_IP}...${NC}"
+    echo ""
+
+    # Télécharger le backup
+    LOCAL_BACKUP="/tmp/${FILENAME}"
+    scp -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i config/ssh/id_rsa \
+        "restic@${PEER_IP}:${REMOTE_PATH}" "$LOCAL_BACKUP" 2>&1
+
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}❌ Échec du téléchargement${NC}"
+        exit 1
+    fi
+
+    echo -e "${GREEN}✅ Backup téléchargé${NC}"
+    echo ""
+
+    # Demander la clé Restic
+    echo -e "${YELLOW}Pour déchiffrer ce backup, entrez votre clé Restic :${NC}"
+    read -s -p "Clé Restic: " RESTIC_KEY
+    echo ""
+    echo ""
+
+    if [ -z "$RESTIC_KEY" ]; then
+        echo -e "${RED}❌ La clé Restic ne peut pas être vide${NC}"
+        rm -f "$LOCAL_BACKUP"
+        exit 1
+    fi
+
+    # Restaurer le backup
+    echo -e "${CYAN}🔓 Restauration en cours...${NC}"
+    echo ""
+
+    python3 scripts/restore-config.py "$LOCAL_BACKUP" "$RESTIC_KEY"
+
+    if [ $? -eq 0 ]; then
+        rm -f "$LOCAL_BACKUP"
+        echo ""
+        echo -e "${GREEN}✅ Configuration restaurée avec succès !${NC}"
+        echo ""
+        echo -e "${CYAN}Vous pouvez maintenant lancer Docker :${NC}"
+        echo -e "  ${GREEN}docker compose up -d${NC}"
+        echo ""
+        exit 0
+    else
+        rm -f "$LOCAL_BACKUP"
         echo -e "${RED}❌ Échec de la restauration${NC}"
         exit 1
     fi

@@ -17,6 +17,7 @@ services:
       - ./config:/config
       - ${BACKUP_DATA_PATH:-./backup}:/mnt/backup
       - ${BACKUP_RECEIVE_PATH:-./backups}:/home/restic/backups
+      - ./config-backups:/config-backups
       - ./logs:/logs
       - /lib/modules:/lib/modules:ro
     ports:

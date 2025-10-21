@@ -16,6 +16,7 @@ config/.setup-completed
 data/
 backups/
 restore/
+config-backups/
 
 # Logs
 logs/
