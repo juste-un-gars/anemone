@@ -28,9 +28,20 @@ if [ -f /config/ssh/authorized_keys ]; then
     chown restic:restic /home/restic/.ssh/authorized_keys
 fi
 
-# Permissions du répertoire backups
+# IMPORTANT: Pour ChrootDirectory, /home/restic DOIT être possédé par root
+# avec permissions strictes (pas de write pour group/others)
+chown root:root /home/restic
+chmod 755 /home/restic
+
+# Mais les sous-répertoires peuvent appartenir à restic
 if [ -d /home/restic/backups ]; then
     chown -R restic:restic /home/restic/backups
+fi
+
+# Le répertoire .ssh doit aussi appartenir à restic
+if [ -d /home/restic/.ssh ]; then
+    chown -R restic:restic /home/restic/.ssh
+    chmod 700 /home/restic/.ssh
 fi
 
 echo "✅ Environment configured"
