@@ -474,6 +474,7 @@ body {{
     <div class="nav">
         <a href="/" class="active">🏠 {t['home']}</a>
         <a href="/peers">👥 {t['peers']}</a>
+        <a href="/recovery">🔄 Recovery</a>
         <a href="/api/status">📊 {t['api_status']}</a>
     </div>
 
@@ -494,6 +495,12 @@ body {{
         <div class="card">
             <h2>💿 {t['disk']}</h2>
             <div id="disk-stats" class="loading">{t['loading']}</div>
+        </div>
+
+        <!-- Restic Snapshots Status -->
+        <div class="card">
+            <h2>📦 Snapshots Restic</h2>
+            <div id="restic-status" class="loading">{t['loading']}</div>
         </div>
     </div>
 </div>
@@ -588,11 +595,88 @@ async function loadStats() {{
     }}
 }}
 
+async function loadResticStatus() {{
+    try {{
+        const res = await fetch('/api/restic/status');
+        const data = await res.json();
+
+        if (data.total_peers === 0) {{
+            document.getElementById('restic-status').innerHTML =
+                '<p style="color:#999;text-align:center">Aucun peer configuré</p>';
+            return;
+        }}
+
+        let resticHtml = '';
+
+        // Afficher un indicateur global
+        const globalEmoji = data.global_status === 'ok' ? '🟢' :
+                           data.global_status === 'warning' ? '🟡' :
+                           data.global_status === 'error' ? '🔴' : '⚪';
+
+        resticHtml += `
+            <div class="stat" style="background:#f8f9fa;border-radius:8px;padding:12px;margin-bottom:12px">
+                <span class="stat-label"><strong>État global</strong></span>
+                <span class="stat-value">${{globalEmoji}} ${{data.global_status.toUpperCase()}}</span>
+            </div>
+        `;
+
+        // Afficher chaque peer
+        data.peers.forEach(peer => {{
+            const statusColor = peer.status === 'ok' ? '#28a745' :
+                               peer.status === 'warning' ? '#ffc107' :
+                               peer.status === 'not_initialized' ? '#6c757d' :
+                               '#dc3545';
+            const statusEmoji = peer.status === 'ok' ? '✅' :
+                               peer.status === 'warning' ? '⚠️' :
+                               peer.status === 'not_initialized' ? '⏸️' :
+                               '❌';
+
+            resticHtml += `
+                <div class="stat">
+                    <div>
+                        <div style="font-weight:600;color:#333">${{statusEmoji}} ${{peer.name}}</div>
+                        <div style="font-size:0.85em;color:#666;margin-top:4px">
+                            ${{peer.last_snapshot ?
+                                peer.last_snapshot.time_formatted + ' (' + peer.last_snapshot.age_hours + 'h)' :
+                                peer.message || 'Aucun snapshot'}}
+                        </div>
+                    </div>
+                    <div style="text-align:right">
+                        <div style="font-size:0.85em;color:${{statusColor}};font-weight:600">
+                            ${{peer.status.replace('_', ' ').toUpperCase()}}
+                        </div>
+                        ${{peer.last_snapshot ?
+                            '<div style="font-size:0.75em;color:#999;margin-top:4px">' + peer.last_snapshot.id + '</div>' :
+                            ''}}
+                    </div>
+                </div>
+            `;
+        }});
+
+        resticHtml += `
+            <div style="margin-top:12px;text-align:center">
+                <a href="/recovery" style="color:#667eea;text-decoration:none;font-size:0.9em">
+                    📊 Voir tous les snapshots →
+                </a>
+            </div>
+        `;
+
+        document.getElementById('restic-status').innerHTML = resticHtml;
+
+    }} catch (err) {{
+        console.error('Erreur chargement Restic:', err);
+        document.getElementById('restic-status').innerHTML =
+            '<p style="color:#dc3545;text-align:center">⚠️ Erreur de chargement</p>';
+    }}
+}}
+
 // Charger au démarrage
 loadStats();
+loadResticStatus();
 
 // Rafraîchir toutes les 30 secondes
 setInterval(loadStats, 30000);
+setInterval(loadResticStatus, 60000); // Restic toutes les 60s (plus lent)
 </script>
 </body></html>"""
     return HTMLResponse(html)
@@ -1504,6 +1588,161 @@ async def test_notification(
             content={"status": "error", "message": str(e)},
             status_code=500
         )
+
+
+@app.get("/api/restic/status")
+async def get_restic_status():
+    """
+    Récupère l'état des snapshots Restic sur tous les peers
+    Retourne le dernier snapshot pour chaque peer avec son statut
+    """
+    try:
+        # Charger la configuration
+        with open(CONFIG_PATH) as f:
+            config = yaml.safe_load(f)
+
+        server_name = config.get('server', {}).get('name', 'unknown')
+        peers = config.get('peers', [])
+
+        if not peers:
+            return JSONResponse(content={
+                "status": "no_peers",
+                "message": "No peers configured",
+                "peers": []
+            })
+
+        peers_status = []
+
+        for peer in peers:
+            peer_name = peer.get('name', 'unknown')
+            peer_ip = peer.get('allowed_ips', '').split('/')[0]
+
+            if not peer_ip:
+                peers_status.append({
+                    "name": peer_name,
+                    "status": "error",
+                    "message": "No IP configured",
+                    "last_snapshot": None
+                })
+                continue
+
+            repo_url = f"sftp:restic@{peer_ip}:/backups/{server_name}"
+
+            try:
+                # Exécuter restic snapshots avec le mot de passe chargé
+                result = subprocess.run(
+                    [
+                        "docker", "exec", "anemone-core", "sh", "-c",
+                        f"export RESTIC_PASSWORD=$(python3 /scripts/decrypt_key.py 2>/dev/null) && "
+                        f"restic -r {repo_url} snapshots --json --latest 1 2>/dev/null"
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=15
+                )
+
+                if result.returncode == 0 and result.stdout.strip():
+                    import json
+                    snapshots = json.loads(result.stdout)
+
+                    if snapshots:
+                        latest = snapshots[0]
+                        snapshot_time = datetime.fromisoformat(latest['time'].replace('Z', '+00:00'))
+                        age_hours = (datetime.now(snapshot_time.tzinfo) - snapshot_time).total_seconds() / 3600
+
+                        # Déterminer le statut en fonction de l'âge
+                        if age_hours < 25:  # Moins de 25h (backup quotidien)
+                            status = "ok"
+                        elif age_hours < 48:  # Moins de 2 jours
+                            status = "warning"
+                        else:  # Plus de 2 jours
+                            status = "error"
+
+                        peers_status.append({
+                            "name": peer_name,
+                            "ip": peer_ip,
+                            "status": status,
+                            "last_snapshot": {
+                                "id": latest['short_id'],
+                                "time": latest['time'],
+                                "time_formatted": snapshot_time.strftime("%Y-%m-%d %H:%M:%S"),
+                                "age_hours": round(age_hours, 1),
+                                "hostname": latest.get('hostname', 'unknown'),
+                                "paths": latest.get('paths', [])
+                            },
+                            "repository_url": repo_url
+                        })
+                    else:
+                        peers_status.append({
+                            "name": peer_name,
+                            "ip": peer_ip,
+                            "status": "no_snapshots",
+                            "message": "No snapshots found",
+                            "last_snapshot": None,
+                            "repository_url": repo_url
+                        })
+                else:
+                    # Vérifier si c'est un problème de repository non initialisé
+                    if "does not exist" in result.stderr or "does not exist" in result.stdout:
+                        peers_status.append({
+                            "name": peer_name,
+                            "ip": peer_ip,
+                            "status": "not_initialized",
+                            "message": "Repository not initialized",
+                            "last_snapshot": None,
+                            "repository_url": repo_url
+                        })
+                    else:
+                        peers_status.append({
+                            "name": peer_name,
+                            "ip": peer_ip,
+                            "status": "error",
+                            "message": "Unable to query repository",
+                            "last_snapshot": None,
+                            "repository_url": repo_url
+                        })
+
+            except subprocess.TimeoutExpired:
+                peers_status.append({
+                    "name": peer_name,
+                    "ip": peer_ip,
+                    "status": "timeout",
+                    "message": "Query timeout (peer unreachable?)",
+                    "last_snapshot": None,
+                    "repository_url": repo_url
+                })
+            except Exception as e:
+                peers_status.append({
+                    "name": peer_name,
+                    "ip": peer_ip,
+                    "status": "error",
+                    "message": str(e),
+                    "last_snapshot": None,
+                    "repository_url": repo_url
+                })
+
+        # Déterminer le statut global
+        if not peers_status:
+            global_status = "no_data"
+        elif all(p["status"] == "ok" for p in peers_status):
+            global_status = "ok"
+        elif any(p["status"] in ["error", "timeout"] for p in peers_status):
+            global_status = "error"
+        elif any(p["status"] == "warning" for p in peers_status):
+            global_status = "warning"
+        else:
+            global_status = "partial"
+
+        return JSONResponse(content={
+            "global_status": global_status,
+            "server_name": server_name,
+            "peers": peers_status,
+            "total_peers": len(peers_status),
+            "checked_at": datetime.now().isoformat()
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get Restic status: {str(e)}")
 
 
 if __name__ == "__main__":
