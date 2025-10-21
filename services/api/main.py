@@ -632,23 +632,43 @@ async function loadResticStatus() {{
                                '❌';
 
             resticHtml += `
-                <div class="stat">
-                    <div>
-                        <div style="font-weight:600;color:#333">${{statusEmoji}} ${{peer.name}}</div>
-                        <div style="font-size:0.85em;color:#666;margin-top:4px">
+                <div class="stat" style="display:block;padding:16px">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                        <div>
+                            <div style="font-weight:600;color:#333">${{statusEmoji}} ${{peer.name}}</div>
+                            <div style="font-size:0.85em;color:#666;margin-top:4px">
+                                ${{peer.last_snapshot ?
+                                    peer.last_snapshot.time_formatted + ' (' + peer.last_snapshot.age_hours + 'h)' :
+                                    peer.message || 'Aucun snapshot'}}
+                            </div>
+                        </div>
+                        <div style="text-align:right">
+                            <div style="font-size:0.85em;color:${{statusColor}};font-weight:600">
+                                ${{peer.status.replace('_', ' ').toUpperCase()}}
+                            </div>
                             ${{peer.last_snapshot ?
-                                peer.last_snapshot.time_formatted + ' (' + peer.last_snapshot.age_hours + 'h)' :
-                                peer.message || 'Aucun snapshot'}}
+                                '<div style="font-size:0.75em;color:#999;margin-top:4px">' + peer.last_snapshot.id + '</div>' :
+                                ''}}
                         </div>
                     </div>
-                    <div style="text-align:right">
-                        <div style="font-size:0.85em;color:${{statusColor}};font-weight:600">
-                            ${{peer.status.replace('_', ' ').toUpperCase()}}
+                    ${{peer.status !== 'ok' ? `
+                        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+                            <button
+                                onclick="testConnection('${{peer.name}}')"
+                                style="flex:1;min-width:120px;padding:8px 12px;background:#667eea;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.85em"
+                            >
+                                🔍 Diagnostiquer
+                            </button>
+                            ${{peer.status === 'not_initialized' || peer.status === 'error' ? `
+                                <button
+                                    onclick="initRepository('${{peer.name}}')"
+                                    style="flex:1;min-width:120px;padding:8px 12px;background:#28a745;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.85em"
+                                >
+                                    🚀 Initialiser
+                                </button>
+                            ` : ''}}
                         </div>
-                        ${{peer.last_snapshot ?
-                            '<div style="font-size:0.75em;color:#999;margin-top:4px">' + peer.last_snapshot.id + '</div>' :
-                            ''}}
-                    </div>
+                    ` : ''}}
                 </div>
             `;
         }});
@@ -667,6 +687,87 @@ async function loadResticStatus() {{
         console.error('Erreur chargement Restic:', err);
         document.getElementById('restic-status').innerHTML =
             '<p style="color:#dc3545;text-align:center">⚠️ Erreur de chargement</p>';
+    }}
+}}
+
+async function testConnection(peerName) {{
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Test en cours...';
+
+    try {{
+        const response = await fetch(`/api/restic/test-connection/${{peerName}}`, {{
+            method: 'POST'
+        }});
+        const data = await response.json();
+
+        // Afficher le diagnostic dans une modal ou alert
+        let message = `📊 Diagnostic de ${{peerName}}\\n\\n`;
+        message += `Statut global: ${{data.overall_message}}\\n\\n`;
+        message += `Tests effectués:\\n`;
+
+        if (data.tests.ping) {{
+            message += `  🌐 Ping: ${{data.tests.ping.status}} - ${{data.tests.ping.message}}\\n`;
+        }}
+        if (data.tests.ssh) {{
+            message += `  🔑 SSH: ${{data.tests.ssh.status}} - ${{data.tests.ssh.message}}\\n`;
+            if (data.tests.ssh.fix) {{
+                message += `     ➡️ Solution: ${{data.tests.ssh.fix}}\\n`;
+            }}
+        }}
+        if (data.tests.sftp) {{
+            message += `  📁 SFTP: ${{data.tests.sftp.status}} - ${{data.tests.sftp.message}}\\n`;
+        }}
+        if (data.tests.restic) {{
+            message += `  📦 Restic: ${{data.tests.restic.status}} - ${{data.tests.restic.message}}\\n`;
+            if (data.tests.restic.fix) {{
+                message += `     ➡️ Solution: ${{data.tests.restic.fix}}\\n`;
+            }}
+        }}
+
+        alert(message);
+
+        // Rafraîchir le statut
+        loadResticStatus();
+
+    }} catch (err) {{
+        alert(`❌ Erreur lors du test: ${{err.message}}`);
+    }} finally {{
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }}
+}}
+
+async function initRepository(peerName) {{
+    if (!confirm(`Voulez-vous initialiser le repository Restic sur ${{peerName}} ?\\n\\nCette opération peut prendre quelques secondes.`)) {{
+        return;
+    }}
+
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Initialisation...';
+
+    try {{
+        const response = await fetch(`/api/restic/init-repository/${{peerName}}`, {{
+            method: 'POST'
+        }});
+        const data = await response.json();
+
+        if (data.status === 'success' || data.status === 'already_initialized') {{
+            alert(`✅ ${{data.message}}`);
+            // Rafraîchir le statut
+            loadResticStatus();
+        }} else {{
+            alert(`❌ Échec de l'initialisation:\\n${{data.message}}\\n\\nErreur: ${{data.error}}`);
+        }}
+
+    }} catch (err) {{
+        alert(`❌ Erreur lors de l'initialisation: ${{err.message}}`);
+    }} finally {{
+        btn.disabled = false;
+        btn.innerHTML = originalText;
     }}
 }}
 
@@ -1588,6 +1689,236 @@ async def test_notification(
             content={"status": "error", "message": str(e)},
             status_code=500
         )
+
+
+@app.post("/api/restic/test-connection/{peer_name}")
+async def test_restic_connection(peer_name: str):
+    """
+    Teste la connexion SSH et Restic avec un peer
+    Retourne un diagnostic détaillé des problèmes éventuels
+    """
+    try:
+        # Charger la configuration
+        with open(CONFIG_PATH) as f:
+            config = yaml.safe_load(f)
+
+        server_name = config.get('server', {}).get('name', 'unknown')
+        peers = config.get('peers', [])
+
+        # Trouver le peer
+        peer = next((p for p in peers if p.get('name') == peer_name), None)
+        if not peer:
+            raise HTTPException(status_code=404, detail=f"Peer '{peer_name}' not found")
+
+        peer_ip = peer.get('allowed_ips', '').split('/')[0]
+        if not peer_ip:
+            raise HTTPException(status_code=400, detail="Peer has no IP configured")
+
+        repo_url = f"sftp:restic@{peer_ip}:/backups/{server_name}"
+
+        results = {
+            "peer_name": peer_name,
+            "peer_ip": peer_ip,
+            "repository_url": repo_url,
+            "tests": {}
+        }
+
+        # Test 1 : Ping
+        try:
+            ping_result = subprocess.run(
+                ["docker", "exec", "anemone-core", "ping", "-c", "2", "-W", "2", peer_ip],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            results["tests"]["ping"] = {
+                "status": "ok" if ping_result.returncode == 0 else "error",
+                "message": "Peer is reachable" if ping_result.returncode == 0 else "Peer is unreachable"
+            }
+        except Exception as e:
+            results["tests"]["ping"] = {
+                "status": "error",
+                "message": f"Ping failed: {str(e)}"
+            }
+
+        # Test 2 : SSH Connection
+        try:
+            ssh_result = subprocess.run(
+                ["docker", "exec", "anemone-core", "ssh", "-o", "StrictHostKeyChecking=no",
+                 "-o", "ConnectTimeout=5", f"restic@{peer_ip}", "echo OK"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+
+            if ssh_result.returncode == 0 and "OK" in ssh_result.stdout:
+                results["tests"]["ssh"] = {
+                    "status": "ok",
+                    "message": "SSH connection successful"
+                }
+            else:
+                error_msg = ssh_result.stderr if ssh_result.stderr else ssh_result.stdout
+                if "Permission denied" in error_msg:
+                    results["tests"]["ssh"] = {
+                        "status": "error",
+                        "message": "SSH key not authorized on peer",
+                        "fix": f"Add this server's SSH public key to {peer_name}'s authorized_keys"
+                    }
+                else:
+                    results["tests"]["ssh"] = {
+                        "status": "error",
+                        "message": f"SSH connection failed: {error_msg}"
+                    }
+        except Exception as e:
+            results["tests"]["ssh"] = {
+                "status": "error",
+                "message": f"SSH test error: {str(e)}"
+            }
+
+        # Test 3 : SFTP Access
+        if results["tests"].get("ssh", {}).get("status") == "ok":
+            try:
+                sftp_result = subprocess.run(
+                    ["docker", "exec", "anemone-core", "sh", "-c",
+                     f"echo 'ls /backups' | sftp -o StrictHostKeyChecking=no restic@{peer_ip}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+
+                if sftp_result.returncode == 0:
+                    results["tests"]["sftp"] = {
+                        "status": "ok",
+                        "message": "SFTP access successful"
+                    }
+                else:
+                    results["tests"]["sftp"] = {
+                        "status": "error",
+                        "message": f"SFTP access failed: {sftp_result.stderr}"
+                    }
+            except Exception as e:
+                results["tests"]["sftp"] = {
+                    "status": "error",
+                    "message": f"SFTP test error: {str(e)}"
+                }
+
+        # Test 4 : Restic Repository
+        if results["tests"].get("ssh", {}).get("status") == "ok":
+            try:
+                restic_result = subprocess.run(
+                    ["docker", "exec", "anemone-core", "sh", "-c",
+                     f"export RESTIC_PASSWORD=$(python3 /scripts/decrypt_key.py 2>/dev/null) && "
+                     f"restic -r {repo_url} snapshots --json --latest 1 2>&1"],
+                    capture_output=True,
+                    text=True,
+                    timeout=15
+                )
+
+                if restic_result.returncode == 0 and restic_result.stdout.strip():
+                    results["tests"]["restic"] = {
+                        "status": "ok",
+                        "message": "Restic repository accessible"
+                    }
+                elif "does not exist" in restic_result.stdout or "does not exist" in restic_result.stderr:
+                    results["tests"]["restic"] = {
+                        "status": "not_initialized",
+                        "message": "Repository not initialized",
+                        "fix": "Click 'Initialize Repository' button"
+                    }
+                else:
+                    results["tests"]["restic"] = {
+                        "status": "error",
+                        "message": f"Repository access failed: {restic_result.stderr or restic_result.stdout}"
+                    }
+            except Exception as e:
+                results["tests"]["restic"] = {
+                    "status": "error",
+                    "message": f"Restic test error: {str(e)}"
+                }
+
+        # Déterminer le statut global
+        all_tests = list(results["tests"].values())
+        if all(t["status"] == "ok" for t in all_tests):
+            results["overall_status"] = "ok"
+            results["overall_message"] = "All tests passed. Backup is ready!"
+        elif any(t["status"] == "not_initialized" for t in all_tests):
+            results["overall_status"] = "not_initialized"
+            results["overall_message"] = "Connection OK but repository needs initialization"
+        else:
+            results["overall_status"] = "error"
+            results["overall_message"] = "Some tests failed. Check details below."
+
+        return JSONResponse(content=results)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Test failed: {str(e)}")
+
+
+@app.post("/api/restic/init-repository/{peer_name}")
+async def init_restic_repository(peer_name: str):
+    """
+    Initialise le repository Restic sur un peer
+    """
+    try:
+        # Charger la configuration
+        with open(CONFIG_PATH) as f:
+            config = yaml.safe_load(f)
+
+        server_name = config.get('server', {}).get('name', 'unknown')
+        peers = config.get('peers', [])
+
+        # Trouver le peer
+        peer = next((p for p in peers if p.get('name') == peer_name), None)
+        if not peer:
+            raise HTTPException(status_code=404, detail=f"Peer '{peer_name}' not found")
+
+        peer_ip = peer.get('allowed_ips', '').split('/')[0]
+        if not peer_ip:
+            raise HTTPException(status_code=400, detail="Peer has no IP configured")
+
+        repo_url = f"sftp:restic@{peer_ip}:/backups/{server_name}"
+
+        # Initialiser le repository
+        result = subprocess.run(
+            ["docker", "exec", "anemone-core", "sh", "-c",
+             f"export RESTIC_PASSWORD=$(python3 /scripts/decrypt_key.py 2>/dev/null) && "
+             f"restic -r {repo_url} init 2>&1"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode == 0:
+            return JSONResponse(content={
+                "status": "success",
+                "message": f"Repository initialized successfully on {peer_name}",
+                "repository_url": repo_url,
+                "output": result.stdout
+            })
+        else:
+            # Vérifier si c'est juste déjà initialisé
+            if "already initialized" in result.stderr or "already exists" in result.stderr:
+                return JSONResponse(content={
+                    "status": "already_initialized",
+                    "message": f"Repository already initialized on {peer_name}",
+                    "repository_url": repo_url
+                })
+            else:
+                return JSONResponse(
+                    content={
+                        "status": "error",
+                        "message": "Failed to initialize repository",
+                        "error": result.stderr or result.stdout
+                    },
+                    status_code=500
+                )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Initialization failed: {str(e)}")
 
 
 @app.get("/api/restic/status")
