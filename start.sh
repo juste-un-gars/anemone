@@ -5,10 +5,66 @@ CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
 GREEN='\033[0;32m'
 RED='\033[0;31m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
 echo -e "${CYAN}🪸 Démarrage d'Anemone...${NC}"
 echo ""
+
+# Gérer l'option --restore-from
+RESTORE_FILE=""
+if [[ "$1" == "--restore-from="* ]]; then
+    RESTORE_FILE="${1#--restore-from=}"
+elif [[ "$1" == "--restore-from" ]] && [[ -n "$2" ]]; then
+    RESTORE_FILE="$2"
+fi
+
+# Si un fichier de restauration est spécifié
+if [ -n "$RESTORE_FILE" ]; then
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}   📦 Mode Restauration de Configuration${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+
+    # Vérifier que le fichier existe
+    if [ ! -f "$RESTORE_FILE" ]; then
+        echo -e "${RED}❌ Fichier introuvable: $RESTORE_FILE${NC}"
+        exit 1
+    fi
+
+    echo -e "${CYAN}Fichier de backup: ${GREEN}$RESTORE_FILE${NC}"
+    echo ""
+
+    # Demander la clé Restic
+    echo -e "${YELLOW}Pour déchiffrer ce backup, entrez votre clé Restic :${NC}"
+    read -s -p "Clé Restic: " RESTIC_KEY
+    echo ""
+    echo ""
+
+    if [ -z "$RESTIC_KEY" ]; then
+        echo -e "${RED}❌ La clé Restic ne peut pas être vide${NC}"
+        exit 1
+    fi
+
+    # Exécuter le script de restauration
+    echo -e "${CYAN}🔓 Restauration en cours...${NC}"
+    echo ""
+
+    python3 scripts/restore-config.py "$RESTORE_FILE" "$RESTIC_KEY"
+
+    if [ $? -eq 0 ]; then
+        echo ""
+        echo -e "${GREEN}✅ Configuration restaurée avec succès !${NC}"
+        echo ""
+        echo -e "${CYAN}Vous pouvez maintenant lancer Docker :${NC}"
+        echo -e "  ${GREEN}docker compose up -d${NC}"
+        echo ""
+        exit 0
+    else
+        echo -e "${RED}❌ Échec de la restauration${NC}"
+        exit 1
+    fi
+fi
 
 # Vérifier si l'initialisation a été faite
 NEED_INIT=false

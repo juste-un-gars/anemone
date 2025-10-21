@@ -1061,6 +1061,137 @@ async def restart_vpn():
             "message": f"Erreur inattendue: {str(e)}"
         }
 
+@app.get("/api/config/export")
+async def export_configuration():
+    """
+    Exporte la configuration complète du serveur dans un fichier chiffré
+
+    Inclut :
+    - config.yaml (configuration complète)
+    - Clés WireGuard (VPN)
+    - Clés SSH
+    - Clé Restic chiffrée + salt
+
+    Le fichier est chiffré avec la clé Restic pour sécurité maximale
+    """
+    import tarfile
+    import tempfile
+    import io
+
+    try:
+        # Vérifier que le setup est complété
+        if not Path("/config/.setup-completed").exists():
+            raise HTTPException(status_code=400, detail="Setup not completed")
+
+        # Lire la clé Restic déchiffrée pour chiffrer l'export
+        restic_key = subprocess.run(
+            ["python3", "/scripts/decrypt_key.py"],
+            capture_output=True,
+            text=True,
+            check=True
+        ).stdout.strip()
+
+        if not restic_key:
+            raise HTTPException(status_code=500, detail="Failed to decrypt Restic key")
+
+        # Créer une archive tar.gz en mémoire
+        tar_buffer = io.BytesIO()
+
+        with tarfile.open(fileobj=tar_buffer, mode='w:gz') as tar:
+            # Ajouter config.yaml
+            if Path("/config/config.yaml").exists():
+                tar.add("/config/config.yaml", arcname="config.yaml")
+
+            # Ajouter les clés WireGuard
+            wg_dir = Path("/config/wireguard")
+            if wg_dir.exists():
+                for key_file in ["private.key", "public.key"]:
+                    key_path = wg_dir / key_file
+                    if key_path.exists():
+                        tar.add(str(key_path), arcname=f"wireguard/{key_file}")
+
+            # Ajouter les clés SSH
+            ssh_dir = Path("/config/ssh")
+            if ssh_dir.exists():
+                for ssh_file in ["id_rsa", "id_rsa.pub", "authorized_keys"]:
+                    ssh_path = ssh_dir / ssh_file
+                    if ssh_path.exists():
+                        tar.add(str(ssh_path), arcname=f"ssh/{ssh_file}")
+
+            # Ajouter la clé Restic chiffrée et le salt
+            if Path("/config/.restic.encrypted").exists():
+                tar.add("/config/.restic.encrypted", arcname=".restic.encrypted")
+            if Path("/config/.restic.salt").exists():
+                tar.add("/config/.restic.salt", arcname=".restic.salt")
+
+        # Récupérer le contenu de l'archive
+        tar_buffer.seek(0)
+        tar_data = tar_buffer.read()
+
+        # Chiffrer l'archive avec la clé Restic
+        # Générer un IV aléatoire
+        iv = secrets.token_bytes(16)
+
+        # Dériver une clé de chiffrement depuis la clé Restic
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=b"anemone-config-export",  # Salt fixe pour l'export
+            iterations=100000,
+            backend=default_backend()
+        )
+        encryption_key = kdf.derive(restic_key.encode())
+
+        # Chiffrer avec AES-256-CBC
+        cipher = Cipher(
+            algorithms.AES(encryption_key),
+            modes.CBC(iv),
+            backend=default_backend()
+        )
+        encryptor = cipher.encryptor()
+
+        # Padding PKCS7
+        block_size = 16
+        padding_length = block_size - (len(tar_data) % block_size)
+        padded_data = tar_data + bytes([padding_length] * padding_length)
+
+        # Chiffrer
+        encrypted_data = encryptor.update(padded_data) + encryptor.finalize()
+
+        # Combiner IV + données chiffrées
+        final_data = iv + encrypted_data
+
+        # Générer le nom de fichier avec timestamp
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+        # Lire le nom du nœud depuis config
+        node_name = "anemone"
+        try:
+            with open("/config/config.yaml") as f:
+                config = yaml.safe_load(f)
+                node_name = config.get("node", {}).get("name", "anemone")
+        except:
+            pass
+
+        filename = f"anemone-backup-{node_name}-{timestamp}.enc"
+
+        # Retourner le fichier chiffré
+        return Response(
+            content=final_data,
+            media_type="application/octet-stream",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "X-Backup-Timestamp": timestamp,
+                "X-Backup-Node": node_name
+            }
+        )
+
+    except subprocess.CalledProcessError as e:
+        raise HTTPException(status_code=500, detail=f"Command error: {e.stderr}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=3000)
