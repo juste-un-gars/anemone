@@ -64,7 +64,7 @@ services:
     profiles:
       - shares  # Ce service ne démarre que si le profile 'shares' est activé
     healthcheck:
-      test: ["CMD", "sh", "-c", "smbclient -L localhost -U% > /dev/null && wget -q --spider http://localhost:${WEBDAV_PORT:-8080}"]
+      test: ["CMD", "sh", "-c", "smbclient -L localhost -U% > /dev/null 2>&1 && ss -tln | grep -q ':${WEBDAV_PORT:-8080}'"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -93,7 +93,7 @@ services:
     networks:
       - anemone-net
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
