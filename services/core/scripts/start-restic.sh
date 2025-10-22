@@ -70,35 +70,57 @@ if [ -f /config/ssh/id_rsa ]; then
     chmod 600 /root/.ssh/id_rsa
 fi
 
-# Mode de backup
-BACKUP_MODE=$(python3 -c "
+# Type et mode de backup
+BACKUP_CONFIG=$(python3 -c "
 import yaml
+import json
 try:
     with open('/config/config.yaml') as f:
         config = yaml.safe_load(f)
-        print(config.get('backup', {}).get('mode', 'scheduled'))
+        backup = config.get('backup', {})
+        print(json.dumps({
+            'type': backup.get('type', 'snapshot'),
+            'mode': backup.get('mode', 'scheduled')
+        }))
 except:
-    print('scheduled')
+    print(json.dumps({'type': 'snapshot', 'mode': 'scheduled'}))
 ")
 
+BACKUP_TYPE=$(echo "$BACKUP_CONFIG" | python3 -c "import sys, json; print(json.load(sys.stdin)['type'])")
+BACKUP_MODE=$(echo "$BACKUP_CONFIG" | python3 -c "import sys, json; print(json.load(sys.stdin)['mode'])")
+
+echo "📋 Backup type: $BACKUP_TYPE"
 echo "📋 Backup mode: $BACKUP_MODE"
+
+# Exporter le type pour les scripts enfants
+export BACKUP_TYPE
 
 # Initialiser repos
 echo "🔧 Initializing repositories..."
 /scripts/init-repos.sh
 
+# Déterminer le script à lancer selon le type
+if [ "$BACKUP_TYPE" = "sync" ]; then
+    SCRIPT_PREFIX="/scripts/sync"
+    echo "🔄 Using rsync synchronization (mirror mode)"
+else
+    SCRIPT_PREFIX="/scripts/backup"
+    echo "📸 Using Restic snapshots (history mode)"
+fi
+
 # Démarrer selon le mode
 case "$BACKUP_MODE" in
     "live")
         echo "🔴 LIVE mode"
-        exec /scripts/backup-live.sh
+        exec ${SCRIPT_PREFIX}-live.sh
         ;;
     "periodic")
         echo "🟡 PERIODIC mode"
-        exec /scripts/backup-periodic.sh
+        exec ${SCRIPT_PREFIX}-periodic.sh
         ;;
     "scheduled")
         echo "🟢 SCHEDULED mode"
+        # Pour scheduled, on utilise setup-cron.sh qui doit être adapté
         /scripts/setup-cron.sh
         exec crond -f -l 2
         ;;
