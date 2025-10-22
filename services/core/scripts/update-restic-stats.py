@@ -37,9 +37,9 @@ def query_target_snapshots(target_name, repo_url, restic_password):
     """
 
     try:
-        # Récupérer le dernier snapshot en JSON
+        # Récupérer tous les snapshots en JSON
         result = subprocess.run(
-            ["restic", "-r", repo_url, "snapshots", "--json", "--latest", "1"],
+            ["restic", "-r", repo_url, "snapshots", "--json"],
             capture_output=True,
             text=True,
             timeout=15,
@@ -61,6 +61,8 @@ def query_target_snapshots(target_name, repo_url, restic_password):
                 "message": "No snapshots found"
             }
 
+        # Trier par date (le plus récent en premier) et prendre le premier
+        snapshots.sort(key=lambda s: s['time'], reverse=True)
         snapshot = snapshots[0]
 
         # Calculer l'âge du snapshot
