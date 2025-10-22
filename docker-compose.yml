@@ -19,6 +19,7 @@ services:
       - ${BACKUP_RECEIVE_PATH:-./backups}:/home/restic/backups
       - ./config-backups:/config-backups
       - ./logs:/logs
+      - ./shared-stats:/var/stats  # Volume partagé pour les stats Restic
       - /lib/modules:/lib/modules:ro
     ports:
       - "51820:51820/udp"  # WireGuard VPN
@@ -82,6 +83,7 @@ services:
       - ./config:/config
       - ./logs:/logs:ro
       - ./scripts:/scripts:ro
+      - ./shared-stats:/var/stats:ro  # Volume partagé pour les stats Restic (lecture seule)
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "${API_PORT:-3000}:3000"

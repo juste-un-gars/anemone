@@ -17,6 +17,7 @@ data/
 backups/
 restore/
 config-backups/
+shared-stats/*.json  # Stats générées dynamiquement
 
 # Logs
 logs/

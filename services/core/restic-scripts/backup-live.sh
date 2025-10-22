@@ -60,8 +60,15 @@ do_backup() {
         LAST_BACKUP=$(date +%s)
         BACKUP_PENDING=0
         echo "✅ Backup completed at $(date '+%Y-%m-%d %H:%M:%S')"
+
+        # Mettre à jour les statistiques pour l'API web
+        echo "📊 Updating Restic stats..."
+        python3 /scripts/core/update-restic-stats.py || echo "⚠️  Failed to update stats"
     else
         echo "❌ Backup failed at $(date '+%Y-%m-%d %H:%M:%S')"
+
+        # Mettre à jour les stats même en cas d'échec
+        python3 /scripts/core/update-restic-stats.py || true
     fi
 
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

@@ -1933,153 +1933,38 @@ async def init_restic_repository(peer_name: str):
 async def get_restic_status():
     """
     Récupère l'état des snapshots Restic sur tous les peers
-    Retourne le dernier snapshot pour chaque peer avec son statut
+    Lit le fichier JSON généré par le service core après chaque backup
     """
     try:
-        # Charger la configuration
-        with open(CONFIG_PATH) as f:
-            config = yaml.safe_load(f)
+        stats_file = Path("/var/stats/restic-status.json")
 
-        server_name = config.get('server', {}).get('name', 'unknown')
-        peers = config.get('peers', [])
+        # Vérifier si le fichier de stats existe
+        if not stats_file.exists():
+            # Si pas encore de stats, retourner un statut par défaut
+            with open(CONFIG_PATH) as f:
+                config = yaml.safe_load(f)
 
-        if not peers:
             return JSONResponse(content={
-                "status": "no_peers",
-                "message": "No peers configured",
-                "peers": []
+                "global_status": "waiting",
+                "message": "Waiting for first backup to complete",
+                "server_name": config.get('server', {}).get('name', 'unknown'),
+                "peers": [],
+                "total_peers": len(config.get('peers', [])),
+                "checked_at": datetime.now().isoformat()
             })
 
-        peers_status = []
+        # Lire le fichier de stats
+        with open(stats_file) as f:
+            stats = json.load(f)
 
-        for peer in peers:
-            peer_name = peer.get('name', 'unknown')
-            peer_ip = peer.get('allowed_ips', '').split('/')[0]
+        # Ajouter des métadonnées
+        stats["total_peers"] = len(stats.get("peers", []))
+        stats["checked_at"] = datetime.now().isoformat()
 
-            if not peer_ip:
-                peers_status.append({
-                    "name": peer_name,
-                    "status": "error",
-                    "message": "No IP configured",
-                    "last_snapshot": None
-                })
-                continue
+        return JSONResponse(content=stats)
 
-            repo_url = f"sftp:restic@{peer_ip}:/backups/{server_name}"
-
-            try:
-                # Exécuter restic snapshots avec le mot de passe chargé
-                result = subprocess.run(
-                    [
-                        "docker", "exec", "anemone-core", "sh", "-c",
-                        f"export RESTIC_PASSWORD=$(python3 /scripts/decrypt_key.py 2>/dev/null) && "
-                        f"restic -r {repo_url} snapshots --json --latest 1 2>/dev/null"
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=15
-                )
-
-                if result.returncode == 0 and result.stdout.strip():
-                    import json
-                    snapshots = json.loads(result.stdout)
-
-                    if snapshots:
-                        latest = snapshots[0]
-                        snapshot_time = datetime.fromisoformat(latest['time'].replace('Z', '+00:00'))
-                        age_hours = (datetime.now(snapshot_time.tzinfo) - snapshot_time).total_seconds() / 3600
-
-                        # Déterminer le statut en fonction de l'âge
-                        if age_hours < 25:  # Moins de 25h (backup quotidien)
-                            status = "ok"
-                        elif age_hours < 48:  # Moins de 2 jours
-                            status = "warning"
-                        else:  # Plus de 2 jours
-                            status = "error"
-
-                        peers_status.append({
-                            "name": peer_name,
-                            "ip": peer_ip,
-                            "status": status,
-                            "last_snapshot": {
-                                "id": latest['short_id'],
-                                "time": latest['time'],
-                                "time_formatted": snapshot_time.strftime("%Y-%m-%d %H:%M:%S"),
-                                "age_hours": round(age_hours, 1),
-                                "hostname": latest.get('hostname', 'unknown'),
-                                "paths": latest.get('paths', [])
-                            },
-                            "repository_url": repo_url
-                        })
-                    else:
-                        peers_status.append({
-                            "name": peer_name,
-                            "ip": peer_ip,
-                            "status": "no_snapshots",
-                            "message": "No snapshots found",
-                            "last_snapshot": None,
-                            "repository_url": repo_url
-                        })
-                else:
-                    # Vérifier si c'est un problème de repository non initialisé
-                    if "does not exist" in result.stderr or "does not exist" in result.stdout:
-                        peers_status.append({
-                            "name": peer_name,
-                            "ip": peer_ip,
-                            "status": "not_initialized",
-                            "message": "Repository not initialized",
-                            "last_snapshot": None,
-                            "repository_url": repo_url
-                        })
-                    else:
-                        peers_status.append({
-                            "name": peer_name,
-                            "ip": peer_ip,
-                            "status": "error",
-                            "message": "Unable to query repository",
-                            "last_snapshot": None,
-                            "repository_url": repo_url
-                        })
-
-            except subprocess.TimeoutExpired:
-                peers_status.append({
-                    "name": peer_name,
-                    "ip": peer_ip,
-                    "status": "timeout",
-                    "message": "Query timeout (peer unreachable?)",
-                    "last_snapshot": None,
-                    "repository_url": repo_url
-                })
-            except Exception as e:
-                peers_status.append({
-                    "name": peer_name,
-                    "ip": peer_ip,
-                    "status": "error",
-                    "message": str(e),
-                    "last_snapshot": None,
-                    "repository_url": repo_url
-                })
-
-        # Déterminer le statut global
-        if not peers_status:
-            global_status = "no_data"
-        elif all(p["status"] == "ok" for p in peers_status):
-            global_status = "ok"
-        elif any(p["status"] in ["error", "timeout"] for p in peers_status):
-            global_status = "error"
-        elif any(p["status"] == "warning" for p in peers_status):
-            global_status = "warning"
-        else:
-            global_status = "partial"
-
-        return JSONResponse(content={
-            "global_status": global_status,
-            "server_name": server_name,
-            "peers": peers_status,
-            "total_peers": len(peers_status),
-            "checked_at": datetime.now().isoformat()
-        })
-
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Invalid stats file format")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get Restic status: {str(e)}")
 
