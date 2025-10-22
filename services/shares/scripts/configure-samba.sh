@@ -1,4 +1,9 @@
 #!/bin/bash
+# Anemone - Distributed encrypted file server with peer redundancy
+# Copyright (C) 2025 juste-un-gars
+# Licensed under the GNU Affero General Public License v3.0
+# See LICENSE for details.
+
 set -e
 
 # Variables
@@ -54,6 +59,16 @@ cat > /etc/samba/smb.conf <<EOF
    create mask = 0664
    directory mask = 0775
    comment = Backed Up Data
+
+   # Corbeille (VFS recycle module)
+   vfs objects = recycle
+   recycle:repository = .trash
+   recycle:keeptree = yes
+   recycle:versions = yes
+   recycle:touch = yes
+   recycle:maxsize = 0
+   recycle:exclude = *.tmp,*.temp,~*,*.swp,*.part
+   recycle:exclude_dir = /tmp,/temp,.trash
 EOF
 
 # Permissions

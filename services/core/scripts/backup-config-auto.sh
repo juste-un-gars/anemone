@@ -324,14 +324,18 @@ while IFS=':' read -r VPN_IP PEER_NAME; do
 
     # Créer le répertoire distant si nécessaire
     ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i /root/.ssh/id_rsa "restic@${VPN_IP}" \
-        "mkdir -p /config-backups/${HOSTNAME}" 2>/dev/null || true
+        "mkdir -p /config-backups/peer-configs/${HOSTNAME}" 2>/dev/null || true
 
     # Uploader le fichier via SFTP
-    if echo "put ${BACKUP_FILE} /config-backups/${HOSTNAME}/$(basename ${BACKUP_FILE})" | \
+    if echo "put ${BACKUP_FILE} /config-backups/peer-configs/${HOSTNAME}/$(basename ${BACKUP_FILE})" | \
        sftp -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i /root/.ssh/id_rsa \
        "restic@${VPN_IP}" >/dev/null 2>&1; then
         log_success "   ✓ ${PEER_NAME}"
         ((SUCCESS_COUNT++))
+
+        # Nettoyer les anciens backups distants (garder les 3 derniers)
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -i /root/.ssh/id_rsa "restic@${VPN_IP}" \
+            "cd /config-backups/peer-configs/${HOSTNAME} && ls -t anemone-backup-*.enc 2>/dev/null | tail -n +4 | xargs -r rm -f" 2>/dev/null || true
     else
         log_error "   ✗ ${PEER_NAME} (échec de connexion)"
         ((FAIL_COUNT++))
@@ -347,10 +351,10 @@ if [ $FAIL_COUNT -gt 0 ]; then
     log_warning "   Échecs: ${FAIL_COUNT} peer(s)"
 fi
 
-# Nettoyer les anciens backups locaux (garder les 7 derniers)
+# Nettoyer les anciens backups locaux (garder les 3 derniers)
 log "🧹 Nettoyage des anciens backups..."
 cd "$BACKUP_DIR"
-ls -t anemone-backup-${HOSTNAME}-*.enc 2>/dev/null | tail -n +8 | xargs -r rm -f
+ls -t anemone-backup-${HOSTNAME}-*.enc 2>/dev/null | tail -n +4 | xargs -r rm -f
 REMAINING=$(ls -1 anemone-backup-${HOSTNAME}-*.enc 2>/dev/null | wc -l)
 log "   Backups locaux conservés: ${REMAINING}"
 

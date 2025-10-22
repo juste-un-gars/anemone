@@ -421,6 +421,7 @@
             <div class="tabs">
                 <button class="tab active" data-tab="backups">📦 Backups Disponibles</button>
                 <button class="tab" data-tab="history">📊 Historique</button>
+                <button class="tab" data-tab="restore">🔄 Restaurer depuis peer</button>
                 <button class="tab" data-tab="settings">⚙️ Paramètres</button>
             </div>
 
@@ -443,6 +444,30 @@
                     <p>Chargement de l'historique...</p>
                 </div>
                 <div id="history-content" style="display: none;"></div>
+            </div>
+
+            <div id="restore-tab" class="tab-content">
+                <div class="alert alert-info">
+                    <strong>🆘 Restauration d'urgence</strong><br>
+                    Cette fonction permet de restaurer <strong>toutes vos données utilisateur</strong> depuis un peer en cas de crash serveur ou de perte de données.<br><br>
+                    <strong>⚠️ Important :</strong> Les fichiers locaux différents seront écrasés par ceux du peer. Utilisez "Mode simulation" pour prévisualiser les changements.
+                </div>
+
+                <h2 style="margin: 20px 0;">Sélectionner le peer source</h2>
+
+                <div id="peers-loading" class="loading">
+                    <div class="spinner"></div>
+                    <p>Chargement des peers...</p>
+                </div>
+
+                <div id="peers-list" style="display: none;">
+                    <!-- Liste des peers remplie dynamiquement -->
+                </div>
+
+                <div id="restore-output" style="display: none; margin-top: 30px;">
+                    <h3>Sortie de la restauration</h3>
+                    <pre style="background: #f8f9fa; padding: 20px; border-radius: 8px; overflow-x: auto; max-height: 400px; font-size: 13px; font-family: monospace; white-space: pre-wrap;"></pre>
+                </div>
             </div>
 
             <div id="settings-tab" class="tab-content">
@@ -529,6 +554,10 @@
 
                 if (tabName === 'history' && !document.getElementById('history-content').hasChildNodes()) {
                     loadHistory();
+                }
+
+                if (tabName === 'restore' && !document.getElementById('peers-list').hasChildNodes()) {
+                    loadAvailablePeers();
                 }
             });
         });
@@ -816,6 +845,138 @@
             } finally {
                 button.disabled = false;
                 button.innerHTML = originalText;
+            }
+        }
+
+        // Charger les peers disponibles pour restauration
+        async function loadAvailablePeers() {
+            const loadingDiv = document.getElementById('peers-loading');
+            const listDiv = document.getElementById('peers-list');
+
+            loadingDiv.style.display = 'block';
+            listDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/restore/available-peers');
+                const data = await response.json();
+
+                if (!data.success || data.count === 0) {
+                    listDiv.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">🤷</div>
+                            <p>Aucun peer configuré. Ajoutez des peers dans la section "Pairs" du dashboard.</p>
+                        </div>
+                    `;
+                } else {
+                    let html = '<div class="backup-list">';
+
+                    for (const peer of data.peers) {
+                        const statusClass = peer.reachable ? 'badge-local' : 'badge-remote';
+                        const statusText = peer.reachable ? '🟢 Accessible' : '🔴 Hors ligne';
+                        const disabled = peer.reachable ? '' : 'disabled';
+
+                        html += `
+                            <div class="backup-item" style="display: block;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                                    <div class="backup-info">
+                                        <div class="backup-filename">📡 ${peer.name}</div>
+                                        <div class="backup-meta">
+                                            <span>IP: ${peer.ip}</span>
+                                            <span class="badge ${statusClass}">${statusText}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                ${peer.reachable ? `
+                                    <div style="display: flex; gap: 12px;">
+                                        <button class="btn btn-secondary" onclick="restoreFromPeer('${peer.name}', true)" ${disabled}>
+                                            🔍 Mode simulation
+                                        </button>
+                                        <button class="btn btn-primary" onclick="confirmRestore('${peer.name}')" ${disabled}>
+                                            🔄 Restaurer maintenant
+                                        </button>
+                                    </div>
+                                ` : `
+                                    <div class="alert alert-error" style="margin-top: 12px;">
+                                        ⚠️ Ce peer n'est pas joignable actuellement. Vérifiez la connexion VPN.
+                                    </div>
+                                `}
+                            </div>
+                        `;
+                    }
+
+                    html += '</div>';
+                    listDiv.innerHTML = html;
+                }
+
+                loadingDiv.style.display = 'none';
+                listDiv.style.display = 'block';
+
+            } catch (error) {
+                console.error('Error loading peers:', error);
+                listDiv.innerHTML = `
+                    <div class="alert alert-error">
+                        ❌ Erreur lors du chargement des peers: ${error.message}
+                    </div>
+                `;
+                loadingDiv.style.display = 'none';
+                listDiv.style.display = 'block';
+            }
+        }
+
+        function confirmRestore(peerName) {
+            if (confirm(
+                `⚠️ ATTENTION : Restauration depuis ${peerName}\n\n` +
+                `Cette opération va :\n` +
+                `• Récupérer TOUTES les données de /mnt/backup depuis ${peerName}\n` +
+                `• Écraser les fichiers locaux différents avec ceux du peer\n` +
+                `• Peut prendre plusieurs minutes selon la quantité de données\n\n` +
+                `Recommandation : Utilisez d'abord "Mode simulation" pour voir les changements.\n\n` +
+                `Voulez-vous vraiment continuer ?`
+            )) {
+                restoreFromPeer(peerName, false);
+            }
+        }
+
+        async function restoreFromPeer(peerName, dryRun) {
+            const outputDiv = document.getElementById('restore-output');
+            const pre = outputDiv.querySelector('pre');
+
+            outputDiv.style.display = 'block';
+            pre.textContent = dryRun
+                ? `🔍 Simulation de la restauration depuis ${peerName}...\n\nCela peut prendre quelques minutes...\n\n`
+                : `🔄 Restauration en cours depuis ${peerName}...\n\nCela peut prendre plusieurs minutes...\n\n`;
+
+            // Faire défiler vers la sortie
+            outputDiv.scrollIntoView({ behavior: 'smooth' });
+
+            try {
+                const response = await fetch(`/api/restore/from-peer/${peerName}?dry_run=${dryRun}`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    pre.textContent = `✅ ${result.message}\n\n` +
+                                     `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                                     result.output;
+
+                    if (!dryRun) {
+                        alert('✅ Restauration terminée avec succès !');
+                    }
+                } else {
+                    pre.textContent = `❌ Erreur lors de la restauration\n\n` +
+                                     `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+                                     `Erreur: ${result.error}\n\n` +
+                                     `Sortie:\n${result.output || '(aucune sortie)'}`;
+
+                    alert('❌ Erreur lors de la restauration. Consultez la sortie ci-dessous.');
+                }
+            } catch (error) {
+                console.error('Error restoring from peer:', error);
+                pre.textContent = `❌ Erreur réseau\n\n${error.message}`;
+                alert('❌ Erreur lors de la restauration : ' + error.message);
             }
         }
 

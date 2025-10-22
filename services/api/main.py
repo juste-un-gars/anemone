@@ -1,6 +1,21 @@
 #!/usr/bin/env python3
 """
 Anemone API - Interface de monitoring et gestion avec setup sécurisé
+
+Copyright (C) 2025 juste-un-gars
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import os
@@ -475,6 +490,8 @@ body {{
     <div class="nav">
         <a href="/" class="active">🏠 {t['home']}</a>
         <a href="/peers">👥 {t['peers']}</a>
+        <a href="/trash">🗑️ Corbeille</a>
+        <a href="/peer-configs">💾 Configs Pairs</a>
         <a href="/recovery">🔄 Recovery</a>
         <a href="/api/status">📊 {t['api_status']}</a>
     </div>
@@ -805,6 +822,20 @@ async def peers_page(request: Request):
     t = get_all_texts(WEB_LANGUAGE)
     return templates.TemplateResponse("peers.html", {"request": request, "t": t})
 
+@app.get("/trash", response_class=HTMLResponse)
+async def trash_page(request: Request):
+    """Page de gestion de la corbeille"""
+    config = load_config()
+    name = config.get('node', {}).get('name', 'Anemone')
+    return templates.TemplateResponse("trash.html", {"request": request, "node_name": name})
+
+@app.get("/peer-configs", response_class=HTMLResponse)
+async def peer_configs_page(request: Request):
+    """Page de téléchargement des configurations des pairs"""
+    config = load_config()
+    name = config.get('node', {}).get('name', 'Anemone')
+    return templates.TemplateResponse("peer-configs.html", {"request": request, "node_name": name})
+
 # ===== API Gestion des pairs =====
 
 class InvitationRequest(BaseModel):
@@ -1030,6 +1061,171 @@ async def update_quota_config(max_size_per_peer: str = Form(...)):
         }
     except Exception as e:
         raise HTTPException(500, f"Erreur: {str(e)}")
+
+# ===== API Gestion de la Corbeille =====
+
+@app.get("/api/trash/list")
+async def list_trash():
+    """Liste tous les fichiers dans la corbeille"""
+    try:
+        trash_dir = Path("/mnt/backup/.trash")
+
+        if not trash_dir.exists():
+            return {
+                "success": True,
+                "files": [],
+                "total_count": 0,
+                "total_size": 0,
+                "total_size_formatted": "0 B"
+            }
+
+        files = []
+        total_size = 0
+
+        for item in trash_dir.rglob("*"):
+            if item.is_file():
+                stat = item.stat()
+                rel_path = item.relative_to(trash_dir)
+
+                files.append({
+                    "name": item.name,
+                    "path": str(rel_path),
+                    "full_path": str(item),
+                    "size": stat.st_size,
+                    "size_formatted": format_bytes(stat.st_size),
+                    "deleted_at": stat.st_mtime,
+                    "deleted_at_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    "parent_dir": str(rel_path.parent) if rel_path.parent != Path('.') else ""
+                })
+                total_size += stat.st_size
+
+        # Trier par date (plus récent en premier)
+        files.sort(key=lambda x: x["deleted_at"], reverse=True)
+
+        return {
+            "success": True,
+            "files": files,
+            "total_count": len(files),
+            "total_size": total_size,
+            "total_size_formatted": format_bytes(total_size)
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Erreur: {str(e)}")
+
+@app.post("/api/trash/restore")
+async def restore_from_trash(file_path: str = Body(..., embed=True)):
+    """Restaure un fichier depuis la corbeille vers son emplacement d'origine"""
+    try:
+        trash_dir = Path("/mnt/backup/.trash")
+        trash_file = trash_dir / file_path
+
+        if not trash_file.exists():
+            raise HTTPException(404, "Fichier introuvable dans la corbeille")
+
+        # Déterminer le chemin de destination (retirer .trash du chemin)
+        restore_path = Path("/mnt/backup") / file_path
+
+        # Créer les dossiers parents si nécessaire
+        restore_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Si le fichier existe déjà, ajouter un suffixe
+        if restore_path.exists():
+            base = restore_path.stem
+            ext = restore_path.suffix
+            counter = 1
+            while restore_path.exists():
+                restore_path = restore_path.parent / f"{base}_restored_{counter}{ext}"
+                counter += 1
+
+        # Déplacer le fichier
+        shutil.move(str(trash_file), str(restore_path))
+
+        # Nettoyer les dossiers vides dans la corbeille
+        try:
+            parent = trash_file.parent
+            while parent != trash_dir and parent.exists():
+                if not any(parent.iterdir()):
+                    parent.rmdir()
+                    parent = parent.parent
+                else:
+                    break
+        except:
+            pass
+
+        return {
+            "success": True,
+            "message": f"Fichier restauré vers {restore_path}",
+            "restored_path": str(restore_path)
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur lors de la restauration: {str(e)}")
+
+@app.delete("/api/trash/empty")
+async def empty_trash():
+    """Vide complètement la corbeille"""
+    try:
+        trash_dir = Path("/mnt/backup/.trash")
+
+        if not trash_dir.exists():
+            return {
+                "success": True,
+                "message": "La corbeille est déjà vide",
+                "deleted_count": 0
+            }
+
+        deleted_count = 0
+        for item in trash_dir.rglob("*"):
+            if item.is_file():
+                item.unlink()
+                deleted_count += 1
+
+        # Supprimer les dossiers vides
+        for item in sorted(trash_dir.rglob("*"), key=lambda p: len(p.parts), reverse=True):
+            if item.is_dir() and not any(item.iterdir()):
+                item.rmdir()
+
+        return {
+            "success": True,
+            "message": f"{deleted_count} fichier(s) supprimé(s) définitivement",
+            "deleted_count": deleted_count
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Erreur lors du vidage: {str(e)}")
+
+@app.delete("/api/trash/{file_path:path}")
+async def delete_from_trash(file_path: str):
+    """Supprime définitivement un fichier de la corbeille"""
+    try:
+        trash_dir = Path("/mnt/backup/.trash")
+        trash_file = trash_dir / file_path
+
+        if not trash_file.exists():
+            raise HTTPException(404, "Fichier introuvable dans la corbeille")
+
+        trash_file.unlink()
+
+        # Nettoyer les dossiers vides
+        try:
+            parent = trash_file.parent
+            while parent != trash_dir and parent.exists():
+                if not any(parent.iterdir()):
+                    parent.rmdir()
+                    parent = parent.parent
+                else:
+                    break
+        except:
+            pass
+
+        return {
+            "success": True,
+            "message": "Fichier supprimé définitivement"
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Erreur lors de la suppression: {str(e)}")
 
 # ===== API Statistiques Système =====
 
@@ -1726,6 +1922,211 @@ async def force_config_backup():
         raise HTTPException(status_code=504, detail="Timeout lors de la sauvegarde")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur lors de la sauvegarde : {str(e)}")
+
+
+@app.post("/api/restore/from-peer/{peer_name}")
+async def restore_from_peer(peer_name: str, dry_run: bool = False):
+    """
+    Restaure les données utilisateur depuis un peer en cas de crash serveur
+    Utilise rsync pour récupérer /mnt/backup du peer vers le serveur local
+
+    Args:
+        peer_name: Nom du peer source
+        dry_run: Si True, simule la restauration sans modifier les données
+    """
+    try:
+        # Vérifier que le peer existe
+        with open(CONFIG_PATH) as f:
+            config = yaml.safe_load(f)
+
+        peers = config.get('peers', [])
+        peer = next((p for p in peers if p.get('name') == peer_name), None)
+
+        if not peer:
+            raise HTTPException(status_code=404, detail=f"Peer '{peer_name}' introuvable")
+
+        # Lancer le script de restauration
+        cmd = ["docker", "exec", "anemone-core", "/scripts/restore-from-peer.sh", peer_name]
+
+        if dry_run:
+            cmd.append("--dry-run")
+
+        # Timeout plus long pour la restauration (30 minutes max)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=1800
+        )
+
+        if result.returncode == 0:
+            return JSONResponse(content={
+                "status": "success",
+                "message": f"Restauration depuis {peer_name} {'simulée' if dry_run else 'terminée'} avec succès",
+                "output": result.stdout,
+                "peer_name": peer_name,
+                "dry_run": dry_run
+            })
+        else:
+            return JSONResponse(
+                content={
+                    "status": "error",
+                    "message": f"Erreur lors de la restauration depuis {peer_name}",
+                    "error": result.stderr,
+                    "output": result.stdout
+                },
+                status_code=500
+            )
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Timeout lors de la restauration (>30 min)")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur : {str(e)}")
+
+
+@app.get("/api/restore/available-peers")
+async def get_available_peers():
+    """
+    Liste les peers disponibles pour la restauration avec leur statut
+    """
+    try:
+        with open(CONFIG_PATH) as f:
+            config = yaml.safe_load(f)
+
+        peers = config.get('peers', [])
+        available_peers = []
+
+        for peer in peers:
+            peer_name = peer.get('name')
+            peer_ip = peer.get('allowed_ips', '').split('/')[0]
+
+            if not peer_ip:
+                continue
+
+            # Tester la connectivité
+            try:
+                ping_result = subprocess.run(
+                    ["docker", "exec", "anemone-core", "ping", "-c", "1", "-W", "2", peer_ip],
+                    capture_output=True,
+                    timeout=3
+                )
+                reachable = ping_result.returncode == 0
+            except:
+                reachable = False
+
+            available_peers.append({
+                "name": peer_name,
+                "ip": peer_ip,
+                "reachable": reachable,
+                "status": "available" if reachable else "unreachable"
+            })
+
+        return JSONResponse(content={
+            "success": True,
+            "peers": available_peers,
+            "count": len(available_peers)
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur : {str(e)}")
+
+
+# ===== API Configurations des pairs =====
+
+@app.get("/api/peer-configs/list")
+async def list_peer_configs():
+    """
+    Liste toutes les configurations de backup reçues des peers
+    Retourne les backups groupés par peer avec date et taille
+    """
+    try:
+        peer_configs_dir = Path("/config-backups/peer-configs")
+
+        if not peer_configs_dir.exists():
+            return JSONResponse(content={
+                "success": True,
+                "peers": [],
+                "total_count": 0
+            })
+
+        peers_data = []
+
+        # Parcourir chaque sous-dossier (un par peer)
+        for peer_dir in sorted(peer_configs_dir.iterdir()):
+            if not peer_dir.is_dir():
+                continue
+
+            peer_name = peer_dir.name
+            backups = []
+
+            # Lister tous les fichiers .enc dans ce dossier
+            for backup_file in sorted(peer_dir.glob("*.enc"), key=lambda p: p.stat().st_mtime, reverse=True):
+                stat = backup_file.stat()
+
+                backups.append({
+                    "filename": backup_file.name,
+                    "size": stat.st_size,
+                    "size_formatted": format_bytes(stat.st_size),
+                    "date": stat.st_mtime,
+                    "date_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    "date_formatted": datetime.fromtimestamp(stat.st_mtime).strftime('%d/%m/%Y %H:%M')
+                })
+
+            if backups:
+                peers_data.append({
+                    "peer_name": peer_name,
+                    "backup_count": len(backups),
+                    "backups": backups,
+                    "latest_backup": backups[0] if backups else None
+                })
+
+        return JSONResponse(content={
+            "success": True,
+            "peers": peers_data,
+            "total_count": sum(p["backup_count"] for p in peers_data)
+        })
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur : {str(e)}")
+
+
+@app.get("/api/peer-configs/download/{peer_name}/{filename}")
+async def download_peer_config(peer_name: str, filename: str):
+    """
+    Télécharge un fichier de configuration d'un peer
+    Le fichier est renvoyé en téléchargement direct
+    """
+    try:
+        # Validation du nom de peer et filename (sécurité)
+        if not peer_name.replace('-', '').replace('_', '').isalnum():
+            raise HTTPException(status_code=400, detail="Nom de peer invalide")
+
+        if not filename.endswith('.enc') or '/' in filename or '..' in filename:
+            raise HTTPException(status_code=400, detail="Nom de fichier invalide")
+
+        # Chemin du fichier
+        file_path = Path(f"/config-backups/peer-configs/{peer_name}/{filename}")
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="Fichier introuvable")
+
+        if not file_path.is_file():
+            raise HTTPException(status_code=400, detail="Chemin invalide")
+
+        # Retourner le fichier en téléchargement
+        from fastapi.responses import FileResponse
+        return FileResponse(
+            path=str(file_path),
+            filename=filename,
+            media_type='application/octet-stream'
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur : {str(e)}")
 
 
 @app.post("/api/restic/test-connection/{peer_name}")

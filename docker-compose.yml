@@ -85,6 +85,7 @@ services:
       - ./scripts:/scripts:ro
       - ./shared-stats:/var/stats:ro  # Volume partagé pour les stats Restic (lecture seule)
       - ${BACKUP_RECEIVE_PATH:-./backups}:/home/restic/backups:ro  # Backups reçus (pour calcul quotas)
+      - ${BACKUP_DATA_PATH:-./backup}:/mnt/backup  # Accès à la corbeille (.trash) pour restauration
       - /var/run/docker.sock:/var/run/docker.sock:ro
     ports:
       - "${API_PORT:-3000}:3000"

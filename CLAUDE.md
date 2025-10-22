@@ -6,21 +6,50 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Anemone is a distributed, encrypted file server with redundancy between peers. It combines WireGuard VPN, Restic encrypted backups, SMB/WebDAV file sharing, and SFTP in a Docker-based architecture. The system enables family/friends to back up each other's data securely without cloud dependencies.
 
-**Core Services**: 5 interconnected Docker containers (WireGuard VPN, Restic backups, Samba/WebDAV file sharing, SFTP backup receiver, FastAPI web interface)
+**Core Services**: 3 Docker containers
+1. **core** - WireGuard VPN + SFTP server + Restic backup engine (all-in-one)
+2. **shares** - Samba SMB + WebDAV file sharing (optional)
+3. **api** - FastAPI web interface for management
+
+## License
+
+**Copyright (C) 2025 juste-un-gars**
+
+This project is licensed under the **GNU Affero General Public License v3.0** (AGPLv3).
+
+All source files should include the following header:
+
+```python
+# Anemone - Distributed encrypted file server with peer redundancy
+# Copyright (C) 2025 juste-un-gars
+# Licensed under the GNU Affero General Public License v3.0
+# See LICENSE for details.
+```
+
+For bash scripts, use the short form header shown above. For Python files with docstrings, include the full AGPLv3 notice as shown in `services/api/main.py`.
+
+When creating new files, always add the appropriate license header.
 
 ## Key Architecture Concepts
 
 ### Multi-Service Docker Architecture
 
-The system consists of 5 interconnected services:
+The system consists of 3 interconnected services:
 
-1. **WireGuard (VPN)**: Peer-to-peer mesh network
-2. **Restic**: Encrypted incremental backups to remote peers
-3. **Samba/WebDAV**: Local file access interfaces
-4. **SFTP**: Receives encrypted backups from peers
-5. **API**: Web dashboard and secure setup interface
+1. **core** (anemone-core): All-in-one container running via supervisord
+   - **WireGuard VPN**: Peer-to-peer mesh network
+   - **SFTP server**: Receives encrypted backups from peers
+   - **Restic**: Encrypted incremental backups to remote peers
 
-**Critical Network Detail**: The Restic service uses `network_mode: "service:wireguard"` which means it shares the WireGuard container's network stack. This allows Restic to access peers via the VPN without exposing additional ports.
+2. **shares** (anemone-shares): File sharing services (optional, profile-based)
+   - **Samba SMB**: Windows/macOS file sharing
+   - **WebDAV**: HTTP-based file access
+
+3. **api** (anemone-api): Web management interface
+   - **FastAPI**: Dashboard and secure setup interface
+   - **Recovery tools**: Disaster recovery management
+
+**Critical Detail**: All core services (WireGuard, SFTP, Restic) run in the same container via supervisord. This allows Restic to access the VPN network stack directly without complex networking configuration.
 
 ### Encryption Key Management System
 

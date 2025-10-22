@@ -15,6 +15,25 @@ Merci de votre intérêt pour contribuer à Anemone ! Ce document vous guidera p
 
 Soyez respectueux et constructif dans vos interactions. Nous voulons une communauté accueillante pour tous.
 
+## 📄 Licence et Contributions
+
+**En contribuant à ce projet, vous acceptez que :**
+
+1. ✅ Vos contributions soient publiées sous la **GNU Affero General Public License v3.0** (AGPLv3)
+2. ✅ Vos contributions deviennent partie intégrante d'Anemone, un logiciel libre et open source
+3. ✅ Vous détenez les droits nécessaires pour contribuer ce code
+4. ✅ Votre contribution n'enfreint aucun brevet, copyright ou autre droit de propriété intellectuelle
+
+L'AGPLv3 garantit que :
+- Le code reste libre et gratuit
+- Toute modification doit être partagée avec la communauté
+- Même un service web utilisant Anemone doit publier son code source
+- Les prestations de service commerciales sont autorisées (installation, maintenance, support)
+
+**Note importante** : L'AGPLv3 est une licence Open Source qui **autorise l'usage commercial**. Cela signifie que n'importe qui peut utiliser, modifier et même vendre Anemone, tant qu'ils respectent les termes de la licence (notamment le partage du code source modifié).
+
+Pour plus d'informations, consultez le fichier [LICENSE](LICENSE).
+
 ## 🚀 Comment contribuer
 
 ### Signaler un bug

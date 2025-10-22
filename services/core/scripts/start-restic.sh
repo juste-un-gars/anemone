@@ -1,4 +1,9 @@
 #!/bin/bash
+# Anemone - Distributed encrypted file server with peer redundancy
+# Copyright (C) 2025 juste-un-gars
+# Licensed under the GNU Affero General Public License v3.0
+# See LICENSE for details.
+
 set -e
 
 echo "🪸 Starting Anemone Restic Service..."

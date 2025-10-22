@@ -27,6 +27,11 @@ echo "🔧 Configuring Samba..."
 echo "🔧 Configuring WebDAV..."
 /scripts/configure-webdav.sh
 
+# Configurer le nettoyage automatique de la corbeille (toutes les heures)
+echo "🔧 Configuring trash cleanup cron job..."
+echo "0 * * * * /scripts/trash-cleanup.sh >> /logs/trash-cleanup.log 2>&1" > /etc/crontabs/root
+chmod 600 /etc/crontabs/root
+
 echo "✅ Configuration completed"
 echo ""
 
