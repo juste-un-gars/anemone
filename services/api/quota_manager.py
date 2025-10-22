@@ -117,8 +117,9 @@ class QuotaManager:
         max_size_str = self.config.get('restic_server', {}).get('max_size_per_peer', '10GB')
         max_size_bytes = self._parse_size(max_size_str)
 
-        # Récupérer le chemin de stockage des backups
-        backup_receive_path = self.config.get('storage', {}).get('backup_receive_path', '/mnt/backups')
+        # Récupérer le chemin de stockage des backups reçus
+        # Les backups sont reçus dans /home/restic/backups/{server_name}/
+        backup_receive_path = '/home/restic/backups'
         peer_dir = Path(backup_receive_path) / peer_name
 
         # Vérifier si le répertoire existe
