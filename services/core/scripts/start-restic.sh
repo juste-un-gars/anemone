@@ -70,57 +70,33 @@ if [ -f /config/ssh/id_rsa ]; then
     chmod 600 /root/.ssh/id_rsa
 fi
 
-# Type et mode de backup
-BACKUP_CONFIG=$(python3 -c "
+# Mode de synchronisation des données utilisateur
+BACKUP_MODE=$(python3 -c "
 import yaml
-import json
 try:
     with open('/config/config.yaml') as f:
         config = yaml.safe_load(f)
-        backup = config.get('backup', {})
-        print(json.dumps({
-            'type': backup.get('type', 'snapshot'),
-            'mode': backup.get('mode', 'scheduled')
-        }))
+        print(config.get('backup', {}).get('mode', 'scheduled'))
 except:
-    print(json.dumps({'type': 'snapshot', 'mode': 'scheduled'}))
+    print('scheduled')
 ")
 
-BACKUP_TYPE=$(echo "$BACKUP_CONFIG" | python3 -c "import sys, json; print(json.load(sys.stdin)['type'])")
-BACKUP_MODE=$(echo "$BACKUP_CONFIG" | python3 -c "import sys, json; print(json.load(sys.stdin)['mode'])")
-
-echo "📋 Backup type: $BACKUP_TYPE"
 echo "📋 Backup mode: $BACKUP_MODE"
+echo "🔄 User data: rsync synchronization (mirror mode)"
+echo "📸 Server config: Restic snapshots (handled separately by cron)"
 
-# Exporter le type pour les scripts enfants
-export BACKUP_TYPE
-
-# Initialiser repos
-echo "🔧 Initializing repositories..."
-/scripts/init-repos.sh
-
-# Déterminer le script à lancer selon le type
-if [ "$BACKUP_TYPE" = "sync" ]; then
-    SCRIPT_PREFIX="/scripts/sync"
-    echo "🔄 Using rsync synchronization (mirror mode)"
-else
-    SCRIPT_PREFIX="/scripts/backup"
-    echo "📸 Using Restic snapshots (history mode)"
-fi
-
-# Démarrer selon le mode
+# Démarrer la synchronisation des données selon le mode
 case "$BACKUP_MODE" in
     "live")
-        echo "🔴 LIVE mode"
-        exec ${SCRIPT_PREFIX}-live.sh
+        echo "🔴 LIVE mode - watching for file changes"
+        exec /scripts/sync-live.sh
         ;;
     "periodic")
-        echo "🟡 PERIODIC mode"
-        exec ${SCRIPT_PREFIX}-periodic.sh
+        echo "🟡 PERIODIC mode - syncing every N minutes"
+        exec /scripts/sync-periodic.sh
         ;;
     "scheduled")
-        echo "🟢 SCHEDULED mode"
-        # Pour scheduled, on utilise setup-cron.sh qui doit être adapté
+        echo "🟢 SCHEDULED mode - syncing on cron schedule"
         /scripts/setup-cron.sh
         exec crond -f -l 2
         ;;
