@@ -258,6 +258,154 @@ api:
     - HOSTNAME=mon-serveur-unique
 ```
 
+## Problèmes avec la corbeille
+
+### La corbeille ne se vide pas automatiquement
+
+**Vérifier le cron** :
+```bash
+docker exec anemone-shares crontab -l
+# Doit afficher : 0 * * * * /scripts/trash-cleanup.sh
+```
+
+**Vérifier crond** :
+```bash
+docker exec anemone-shares ps aux | grep crond
+```
+
+**Tester manuellement** :
+```bash
+docker exec anemone-shares /scripts/trash-cleanup.sh
+```
+
+### Les fichiers supprimés ne vont pas dans la corbeille
+
+**Vérifier la configuration Samba** :
+```bash
+docker exec anemone-shares cat /etc/samba/smb.conf | grep -A 5 "vfs objects"
+# Doit afficher : vfs objects = recycle
+```
+
+**Vérifier que le répertoire existe** :
+```bash
+docker exec anemone-shares ls -la /mnt/backup/.trash
+```
+
+### La corbeille est pleine mais rien ne se supprime
+
+**Augmenter la taille limite** :
+
+Éditez `services/shares/scripts/trash-cleanup.sh` :
+```bash
+MAX_SIZE_GB=${TRASH_MAX_SIZE_GB:-20}  # au lieu de 10
+```
+
+Puis redémarrez :
+```bash
+docker-compose restart shares
+```
+
+---
+
+## Problèmes de restauration depuis peer
+
+### Aucun peer disponible pour restauration
+
+**Vérifier la connectivité VPN** :
+```bash
+docker exec anemone-core wg show
+docker exec anemone-core ping 10.8.0.2  # IP du peer
+```
+
+**Vérifier SSH** :
+```bash
+docker exec anemone-core ssh -o ConnectTimeout=5 restic@10.8.0.2 echo "OK"
+```
+
+### La restauration échoue avec "Permission denied"
+
+**Vérifier les clés SSH** :
+```bash
+# Sur le serveur source
+docker exec anemone-core cat /root/.ssh/id_rsa.pub
+
+# Sur le serveur destination (doit contenir la clé ci-dessus)
+cat config/ssh/authorized_keys
+```
+
+### La restauration est très lente
+
+C'est normal si vous avez beaucoup de données. Utilisez d'abord le **mode simulation** pour estimer la durée.
+
+---
+
+## Problèmes avec les configurations de pairs
+
+### Aucune configuration de pair visible
+
+**Vérifier que les backups sont reçus** :
+```bash
+ls -la config-backups/peer-configs/
+```
+
+Si vide, vérifier sur un pair :
+```bash
+# Sur l'autre serveur
+docker logs anemone-core 2>&1 | grep "backup-config-auto"
+```
+
+### Impossible de télécharger un backup de pair
+
+**Vérifier les permissions** :
+```bash
+docker exec anemone-api ls -la /config-backups/peer-configs/
+```
+
+**Vérifier le volume mount** :
+```bash
+docker inspect anemone-api | grep -A 5 "Mounts"
+# Doit afficher /config-backups
+```
+
+---
+
+## Problèmes avec les scripts de démarrage
+
+### ./fr_start.sh : Permission denied
+
+```bash
+chmod +x fr_start.sh en_start.sh fr_restore.sh en_restore.sh
+```
+
+### Script de restauration : "Échec du déchiffrement"
+
+**Causes possibles** :
+
+1. **Mauvaise clé** : Vérifiez dans Bitwarden
+2. **Fichier corrompu** : Retéléchargez depuis le peer
+3. **Mauvais format** : Le fichier doit être .enc
+
+**Test de validation** :
+```bash
+file backup-SERVER-DATE.enc
+# Doit afficher : data (fichier binaire)
+```
+
+### Docker Compose non trouvé
+
+Le script cherche `docker-compose` ou `docker compose`.
+
+**Installation** :
+```bash
+# Sur Ubuntu/Debian
+sudo apt install docker-compose
+
+# Ou utiliser le plugin Docker
+docker compose version
+```
+
+---
+
 ## Besoin d'aide supplémentaire
 
 1. **Logs complets** :
