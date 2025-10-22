@@ -1692,6 +1692,42 @@ async def test_notification(
         )
 
 
+@app.post("/api/recovery/force-backup")
+async def force_config_backup():
+    """
+    Force une sauvegarde immédiate de la configuration
+    Appelle le script backup-config.sh dans le conteneur core
+    """
+    try:
+        result = subprocess.run(
+            ["docker", "exec", "anemone-core", "/scripts/backup-config.sh"],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode == 0:
+            return JSONResponse(content={
+                "status": "success",
+                "message": "Sauvegarde de configuration créée avec succès",
+                "output": result.stdout
+            })
+        else:
+            return JSONResponse(
+                content={
+                    "status": "error",
+                    "message": "Échec de la sauvegarde",
+                    "error": result.stderr
+                },
+                status_code=500
+            )
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Timeout lors de la sauvegarde")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la sauvegarde : {str(e)}")
+
+
 @app.post("/api/restic/test-connection/{peer_name}")
 async def test_restic_connection(peer_name: str):
     """

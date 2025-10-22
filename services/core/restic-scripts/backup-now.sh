@@ -128,4 +128,8 @@ else
     echo "[$(date)] ❌ Backup completed with errors"
 fi
 
+# Mettre à jour les statistiques pour l'API web
+echo "📊 Updating Restic stats..."
+python3 /scripts/core/update-restic-stats.py || echo "⚠️  Failed to update stats"
+
 exit $EXIT_CODE

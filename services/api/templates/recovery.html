@@ -425,6 +425,11 @@
             </div>
 
             <div id="backups-tab" class="tab-content active">
+                <div style="margin-bottom: 20px; display: flex; gap: 12px; justify-content: flex-end;">
+                    <button onclick="forceConfigBackup()" style="background:#28a745;color:white;padding:12px 24px;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:14px;">
+                        💾 Forcer une sauvegarde maintenant
+                    </button>
+                </div>
                 <div id="backups-loading" class="loading">
                     <div class="spinner"></div>
                     <p>Chargement des backups...</p>
@@ -783,6 +788,34 @@
                         ❌ Erreur: ${error.message}
                     </div>
                 `;
+            }
+        }
+
+        async function forceConfigBackup() {
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '⏳ Sauvegarde en cours...';
+
+            try {
+                const response = await fetch('/api/recovery/force-backup', {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    alert('✅ Sauvegarde de configuration créée avec succès !');
+                    // Recharger la liste des backups
+                    await loadBackups();
+                } else {
+                    alert('❌ Erreur lors de la sauvegarde : ' + result.message);
+                }
+            } catch (error) {
+                alert('❌ Erreur : ' + error.message);
+            } finally {
+                button.disabled = false;
+                button.innerHTML = originalText;
             }
         }
 
