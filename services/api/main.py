@@ -601,9 +601,9 @@ async function loadResticStatus() {{
         const res = await fetch('/api/restic/status');
         const data = await res.json();
 
-        if (data.total_peers === 0) {{
+        if (data.total_targets === 0) {{
             document.getElementById('restic-status').innerHTML =
-                '<p style="color:#999;text-align:center">Aucun peer configuré</p>';
+                '<p style="color:#999;text-align:center">Aucune destination de backup configurée</p>';
             return;
         }}
 
@@ -621,48 +621,48 @@ async function loadResticStatus() {{
             </div>
         `;
 
-        // Afficher chaque peer
-        data.peers.forEach(peer => {{
-            const statusColor = peer.status === 'ok' ? '#28a745' :
-                               peer.status === 'warning' ? '#ffc107' :
-                               peer.status === 'not_initialized' ? '#6c757d' :
+        // Afficher chaque target de backup
+        data.targets.forEach(target => {{
+            const statusColor = target.status === 'ok' ? '#28a745' :
+                               target.status === 'warning' ? '#ffc107' :
+                               target.status === 'not_initialized' ? '#6c757d' :
                                '#dc3545';
-            const statusEmoji = peer.status === 'ok' ? '✅' :
-                               peer.status === 'warning' ? '⚠️' :
-                               peer.status === 'not_initialized' ? '⏸️' :
+            const statusEmoji = target.status === 'ok' ? '✅' :
+                               target.status === 'warning' ? '⚠️' :
+                               target.status === 'not_initialized' ? '⏸️' :
                                '❌';
 
             resticHtml += `
                 <div class="stat" style="display:block;padding:16px">
                     <div style="display:flex;justify-content:space-between;align-items:flex-start">
                         <div>
-                            <div style="font-weight:600;color:#333">${{statusEmoji}} ${{peer.name}}</div>
+                            <div style="font-weight:600;color:#333">${{statusEmoji}} ${{target.name}}</div>
                             <div style="font-size:0.85em;color:#666;margin-top:4px">
-                                ${{peer.last_snapshot ?
-                                    peer.last_snapshot.time_formatted + ' (' + peer.last_snapshot.age_hours + 'h)' :
-                                    peer.message || 'Aucun snapshot'}}
+                                ${{target.last_snapshot ?
+                                    target.last_snapshot.time_formatted + ' (' + target.last_snapshot.age_hours + 'h)' :
+                                    target.message || 'Aucun snapshot'}}
                             </div>
                         </div>
                         <div style="text-align:right">
                             <div style="font-size:0.85em;color:${{statusColor}};font-weight:600">
-                                ${{peer.status.replace('_', ' ').toUpperCase()}}
+                                ${{target.status.replace('_', ' ').toUpperCase()}}
                             </div>
-                            ${{peer.last_snapshot ?
-                                '<div style="font-size:0.75em;color:#999;margin-top:4px">' + peer.last_snapshot.id + '</div>' :
+                            ${{target.last_snapshot ?
+                                '<div style="font-size:0.75em;color:#999;margin-top:4px">' + target.last_snapshot.id + '</div>' :
                                 ''}}
                         </div>
                     </div>
-                    ${{peer.status !== 'ok' ? `
+                    ${{target.status !== 'ok' ? `
                         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
                             <button
-                                onclick="testConnection('${{peer.name}}')"
+                                onclick="testConnection('${{target.name}}')"
                                 style="flex:1;min-width:120px;padding:8px 12px;background:#667eea;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.85em"
                             >
                                 🔍 Diagnostiquer
                             </button>
-                            ${{peer.status === 'not_initialized' || peer.status === 'error' ? `
+                            ${{target.status === 'not_initialized' || target.status === 'error' ? `
                                 <button
-                                    onclick="initRepository('${{peer.name}}')"
+                                    onclick="initRepository('${{target.name}}')"
                                     style="flex:1;min-width:120px;padding:8px 12px;background:#28a745;color:white;border:none;border-radius:6px;cursor:pointer;font-size:0.85em"
                                 >
                                     🚀 Initialiser
@@ -677,7 +677,7 @@ async function loadResticStatus() {{
         resticHtml += `
             <div style="margin-top:12px;text-align:center">
                 <a href="/recovery" style="color:#667eea;text-decoration:none;font-size:0.9em">
-                    📊 Voir tous les snapshots →
+                    🛟 Sauvegardes de configuration →
                 </a>
             </div>
         `;
@@ -1933,7 +1933,7 @@ async def init_restic_repository(peer_name: str):
 @app.get("/api/restic/status")
 async def get_restic_status():
     """
-    Récupère l'état des snapshots Restic sur tous les peers
+    Récupère l'état des snapshots Restic sur tous les targets de backup
     Lit le fichier JSON généré par le service core après chaque backup
     """
     try:
@@ -1945,12 +1945,15 @@ async def get_restic_status():
             with open(CONFIG_PATH) as f:
                 config = yaml.safe_load(f)
 
+            targets = config.get('backup', {}).get('targets', [])
+            active_targets = [t for t in targets if t.get('enabled', True)]
+
             return JSONResponse(content={
                 "global_status": "waiting",
                 "message": "Waiting for first backup to complete",
-                "server_name": config.get('server', {}).get('name', 'unknown'),
-                "peers": [],
-                "total_peers": len(config.get('peers', [])),
+                "server_name": config.get('node', {}).get('name', 'unknown'),
+                "targets": [],
+                "total_targets": len(active_targets),
                 "checked_at": datetime.now().isoformat()
             })
 
@@ -1959,7 +1962,7 @@ async def get_restic_status():
             stats = json.load(f)
 
         # Ajouter des métadonnées
-        stats["total_peers"] = len(stats.get("peers", []))
+        stats["total_targets"] = len(stats.get("targets", []))
         stats["checked_at"] = datetime.now().isoformat()
 
         return JSONResponse(content=stats)

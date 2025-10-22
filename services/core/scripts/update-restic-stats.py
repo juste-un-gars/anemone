@@ -30,12 +30,11 @@ def get_restic_password():
     return None
 
 
-def query_peer_snapshots(peer_ip, server_name, restic_password):
+def query_target_snapshots(target_name, repo_url, restic_password):
     """
-    Interroge un peer pour récupérer ses snapshots
+    Interroge un repository de backup pour récupérer ses snapshots
     Retourne le dernier snapshot avec métadonnées
     """
-    repo_url = f"sftp:restic@{peer_ip}:/backups/{server_name}"
 
     try:
         # Récupérer le dernier snapshot en JSON
@@ -114,8 +113,8 @@ def update_stats():
         with open(CONFIG_FILE) as f:
             config = yaml.safe_load(f)
 
-        server_name = config.get('server', {}).get('name', 'unknown')
-        peers = config.get('peers', [])
+        server_name = config.get('node', {}).get('name', 'unknown')
+        targets = config.get('backup', {}).get('targets', [])
 
         # Récupérer le mot de passe Restic
         restic_password = get_restic_password()
@@ -127,36 +126,54 @@ def update_stats():
         stats = {
             "last_update": datetime.now(timezone.utc).isoformat(),
             "server_name": server_name,
-            "peers": []
+            "targets": []
         }
 
-        # Pour chaque peer, récupérer les stats
-        for peer in peers:
-            peer_name = peer.get('name', 'unknown')
-            peer_ip = peer.get('allowed_ips', '').split('/')[0]
+        # Pour chaque target de backup, récupérer les stats
+        for target in targets:
+            target_name = target.get('name', 'unknown')
 
-            if not peer_ip:
-                stats["peers"].append({
-                    "name": peer_name,
-                    "status": "error",
-                    "message": "No IP configured"
+            # Ne traiter que les targets activés
+            if not target.get('enabled', True):
+                stats["targets"].append({
+                    "name": target_name,
+                    "status": "disabled",
+                    "message": "Target disabled in config"
                 })
                 continue
 
-            peer_stats = query_peer_snapshots(peer_ip, server_name, restic_password)
-            peer_stats["name"] = peer_name
-            peer_stats["ip"] = peer_ip
+            # Construire l'URL du repository (même logique que backup-now.sh)
+            host = target.get('host')
+            port = target.get('port', 22)
+            user = target.get('user', 'restic')
+            path = target.get('path', '/backups')
 
-            stats["peers"].append(peer_stats)
+            if not host:
+                stats["targets"].append({
+                    "name": target_name,
+                    "status": "error",
+                    "message": "No host configured"
+                })
+                continue
+
+            repo_url = f"sftp:{user}@{host}:{path}"
+
+            target_stats = query_target_snapshots(target_name, repo_url, restic_password)
+            target_stats["name"] = target_name
+            target_stats["host"] = host
+
+            stats["targets"].append(target_stats)
 
         # Déterminer le statut global
-        if not stats["peers"]:
-            stats["global_status"] = "no_peers"
-        elif all(p["status"] == "ok" for p in stats["peers"]):
+        active_targets = [t for t in stats["targets"] if t["status"] not in ["disabled"]]
+
+        if not active_targets:
+            stats["global_status"] = "no_targets"
+        elif all(t["status"] == "ok" for t in active_targets):
             stats["global_status"] = "ok"
-        elif any(p["status"] in ["error", "timeout"] for p in stats["peers"]):
+        elif any(t["status"] in ["error", "timeout"] for t in active_targets):
             stats["global_status"] = "error"
-        elif any(p["status"] == "warning" for p in stats["peers"]):
+        elif any(t["status"] == "warning" for t in active_targets):
             stats["global_status"] = "warning"
         else:
             stats["global_status"] = "partial"
