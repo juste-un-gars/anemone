@@ -4,6 +4,15 @@ set -e
 CONFIG_PATH=${CONFIG_PATH:-/config/config.yaml}
 BACKUP_SOURCE=${BACKUP_SOURCE:-/mnt/backup}
 
+# Charger le mot de passe Restic s'il n'est pas déjà défini
+if [ -z "$RESTIC_PASSWORD" ]; then
+    export RESTIC_PASSWORD=$(python3 /scripts/decrypt_key.py 2>/dev/null)
+    if [ -z "$RESTIC_PASSWORD" ]; then
+        echo "❌ Failed to decrypt Restic password" >&2
+        exit 1
+    fi
+fi
+
 echo "[$(date)] 🔄 Backup starting..."
 
 # Lire les targets depuis config.yaml

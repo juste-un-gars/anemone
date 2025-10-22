@@ -5,6 +5,7 @@ Anemone API - Interface de monitoring et gestion avec setup sécurisé
 
 import os
 import yaml
+import json
 import subprocess
 import secrets
 import shutil
