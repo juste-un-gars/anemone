@@ -20,11 +20,12 @@ if ! command -v docker &> /dev/null; then
     echo -e "${RED}❌ Docker non installé${NC}"
     exit 1
 fi
-if ! command -v docker-compose &> /dev/null; then
+if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
     echo -e "${RED}❌ Docker Compose non installé${NC}"
     exit 1
 fi
 echo -e "${GREEN}✓ Docker installé${NC}"
+echo -e "${GREEN}✓ Docker Compose installé${NC}"
 echo ""
 
 echo -e "${BLUE}[2/5]${NC} Création de la structure..."

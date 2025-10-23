@@ -16,6 +16,18 @@ NC='\033[0m'
 
 BACKUP_FILE="$1"
 
+# Vérifier Docker Compose et déterminer la commande à utiliser
+DOCKER_COMPOSE_CMD=""
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker compose"
+elif command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+else
+    echo -e "${RED}❌ Docker Compose n'est pas installé${NC}"
+    echo "   Installez Docker Compose v2 : https://docs.docker.com/compose/install/"
+    exit 1
+fi
+
 echo -e "${CYAN}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  🪸 Anemone - Restauration depuis backup"
@@ -188,7 +200,7 @@ echo -e "${GREEN}✅ Configuration restaurée${NC}"
 # Démarrer Docker
 echo ""
 echo "🐳 Démarrage de Docker..."
-docker-compose up -d --build
+$DOCKER_COMPOSE_CMD up -d --build
 
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -209,7 +221,7 @@ echo "   • Mode simulation puis restauration"
 echo ""
 echo "3. ✅ Vérifier que tout fonctionne"
 echo "   • Dashboard : ${CYAN}http://localhost:3000/${NC}"
-echo "   • Logs : ${CYAN}docker-compose logs -f${NC}"
+echo "   • Logs : ${CYAN}$DOCKER_COMPOSE_CMD logs -f${NC}"
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${RED}⚠️  Rappel : Votre clé temporaire est dans /tmp/.restic-key-restore${NC}"
