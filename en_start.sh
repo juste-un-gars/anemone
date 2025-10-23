@@ -135,10 +135,10 @@ if [ "$USE_INTEGRATED_SHARES" = "yes" ]; then
 
     # Update config.yaml with credentials
     if [ -f config/config.yaml ]; then
-        sed -i "/services:/,/smb:/{s/username: .*/username: \"${SHARE_USERNAME}\"/}" config/config.yaml
-        sed -i "/services:/,/smb:/{s/password: .*/password: \"${SHARE_PASSWORD}\"/}" config/config.yaml
-        sed -i "/webdav:/,/ssl:/{s/username: .*/username: \"${SHARE_USERNAME}\"/}" config/config.yaml
-        sed -i "/webdav:/,/ssl:/{s/password: .*/password: \"${SHARE_PASSWORD}\"/}" config/config.yaml
+        # Replace in smb section (between smb: and webdav:)
+        sed -i '/^  smb:/,/^  webdav:/ {s/username: ".*"/username: "'"${SHARE_USERNAME}"'"/; s/password: ".*"/password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
+        # Replace in webdav section (between webdav: and sftp:)
+        sed -i '/^  webdav:/,/^  sftp:/ {s/username: ".*"/username: "'"${SHARE_USERNAME}"'"/; s/password: ".*"/password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
         echo -e "${GREEN}✅ Credentials configured in config.yaml${NC}"
     fi
 
