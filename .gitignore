@@ -12,6 +12,7 @@ config/restic-password
 config/.restic.encrypted
 config/.restic.salt
 config/.setup-completed
+config/.anemone-storage-config
 
 # Données et backups
 data/

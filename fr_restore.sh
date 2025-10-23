@@ -197,6 +197,84 @@ chmod 600 /tmp/.restic-key-restore
 
 echo -e "${GREEN}✅ Configuration restaurée${NC}"
 
+# Vérifier si la configuration de stockage existe
+if [ -f "config/.anemone-storage-config" ]; then
+    STORAGE_TYPE=$(grep "storage_type:" config/.anemone-storage-config | cut -d: -f2 | tr -d ' ')
+
+    if [ "$STORAGE_TYPE" = "network_mount" ]; then
+        echo ""
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${CYAN}  🌐 Configuration de montage réseau détectée${NC}"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+
+        # Récupérer les chemins des partages
+        NETWORK_BACKUP=$(grep "network_backup_path:" config/.anemone-storage-config | cut -d: -f2- | tr -d ' ')
+        NETWORK_BACKUPS=$(grep "network_backups_path:" config/.anemone-storage-config | cut -d: -f2- | tr -d ' ')
+
+        echo "Ancien serveur utilisait :"
+        echo "  • Backup  : ${CYAN}$NETWORK_BACKUP${NC}"
+        echo "  • Backups : ${CYAN}$NETWORK_BACKUPS${NC}"
+        echo ""
+        read -p "Voulez-vous remonter ces partages réseau ? (oui/non) : " REMOUNT_SHARES
+
+        if [ "$REMOUNT_SHARES" = "oui" ]; then
+            echo ""
+            read -p "👤 Nom d'utilisateur pour les montages : " SMB_USERNAME
+            read -s -p "🔐 Mot de passe : " SMB_PASSWORD
+            echo ""
+
+            # Créer les répertoires de montage
+            sudo mkdir -p /mnt/anemone/backup /mnt/anemone/backups
+
+            # Créer le fichier credentials
+            sudo bash -c "cat > /root/.anemone-cifs-credentials << EOF
+username=${SMB_USERNAME}
+password=${SMB_PASSWORD}
+EOF"
+            sudo chmod 600 /root/.anemone-cifs-credentials
+
+            # Monter les partages
+            echo "📌 Montage des partages réseau..."
+            sudo mount -t cifs "$NETWORK_BACKUP" /mnt/anemone/backup -o credentials=/root/.anemone-cifs-credentials,iocharset=utf8,file_mode=0777,dir_mode=0777 || {
+                echo -e "${RED}❌ Échec du montage de $NETWORK_BACKUP${NC}"
+            }
+
+            sudo mount -t cifs "$NETWORK_BACKUPS" /mnt/anemone/backups -o credentials=/root/.anemone-cifs-credentials,iocharset=utf8,file_mode=0777,dir_mode=0777 || {
+                echo -e "${RED}❌ Échec du montage de $NETWORK_BACKUPS${NC}"
+            }
+
+            # Ajouter à fstab
+            sudo cp /etc/fstab /etc/fstab.backup.$(date +%Y%m%d-%H%M%S)
+
+            if ! grep -qF "$NETWORK_BACKUP" /etc/fstab; then
+                echo "$NETWORK_BACKUP /mnt/anemone/backup cifs credentials=/root/.anemone-cifs-credentials,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0" | sudo tee -a /etc/fstab > /dev/null
+            fi
+
+            if ! grep -qF "$NETWORK_BACKUPS" /etc/fstab; then
+                echo "$NETWORK_BACKUPS /mnt/anemone/backups cifs credentials=/root/.anemone-cifs-credentials,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0" | sudo tee -a /etc/fstab > /dev/null
+            fi
+
+            # Créer .env
+            cat > .env << EOFENV
+# Configuration générée par fr_restore.sh
+BACKUP_DATA_PATH=/mnt/anemone/backup
+BACKUP_RECEIVE_PATH=/mnt/anemone/backups
+EOFENV
+
+            echo -e "${GREEN}✅ Partages réseau remontés${NC}"
+            echo ""
+            read -p "Voulez-vous restaurer les données depuis un pair ? (oui/non) : " RESTORE_FROM_PEER
+        else
+            echo ""
+            echo -e "${YELLOW}ℹ️  Passage en mode stockage local${NC}"
+            echo "   Vous devrez probablement restaurer vos données depuis un pair"
+            echo ""
+            RESTORE_FROM_PEER="oui"
+        fi
+    fi
+fi
+
 # Démarrer Docker
 echo ""
 echo "🐳 Démarrage de Docker..."

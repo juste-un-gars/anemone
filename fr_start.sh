@@ -113,6 +113,14 @@ read -p "📂 Voulez-vous utiliser le partage intégré (Samba + WebDAV) ? (oui/
 if [ "$USE_INTEGRATED_SHARES" = "oui" ]; then
     DOCKER_PROFILES="--profile shares"
     echo -e "${GREEN}✅ Le partage intégré sera activé${NC}"
+
+    # Sauvegarder la configuration de stockage
+    mkdir -p config
+    cat > config/.anemone-storage-config << EOF
+# Configuration de stockage Anemone
+# Ce fichier est sauvegardé avec les backups de configuration
+storage_type: integrated_shares
+EOF
 else
     echo -e "${YELLOW}ℹ️  Le partage intégré ne sera pas activé${NC}"
     echo ""
@@ -245,7 +253,23 @@ EOFENV
             echo -e "${YELLOW}⚠️  Validation /etc/fstab : vérifiez manuellement avec 'sudo mount -a'${NC}"
             FSTAB_MODIFIED="oui"
         fi
+
+        # Sauvegarder la configuration de stockage
+        cat > config/.anemone-storage-config << EOF
+# Configuration de stockage Anemone
+# Ce fichier est sauvegardé avec les backups de configuration
+storage_type: network_mount
+network_backup_path: ${SMB_BACKUP_PATH}
+network_backups_path: ${SMB_BACKUPS_PATH}
+EOF
         echo ""
+    else
+        # Stockage local (ni partages intégrés, ni montage réseau)
+        cat > config/.anemone-storage-config << EOF
+# Configuration de stockage Anemone
+# Ce fichier est sauvegardé avec les backups de configuration
+storage_type: local
+EOF
     fi
 fi
 

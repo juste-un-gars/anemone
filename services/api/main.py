@@ -1506,6 +1506,10 @@ async def export_configuration():
             if Path("/config/.restic.salt").exists():
                 tar.add("/config/.restic.salt", arcname=".restic.salt")
 
+            # Ajouter la configuration de stockage
+            if Path("/config/.anemone-storage-config").exists():
+                tar.add("/config/.anemone-storage-config", arcname=".anemone-storage-config")
+
         # Récupérer le contenu de l'archive
         tar_buffer.seek(0)
         tar_data = tar_buffer.read()

@@ -113,6 +113,14 @@ read -p "📂 Do you want to use integrated sharing (Samba + WebDAV)? (yes/no): 
 if [ "$USE_INTEGRATED_SHARES" = "yes" ]; then
     DOCKER_PROFILES="--profile shares"
     echo -e "${GREEN}✅ Integrated sharing will be enabled${NC}"
+
+    # Save storage configuration
+    mkdir -p config
+    cat > config/.anemone-storage-config << EOF
+# Anemone storage configuration
+# This file is saved with configuration backups
+storage_type: integrated_shares
+EOF
 else
     echo -e "${YELLOW}ℹ️  Integrated sharing will not be enabled${NC}"
     echo ""
@@ -245,7 +253,23 @@ EOFENV
             echo -e "${YELLOW}⚠️  /etc/fstab validation: check manually with 'sudo mount -a'${NC}"
             FSTAB_MODIFIED="yes"
         fi
+
+        # Save storage configuration
+        cat > config/.anemone-storage-config << EOF
+# Anemone storage configuration
+# This file is saved with configuration backups
+storage_type: network_mount
+network_backup_path: ${SMB_BACKUP_PATH}
+network_backups_path: ${SMB_BACKUPS_PATH}
+EOF
         echo ""
+    else
+        # Local storage (neither integrated shares nor network mount)
+        cat > config/.anemone-storage-config << EOF
+# Anemone storage configuration
+# This file is saved with configuration backups
+storage_type: local
+EOF
     fi
 fi
 
