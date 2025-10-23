@@ -93,8 +93,9 @@ VPN_PORT=${VPN_PORT:-51820}
 # Update config.yaml if needed
 if [ -f "config/config.yaml" ]; then
     echo "📝 Updating config/config.yaml..."
-    sed -i "s/name: .*/name: ${SERVER_NAME}/" config/config.yaml 2>/dev/null || true
-    sed -i "s/endpoint: .*/endpoint: ${EXTERNAL_ADDR}:${VPN_PORT}/" config/config.yaml 2>/dev/null || true
+    # Target only the name field in the node section (2 spaces at the beginning)
+    sed -i '/^node:/,/^storage:/ s/^  name: .*/  name: "'"${SERVER_NAME}"'"/' config/config.yaml 2>/dev/null || true
+    sed -i '/^wireguard:/,/^peers:/ s/^  public_endpoint: .*/  public_endpoint: "'"${EXTERNAL_ADDR}:${VPN_PORT}"'"/' config/config.yaml 2>/dev/null || true
 fi
 
 echo ""
@@ -135,10 +136,10 @@ if [ "$USE_INTEGRATED_SHARES" = "yes" ]; then
 
     # Update config.yaml with credentials
     if [ -f config/config.yaml ]; then
-        # Replace in smb section (between smb: and webdav:)
-        sed -i '/^  smb:/,/^  webdav:/ {s/username: ".*"/username: "'"${SHARE_USERNAME}"'"/; s/password: ".*"/password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
-        # Replace in webdav section (between webdav: and sftp:)
-        sed -i '/^  webdav:/,/^  sftp:/ {s/username: ".*"/username: "'"${SHARE_USERNAME}"'"/; s/password: ".*"/password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
+        # Replace in smb section (between smb: and webdav:) - 4 spaces for fields
+        sed -i '/^  smb:/,/^  webdav:/ {s/^    username: ".*"/    username: "'"${SHARE_USERNAME}"'"/; s/^    password: ".*"/    password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
+        # Replace in webdav section (between webdav: and sftp:) - 4 spaces for fields
+        sed -i '/^  webdav:/,/^  sftp:/ {s/^    username: ".*"/    username: "'"${SHARE_USERNAME}"'"/; s/^    password: ".*"/    password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
         echo -e "${GREEN}✅ Credentials configured in config.yaml${NC}"
     fi
 

@@ -275,10 +275,10 @@ if [ -f "config/.anemone-storage-config" ]; then
 
             # Update config.yaml with credentials
             if [ -f config/config.yaml ]; then
-                # Replace in smb section (between smb: and webdav:)
-                sed -i '/^  smb:/,/^  webdav:/ {s/username: ".*"/username: "'"${SHARE_USERNAME}"'"/; s/password: ".*"/password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
-                # Replace in webdav section (between webdav: and sftp:)
-                sed -i '/^  webdav:/,/^  sftp:/ {s/username: ".*"/username: "'"${SHARE_USERNAME}"'"/; s/password: ".*"/password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
+                # Replace in smb section (between smb: and webdav:) - 4 spaces for fields
+                sed -i '/^  smb:/,/^  webdav:/ {s/^    username: ".*"/    username: "'"${SHARE_USERNAME}"'"/; s/^    password: ".*"/    password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
+                # Replace in webdav section (between webdav: and sftp:) - 4 spaces for fields
+                sed -i '/^  webdav:/,/^  sftp:/ {s/^    username: ".*"/    username: "'"${SHARE_USERNAME}"'"/; s/^    password: ".*"/    password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
                 echo -e "${GREEN}✅ Credentials configured${NC}"
             fi
         else

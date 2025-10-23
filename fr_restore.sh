@@ -275,10 +275,10 @@ if [ -f "config/.anemone-storage-config" ]; then
 
             # Mettre à jour config.yaml avec les identifiants
             if [ -f config/config.yaml ]; then
-                # Remplacer dans la section smb (entre smb: et webdav:)
-                sed -i '/^  smb:/,/^  webdav:/ {s/username: ".*"/username: "'"${SHARE_USERNAME}"'"/; s/password: ".*"/password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
-                # Remplacer dans la section webdav (entre webdav: et sftp:)
-                sed -i '/^  webdav:/,/^  sftp:/ {s/username: ".*"/username: "'"${SHARE_USERNAME}"'"/; s/password: ".*"/password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
+                # Remplacer dans la section smb (entre smb: et webdav:) - 4 espaces pour les champs
+                sed -i '/^  smb:/,/^  webdav:/ {s/^    username: ".*"/    username: "'"${SHARE_USERNAME}"'"/; s/^    password: ".*"/    password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
+                # Remplacer dans la section webdav (entre webdav: et sftp:) - 4 espaces pour les champs
+                sed -i '/^  webdav:/,/^  sftp:/ {s/^    username: ".*"/    username: "'"${SHARE_USERNAME}"'"/; s/^    password: ".*"/    password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
                 echo -e "${GREEN}✅ Identifiants configurés${NC}"
             fi
         else
