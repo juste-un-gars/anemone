@@ -77,7 +77,7 @@ fi
 
 # Initialiser les dépôts Restic si nécessaire
 echo "🔧 Checking/initializing Restic repositories..."
-/scripts/restic/init-repos.sh || echo "⚠️  Repository initialization failed (will retry during backup)"
+/scripts/init-repos.sh || echo "⚠️  Repository initialization failed (will retry during backup)"
 echo ""
 
 # Mode de synchronisation des données utilisateur
