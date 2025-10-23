@@ -279,7 +279,7 @@ echo -e "${CYAN}  Étape 4/5 : Démarrage de Docker${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 echo "🐳 Construction et démarrage des conteneurs..."
-$DOCKER_COMPOSE_CMD up -d --build $DOCKER_PROFILES
+$DOCKER_COMPOSE_CMD $DOCKER_PROFILES up -d --build
 
 echo ""
 echo -e "${GREEN}✅ Conteneurs démarrés avec succès !${NC}"
