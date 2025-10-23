@@ -197,6 +197,43 @@ chmod 600 /tmp/.restic-key-restore
 
 echo -e "${GREEN}✅ Configuration restored${NC}"
 
+# Verify and validate VPN address
+if [ -f "config/config.yaml" ]; then
+    CURRENT_VPN_ADDRESS=$(grep "address:" config/config.yaml | head -1 | awk '{print $2}')
+
+    if [ -n "$CURRENT_VPN_ADDRESS" ]; then
+        echo ""
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${CYAN}  🌐 VPN Address Verification${NC}"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo "VPN address in configuration file: ${CYAN}$CURRENT_VPN_ADDRESS${NC}"
+        echo ""
+        echo -e "${YELLOW}⚠️  Reminder: Each Anemone server must have a unique VPN IP address!${NC}"
+        echo ""
+        read -p "Do you want to keep this address? (yes/no): " KEEP_VPN_ADDRESS
+
+        if [ "$KEEP_VPN_ADDRESS" != "yes" ]; then
+            echo ""
+            read -p "New VPN address (e.g., 10.8.0.2/24): " NEW_VPN_ADDRESS
+
+            if [ -n "$NEW_VPN_ADDRESS" ]; then
+                # Update config.yaml
+                sed -i "s|address: $CURRENT_VPN_ADDRESS|address: $NEW_VPN_ADDRESS|g" config/config.yaml
+
+                # Update wg0.conf if exists
+                if [ -f "config/wg_confs/wg0.conf" ]; then
+                    sed -i "s|Address = $CURRENT_VPN_ADDRESS|Address = $NEW_VPN_ADDRESS|g" config/wg_confs/wg0.conf
+                fi
+
+                echo -e "${GREEN}✅ VPN address updated: $NEW_VPN_ADDRESS${NC}"
+            fi
+        else
+            echo -e "${GREEN}✅ VPN address kept: $CURRENT_VPN_ADDRESS${NC}"
+        fi
+    fi
+fi
+
 # Check if storage configuration exists
 if [ -f "config/.anemone-storage-config" ]; then
     STORAGE_TYPE=$(grep "storage_type:" config/.anemone-storage-config | cut -d: -f2 | tr -d ' ')

@@ -34,7 +34,18 @@ mkdir -p data backup backups logs services/{restic,api}
 echo -e "${GREEN}✓ Structure créée${NC}"
 echo ""
 
-echo -e "${BLUE}[3/5]${NC} Génération clés WireGuard..."
+echo -e "${BLUE}[3/5]${NC} Configuration VPN..."
+
+# Demander l'adresse IP VPN locale
+echo ""
+echo -e "${YELLOW}⚠️  Chaque serveur Anemone doit avoir une adresse IP VPN unique !${NC}"
+echo ""
+read -p "Adresse IP VPN locale (par défaut: 10.8.0.1/24) : " VPN_ADDRESS
+VPN_ADDRESS=${VPN_ADDRESS:-10.8.0.1/24}
+echo -e "${GREEN}✓ Adresse VPN : ${VPN_ADDRESS}${NC}"
+echo ""
+
+echo -e "${BLUE}[4/5]${NC} Génération clés WireGuard..."
 if [ ! -f config/wireguard/private.key ]; then
     # Méthode 1: Utiliser wg si disponible sur le host (méthode officielle)
     if command -v wg &> /dev/null; then
@@ -69,7 +80,7 @@ if [ ! -f config/wireguard/private.key ]; then
     cat > config/wg_confs/wg0.conf <<EOF
 [Interface]
 PrivateKey = ${PRIVATE_KEY}
-Address = 10.8.0.1/24
+Address = ${VPN_ADDRESS}
 ListenPort = 51820
 PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth+ -j MASQUERADE
 PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth+ -j MASQUERADE
@@ -92,7 +103,7 @@ else
         cat > config/wg_confs/wg0.conf <<EOF
 [Interface]
 PrivateKey = ${PRIVATE_KEY}
-Address = 10.8.0.1/24
+Address = ${VPN_ADDRESS}
 ListenPort = 51820
 PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth+ -j MASQUERADE
 PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth+ -j MASQUERADE
@@ -110,7 +121,7 @@ EOF
 fi
 echo ""
 
-echo -e "${BLUE}[4/5]${NC} Génération clés SSH..."
+echo -e "${BLUE}[5/6]${NC} Génération clés SSH..."
 if [ ! -f config/ssh/id_rsa ]; then
     ssh-keygen -t rsa -b 4096 -f config/ssh/id_rsa -N "" -C "restic@anemone" -q
     chmod 600 config/ssh/id_rsa
@@ -123,10 +134,14 @@ else
 fi
 echo ""
 
-echo -e "${BLUE}[5/5]${NC} Configuration..."
+echo -e "${BLUE}[6/6]${NC} Configuration..."
 if [ ! -f config/config.yaml ]; then
     [ -f config/config.yaml.example ] && cp config/config.yaml.example config/config.yaml
-    echo -e "${GREEN}✓ config.yaml créé${NC}"
+    # Mettre à jour l'adresse VPN dans config.yaml
+    if [ -f config/config.yaml ]; then
+        sed -i "s|address: 10.8.0.1/24|address: ${VPN_ADDRESS}|g" config/config.yaml
+    fi
+    echo -e "${GREEN}✓ config.yaml créé avec adresse VPN ${VPN_ADDRESS}${NC}"
 else
     echo -e "${YELLOW}⚠ config.yaml présent${NC}"
 fi

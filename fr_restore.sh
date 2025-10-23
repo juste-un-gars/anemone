@@ -197,6 +197,43 @@ chmod 600 /tmp/.restic-key-restore
 
 echo -e "${GREEN}✅ Configuration restaurée${NC}"
 
+# Vérifier et valider l'adresse VPN
+if [ -f "config/config.yaml" ]; then
+    CURRENT_VPN_ADDRESS=$(grep "address:" config/config.yaml | head -1 | awk '{print $2}')
+
+    if [ -n "$CURRENT_VPN_ADDRESS" ]; then
+        echo ""
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${CYAN}  🌐 Vérification de l'adresse VPN${NC}"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo "Adresse VPN dans le fichier de configuration : ${CYAN}$CURRENT_VPN_ADDRESS${NC}"
+        echo ""
+        echo -e "${YELLOW}⚠️  Rappel : Chaque serveur Anemone doit avoir une adresse IP VPN unique !${NC}"
+        echo ""
+        read -p "Souhaitez-vous garder cette adresse ? (oui/non) : " KEEP_VPN_ADDRESS
+
+        if [ "$KEEP_VPN_ADDRESS" != "oui" ]; then
+            echo ""
+            read -p "Nouvelle adresse VPN (ex: 10.8.0.2/24) : " NEW_VPN_ADDRESS
+
+            if [ -n "$NEW_VPN_ADDRESS" ]; then
+                # Mettre à jour config.yaml
+                sed -i "s|address: $CURRENT_VPN_ADDRESS|address: $NEW_VPN_ADDRESS|g" config/config.yaml
+
+                # Mettre à jour wg0.conf si existant
+                if [ -f "config/wg_confs/wg0.conf" ]; then
+                    sed -i "s|Address = $CURRENT_VPN_ADDRESS|Address = $NEW_VPN_ADDRESS|g" config/wg_confs/wg0.conf
+                fi
+
+                echo -e "${GREEN}✅ Adresse VPN mise à jour : $NEW_VPN_ADDRESS${NC}"
+            fi
+        else
+            echo -e "${GREEN}✅ Adresse VPN conservée : $CURRENT_VPN_ADDRESS${NC}"
+        fi
+    fi
+fi
+
 # Vérifier si la configuration de stockage existe
 if [ -f "config/.anemone-storage-config" ]; then
     STORAGE_TYPE=$(grep "storage_type:" config/.anemone-storage-config | cut -d: -f2 | tr -d ' ')
