@@ -99,11 +99,132 @@ fi
 
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}  Étape 3b/5 : Configuration du stockage${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+# Configuration du partage et du stockage
+DOCKER_PROFILES=""
+USE_NETWORK_SHARES="non"
+
+echo ""
+read -p "📂 Voulez-vous utiliser le partage intégré (Samba + WebDAV) ? (oui/non) : " USE_INTEGRATED_SHARES
+
+if [ "$USE_INTEGRATED_SHARES" = "oui" ]; then
+    DOCKER_PROFILES="--profile shares"
+    echo -e "${GREEN}✅ Le partage intégré sera activé${NC}"
+else
+    echo -e "${YELLOW}ℹ️  Le partage intégré ne sera pas activé${NC}"
+    echo ""
+    read -p "🌐 Voulez-vous monter un partage réseau existant ? (oui/non) : " USE_NETWORK_SHARES
+
+    if [ "$USE_NETWORK_SHARES" = "oui" ]; then
+        echo ""
+        echo -e "${BLUE}Configuration du montage réseau...${NC}"
+
+        # Vérifier si cifs-utils est installé
+        if ! dpkg -l | grep -q cifs-utils 2>/dev/null && ! rpm -q cifs-utils &>/dev/null; then
+            echo -e "${YELLOW}⚠️  cifs-utils n'est pas installé${NC}"
+            read -p "   Voulez-vous l'installer maintenant ? (oui/non) : " INSTALL_CIFS
+            if [ "$INSTALL_CIFS" = "oui" ]; then
+                if command -v apt-get &> /dev/null; then
+                    sudo apt-get update && sudo apt-get install -y cifs-utils
+                elif command -v dnf &> /dev/null; then
+                    sudo dnf install -y cifs-utils
+                elif command -v yum &> /dev/null; then
+                    sudo yum install -y cifs-utils
+                else
+                    echo -e "${RED}❌ Impossible d'installer automatiquement. Installez cifs-utils manuellement.${NC}"
+                    exit 1
+                fi
+            else
+                echo -e "${RED}❌ cifs-utils est requis pour monter des partages réseau${NC}"
+                exit 1
+            fi
+        fi
+
+        echo ""
+        echo "Entrez les informations du partage réseau pour les données utilisateur :"
+        read -p "  Serveur/Partage (ex: //192.168.1.10/backup) : " SMB_BACKUP_PATH
+        echo ""
+        echo "Entrez les informations du partage réseau pour les backups reçus :"
+        read -p "  Serveur/Partage (ex: //192.168.1.10/backups) : " SMB_BACKUPS_PATH
+        echo ""
+        read -p "👤 Nom d'utilisateur pour les montages : " SMB_USERNAME
+        read -s -p "🔐 Mot de passe : " SMB_PASSWORD
+        echo ""
+
+        # Créer les répertoires de montage
+        sudo mkdir -p /mnt/anemone/backup /mnt/anemone/backups
+
+        # Créer le fichier credentials
+        sudo bash -c "cat > /root/.anemone-cifs-credentials << EOF
+username=${SMB_USERNAME}
+password=${SMB_PASSWORD}
+EOF"
+        sudo chmod 600 /root/.anemone-cifs-credentials
+
+        # Créer le script de montage
+        cat > mount-shares.sh << 'EOFMOUNT'
+#!/bin/bash
+# Anemone - Script de montage des partages réseau
+# Copyright (C) 2025 juste-un-gars
+# Licensed under the GNU Affero General Public License v3.0
+
+set -e
+
+CREDENTIALS="/root/.anemone-cifs-credentials"
+MOUNT_OPTS="credentials=${CREDENTIALS},iocharset=utf8,file_mode=0777,dir_mode=0777"
+
+# Monter backup (données utilisateur)
+if ! mountpoint -q /mnt/anemone/backup; then
+    echo "Montage de SMB_BACKUP_PATH_PLACEHOLDER..."
+    sudo mount -t cifs "SMB_BACKUP_PATH_PLACEHOLDER" /mnt/anemone/backup -o ${MOUNT_OPTS}
+    echo "✅ Monté : /mnt/anemone/backup"
+fi
+
+# Monter backups (backups reçus des pairs)
+if ! mountpoint -q /mnt/anemone/backups; then
+    echo "Montage de SMB_BACKUPS_PATH_PLACEHOLDER..."
+    sudo mount -t cifs "SMB_BACKUPS_PATH_PLACEHOLDER" /mnt/anemone/backups -o ${MOUNT_OPTS}
+    echo "✅ Monté : /mnt/anemone/backups"
+fi
+
+echo "✅ Tous les partages sont montés"
+EOFMOUNT
+
+        # Remplacer les placeholders
+        sed -i "s|SMB_BACKUP_PATH_PLACEHOLDER|${SMB_BACKUP_PATH}|g" mount-shares.sh
+        sed -i "s|SMB_BACKUPS_PATH_PLACEHOLDER|${SMB_BACKUPS_PATH}|g" mount-shares.sh
+        chmod +x mount-shares.sh
+
+        # Monter maintenant
+        echo ""
+        echo "📌 Montage des partages réseau..."
+        sudo ./mount-shares.sh
+
+        # Créer/modifier .env pour utiliser les montages
+        cat > .env << EOFENV
+# Configuration générée par fr_start.sh
+BACKUP_DATA_PATH=/mnt/anemone/backup
+BACKUP_RECEIVE_PATH=/mnt/anemone/backups
+EOFENV
+
+        echo -e "${GREEN}✅ Partages réseau montés et configurés${NC}"
+        echo -e "${YELLOW}⚠️  Pour remonter automatiquement au démarrage, ajoutez à /etc/fstab :${NC}"
+        echo ""
+        echo "${SMB_BACKUP_PATH} /mnt/anemone/backup cifs credentials=/root/.anemone-cifs-credentials,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0"
+        echo "${SMB_BACKUPS_PATH} /mnt/anemone/backups cifs credentials=/root/.anemone-cifs-credentials,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0"
+        echo ""
+    fi
+fi
+
+echo ""
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}  Étape 4/5 : Démarrage de Docker${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 echo "🐳 Construction et démarrage des conteneurs..."
-$DOCKER_COMPOSE_CMD up -d --build
+$DOCKER_COMPOSE_CMD up -d --build $DOCKER_PROFILES
 
 echo ""
 echo -e "${GREEN}✅ Conteneurs démarrés avec succès !${NC}"

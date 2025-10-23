@@ -1,5 +1,6 @@
 # Configuration locale
 .env
+mount-shares.sh
 config/config.yaml
 config/wireguard/
 config/wg_confs/
