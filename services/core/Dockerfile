@@ -40,7 +40,7 @@ RUN ssh-keygen -A && \
     echo "    UserKnownHostsFile /root/.ssh/known_hosts" >> /root/.ssh/config && \
     chmod 600 /root/.ssh/config
 
-# Configuration SSHD pour SFTP
+# Configuration SSHD pour SSH/SFTP (rsync nécessite shell access)
 RUN echo "Port 22" >> /etc/ssh/sshd_config && \
     echo "PermitRootLogin no" >> /etc/ssh/sshd_config && \
     echo "PasswordAuthentication no" >> /etc/ssh/sshd_config && \
@@ -50,8 +50,6 @@ RUN echo "Port 22" >> /etc/ssh/sshd_config && \
     echo "UsePAM no" >> /etc/ssh/sshd_config && \
     echo "Subsystem sftp internal-sftp" >> /etc/ssh/sshd_config && \
     echo "Match User restic" >> /etc/ssh/sshd_config && \
-    echo "    ChrootDirectory /home/restic" >> /etc/ssh/sshd_config && \
-    echo "    ForceCommand internal-sftp" >> /etc/ssh/sshd_config && \
     echo "    X11Forwarding no" >> /etc/ssh/sshd_config && \
     echo "    AllowTcpForwarding no" >> /etc/ssh/sshd_config
 
