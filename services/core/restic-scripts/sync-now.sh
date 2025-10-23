@@ -59,7 +59,7 @@ failed_targets = []
 for target in targets:
     name = target.get('name', 'unknown')
     host = target.get('host')
-    port = target.get('port', 22)
+    port = target.get('port', 22222)
     user = target.get('user', 'restic')
     path = target.get('path', '/backups')
 

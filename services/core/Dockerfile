@@ -36,12 +36,13 @@ RUN ssh-keygen -A && \
     mkdir -p /root/.ssh && \
     chmod 700 /root/.ssh && \
     echo "Host *" > /root/.ssh/config && \
+    echo "    Port 22222" >> /root/.ssh/config && \
     echo "    StrictHostKeyChecking accept-new" >> /root/.ssh/config && \
     echo "    UserKnownHostsFile /root/.ssh/known_hosts" >> /root/.ssh/config && \
     chmod 600 /root/.ssh/config
 
 # Configuration SSHD pour SSH/SFTP (rsync nécessite shell access)
-RUN echo "Port 22" >> /etc/ssh/sshd_config && \
+RUN echo "Port 22222" >> /etc/ssh/sshd_config && \
     echo "PermitRootLogin no" >> /etc/ssh/sshd_config && \
     echo "PasswordAuthentication no" >> /etc/ssh/sshd_config && \
     echo "PubkeyAuthentication yes" >> /etc/ssh/sshd_config && \
@@ -79,6 +80,6 @@ WORKDIR /scripts
 
 # Exposer les ports
 # Note: Avec network_mode: host, ces EXPOSE sont informatifs
-EXPOSE 51820/udp 22
+EXPOSE 51820/udp 22222
 
 ENTRYPOINT ["/entrypoint.sh"]

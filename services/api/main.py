@@ -520,8 +520,44 @@ body {{
             <h2>📦 Snapshots Restic</h2>
             <div id="restic-status" class="loading">{t['loading']}</div>
         </div>
+
+        <!-- Actions rapides -->
+        <div class="card">
+            <h2>⚡ Actions rapides</h2>
+            <button id="force-sync-btn" class="action-btn" onclick="forceDataSync()">
+                🔄 Forcer backup données maintenant
+            </button>
+            <div id="sync-status" style="margin-top: 12px; font-size: 0.9em; color: #666;"></div>
+        </div>
     </div>
 </div>
+
+<style>
+.action-btn {{
+    width: 100%;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}}
+.action-btn:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102,126,234,0.4);
+}}
+.action-btn:active {{
+    transform: translateY(0);
+}}
+.action-btn:disabled {{
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+}}
+</style>
 
 <script>
 // Traductions injectées côté serveur
@@ -705,6 +741,47 @@ async function loadResticStatus() {{
         console.error('Erreur chargement Restic:', err);
         document.getElementById('restic-status').innerHTML =
             '<p style="color:#dc3545;text-align:center">⚠️ Erreur de chargement</p>';
+    }}
+}}
+
+async function forceDataSync() {{
+    const btn = document.getElementById('force-sync-btn');
+    const statusDiv = document.getElementById('sync-status');
+    const originalText = btn.innerHTML;
+
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Sauvegarde en cours...';
+    statusDiv.innerHTML = '<span style="color:#667eea">⏳ Synchronisation des données en cours...</span>';
+
+    try {{
+        const response = await fetch('/api/backup/force-data-sync', {{
+            method: 'POST'
+        }});
+
+        const data = await response.json();
+
+        if (response.ok && data.status === 'success') {{
+            statusDiv.innerHTML = '<span style="color:#28a745">✅ ' + data.message + '</span>';
+
+            // Rafraîchir le statut Restic après 2 secondes
+            setTimeout(() => {{
+                loadResticStatus();
+            }}, 2000);
+        }} else {{
+            statusDiv.innerHTML = '<span style="color:#dc3545">❌ ' + (data.message || 'Erreur inconnue') + '</span>';
+        }}
+
+    }} catch (err) {{
+        console.error('Erreur lors de la synchronisation:', err);
+        statusDiv.innerHTML = '<span style="color:#dc3545">❌ Erreur: ' + err.message + '</span>';
+    }} finally {{
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+
+        // Effacer le message après 10 secondes
+        setTimeout(() => {{
+            statusDiv.innerHTML = '';
+        }}, 10000);
     }}
 }}
 
@@ -1903,7 +1980,7 @@ async def force_config_backup():
             ["docker", "exec", "anemone-core", "/scripts/backup-config.sh"],
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=120  # Augmenté à 2 minutes pour la distribution vers les pairs
         )
 
         if result.returncode == 0:
@@ -1923,9 +2000,45 @@ async def force_config_backup():
             )
 
     except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=504, detail="Timeout lors de la sauvegarde")
+        raise HTTPException(status_code=504, detail="Timeout lors de la sauvegarde (>2min)")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur lors de la sauvegarde : {str(e)}")
+
+
+@app.post("/api/backup/force-data-sync")
+async def force_data_sync():
+    """
+    Force une synchronisation immédiate des données utilisateur vers les pairs
+    Appelle le script sync-now.sh dans le conteneur core
+    """
+    try:
+        result = subprocess.run(
+            ["docker", "exec", "anemone-core", "/scripts/sync-now.sh"],
+            capture_output=True,
+            text=True,
+            timeout=600  # 10 minutes pour les gros volumes
+        )
+
+        if result.returncode == 0:
+            return JSONResponse(content={
+                "status": "success",
+                "message": "Synchronisation des données terminée avec succès",
+                "output": result.stdout
+            })
+        else:
+            return JSONResponse(
+                content={
+                    "status": "error",
+                    "message": "Échec de la synchronisation",
+                    "error": result.stderr
+                },
+                status_code=500
+            )
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Timeout lors de la synchronisation (>10min)")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la synchronisation : {str(e)}")
 
 
 @app.post("/api/restore/from-peer/{peer_name}")

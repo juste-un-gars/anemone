@@ -314,37 +314,43 @@ echo -e "${CYAN}  Step 3c/5: Backup Mode${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 echo ""
-echo "Choose backup mode:"
-echo "  1) 🟢 scheduled - Scheduled backup (cron, recommended)"
-echo "  2) 🟡 periodic  - Backup every N minutes"
-echo "  3) 🔴 live      - Real-time monitoring (inotify)"
+echo "Choose automatic backup frequency:"
+echo "  1) Every 30 minutes (recommended)"
+echo "  2) Every hour"
+echo "  3) Every 6 hours"
+echo "  4) Every 12 hours"
 echo ""
-read -p "Your choice (1/2/3, default: 1): " BACKUP_MODE_CHOICE
-BACKUP_MODE_CHOICE=${BACKUP_MODE_CHOICE:-1}
+read -p "Your choice (1-4, default: 1): " BACKUP_FREQ_CHOICE
+BACKUP_FREQ_CHOICE=${BACKUP_FREQ_CHOICE:-1}
 
-case "$BACKUP_MODE_CHOICE" in
+case "$BACKUP_FREQ_CHOICE" in
     1)
-        BACKUP_MODE="scheduled"
-        echo -e "${GREEN}✅ Mode: scheduled (backup according to cron schedule)${NC}"
+        BACKUP_INTERVAL=30
+        echo -e "${GREEN}✅ Frequency: every 30 minutes${NC}"
         ;;
     2)
-        BACKUP_MODE="periodic"
-        echo -e "${GREEN}✅ Mode: periodic (periodic backup)${NC}"
+        BACKUP_INTERVAL=60
+        echo -e "${GREEN}✅ Frequency: every hour${NC}"
         ;;
     3)
-        BACKUP_MODE="live"
-        echo -e "${GREEN}✅ Mode: live (real-time monitoring)${NC}"
+        BACKUP_INTERVAL=360
+        echo -e "${GREEN}✅ Frequency: every 6 hours${NC}"
+        ;;
+    4)
+        BACKUP_INTERVAL=720
+        echo -e "${GREEN}✅ Frequency: every 12 hours${NC}"
         ;;
     *)
-        BACKUP_MODE="scheduled"
-        echo -e "${YELLOW}⚠️  Invalid choice, using scheduled mode${NC}"
+        BACKUP_INTERVAL=30
+        echo -e "${YELLOW}⚠️  Invalid choice, using 30 minutes${NC}"
         ;;
 esac
 
-# Update config.yaml with chosen mode
+# Update config.yaml with periodic mode and interval
 if [ -f config/config.yaml ]; then
-    sed -i '/^backup:/,/^restic_server:/ s/^  mode: .*/  mode: "'"${BACKUP_MODE}"'"/' config/config.yaml
-    echo -e "${GREEN}✅ Backup mode configured: ${BACKUP_MODE}${NC}"
+    sed -i '/^backup:/,/^restic_server:/ s/^  mode: .*/  mode: "periodic"/' config/config.yaml
+    sed -i '/^backup:/,/^restic_server:/ s/^  interval: .*/  interval: '"${BACKUP_INTERVAL}"'/' config/config.yaml
+    echo -e "${GREEN}✅ Automatic backup configured: every ${BACKUP_INTERVAL} minutes${NC}"
 fi
 
 echo ""

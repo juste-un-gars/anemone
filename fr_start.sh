@@ -314,37 +314,43 @@ echo -e "${CYAN}  Étape 3c/5 : Mode de sauvegarde${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 echo ""
-echo "Choisissez le mode de sauvegarde :"
-echo "  1) 🟢 scheduled - Sauvegarde planifiée (cron, recommandé)"
-echo "  2) 🟡 periodic  - Sauvegarde toutes les N minutes"
-echo "  3) 🔴 live      - Surveillance en temps réel (inotify)"
+echo "Choisissez la fréquence de sauvegarde automatique :"
+echo "  1) Toutes les 30 minutes (recommandé)"
+echo "  2) Toutes les heures"
+echo "  3) Toutes les 6 heures"
+echo "  4) Toutes les 12 heures"
 echo ""
-read -p "Votre choix (1/2/3, par défaut: 1) : " BACKUP_MODE_CHOICE
-BACKUP_MODE_CHOICE=${BACKUP_MODE_CHOICE:-1}
+read -p "Votre choix (1-4, par défaut: 1) : " BACKUP_FREQ_CHOICE
+BACKUP_FREQ_CHOICE=${BACKUP_FREQ_CHOICE:-1}
 
-case "$BACKUP_MODE_CHOICE" in
+case "$BACKUP_FREQ_CHOICE" in
     1)
-        BACKUP_MODE="scheduled"
-        echo -e "${GREEN}✅ Mode : scheduled (sauvegarde selon planning cron)${NC}"
+        BACKUP_INTERVAL=30
+        echo -e "${GREEN}✅ Fréquence : toutes les 30 minutes${NC}"
         ;;
     2)
-        BACKUP_MODE="periodic"
-        echo -e "${GREEN}✅ Mode : periodic (sauvegarde périodique)${NC}"
+        BACKUP_INTERVAL=60
+        echo -e "${GREEN}✅ Fréquence : toutes les heures${NC}"
         ;;
     3)
-        BACKUP_MODE="live"
-        echo -e "${GREEN}✅ Mode : live (surveillance en temps réel)${NC}"
+        BACKUP_INTERVAL=360
+        echo -e "${GREEN}✅ Fréquence : toutes les 6 heures${NC}"
+        ;;
+    4)
+        BACKUP_INTERVAL=720
+        echo -e "${GREEN}✅ Fréquence : toutes les 12 heures${NC}"
         ;;
     *)
-        BACKUP_MODE="scheduled"
-        echo -e "${YELLOW}⚠️  Choix invalide, utilisation du mode scheduled${NC}"
+        BACKUP_INTERVAL=30
+        echo -e "${YELLOW}⚠️  Choix invalide, utilisation de 30 minutes${NC}"
         ;;
 esac
 
-# Mettre à jour config.yaml avec le mode choisi
+# Mettre à jour config.yaml avec le mode periodic et l'intervalle
 if [ -f config/config.yaml ]; then
-    sed -i '/^backup:/,/^restic_server:/ s/^  mode: .*/  mode: "'"${BACKUP_MODE}"'"/' config/config.yaml
-    echo -e "${GREEN}✅ Mode de sauvegarde configuré : ${BACKUP_MODE}${NC}"
+    sed -i '/^backup:/,/^restic_server:/ s/^  mode: .*/  mode: "periodic"/' config/config.yaml
+    sed -i '/^backup:/,/^restic_server:/ s/^  interval: .*/  interval: '"${BACKUP_INTERVAL}"'/' config/config.yaml
+    echo -e "${GREEN}✅ Sauvegarde automatique configurée : toutes les ${BACKUP_INTERVAL} minutes${NC}"
 fi
 
 echo ""

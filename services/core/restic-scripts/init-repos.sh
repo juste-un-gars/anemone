@@ -44,13 +44,14 @@ try:
     for target in enabled_targets:
         name = target.get('name', 'unknown')
         host = target.get('host')
-        port = target.get('port', 22)
+        port = target.get('port', 22222)
         user = target.get('user', 'restic')
         path = target.get('path', '/backups')
 
         # Construire l'URL du repository
-        # Format SFTP pour Restic : sftp:user@host:/path (port 22 par défaut)
-        # Via VPN, on utilise toujours le port 22 (port interne du conteneur)
+        # Format SFTP pour Restic : sftp:user@host:/path
+        # Le port 22222 est configuré dans /root/.ssh/config (Host *)
+        # Via VPN, on utilise le port 22222 (port interne du conteneur)
         repo_url = f'sftp:{user}@{host}:{path}'
 
         print(f'\\n  Checking repository: {name}')

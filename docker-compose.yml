@@ -23,7 +23,7 @@ services:
       - /lib/modules:/lib/modules:ro
     ports:
       - "51820:51820/udp"  # WireGuard VPN
-      - "${SFTP_PORT:-22222}:22"  # SFTP for receiving backups
+      - "${SFTP_PORT:-22222}:22222"  # SFTP for receiving backups
     sysctls:
       - net.ipv4.conf.all.src_valid_mark=1
       - net.ipv4.ip_forward=1
@@ -31,7 +31,7 @@ services:
     networks:
       - anemone-net
     healthcheck:
-      test: ["CMD", "sh", "-c", "wg show && ss -tlnp | grep -q ':22'"]
+      test: ["CMD", "sh", "-c", "wg show && ss -tlnp | grep -q ':22222'"]
       interval: 30s
       timeout: 10s
       retries: 3
