@@ -45,12 +45,19 @@ if ! command -v docker &> /dev/null; then
 fi
 echo -e "${GREEN}✅ Docker detected${NC}"
 
-# Check Docker Compose
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+# Check Docker Compose and determine which command to use
+DOCKER_COMPOSE_CMD=""
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker compose"
+    echo -e "${GREEN}✅ Docker Compose v2 detected${NC}"
+elif command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+    echo -e "${GREEN}✅ Docker Compose v1 detected${NC}"
+    echo -e "${YELLOW}⚠️  Docker Compose v1 is deprecated, install the v2 plugin${NC}"
+else
     echo -e "${RED}❌ Docker Compose is not installed${NC}"
     exit 1
 fi
-echo -e "${GREEN}✅ Docker Compose detected${NC}"
 
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -79,13 +86,15 @@ echo -e "${CYAN}  Step 3/5: Server Configuration${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 read -p "🏷️  Server name (e.g., SERVER1, PARIS, HOME): " SERVER_NAME
-read -p "🌐 DynDNS address (e.g., my-server.duckdns.org): " DYNDNS
+read -p "🌐 External VPN address (e.g., dyndns, public IP): " EXTERNAL_ADDR
+read -p "🔌 WireGuard port (default 51820): " VPN_PORT
+VPN_PORT=${VPN_PORT:-51820}
 
 # Update config.yaml if needed
 if [ -f "config/config.yaml" ]; then
     echo "📝 Updating config/config.yaml..."
     sed -i "s/name: .*/name: ${SERVER_NAME}/" config/config.yaml 2>/dev/null || true
-    sed -i "s/endpoint: .*/endpoint: ${DYNDNS}:51820/" config/config.yaml 2>/dev/null || true
+    sed -i "s/endpoint: .*/endpoint: ${EXTERNAL_ADDR}:${VPN_PORT}/" config/config.yaml 2>/dev/null || true
 fi
 
 echo ""
@@ -94,7 +103,7 @@ echo -e "${CYAN}  Step 4/5: Starting Docker${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 echo "🐳 Building and starting containers..."
-docker-compose up -d --build
+$DOCKER_COMPOSE_CMD up -d --build
 
 echo ""
 echo -e "${GREEN}✅ Containers started successfully!${NC}"
@@ -126,7 +135,7 @@ echo "   • Dashboard: http://localhost:3000/"
 echo "   • Recovery: http://localhost:3000/recovery"
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${CYAN}  Logs: docker-compose logs -f${NC}"
-echo -e "${CYAN}  Stop: docker-compose down${NC}"
-echo -e "${CYAN}  Restart: docker-compose restart${NC}"
+echo -e "${CYAN}  Logs: $DOCKER_COMPOSE_CMD logs -f${NC}"
+echo -e "${CYAN}  Stop: $DOCKER_COMPOSE_CMD down${NC}"
+echo -e "${CYAN}  Restart: $DOCKER_COMPOSE_CMD restart${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

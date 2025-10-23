@@ -45,12 +45,19 @@ if ! command -v docker &> /dev/null; then
 fi
 echo -e "${GREEN}✅ Docker détecté${NC}"
 
-# Vérifier Docker Compose
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
+# Vérifier Docker Compose et déterminer la commande à utiliser
+DOCKER_COMPOSE_CMD=""
+if docker compose version &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker compose"
+    echo -e "${GREEN}✅ Docker Compose v2 détecté${NC}"
+elif command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+    echo -e "${GREEN}✅ Docker Compose v1 détecté${NC}"
+    echo -e "${YELLOW}⚠️  Docker Compose v1 est obsolète, installez le plugin v2${NC}"
+else
     echo -e "${RED}❌ Docker Compose n'est pas installé${NC}"
     exit 1
 fi
-echo -e "${GREEN}✅ Docker Compose détecté${NC}"
 
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -79,13 +86,15 @@ echo -e "${CYAN}  Étape 3/5 : Configuration du serveur${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 read -p "🏷️  Nom de ce serveur (ex: FR1, PARIS, HOME) : " SERVER_NAME
-read -p "🌐 Adresse DynDNS (ex: mon-serveur.duckdns.org) : " DYNDNS
+read -p "🌐 Adresse extérieure pour le VPN (ex: dyndns, IP publique) : " EXTERNAL_ADDR
+read -p "🔌 Port WireGuard (par défaut 51820) : " VPN_PORT
+VPN_PORT=${VPN_PORT:-51820}
 
 # Mettre à jour config.yaml si nécessaire
 if [ -f "config/config.yaml" ]; then
     echo "📝 Mise à jour de config/config.yaml..."
     sed -i "s/name: .*/name: ${SERVER_NAME}/" config/config.yaml 2>/dev/null || true
-    sed -i "s/endpoint: .*/endpoint: ${DYNDNS}:51820/" config/config.yaml 2>/dev/null || true
+    sed -i "s/endpoint: .*/endpoint: ${EXTERNAL_ADDR}:${VPN_PORT}/" config/config.yaml 2>/dev/null || true
 fi
 
 echo ""
@@ -94,7 +103,7 @@ echo -e "${CYAN}  Étape 4/5 : Démarrage de Docker${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 echo "🐳 Construction et démarrage des conteneurs..."
-docker-compose up -d --build
+$DOCKER_COMPOSE_CMD up -d --build
 
 echo ""
 echo -e "${GREEN}✅ Conteneurs démarrés avec succès !${NC}"
@@ -126,7 +135,7 @@ echo "   • Dashboard : http://localhost:3000/"
 echo "   • Recovery : http://localhost:3000/recovery"
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${CYAN}  Logs : docker-compose logs -f${NC}"
-echo -e "${CYAN}  Arrêter : docker-compose down${NC}"
-echo -e "${CYAN}  Redémarrer : docker-compose restart${NC}"
+echo -e "${CYAN}  Logs : $DOCKER_COMPOSE_CMD logs -f${NC}"
+echo -e "${CYAN}  Arrêter : $DOCKER_COMPOSE_CMD down${NC}"
+echo -e "${CYAN}  Redémarrer : $DOCKER_COMPOSE_CMD restart${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
