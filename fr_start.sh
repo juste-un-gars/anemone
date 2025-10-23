@@ -113,6 +113,34 @@ read -p "📂 Voulez-vous utiliser le partage intégré (Samba + WebDAV) ? (oui/
 if [ "$USE_INTEGRATED_SHARES" = "oui" ]; then
     DOCKER_PROFILES="--profile shares"
     echo -e "${GREEN}✅ Le partage intégré sera activé${NC}"
+    echo ""
+
+    # Demander les identifiants Samba/WebDAV
+    echo -e "${BLUE}Configuration des identifiants de partage...${NC}"
+    read -p "👤 Nom d'utilisateur (par défaut: anemone) : " SHARE_USERNAME
+    SHARE_USERNAME=${SHARE_USERNAME:-anemone}
+
+    while true; do
+        read -s -p "🔐 Mot de passe pour ${SHARE_USERNAME} : " SHARE_PASSWORD
+        echo ""
+        read -s -p "🔐 Confirmez le mot de passe : " SHARE_PASSWORD_CONFIRM
+        echo ""
+
+        if [ "$SHARE_PASSWORD" = "$SHARE_PASSWORD_CONFIRM" ]; then
+            break
+        else
+            echo -e "${RED}❌ Les mots de passe ne correspondent pas. Réessayez.${NC}"
+        fi
+    done
+
+    # Mettre à jour config.yaml avec les identifiants
+    if [ -f config/config.yaml ]; then
+        sed -i "/services:/,/smb:/{s/username: .*/username: \"${SHARE_USERNAME}\"/}" config/config.yaml
+        sed -i "/services:/,/smb:/{s/password: .*/password: \"${SHARE_PASSWORD}\"/}" config/config.yaml
+        sed -i "/webdav:/,/ssl:/{s/username: .*/username: \"${SHARE_USERNAME}\"/}" config/config.yaml
+        sed -i "/webdav:/,/ssl:/{s/password: .*/password: \"${SHARE_PASSWORD}\"/}" config/config.yaml
+        echo -e "${GREEN}✅ Identifiants configurés dans config.yaml${NC}"
+    fi
 
     # Sauvegarder la configuration de stockage
     mkdir -p config

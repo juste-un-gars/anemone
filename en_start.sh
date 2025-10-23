@@ -113,6 +113,34 @@ read -p "📂 Do you want to use integrated sharing (Samba + WebDAV)? (yes/no): 
 if [ "$USE_INTEGRATED_SHARES" = "yes" ]; then
     DOCKER_PROFILES="--profile shares"
     echo -e "${GREEN}✅ Integrated sharing will be enabled${NC}"
+    echo ""
+
+    # Ask for Samba/WebDAV credentials
+    echo -e "${BLUE}Configuring share credentials...${NC}"
+    read -p "👤 Username (default: anemone): " SHARE_USERNAME
+    SHARE_USERNAME=${SHARE_USERNAME:-anemone}
+
+    while true; do
+        read -s -p "🔐 Password for ${SHARE_USERNAME}: " SHARE_PASSWORD
+        echo ""
+        read -s -p "🔐 Confirm password: " SHARE_PASSWORD_CONFIRM
+        echo ""
+
+        if [ "$SHARE_PASSWORD" = "$SHARE_PASSWORD_CONFIRM" ]; then
+            break
+        else
+            echo -e "${RED}❌ Passwords do not match. Please try again.${NC}"
+        fi
+    done
+
+    # Update config.yaml with credentials
+    if [ -f config/config.yaml ]; then
+        sed -i "/services:/,/smb:/{s/username: .*/username: \"${SHARE_USERNAME}\"/}" config/config.yaml
+        sed -i "/services:/,/smb:/{s/password: .*/password: \"${SHARE_PASSWORD}\"/}" config/config.yaml
+        sed -i "/webdav:/,/ssl:/{s/username: .*/username: \"${SHARE_USERNAME}\"/}" config/config.yaml
+        sed -i "/webdav:/,/ssl:/{s/password: .*/password: \"${SHARE_PASSWORD}\"/}" config/config.yaml
+        echo -e "${GREEN}✅ Credentials configured in config.yaml${NC}"
+    fi
 
     # Save storage configuration
     mkdir -p config

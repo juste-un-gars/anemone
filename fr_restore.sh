@@ -238,10 +238,53 @@ if [ -f "config/config.yaml" ]; then
 fi
 
 # Vérifier si la configuration de stockage existe
+DOCKER_PROFILES=""
 if [ -f "config/.anemone-storage-config" ]; then
     STORAGE_TYPE=$(grep "storage_type:" config/.anemone-storage-config | cut -d: -f2 | tr -d ' ')
 
-    if [ "$STORAGE_TYPE" = "network_mount" ]; then
+    if [ "$STORAGE_TYPE" = "integrated_shares" ]; then
+        echo ""
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${CYAN}  📂 Partage intégré détecté${NC}"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo "L'ancien serveur utilisait le partage intégré (Samba + WebDAV)."
+        echo ""
+        read -p "Voulez-vous continuer à utiliser le partage intégré ? (oui/non) : " USE_INTEGRATED_SHARES
+
+        if [ "$USE_INTEGRATED_SHARES" = "oui" ]; then
+            DOCKER_PROFILES="--profile shares"
+
+            echo ""
+            echo -e "${BLUE}Configuration des identifiants de partage...${NC}"
+            read -p "👤 Nom d'utilisateur (par défaut: anemone) : " SHARE_USERNAME
+            SHARE_USERNAME=${SHARE_USERNAME:-anemone}
+
+            while true; do
+                read -s -p "🔐 Mot de passe pour ${SHARE_USERNAME} : " SHARE_PASSWORD
+                echo ""
+                read -s -p "🔐 Confirmez le mot de passe : " SHARE_PASSWORD_CONFIRM
+                echo ""
+
+                if [ "$SHARE_PASSWORD" = "$SHARE_PASSWORD_CONFIRM" ]; then
+                    break
+                else
+                    echo -e "${RED}❌ Les mots de passe ne correspondent pas. Réessayez.${NC}"
+                fi
+            done
+
+            # Mettre à jour config.yaml avec les identifiants
+            if [ -f config/config.yaml ]; then
+                sed -i "/services:/,/smb:/{s/username: .*/username: \"${SHARE_USERNAME}\"/}" config/config.yaml
+                sed -i "/services:/,/smb:/{s/password: .*/password: \"${SHARE_PASSWORD}\"/}" config/config.yaml
+                sed -i "/webdav:/,/ssl:/{s/username: .*/username: \"${SHARE_USERNAME}\"/}" config/config.yaml
+                sed -i "/webdav:/,/ssl:/{s/password: .*/password: \"${SHARE_PASSWORD}\"/}" config/config.yaml
+                echo -e "${GREEN}✅ Identifiants configurés${NC}"
+            fi
+        else
+            echo -e "${YELLOW}ℹ️  Le partage intégré ne sera pas activé${NC}"
+        fi
+    elif [ "$STORAGE_TYPE" = "network_mount" ]; then
         echo ""
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "${CYAN}  🌐 Configuration de montage réseau détectée${NC}"
@@ -345,7 +388,7 @@ fi
 # Démarrer Docker
 echo ""
 echo "🐳 Démarrage de Docker..."
-$DOCKER_COMPOSE_CMD up -d --build
+$DOCKER_COMPOSE_CMD $DOCKER_PROFILES up -d --build
 
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
