@@ -339,6 +339,62 @@ C'est normal si vous avez beaucoup de données. Utilisez d'abord le **mode simul
 
 ---
 
+## Erreur : Permission denied lors de la synchronisation rsync/restic
+
+### Symptôme
+```
+rsync: mkdir "/backups/SERVER" failed: No such file or directory (2)
+# ou
+Fatal: unable to open repository: MkdirAll /backups/SERVER: permission denied
+```
+
+### Cause
+L'utilisateur `restic` n'a accès qu'à son répertoire home (`/home/restic/`). Les chemins de destination doivent être **relatifs** et non absolus.
+
+### Solution
+
+**Vérifier votre configuration** dans `config/config.yaml` :
+
+❌ **INCORRECT** (chemin absolu) :
+```yaml
+backup:
+  targets:
+    - name: "peer-backup"
+      host: "10.8.0.2"
+      port: 22222
+      user: "restic"
+      path: "/backups/myserver"   # ❌ Absolu - ne fonctionne pas
+```
+
+✅ **CORRECT** (chemin relatif) :
+```yaml
+backup:
+  targets:
+    - name: "peer-backup"
+      host: "10.8.0.2"
+      port: 22222
+      user: "restic"
+      path: "backups/myserver"    # ✅ Relatif - sera /home/restic/backups/myserver
+```
+
+**Corriger la configuration** :
+```bash
+# 1. Éditer config.yaml
+nano config/config.yaml
+
+# 2. Enlever le / initial du path (dans la section backup.targets)
+
+# 3. Redémarrer le conteneur core
+docker compose restart core
+
+# 4. Tester
+docker exec anemone-core /scripts/sync-now.sh
+```
+
+**Note** : Si vous ajoutez des pairs via l'interface web, les chemins sont automatiquement créés en relatif (depuis la version récente).
+
+---
+
 ## Problèmes avec les configurations de pairs
 
 ### Aucune configuration de pair visible

@@ -41,7 +41,9 @@ git clone https://github.com/juste-un-gars/anemone.git
 cd anemone
 
 # 2. Lancer le script de démarrage (initialise et démarre automatiquement)
-./start.sh
+./fr_start.sh   # Interface en français
+# ou
+./en_start.sh   # Interface en anglais
 
 # 3. Suivre les instructions affichées
 # Le script vérifie l'initialisation et démarre Docker
@@ -89,23 +91,18 @@ docker compose up -d
 
 Anemone dispose d'un système complet de disaster recovery (3 méthodes) :
 
-**Méthode 1 : Restauration depuis backup local**
+**Méthode 1 : Restauration interactive**
 ```bash
-./start.sh --restore-from=anemone-backup-SERVEUR-DATE.enc
-# Le script demandera votre clé Restic
+./fr_restore.sh   # Interface en français
+# ou
+./en_restore.sh   # Interface en anglais
+# Le script vous guide pour restaurer depuis un backup local ou distant
 ```
 
-**Méthode 2 : Restauration automatique depuis les peers** (recommandé)
-```bash
-./start.sh --auto-restore
-# Découvre automatiquement les backups sur vos peers
-# Vous choisissez lequel restaurer
-```
-
-**Méthode 3 : Interface web de recovery**
+**Méthode 2 : Interface web de recovery** (recommandé)
 ```
 http://localhost:3000/recovery
-# Interface graphique pour gérer tous vos backups
+# Interface graphique pour restaurer et gérer tous vos backups de configuration
 ```
 
 Consultez le [Guide de Disaster Recovery](DISASTER_RECOVERY.md) pour plus de détails.
@@ -208,11 +205,12 @@ docker exec anemone-core restic -r sftp:user@host:/path check
 ### Tester une restauration
 
 ```bash
-# Méthode automatique : découvre les backups sur vos peers
-./start.sh --auto-restore
+# Via l'interface web (recommandé)
+http://localhost:3000/recovery
 
-# Méthode manuelle : depuis un fichier local
-./start.sh --restore-from=backup.enc
+# Via script interactif
+./fr_restore.sh   # ou ./en_restore.sh
+# Suivez les instructions pour restaurer depuis un backup local ou distant
 ```
 
 ## 📋 Checklist de sécurité

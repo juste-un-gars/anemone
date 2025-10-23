@@ -53,3 +53,4 @@ tmp/
 temp/
 *.tmp
 *.bak
+backup/
