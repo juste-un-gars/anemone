@@ -13,6 +13,7 @@ RUN apk add --no-cache \
     openssh-server \
     openssh-client \
     restic \
+    rsync \
     bash \
     curl \
     dcron \
