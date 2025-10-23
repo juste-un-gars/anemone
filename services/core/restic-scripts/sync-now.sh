@@ -61,16 +61,21 @@ for target in targets:
     host = target.get('host')
     port = target.get('port', 22222)
     user = target.get('user', 'restic')
-    path = target.get('path', '/backups')
+    path = target.get('path', 'backups')
 
     if not host:
         print(f'⚠️  Target {name}: no host configured', file=sys.stderr)
         failed_targets.append(name)
         continue
 
+    # Normaliser le path : enlever le / initial pour le rendre relatif
+    # L'utilisateur restic n'a accès qu'à /home/restic/
+    # Donc /backups doit devenir backups (relatif = /home/restic/backups)
+    if path.startswith('/'):
+        path = path[1:]
+
     # Construire la destination rsync
-    # Format: user@host:path/server_name/
-    # Le path doit correspondre au nom du serveur pour la structure
+    # Format: user@host:path (relatif au home de l'utilisateur)
     server_name = os.getenv('HOSTNAME', 'anemone')
     dest = f'{user}@{host}:{path}'
 

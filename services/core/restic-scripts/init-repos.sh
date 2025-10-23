@@ -46,10 +46,16 @@ try:
         host = target.get('host')
         port = target.get('port', 22222)
         user = target.get('user', 'restic')
-        path = target.get('path', '/backups')
+        path = target.get('path', 'backups')
+
+        # Normaliser le path : enlever le / initial pour le rendre relatif
+        # L'utilisateur restic n'a accès qu'à /home/restic/
+        # Donc /backups doit devenir backups (relatif = /home/restic/backups)
+        if path.startswith('/'):
+            path = path[1:]
 
         # Construire l'URL du repository
-        # Format SFTP pour Restic : sftp:user@host:/path
+        # Format SFTP pour Restic : sftp:user@host:path (relatif au home)
         # Le port 22222 est configuré dans /root/.ssh/config (Host *)
         # Via VPN, on utilise le port 22222 (port interne du conteneur)
         repo_url = f'sftp:{user}@{host}:{path}'

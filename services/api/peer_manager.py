@@ -233,7 +233,7 @@ class PeerManager:
             "host": peer_vpn_ip,
             "port": sftp_port,
             "user": "restic",
-            "path": f"/backups/{local_name}"
+            "path": f"backups/{local_name}"  # Relatif à /home/restic/
         }
 
         # Initialiser la section backup si nécessaire

@@ -68,7 +68,7 @@ backup:
     #   host: "10.8.0.2"
     #   port: 22222
     #   user: "restic"
-    #   path: "/backups/home"
+    #   path: "backups/server1"  # Relatif à /home/restic/ sur le serveur distant
   
   keep_last: 10
   keep_daily: 7
