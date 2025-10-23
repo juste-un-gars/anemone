@@ -134,13 +134,19 @@ if [ "$USE_INTEGRATED_SHARES" = "yes" ]; then
         fi
     done
 
-    # Update config.yaml with credentials
+    # Update .env with credentials (REQUIRED for shares container)
+    if [ -f .env ]; then
+        sed -i "s/^SMB_USER=.*/SMB_USER=${SHARE_USERNAME}/" .env
+        sed -i "s/^SMB_PASSWORD=.*/SMB_PASSWORD=${SHARE_PASSWORD}/" .env
+        sed -i "s/^WEBDAV_USER=.*/WEBDAV_USER=${SHARE_USERNAME}/" .env
+        sed -i "s/^WEBDAV_PASSWORD=.*/WEBDAV_PASSWORD=${SHARE_PASSWORD}/" .env
+        echo -e "${GREEN}✅ Credentials configured in .env${NC}"
+    fi
+
+    # Update config.yaml too (for consistency)
     if [ -f config/config.yaml ]; then
-        # Replace in smb section (between smb: and webdav:) - 4 spaces for fields
         sed -i '/^  smb:/,/^  webdav:/ {s/^    username: ".*"/    username: "'"${SHARE_USERNAME}"'"/; s/^    password: ".*"/    password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
-        # Replace in webdav section (between webdav: and sftp:) - 4 spaces for fields
         sed -i '/^  webdav:/,/^  sftp:/ {s/^    username: ".*"/    username: "'"${SHARE_USERNAME}"'"/; s/^    password: ".*"/    password: "'"${SHARE_PASSWORD}"'"/}' config/config.yaml
-        echo -e "${GREEN}✅ Credentials configured in config.yaml${NC}"
     fi
 
     # Save storage configuration
