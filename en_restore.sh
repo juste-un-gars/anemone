@@ -209,16 +209,34 @@ if [ -f "config/.anemone-storage-config" ]; then
         echo ""
 
         # Get share paths
-        NETWORK_BACKUP=$(grep "network_backup_path:" config/.anemone-storage-config | cut -d: -f2- | tr -d ' ')
-        NETWORK_BACKUPS=$(grep "network_backups_path:" config/.anemone-storage-config | cut -d: -f2- | tr -d ' ')
+        OLD_NETWORK_BACKUP=$(grep "network_backup_path:" config/.anemone-storage-config | cut -d: -f2- | tr -d ' ')
+        OLD_NETWORK_BACKUPS=$(grep "network_backups_path:" config/.anemone-storage-config | cut -d: -f2- | tr -d ' ')
 
         echo "Old server used:"
-        echo "  • Backup  : ${CYAN}$NETWORK_BACKUP${NC}"
-        echo "  • Backups : ${CYAN}$NETWORK_BACKUPS${NC}"
+        echo "  • Backup  : ${CYAN}$OLD_NETWORK_BACKUP${NC}"
+        echo "  • Backups : ${CYAN}$OLD_NETWORK_BACKUPS${NC}"
         echo ""
         read -p "Do you want to remount these network shares? (yes/no): " REMOUNT_SHARES
 
         if [ "$REMOUNT_SHARES" = "yes" ]; then
+            echo ""
+            read -p "Are the paths still correct? (yes/no): " PATHS_CORRECT
+
+            if [ "$PATHS_CORRECT" = "yes" ]; then
+                # Use old paths
+                NETWORK_BACKUP="$OLD_NETWORK_BACKUP"
+                NETWORK_BACKUPS="$OLD_NETWORK_BACKUPS"
+            else
+                # Ask for new paths
+                echo ""
+                echo -e "${YELLOW}Please enter the new network paths:${NC}"
+                echo ""
+                echo "Enter network share information for user data:"
+                read -p "  Server/Share (e.g., //192.168.1.10/backup): " NETWORK_BACKUP
+                echo ""
+                echo "Enter network share information for received backups:"
+                read -p "  Server/Share (e.g., //192.168.1.10/backups): " NETWORK_BACKUPS
+            fi
             echo ""
             read -p "👤 Username for mounts: " SMB_USERNAME
             read -s -p "🔐 Password: " SMB_PASSWORD
@@ -261,6 +279,15 @@ EOF"
 BACKUP_DATA_PATH=/mnt/anemone/backup
 BACKUP_RECEIVE_PATH=/mnt/anemone/backups
 EOFENV
+
+            # Update .anemone-storage-config with used paths
+            cat > config/.anemone-storage-config << EOF
+# Anemone storage configuration
+# This file is saved with configuration backups
+storage_type: network_mount
+network_backup_path: ${NETWORK_BACKUP}
+network_backups_path: ${NETWORK_BACKUPS}
+EOF
 
             echo -e "${GREEN}✅ Network shares remounted${NC}"
             echo ""

@@ -209,16 +209,34 @@ if [ -f "config/.anemone-storage-config" ]; then
         echo ""
 
         # Récupérer les chemins des partages
-        NETWORK_BACKUP=$(grep "network_backup_path:" config/.anemone-storage-config | cut -d: -f2- | tr -d ' ')
-        NETWORK_BACKUPS=$(grep "network_backups_path:" config/.anemone-storage-config | cut -d: -f2- | tr -d ' ')
+        OLD_NETWORK_BACKUP=$(grep "network_backup_path:" config/.anemone-storage-config | cut -d: -f2- | tr -d ' ')
+        OLD_NETWORK_BACKUPS=$(grep "network_backups_path:" config/.anemone-storage-config | cut -d: -f2- | tr -d ' ')
 
         echo "Ancien serveur utilisait :"
-        echo "  • Backup  : ${CYAN}$NETWORK_BACKUP${NC}"
-        echo "  • Backups : ${CYAN}$NETWORK_BACKUPS${NC}"
+        echo "  • Backup  : ${CYAN}$OLD_NETWORK_BACKUP${NC}"
+        echo "  • Backups : ${CYAN}$OLD_NETWORK_BACKUPS${NC}"
         echo ""
         read -p "Voulez-vous remonter ces partages réseau ? (oui/non) : " REMOUNT_SHARES
 
         if [ "$REMOUNT_SHARES" = "oui" ]; then
+            echo ""
+            read -p "Les chemins sont-ils toujours corrects ? (oui/non) : " PATHS_CORRECT
+
+            if [ "$PATHS_CORRECT" = "oui" ]; then
+                # Utiliser les anciens chemins
+                NETWORK_BACKUP="$OLD_NETWORK_BACKUP"
+                NETWORK_BACKUPS="$OLD_NETWORK_BACKUPS"
+            else
+                # Demander les nouveaux chemins
+                echo ""
+                echo -e "${YELLOW}Veuillez entrer les nouveaux chemins réseau :${NC}"
+                echo ""
+                echo "Entrez les informations du partage réseau pour les données utilisateur :"
+                read -p "  Serveur/Partage (ex: //192.168.1.10/backup) : " NETWORK_BACKUP
+                echo ""
+                echo "Entrez les informations du partage réseau pour les backups reçus :"
+                read -p "  Serveur/Partage (ex: //192.168.1.10/backups) : " NETWORK_BACKUPS
+            fi
             echo ""
             read -p "👤 Nom d'utilisateur pour les montages : " SMB_USERNAME
             read -s -p "🔐 Mot de passe : " SMB_PASSWORD
@@ -261,6 +279,15 @@ EOF"
 BACKUP_DATA_PATH=/mnt/anemone/backup
 BACKUP_RECEIVE_PATH=/mnt/anemone/backups
 EOFENV
+
+            # Mettre à jour .anemone-storage-config avec les chemins utilisés
+            cat > config/.anemone-storage-config << EOF
+# Configuration de stockage Anemone
+# Ce fichier est sauvegardé avec les backups de configuration
+storage_type: network_mount
+network_backup_path: ${NETWORK_BACKUP}
+network_backups_path: ${NETWORK_BACKUPS}
+EOF
 
             echo -e "${GREEN}✅ Partages réseau remontés${NC}"
             echo ""
