@@ -310,6 +310,45 @@ fi
 
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}  Step 3c/5: Backup Mode${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+echo ""
+echo "Choose backup mode:"
+echo "  1) 🟢 scheduled - Scheduled backup (cron, recommended)"
+echo "  2) 🟡 periodic  - Backup every N minutes"
+echo "  3) 🔴 live      - Real-time monitoring (inotify)"
+echo ""
+read -p "Your choice (1/2/3, default: 1): " BACKUP_MODE_CHOICE
+BACKUP_MODE_CHOICE=${BACKUP_MODE_CHOICE:-1}
+
+case "$BACKUP_MODE_CHOICE" in
+    1)
+        BACKUP_MODE="scheduled"
+        echo -e "${GREEN}✅ Mode: scheduled (backup according to cron schedule)${NC}"
+        ;;
+    2)
+        BACKUP_MODE="periodic"
+        echo -e "${GREEN}✅ Mode: periodic (periodic backup)${NC}"
+        ;;
+    3)
+        BACKUP_MODE="live"
+        echo -e "${GREEN}✅ Mode: live (real-time monitoring)${NC}"
+        ;;
+    *)
+        BACKUP_MODE="scheduled"
+        echo -e "${YELLOW}⚠️  Invalid choice, using scheduled mode${NC}"
+        ;;
+esac
+
+# Update config.yaml with chosen mode
+if [ -f config/config.yaml ]; then
+    sed -i '/^backup:/,/^restic_server:/ s/^  mode: .*/  mode: "'"${BACKUP_MODE}"'"/' config/config.yaml
+    echo -e "${GREEN}✅ Backup mode configured: ${BACKUP_MODE}${NC}"
+fi
+
+echo ""
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}  Step 4/5: Starting Docker${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
