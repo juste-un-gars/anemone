@@ -105,6 +105,7 @@ echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━�
 # Configuration du partage et du stockage
 DOCKER_PROFILES=""
 USE_NETWORK_SHARES="non"
+FSTAB_MODIFIED="non"
 
 echo ""
 read -p "📂 Voulez-vous utiliser le partage intégré (Samba + WebDAV) ? (oui/non) : " USE_INTEGRATED_SHARES
@@ -210,10 +211,40 @@ BACKUP_RECEIVE_PATH=/mnt/anemone/backups
 EOFENV
 
         echo -e "${GREEN}✅ Partages réseau montés et configurés${NC}"
-        echo -e "${YELLOW}⚠️  Pour remonter automatiquement au démarrage, ajoutez à /etc/fstab :${NC}"
+
+        # Ajouter automatiquement à /etc/fstab
         echo ""
-        echo "${SMB_BACKUP_PATH} /mnt/anemone/backup cifs credentials=/root/.anemone-cifs-credentials,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0"
-        echo "${SMB_BACKUPS_PATH} /mnt/anemone/backups cifs credentials=/root/.anemone-cifs-credentials,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0"
+        echo "📝 Ajout des montages à /etc/fstab pour montage automatique au boot..."
+
+        # Backup de fstab
+        sudo cp /etc/fstab /etc/fstab.backup.$(date +%Y%m%d-%H%M%S)
+
+        # Vérifier si les entrées existent déjà
+        FSTAB_ENTRY_1="${SMB_BACKUP_PATH} /mnt/anemone/backup cifs credentials=/root/.anemone-cifs-credentials,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0"
+        FSTAB_ENTRY_2="${SMB_BACKUPS_PATH} /mnt/anemone/backups cifs credentials=/root/.anemone-cifs-credentials,iocharset=utf8,file_mode=0777,dir_mode=0777 0 0"
+
+        if ! grep -qF "${SMB_BACKUP_PATH}" /etc/fstab; then
+            echo "$FSTAB_ENTRY_1" | sudo tee -a /etc/fstab > /dev/null
+            echo "  ✅ Ajouté : ${SMB_BACKUP_PATH} → /mnt/anemone/backup"
+        else
+            echo "  ⚠️  Entrée déjà présente : ${SMB_BACKUP_PATH}"
+        fi
+
+        if ! grep -qF "${SMB_BACKUPS_PATH}" /etc/fstab; then
+            echo "$FSTAB_ENTRY_2" | sudo tee -a /etc/fstab > /dev/null
+            echo "  ✅ Ajouté : ${SMB_BACKUPS_PATH} → /mnt/anemone/backups"
+        else
+            echo "  ⚠️  Entrée déjà présente : ${SMB_BACKUPS_PATH}"
+        fi
+
+        # Valider la configuration fstab (test à blanc)
+        if sudo mount -a --fake 2>/dev/null; then
+            echo -e "${GREEN}✅ Configuration /etc/fstab validée${NC}"
+            FSTAB_MODIFIED="oui"
+        else
+            echo -e "${YELLOW}⚠️  Validation /etc/fstab : vérifiez manuellement avec 'sudo mount -a'${NC}"
+            FSTAB_MODIFIED="oui"
+        fi
         echo ""
     fi
 fi
@@ -239,6 +270,20 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo -e "${GREEN}  ✅ Installation terminée !${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+
+# Afficher info si fstab a été modifié
+if [ "$FSTAB_MODIFIED" = "oui" ]; then
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}  📝 Modification /etc/fstab${NC}"
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "${GREEN}✅ Les montages réseau ont été ajoutés à /etc/fstab${NC}"
+    echo "   Les partages seront remontés automatiquement au redémarrage"
+    echo ""
+    echo -e "${YELLOW}ℹ️  Backup créé : /etc/fstab.backup.*${NC}"
+    echo ""
+fi
+
 echo -e "${YELLOW}📋 PROCHAINES ÉTAPES :${NC}"
 echo ""
 echo "1. 🌐 Accédez à : ${CYAN}http://localhost:3000/setup${NC}"
