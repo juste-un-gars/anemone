@@ -199,7 +199,10 @@ echo -e "${GREEN}✅ Configuration restored${NC}"
 
 # Verify and validate VPN address
 if [ -f "config/config.yaml" ]; then
-    CURRENT_VPN_ADDRESS=$(grep "address:" config/config.yaml | head -1 | awk '{print $2}')
+    # Extract address with quotes
+    CURRENT_VPN_ADDRESS_RAW=$(grep "address:" config/config.yaml | head -1 | awk '{print $2}')
+    # Extract address without quotes for display
+    CURRENT_VPN_ADDRESS=$(echo "$CURRENT_VPN_ADDRESS_RAW" | tr -d '"')
 
     if [ -n "$CURRENT_VPN_ADDRESS" ]; then
         echo ""
@@ -218,8 +221,8 @@ if [ -f "config/config.yaml" ]; then
             read -p "New VPN address (e.g., 10.8.0.2/24): " NEW_VPN_ADDRESS
 
             if [ -n "$NEW_VPN_ADDRESS" ]; then
-                # Update config.yaml
-                sed -i "s|address: $CURRENT_VPN_ADDRESS|address: $NEW_VPN_ADDRESS|g" config/config.yaml
+                # Update config.yaml (preserving quotes)
+                sed -i "s|address: \"$CURRENT_VPN_ADDRESS\"|address: \"$NEW_VPN_ADDRESS\"|g" config/config.yaml
 
                 # Update wg0.conf if exists
                 if [ -f "config/wg_confs/wg0.conf" ]; then

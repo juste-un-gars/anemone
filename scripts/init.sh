@@ -139,7 +139,7 @@ if [ ! -f config/config.yaml ]; then
     [ -f config/config.yaml.example ] && cp config/config.yaml.example config/config.yaml
     # Mettre à jour l'adresse VPN dans config.yaml
     if [ -f config/config.yaml ]; then
-        sed -i "s|address: 10.8.0.1/24|address: ${VPN_ADDRESS}|g" config/config.yaml
+        sed -i "s|address: \"10.8.0.1/24\"|address: \"${VPN_ADDRESS}\"|g" config/config.yaml
     fi
     echo -e "${GREEN}✓ config.yaml créé avec adresse VPN ${VPN_ADDRESS}${NC}"
 else
