@@ -517,47 +517,14 @@ body {{
 
         <!-- Restic Snapshots Status -->
         <div class="card">
-            <h2>📦 Snapshots Restic</h2>
+            <h2>📦 {t['last_backup']}</h2>
             <div id="restic-status" class="loading">{t['loading']}</div>
         </div>
 
-        <!-- Actions rapides -->
-        <div class="card">
-            <h2>⚡ Actions rapides</h2>
-            <button id="force-sync-btn" class="action-btn" onclick="forceDataSync()">
-                🔄 Forcer backup données maintenant
-            </button>
-            <div id="sync-status" style="margin-top: 12px; font-size: 0.9em; color: #666;"></div>
-        </div>
     </div>
 </div>
 
 <style>
-.action-btn {{
-    width: 100%;
-    padding: 12px 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 1em;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-}}
-.action-btn:hover {{
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102,126,234,0.4);
-}}
-.action-btn:active {{
-    transform: translateY(0);
-}}
-.action-btn:disabled {{
-    background: #ccc;
-    cursor: not-allowed;
-    transform: none;
-}}
-</style>
 
 <script>
 // Traductions injectées côté serveur

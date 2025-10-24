@@ -26,7 +26,7 @@
 
 ### Prérequis
 
-- Docker & Docker Compose
+- **Docker & Docker Compose** - [Guide d'installation officiel](https://docs.docker.com/engine/install/)
 - 1 Go RAM minimum
 - Port UDP 51820 ouvert (port-forwarding sur votre box)
 - Un nom de domaine DynDNS (gratuit : [DuckDNS](https://www.duckdns.org), [No-IP](https://www.noip.com))
