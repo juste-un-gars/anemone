@@ -1,7 +1,12 @@
 #!/bin/bash
+# Anemone - Distributed encrypted file server with peer redundancy
+# Copyright (C) 2025 juste-un-gars
+# Licensed under the GNU Affero General Public License v3.0
+# See LICENSE for details.
+
 set -e
 
-echo "[$(date)] 🔄 Rsync synchronization starting..."
+echo "[$(date)] 🔄 Encrypted synchronization starting..."
 
 CONFIG_PATH=${CONFIG_PATH:-/config/config.yaml}
 BACKUP_SOURCE=${BACKUP_SOURCE:-/mnt/backup}
@@ -33,9 +38,23 @@ fi
 
 echo "📦 Found $TARGET_COUNT sync target(s)"
 
-# Vérifier que rsync est installé
-if ! command -v rsync &> /dev/null; then
-    echo "❌ rsync is not installed"
+# Vérifier que rclone est installé
+if ! command -v rclone &> /dev/null; then
+    echo "❌ rclone is not installed"
+    exit 1
+fi
+
+# S'assurer que le répertoire source se termine par /
+if [ ! -d "$BACKUP_SOURCE" ]; then
+    echo "⚠️  Backup source does not exist: $BACKUP_SOURCE"
+    echo "   Creating it..."
+    mkdir -p "$BACKUP_SOURCE"
+fi
+
+# Vérifier que la configuration rclone existe
+if [ ! -f /root/.config/rclone/rclone.conf ]; then
+    echo "❌ Rclone configuration not found"
+    echo "   Run: python3 /scripts/configure-rclone.py"
     exit 1
 fi
 
@@ -49,73 +68,59 @@ import os
 targets = json.load(sys.stdin)
 backup_source = os.getenv('BACKUP_SOURCE', '/mnt/backup')
 
-# S'assurer que le chemin source se termine par / pour rsync
-if not backup_source.endswith('/'):
-    backup_source += '/'
-
 success_count = 0
 failed_targets = []
 
 for target in targets:
     name = target.get('name', 'unknown')
-    host = target.get('host')
-    port = target.get('port', 22222)
-    user = target.get('user', 'restic')
-    path = target.get('path', 'backups')
 
-    if not host:
-        print(f'⚠️  Target {name}: no host configured', file=sys.stderr)
-        failed_targets.append(name)
-        continue
+    # Remote name: remove '-backup' suffix and add '-crypt'
+    remote_base = name.replace('-backup', '')
+    crypt_remote = f'{remote_base}-crypt'
 
-    # Normaliser le path : enlever le / initial pour le rendre relatif
-    # L'utilisateur restic n'a accès qu'à /home/restic/
-    # Donc /backups doit devenir backups (relatif = /home/restic/backups)
-    if path.startswith('/'):
-        path = path[1:]
+    print(f'\\n📤 Syncing to: {name} (encrypted)')
 
-    # Construire la destination rsync
-    # Format: user@host:path (relatif au home de l'utilisateur)
-    server_name = os.getenv('HOSTNAME', 'anemone')
-    dest = f'{user}@{host}:{path}'
-
-    print(f'\\n📤 Syncing to: {name} ({dest})')
-
-    # Options rsync:
-    # -a : archive mode (recursive, preserve permissions, times, etc.)
-    # -v : verbose
-    # -z : compress during transfer
-    # --delete : delete files on destination that don't exist on source (MIRROR)
-    # --exclude : exclude patterns
-    # -e : specify SSH with custom port
-    rsync_cmd = [
-        'rsync',
-        '-avz',
-        '--delete',
-        '--exclude=.trash/',        # Ne pas synchroniser la corbeille
-        '--exclude=*.tmp',
-        '--exclude=*.swp',
-        '--exclude=*.part',
-        '--exclude=~*',
-        '-e', f'ssh -p {port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null',
+    # Options rclone sync:
+    # --delete-during : supprime les fichiers manquants pendant le transfert (miroir)
+    # --progress : affiche la progression
+    # --stats : affiche les statistiques
+    # --stats-one-line : stats sur une ligne
+    # --exclude : exclut les patterns
+    # --checksum : vérifie les checksums pour détecter les changements
+    # --retries : nombre de tentatives en cas d'erreur
+    rclone_cmd = [
+        'rclone',
+        'sync',
         backup_source,
-        dest
+        f'{crypt_remote}:',
+        '--delete-during',
+        '--progress',
+        '--stats', '5s',
+        '--stats-one-line',
+        '--exclude', '.trash/**',
+        '--exclude', '*.tmp',
+        '--exclude', '*.swp',
+        '--exclude', '*.part',
+        '--exclude', '~*',
+        '--checksum',
+        '--retries', '3',
+        '--low-level-retries', '10'
     ]
 
     try:
         result = subprocess.run(
-            rsync_cmd,
+            rclone_cmd,
             capture_output=True,
             text=True,
-            timeout=600  # 10 minutes timeout
+            timeout=3600  # 1 heure timeout
         )
 
         if result.returncode == 0:
             print(f'  ✅ Sync successful to {name}')
 
-            # Afficher les statistiques de rsync
-            for line in result.stdout.split('\\n'):
-                if 'sent' in line or 'total size' in line or 'speedup' in line:
+            # Afficher les statistiques
+            for line in result.stderr.split('\\n'):
+                if line.strip() and ('Transferred' in line or 'Checks' in line or 'Deleted' in line or 'Elapsed' in line):
                     print(f'     {line.strip()}')
 
             success_count += 1
@@ -125,7 +130,7 @@ for target in targets:
             failed_targets.append(name)
 
     except subprocess.TimeoutExpired:
-        print(f'  ⏱️  Sync timeout to {name}', file=sys.stderr)
+        print(f'  ⏱️  Sync timeout to {name} (>1h)', file=sys.stderr)
         failed_targets.append(name)
     except Exception as e:
         print(f'  ❌ Exception during sync to {name}: {e}', file=sys.stderr)
@@ -141,9 +146,9 @@ if failed_targets:
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -eq 0 ]; then
-    echo "[$(date)] ✅ Sync completed successfully"
+    echo "[$(date)] ✅ Encrypted sync completed successfully"
 else
-    echo "[$(date)] ❌ Sync completed with errors"
+    echo "[$(date)] ❌ Encrypted sync completed with errors"
 fi
 
 exit $EXIT_CODE

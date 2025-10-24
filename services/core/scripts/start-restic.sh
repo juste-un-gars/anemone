@@ -75,6 +75,11 @@ if [ -f /config/ssh/id_rsa ]; then
     chmod 600 /root/.ssh/id_rsa
 fi
 
+# Configurer rclone pour le chiffrement
+echo "🔐 Configuring encrypted mirroring with rclone..."
+python3 /scripts/core/configure-rclone.py || echo "⚠️  Rclone configuration failed"
+echo ""
+
 # Initialiser les dépôts Restic si nécessaire
 echo "🔧 Checking/initializing Restic repositories..."
 /scripts/init-repos.sh || echo "⚠️  Repository initialization failed (will retry during backup)"
@@ -92,7 +97,7 @@ except:
 ")
 
 echo "📋 Backup mode: $BACKUP_MODE"
-echo "🔄 User data: rsync synchronization (mirror mode)"
+echo "🔄 User data: rclone encrypted mirror (AES-256)"
 echo "📸 Server config: Restic snapshots (handled separately by cron)"
 
 # Démarrer la synchronisation des données selon le mode

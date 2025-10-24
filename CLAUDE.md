@@ -4,12 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Anemone is a distributed, encrypted file server with redundancy between peers. It combines WireGuard VPN, Restic encrypted backups, SMB/WebDAV file sharing, and SFTP in a Docker-based architecture. The system enables family/friends to back up each other's data securely without cloud dependencies.
+Anemone is a distributed, encrypted file server with redundancy between peers. It combines WireGuard VPN, rclone encrypted mirroring, Restic config backups, SMB/WebDAV file sharing, and SFTP in a Docker-based architecture. The system enables family/friends to back up each other's data securely without cloud dependencies.
 
 **Core Services**: 3 Docker containers
-1. **core** - WireGuard VPN + SFTP server + Restic backup engine (all-in-one)
+1. **core** - WireGuard VPN + SFTP server + rclone encrypted mirror + Restic config backups (all-in-one)
 2. **shares** - Samba SMB + WebDAV file sharing (optional)
 3. **api** - FastAPI web interface for management
+
+**Encryption Architecture**:
+- **User data**: rclone crypt with AES-256 (filenames AND content encrypted)
+- **Server config**: Restic snapshots with AES-256
+- **Encryption key**: Derived from setup wizard, stored encrypted with PBKDF2
 
 ## License
 
@@ -77,15 +82,60 @@ The most critical security component is the Restic encryption key lifecycle:
 - `services/restic/decrypt_key.py`: Decryption logic (standalone Python script)
 - `services/restic/entrypoint.sh`: Orchestrates decryption at startup
 
+### Encrypted Mirroring with rclone
+
+**Critical Security Feature**: User data is encrypted BEFORE leaving the server using rclone's crypt backend.
+
+**How it works**:
+1. **Setup**: Script `configure-rclone.py` generates rclone configuration at container startup
+2. **Encryption**: Uses the same Restic key (from `RESTIC_PASSWORD` env var)
+3. **Dual-layer remotes**:
+   - SFTP remote: Connects to peer via SSH over VPN
+   - Crypt remote: Wraps SFTP, encrypts everything with AES-256
+
+**What is encrypted**:
+- ✅ File contents: AES-256-CTR
+- ✅ Filenames: AES-256-EME (completely unreadable)
+- ✅ Directory names: Also encrypted
+- ✅ File structure: Obfuscated
+
+**Example**: On source server `Documents/photo.jpg` → On peer `gH73kD9f/xY2pL4q.bin`
+
+**Synchronization behavior**:
+- `rclone sync` creates an exact encrypted mirror
+- `--delete-during` flag: Files deleted on source are deleted on destination
+- `--checksum` flag: Verifies integrity, detects file changes
+- No versions kept: Simple mirror, not incremental backup
+
+**Key Configuration Files**:
+- `services/core/scripts/configure-rclone.py`: Generates `/root/.config/rclone/rclone.conf`
+- `services/core/restic-scripts/sync-now.sh`: Executes encrypted sync
+- `services/core/scripts/start-restic.sh`: Calls configure-rclone.py at startup
+
+**Decryption** (for recovery):
+```bash
+# On peer server, to decrypt received data
+rclone mount <remote>-crypt: /mnt/decrypted
+# Requires same Restic password used by source server
+```
+
+**Security guarantees**:
+- Peer admin CANNOT read your files (only encrypted blobs)
+- Peer admin CANNOT see your file/directory names
+- Only someone with your Restic password can decrypt
+
 ### Backup Modes
 
-Three operational modes controlled via `config/config.yaml`:
+Simplified operational mode controlled via `config/config.yaml`:
 
-- **live**: Uses `inotify-tools` to watch filesystem, triggers immediate backup on changes (debounced)
-- **periodic**: Backup loop every N minutes
-- **scheduled**: Cron-based backup at specific times
+- **periodic**: Backup loop every N minutes (30mn, 1h, 6h, or 12h intervals)
+  - User chooses frequency during setup
+  - Uses `sync-periodic.sh` which calls `sync-now.sh` in a loop
+  - Script sleeps between synchronizations
 
-The entrypoint.sh switches between modes using bash case statement and exec.
+**Note**: The "live" and "scheduled" modes have been removed for simplicity. Periodic mode with short intervals provides equivalent functionality without the complexity of inotify watchers or cron.
+
+The entrypoint.sh switches to periodic mode and execs the sync script.
 
 
 ## Important Implementation Details

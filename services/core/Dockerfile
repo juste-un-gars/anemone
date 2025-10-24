@@ -14,6 +14,7 @@ RUN apk add --no-cache \
     openssh-client \
     restic \
     rsync \
+    rclone \
     bash \
     curl \
     dcron \
@@ -67,7 +68,7 @@ RUN chmod +x /scripts/generate-wireguard-config.py
 
 # Copier les scripts spécifiques à core (depuis services/core/scripts/)
 COPY services/core/scripts/ /scripts/core/
-RUN chmod +x /scripts/core/*.sh
+RUN chmod +x /scripts/core/*.sh /scripts/core/*.py
 
 # Copier la configuration supervisord
 COPY services/core/supervisord.conf /etc/supervisord.conf

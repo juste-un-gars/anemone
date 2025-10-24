@@ -4,9 +4,9 @@
 
 ## ✨ Fonctionnalités Principales
 
-- 🔐 **Chiffrement de bout en bout** - Vos données sont chiffrées avant de quitter votre serveur
+- 🔐 **Chiffrement AES-256** - Données ET noms de fichiers chiffrés avant synchronisation (rclone crypt)
 - 🌐 **VPN WireGuard** - Connexion sécurisée entre tous vos serveurs
-- 📦 **Backups automatiques** - Sauvegarde incrémentale quotidienne vers vos pairs
+- 📦 **Miroir chiffré automatique** - Synchronisation continue de vos données vers vos pairs (totalement illisible chez eux)
 - 🔄 **Disaster Recovery complet** - Interface web pour gérer et restaurer vos backups
 - 📱 **Configuration par QR Code** - Ajoutez des serveurs en scannant un QR code
 - 💾 **Partage SMB/WebDAV** - Accédez à vos fichiers depuis n'importe quel appareil
