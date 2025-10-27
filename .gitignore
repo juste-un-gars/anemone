@@ -16,7 +16,7 @@ docker-compose.override.yml
 *.out
 go.work
 vendor/
-anemone
+/anemone
 
 # OS
 .DS_Store
