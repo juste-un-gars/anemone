@@ -1,5 +1,25 @@
-{{template "base.html" .}}
-{{define "content"}}
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <!-- Custom styles -->
+    <style>
+        [x-cloak] { display: none !important; }
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
 <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
     <div class="max-w-2xl w-full space-y-8">
         <!-- Header -->
@@ -10,7 +30,7 @@
                 </svg>
             </div>
             <h1 class="text-3xl font-bold text-gray-900 mb-2">
-                {{.T "setup.success.title"}}
+                {{call .T "setup.success.title"}}
             </h1>
         </div>
 
@@ -26,7 +46,7 @@
                     </div>
                     <div class="ml-3">
                         <p class="text-sm text-yellow-700 font-bold">
-                            {{.T "setup.success.key_warning"}}
+                            {{call .T "setup.success.key_warning"}}
                         </p>
                     </div>
                 </div>
@@ -35,61 +55,56 @@
             <!-- Key Display -->
             <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    {{.T "setup.success.key"}}
+                    {{call .T "setup.success.key"}}
                 </label>
                 <div class="relative">
                     <input type="text" readonly value="{{.EncryptionKey}}" id="encryption-key"
                            class="mt-1 block w-full border-2 border-indigo-500 rounded-md shadow-sm py-3 px-3 bg-gray-50 font-mono text-sm">
                     <button type="button" onclick="copyKey()"
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">
-                        Copy
+                        Copier
                     </button>
                 </div>
                 <p class="mt-2 text-sm text-gray-600">
-                    {{.T "setup.success.key_help"}}
+                    {{call .T "setup.success.key_help"}}
                 </p>
             </div>
 
-            <!-- Confirmation Checkboxes -->
-            <form id="confirm-form" action="/setup/confirm" method="POST">
+            <!-- Download Key Button -->
+            <div class="mb-6">
+                <button type="button" onclick="downloadKey()"
+                        class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                    <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                    </svg>
+                    {{call .T "setup.success.download"}}
+                </button>
+            </div>
+
+            <!-- Confirmation Form -->
+            <form method="POST" action="/setup/confirm" id="confirm-form">
+                <!-- Checkboxes -->
                 <div class="space-y-3 mb-6">
                     <div class="flex items-start">
-                        <div class="flex items-center h-5">
-                            <input id="confirm1" name="confirm1" type="checkbox" required
-                                   class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
-                        </div>
-                        <div class="ml-3 text-sm">
-                            <label for="confirm1" class="font-medium text-gray-700">
-                                {{.T "setup.success.checkbox1"}}
-                            </label>
-                        </div>
+                        <input id="confirm1" name="confirm1" type="checkbox" required
+                               class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded mt-1">
+                        <label for="confirm1" class="ml-3 text-sm text-gray-700">
+                            {{call .T "setup.success.checkbox1"}}
+                        </label>
                     </div>
-
                     <div class="flex items-start">
-                        <div class="flex items-center h-5">
-                            <input id="confirm2" name="confirm2" type="checkbox" required
-                                   class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
-                        </div>
-                        <div class="ml-3 text-sm">
-                            <label for="confirm2" class="font-medium text-gray-700">
-                                {{.T "setup.success.checkbox2"}}
-                            </label>
-                        </div>
+                        <input id="confirm2" name="confirm2" type="checkbox" required
+                               class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded mt-1">
+                        <label for="confirm2" class="ml-3 text-sm text-gray-700">
+                            {{call .T "setup.success.checkbox2"}}
+                        </label>
                     </div>
-                </div>
-
-                <!-- Download Key Button -->
-                <div class="mb-4">
-                    <button type="button" onclick="downloadKey()"
-                            class="w-full flex justify-center py-2 px-4 border-2 border-indigo-600 rounded-md shadow-sm text-sm font-medium text-indigo-600 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        📥 Download Key as File
-                    </button>
                 </div>
 
                 <!-- Continue Button -->
                 <button type="submit" id="continue-btn" disabled
                         class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-400 cursor-not-allowed">
-                    {{.T "setup.success.button"}}
+                    {{call .T "setup.success.button"}}
                 </button>
             </form>
         </div>
@@ -97,12 +112,12 @@
 </div>
 
 <script>
-    const key = document.getElementById('encryption-key').value;
     const confirm1 = document.getElementById('confirm1');
     const confirm2 = document.getElementById('confirm2');
     const continueBtn = document.getElementById('continue-btn');
+    const encryptionKeyInput = document.getElementById('encryption-key');
 
-    // Enable continue button only when both checkboxes are checked
+    // Enable button only when both checkboxes are checked
     function updateContinueButton() {
         if (confirm1.checked && confirm2.checked) {
             continueBtn.disabled = false;
@@ -120,21 +135,24 @@
 
     // Copy key to clipboard
     function copyKey() {
-        const keyInput = document.getElementById('encryption-key');
-        keyInput.select();
+        encryptionKeyInput.select();
         document.execCommand('copy');
 
-        // Show feedback
-        const btn = event.target;
-        const originalText = btn.textContent;
-        btn.textContent = '✓ Copied';
+        // Visual feedback
+        const button = event.target;
+        const originalText = button.textContent;
+        button.textContent = '✓ Copié!';
+        button.classList.add('bg-green-600');
+
         setTimeout(() => {
-            btn.textContent = originalText;
+            button.textContent = originalText;
+            button.classList.remove('bg-green-600');
         }, 2000);
     }
 
-    // Download key as text file
+    // Download key as file
     function downloadKey() {
+        const key = encryptionKeyInput.value;
         const blob = new Blob([key], { type: 'text/plain' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -146,4 +164,6 @@
         window.URL.revokeObjectURL(url);
     }
 </script>
-{{end}}
+
+</body>
+</html>

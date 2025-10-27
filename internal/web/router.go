@@ -390,7 +390,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for key, value := range configs {
-			_, err = tx.Exec("INSERT INTO system_config (key, value) VALUES (?, ?)", key, value)
+			_, err = tx.Exec("INSERT OR REPLACE INTO system_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)", key, value)
 			if err != nil {
 				log.Printf("Error saving config %s: %v", key, err)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -441,7 +441,7 @@ func (s *Server) handleSetupConfirm(w http.ResponseWriter, r *http.Request) {
 
 	// Mark setup as completed
 	_, err := s.db.Exec(
-		"INSERT INTO system_config (key, value, updated_at) VALUES (?, ?, ?)",
+		"INSERT OR REPLACE INTO system_config (key, value, updated_at) VALUES (?, ?, ?)",
 		"setup_completed",
 		time.Now().Format(time.RFC3339),
 		time.Now(),
