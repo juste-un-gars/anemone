@@ -1,0 +1,122 @@
+{{define "content"}}
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gray-100">
+    <div class="max-w-md w-full space-y-8">
+        <!-- Header -->
+        <div class="text-center">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">
+                🪸 Anemone
+            </h1>
+            <h2 class="text-xl text-gray-600">
+                {{.T "activate.title"}}
+            </h2>
+        </div>
+
+        <!-- Activation Form -->
+        <div class="bg-white shadow-xl rounded-lg p-8">
+            {{if .Error}}
+            <div class="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-red-700">{{.Error}}</p>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+
+            <!-- Welcome Message -->
+            <div class="mb-6 text-center">
+                <p class="text-gray-600 mb-2">{{.T "activate.welcome"}}</p>
+                <p class="text-lg font-semibold text-gray-900">{{.Username}}</p>
+            </div>
+
+            <form id="activation-form" method="POST" action="/activate/{{.Token}}" class="space-y-6">
+                <!-- Username (readonly) -->
+                <div>
+                    <label for="username" class="block text-sm font-medium text-gray-700">
+                        {{.T "activate.username"}}
+                    </label>
+                    <input type="text" id="username" name="username" value="{{.Username}}" readonly
+                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-100 text-gray-600 cursor-not-allowed sm:text-sm">
+                </div>
+
+                <!-- Set Password Section -->
+                <div class="pt-4 border-t border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">
+                        {{.T "activate.set_password"}}
+                    </h3>
+
+                    <!-- Password -->
+                    <div class="mb-4">
+                        <label for="password" class="block text-sm font-medium text-gray-700">
+                            {{.T "activate.password"}}
+                        </label>
+                        <input type="password" id="password" name="password" required minlength="8"
+                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                               autocomplete="new-password">
+                        <p class="mt-1 text-sm text-gray-500">{{.T "activate.password.help"}}</p>
+                    </div>
+
+                    <!-- Password Confirmation -->
+                    <div>
+                        <label for="password_confirm" class="block text-sm font-medium text-gray-700">
+                            {{.T "activate.password_confirm"}}
+                        </label>
+                        <input type="password" id="password_confirm" name="password_confirm" required minlength="8"
+                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                               autocomplete="new-password">
+                    </div>
+                </div>
+
+                <!-- Info Box -->
+                <div class="bg-blue-50 border-l-4 border-blue-400 p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-blue-700">
+                                Lors de l'activation, une clé de chiffrement unique sera générée pour sécuriser vos sauvegardes. Vous devrez la sauvegarder car elle ne pourra pas être récupérée.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-4">
+                    <button type="submit"
+                            class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white anemone-gradient hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        {{.T "activate.button"}}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Client-side password validation
+    document.getElementById('activation-form').addEventListener('submit', function(e) {
+        const password = document.getElementById('password').value;
+        const passwordConfirm = document.getElementById('password_confirm').value;
+
+        if (password !== passwordConfirm) {
+            e.preventDefault();
+            alert('{{.T "activate.errors.password_mismatch"}}');
+            return false;
+        }
+
+        if (password.length < 8) {
+            e.preventDefault();
+            alert('{{.T "activate.errors.password_length"}}');
+            return false;
+        }
+    });
+</script>
+{{end}}

@@ -1,42 +1,22 @@
-# Configuration locale
-.env
-mount-shares.sh
-config/config.yaml
-config/wireguard/
-config/wg_confs/
-config/ssh/
-config/samba/
-
-# ⚠️ CRITIQUE : Fichiers de chiffrement
-config/restic-password
-config/.restic.encrypted
-config/.restic.salt
-config/.setup-completed
-config/.anemone-storage-config
-
-# Données et backups
+# Data and runtime
 data/
-backups/
-restore/
-config-backups/
-shared-stats/*.json  # Stats générées dynamiquement
-
-# Logs
-logs/
+*.db
 *.log
 
 # Docker
 docker-compose.override.yml
 
-# Python
-__pycache__/
-*.py[cod]
-.Python
-venv/
-env/
-
-# Node.js
-node_modules/
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+vendor/
+anemone
 
 # OS
 .DS_Store
@@ -54,3 +34,4 @@ temp/
 *.tmp
 *.bak
 backup/
+_old/

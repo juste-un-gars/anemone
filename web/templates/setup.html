@@ -1,0 +1,139 @@
+{{define "content"}}
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-2xl w-full space-y-8">
+        <!-- Header -->
+        <div class="text-center">
+            <h1 class="text-4xl font-bold text-gray-900 mb-2">
+                🪸 {{.T "setup.welcome"}}
+            </h1>
+            <p class="text-gray-600 text-lg">
+                {{.T "setup.description"}}
+            </p>
+        </div>
+
+        <!-- Setup Form -->
+        <div class="bg-white shadow-xl rounded-lg p-8">
+            <form id="setup-form" hx-post="/setup" hx-target="#form-content" hx-swap="innerHTML">
+                <div id="form-content" class="space-y-6">
+                    <!-- Language Selection -->
+                    <div>
+                        <label for="language" class="block text-sm font-medium text-gray-700">
+                            {{.T "setup.language"}}
+                        </label>
+                        <select id="language" name="language" required
+                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                                onchange="window.location.href='/setup?lang=' + this.value">
+                            <option value="fr" {{if eq .Lang "fr"}}selected{{end}}>{{.T "setup.language.fr"}}</option>
+                            <option value="en" {{if eq .Lang "en"}}selected{{end}}>{{.T "setup.language.en"}}</option>
+                        </select>
+                    </div>
+
+                    <!-- NAS Name -->
+                    <div>
+                        <label for="nas_name" class="block text-sm font-medium text-gray-700">
+                            {{.T "setup.nas_name"}}
+                        </label>
+                        <input type="text" id="nas_name" name="nas_name" required
+                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                               placeholder="nas-maison">
+                        <p class="mt-1 text-sm text-gray-500">{{.T "setup.nas_name.help"}}</p>
+                    </div>
+
+                    <!-- Timezone -->
+                    <div>
+                        <label for="timezone" class="block text-sm font-medium text-gray-700">
+                            {{.T "setup.timezone"}}
+                        </label>
+                        <select id="timezone" name="timezone" required
+                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                            <option value="Europe/Paris">Europe/Paris</option>
+                            <option value="Europe/London">Europe/London</option>
+                            <option value="America/New_York">America/New_York</option>
+                            <option value="America/Los_Angeles">America/Los_Angeles</option>
+                            <option value="Asia/Tokyo">Asia/Tokyo</option>
+                            <option value="UTC">UTC</option>
+                        </select>
+                        <p class="mt-1 text-sm text-gray-500">{{.T "setup.timezone.help"}}</p>
+                    </div>
+
+                    <!-- Admin Account Section -->
+                    <div class="pt-6 border-t border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">
+                            {{.T "setup.admin.title"}}
+                        </h3>
+
+                        <!-- Username -->
+                        <div class="mb-4">
+                            <label for="username" class="block text-sm font-medium text-gray-700">
+                                {{.T "setup.admin.username"}}
+                            </label>
+                            <input type="text" id="username" name="username" required
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                   autocomplete="username">
+                        </div>
+
+                        <!-- Password -->
+                        <div class="mb-4">
+                            <label for="password" class="block text-sm font-medium text-gray-700">
+                                {{.T "setup.admin.password"}}
+                            </label>
+                            <input type="password" id="password" name="password" required minlength="8"
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                   autocomplete="new-password">
+                        </div>
+
+                        <!-- Password Confirmation -->
+                        <div class="mb-4">
+                            <label for="password_confirm" class="block text-sm font-medium text-gray-700">
+                                {{.T "setup.admin.password_confirm"}}
+                            </label>
+                            <input type="password" id="password_confirm" name="password_confirm" required minlength="8"
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                   autocomplete="new-password">
+                        </div>
+
+                        <!-- Email (optional) -->
+                        <div>
+                            <label for="email" class="block text-sm font-medium text-gray-700">
+                                {{.T "setup.admin.email"}}
+                            </label>
+                            <input type="email" id="email" name="email"
+                                   class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                   autocomplete="email">
+                            <p class="mt-1 text-sm text-gray-500">{{.T "setup.admin.email.help"}}</p>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="pt-4">
+                        <button type="submit"
+                                class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white anemone-gradient hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                            {{.T "setup.button.submit"}}
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Client-side password validation
+    document.getElementById('setup-form').addEventListener('submit', function(e) {
+        const password = document.getElementById('password').value;
+        const passwordConfirm = document.getElementById('password_confirm').value;
+
+        if (password !== passwordConfirm) {
+            e.preventDefault();
+            alert('{{.T "setup.errors.password_mismatch"}}');
+            return false;
+        }
+
+        if (password.length < 8) {
+            e.preventDefault();
+            alert('{{.T "setup.errors.password_length"}}');
+            return false;
+        }
+    });
+</script>
+{{end}}

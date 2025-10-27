@@ -1,298 +1,275 @@
-# 🪸 Anemone
+# 🪸 Anemone v2
 
-**Serveur de fichiers distribué, simple et chiffré, avec redondance entre proches**
+**Multi-user NAS with P2P encrypted backup synchronization**
 
-## ✨ Fonctionnalités Principales
+## 🎯 Overview
 
-- 🔐 **Chiffrement AES-256** - Données ET noms de fichiers chiffrés avant synchronisation (rclone crypt)
-- 🌐 **VPN WireGuard** - Connexion sécurisée entre tous vos serveurs
-- 📦 **Miroir chiffré automatique** - Synchronisation continue de vos données vers vos pairs (totalement illisible chez eux)
-- 🔄 **Disaster Recovery complet** - Interface web pour gérer et restaurer vos backups
-- 📱 **Configuration par QR Code** - Ajoutez des serveurs en scannant un QR code
-- 💾 **Partage SMB/WebDAV** - Accédez à vos fichiers depuis n'importe quel appareil
-- 🎨 **Interface web moderne** - Gestion complète via navigateur
-- 🔔 **Notifications optionnelles** - Alertes email/webhook en cas de problème (optionnel)
+Anemone is a self-hosted Network Attached Storage (NAS) solution designed for families and small teams. It provides:
 
-## 🎯 Cas d'Usage
+- 🔐 **Multi-user support** with individual encrypted backups
+- 🌐 **Peer-to-peer synchronization** of encrypted data
+- 📦 **SMB file sharing** (Windows/Mac/Linux compatible)
+- 🗑️ **Per-user trash** with configurable retention
+- 💾 **Quota management** per user
+- 🌍 **Multilingual** (French & English)
+- 🔒 **End-to-end encryption** with user-specific keys
 
-- **Famille** : Sauvegardez les photos/vidéos de famille entre plusieurs maisons
-- **Amis** : Partagez et sauvegardez mutuellement vos données importantes
-- **Multi-sites** : Redondance automatique entre plusieurs localisations
-- **Disaster Recovery** : Récupérez votre configuration complète depuis n'importe quel serveur pair
+## 🏗️ Architecture
 
-[Contenu identique jusqu'à la section Installation...]
+### Stack
 
-## 🚀 Installation rapide
+- **Backend**: Go (fast, single binary, easy deployment)
+- **Database**: SQLite (simple, reliable, no external dependencies)
+- **Frontend**: HTML templates + HTMX + Tailwind CSS
+- **File sharing**: Samba (SMB protocol)
+- **Backup sync**: rclone with encryption
 
-### Prérequis
+### Project Structure
 
-- **Docker & Docker Compose** - [Guide d'installation officiel](https://docs.docker.com/engine/install/)
-- 1 Go RAM minimum
-- Port UDP 51820 ouvert (port-forwarding sur votre box)
-- Un nom de domaine DynDNS (gratuit : [DuckDNS](https://www.duckdns.org), [No-IP](https://www.noip.com))
-
-### Installation
-
-#### Méthode recommandée (script tout-en-un)
-
-```bash
-# 1. Cloner le dépôt
-git clone https://github.com/juste-un-gars/anemone.git
-cd anemone
-
-# 2. Lancer le script de démarrage (initialise et démarre automatiquement)
-./fr_start.sh   # Interface en français
-# ou
-./en_start.sh   # Interface en anglais
-
-# 3. Suivre les instructions affichées
-# Le script vérifie l'initialisation et démarre Docker
+```
+anemone/
+├── cmd/anemone/main.go          # Application entry point
+├── internal/
+│   ├── config/                  # Configuration management
+│   ├── database/                # SQLite + migrations
+│   ├── users/                   # User management & auth
+│   ├── shares/                  # SMB share management
+│   ├── sync/                    # P2P synchronization
+│   ├── crypto/                  # Encryption utilities
+│   ├── quota/                   # Quota enforcement
+│   ├── trash/                   # Trash management
+│   └── web/                     # HTTP handlers
+├── web/
+│   ├── static/                  # CSS, JS, images
+│   └── templates/               # HTML templates
+├── data/                        # Runtime data (gitignored)
+│   ├── db/anemone.db           # SQLite database
+│   ├── shares/                 # User shares
+│   └── config/                 # Generated configs
+└── docker-compose.yml
 ```
 
-#### Méthode manuelle (contrôle total)
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Docker & Docker Compose - [Installation guide](https://docs.docker.com/engine/install/)
+- OR: Go 1.21+ (for local development)
+
+### With Docker (Recommended)
 
 ```bash
-# 1. Cloner le dépôt
+# Clone repository
 git clone https://github.com/juste-un-gars/anemone.git
 cd anemone
 
-# 2. Initialiser (génère clés WireGuard et SSH)
-./scripts/init.sh
-
-# 3. Éditer la configuration
-nano .env                    # Mots de passe SMB/WebDAV
-nano config/config.yaml      # Configuration générale
-
-# 4. Démarrer Anemone
+# Start services
 docker compose up -d
+
+# Access web interface
+open http://localhost:8080
 ```
 
-**Dans les deux cas**, après le démarrage :
-
-- Ouvrez http://localhost:3000/setup dans votre navigateur
-- Suivez l'assistant de configuration
-- **⚠️ SAUVEGARDEZ VOTRE CLÉ DANS BITWARDEN !**
-
-## 🔐 Configuration initiale sécurisée
-
-### Première fois (nouveau serveur)
-
-1. Accédez à `http://localhost:3000/setup`
-2. Choisissez **"Nouveau serveur"**
-3. Une clé de chiffrement est générée automatiquement
-4. **⚠️ SAUVEGARDEZ CETTE CLÉ IMMÉDIATEMENT**
-   - Dans Bitwarden / 1Password / KeePass
-   - Sur une clé USB dans un coffre
-   - Sur papier dans un lieu sûr
-5. Cochez la case de confirmation
-6. Validez
-
-### Restauration après incident
-
-Anemone dispose d'un système complet de disaster recovery (3 méthodes) :
-
-**Méthode 1 : Restauration interactive**
-```bash
-./fr_restore.sh   # Interface en français
-# ou
-./en_restore.sh   # Interface en anglais
-# Le script vous guide pour restaurer depuis un backup local ou distant
-```
-
-**Méthode 2 : Interface web de recovery** (recommandé)
-```
-http://localhost:3000/recovery
-# Interface graphique pour restaurer et gérer tous vos backups de configuration
-```
-
-Consultez le [Guide de Disaster Recovery](DISASTER_RECOVERY.md) pour plus de détails.
-
-## 🔒 Sécurité de la clé de chiffrement
-
-### Comment la clé est protégée
-
-✅ **Jamais stockée en clair** : La clé est immédiatement chiffrée après la configuration  
-✅ **Chiffrement fort** : AES-256-CBC avec 100 000 itérations PBKDF2  
-✅ **Clé dérivée du système** : Utilise l'UUID unique de la machine  
-✅ **Inaccessible via l'interface** : Impossible de consulter la clé après setup  
-✅ **Logs sécurisés** : La clé n'apparaît jamais dans les logs  
-
-### Que se passe-t-il si...
-
-**❓ Je perds ma clé ?**  
-→ ❌ Vos backups sont **irrécupérables**. C'est pourquoi il faut la sauvegarder !
-
-**❓ Mon serveur est volé ?**  
-→ ⚠️ Le voleur ne peut pas lire vos backups distants (ils sont chiffrés)  
-→ ⚠️ Il peut potentiellement déchiffrer la clé si le serveur est démarré  
-→ ✅ Solution : Coupez l'accès réseau du serveur volé immédiatement
-
-**❓ Un pair est compromis ?**  
-→ ✅ Le pirate a vos backups chiffrés mais **pas la clé**  
-→ ✅ Vos données restent protégées
-
-**❓ Je veux changer de serveur ?**  
-→ ✅ Copiez votre clé depuis Bitwarden  
-→ ✅ Utilisez "Restauration" lors du setup  
-→ ✅ Récupérez vos données depuis n'importe quel pair
-
-## 🛡️ Meilleures pratiques de sécurité
-
-### ✅ À faire ABSOLUMENT
-
-1. **Sauvegarder la clé** dans au moins 2 endroits différents :
-   - Gestionnaire de mots de passe (Bitwarden, 1Password)
-   - Clé USB chiffrée dans un coffre
-   - Papier dans un lieu sûr physique
-
-2. **Changer les mots de passe par défaut** dans `.env` :
-   ```bash
-   SMB_PASSWORD=MotDePasseFort123!
-   WEBDAV_PASSWORD=AutreMotDePasseFort456!
-   ```
-
-3. **Configurer le firewall** :
-   ```bash
-   # Bloquer SMB/WebDAV depuis Internet
-   sudo ufw deny 445
-   sudo ufw deny 8080
-   # Autoriser uniquement WireGuard
-   sudo ufw allow 51820/udp
-   ```
-
-4. **Tester la restauration** régulièrement (1x par an minimum)
-
-### ⚠️ À NE PAS faire
-
-❌ Commiter la clé dans Git  
-❌ Envoyer la clé par email non chiffré  
-❌ Stocker la clé en clair sur le cloud  
-❌ Partager la clé avec vos pairs (ils n'en ont pas besoin)  
-❌ Oublier de sauvegarder la clé après génération  
-
-## 🔧 Maintenance
-
-### Sauvegarder votre clé après setup
-
-Si vous avez oublié de sauvegarder votre clé lors du setup initial, vous pouvez la récupérer **une seule fois** avec cette commande :
+### Local Development
 
 ```bash
-# ⚠️ À utiliser UNIQUEMENT en urgence
-docker exec anemone-core python3 /scripts/decrypt_key.py
+# Install Go 1.21+
+# https://go.dev/doc/install
+
+# Clone repository
+git clone https://github.com/juste-un-gars/anemone.git
+cd anemone
+
+# Install dependencies
+go mod download
+
+# Run
+go run cmd/anemone/main.go
 ```
 
-**Ensuite sauvegardez-la IMMÉDIATEMENT dans Bitwarden !**
+## 📋 Initial Setup
 
-### Vérifier l'intégrité des backups
+1. **Access web interface** at `http://localhost:8080`
+2. **Choose language** (French or English)
+3. **Set NAS name** and timezone
+4. **Create first admin user**
+   - Username
+   - Password
+   - Email (optional)
+5. System generates encryption key automatically
+6. **Done!** Redirect to admin dashboard
 
-**Via l'interface web** (recommandé) :
+## 👥 User Management
+
+### Adding a User (Admin)
+
+1. Go to **Users** section in admin dashboard
+2. Click **Add User**
+3. Enter username and email
+4. System generates a **temporary activation link** (valid 24h)
+5. Send link to user via email/chat
+
+### User Activation
+
+1. User clicks activation link
+2. User chooses password
+3. System generates **encryption key** (32 bytes random)
+4. ⚠️ **CRITICAL PAGE**:
+   - Key is displayed ONE TIME only
+   - User must save it (copy/print/download)
+   - Checkboxes: "I saved my key" + "I understand I cannot recover without it"
+   - User must re-type key to confirm
+5. Account activated → Redirect to dashboard
+
+## 🔐 Security
+
+### Encryption Keys
+
+- Each user has a **unique encryption key** (32 bytes)
+- Key is generated automatically and shown **once** during activation
+- Key is stored encrypted in database (using system master key)
+- Hash stored for verification without exposing the key
+- **Without the key, backup data cannot be decrypted**
+
+### P2P Sync Security
+
+- Each user's backups are encrypted with their personal key
+- Peers cannot decrypt data from other users
+- No VPN required (assume firewall/network security handled externally)
+- HTTPS recommended for peer connections
+
+## 📂 File Shares
+
+### Default Structure
+
+Each user gets:
+
 ```
-http://localhost:3000/recovery
-→ Cliquer sur "Vérifier" sur un backup
+/shares/
+  └── username/
+      └── backup/     # Auto-synced to peers (encrypted)
 ```
 
-**Via ligne de commande** :
+Optional additional shares can be created (local only, no sync).
+
+### SMB Access
+
+```
+Windows: \\nas.local\username-backup
+Mac:     smb://nas.local/username-backup
+Linux:   smb://nas.local/username-backup
+```
+
+## 🔄 P2P Synchronization
+
+### How it works
+
+1. Admin adds **peer** (another Anemone instance)
+2. Enter peer IP address
+3. Each user's `backup/` folder syncs automatically
+4. Data is encrypted **before** leaving source NAS
+5. Peer stores encrypted blobs (cannot read content)
+
+### Sync Monitoring
+
+- Dashboard shows last sync time per user
+- Sync logs stored in database
+- Manual sync button available
+
+## 🗑️ Trash System
+
+- Each user has personal trash
+- Deleted files retained for **30 days** (configurable)
+- Files automatically purged after expiration
+- Restore from trash available in dashboard
+
+## 💾 Quotas
+
+- Admin sets per-user quotas (total + backup)
+- System monitors usage
+- Alerts when approaching limit
+- Blocks writes when quota exceeded
+
+## 🌍 Internationalization
+
+Supported languages:
+- 🇫🇷 French
+- 🇬🇧 English
+
+Language selected during initial setup.
+
+## 📊 Database Schema
+
+See `internal/database/migrations.go` for complete schema.
+
+Main tables:
+- `system_config` - System settings
+- `users` - User accounts
+- `activation_tokens` - Temporary activation links
+- `shares` - File shares
+- `trash_items` - Deleted files
+- `peers` - Connected Anemone instances
+- `sync_log` - Synchronization history
+
+## 🔧 Configuration
+
+Environment variables:
+
 ```bash
-# Vérifier l'intégrité d'un backup de configuration
-curl -X POST http://localhost:3000/api/recovery/verify \
-  -H "Content-Type: application/json" \
-  -d '{"backup_path": "/config-backups/local/backup.enc"}'
-
-# Vérifier les backups Restic (données)
-docker exec anemone-core restic -r sftp:user@host:/path check
+ANEMONE_DATA_DIR=/app/data  # Data directory
+PORT=8080                    # HTTP port
+LANGUAGE=fr                  # Default language (fr/en)
 ```
 
-### Tester une restauration
+## 🐛 Troubleshooting
+
+### Can't access web interface
 
 ```bash
-# Via l'interface web (recommandé)
-http://localhost:3000/recovery
+# Check if server is running
+docker compose ps
 
-# Via script interactif
-./fr_restore.sh   # ou ./en_restore.sh
-# Suivez les instructions pour restaurer depuis un backup local ou distant
+# Check logs
+docker compose logs anemone
 ```
 
-## 📋 Checklist de sécurité
+### Database issues
 
-Avant de mettre en production :
+```bash
+# Reset database (WARNING: deletes all data)
+rm data/db/anemone.db
+docker compose restart anemone
+```
 
-- [ ] Clé de chiffrement sauvegardée dans Bitwarden
-- [ ] Clé de chiffrement sauvegardée sur clé USB
-- [ ] Mots de passe SMB/WebDAV changés
-- [ ] Firewall configuré (bloquer SMB/WebDAV depuis Internet)
-- [ ] Port-forwarding WireGuard (51820/UDP) configuré
-- [ ] DNS dynamique configuré et testé
-- [ ] Premier backup réussi
-- [ ] Restauration testée depuis un pair
-- [ ] Clés publiques échangées avec les pairs
-- [ ] VPN WireGuard fonctionnel : `docker exec anemone-wireguard wg show`
+## 📝 Development Status
 
-## ❓ FAQ Sécurité
+**Current**: ✅ Base structure created
 
-**Q : Mes pairs peuvent-ils lire mes données ?**  
-R : Non. Les backups sont chiffrés avec votre clé. Les pairs ne stockent que des données chiffrées.
+**Next**:
+- [ ] Setup page implementation
+- [ ] User authentication
+- [ ] Activation tokens system
+- [ ] Samba dynamic configuration
+- [ ] rclone multi-user sync
+- [ ] Dashboard pages
 
-**Q : La clé est-elle visible quelque part ?**  
-R : Non, après le setup initial, elle est chiffrée et inaccessible via l'interface web ou les logs.
+## 🤝 Contributing
 
-**Q : Que faire si je soupçonne une compromission ?**  
-R : 
-1. Arrêtez immédiatement Anemone : `docker-compose down`
-2. Changez tous vos mots de passe
-3. Générez une nouvelle clé et refaites les backups
-4. Informez vos pairs
+See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
-**Q : Puis-je changer de clé de chiffrement ?**  
-R : Oui, mais il faudra refaire tous les backups. Procédure :
-1. Sauvegarder vos données locales
-2. Supprimer `config/.setup-completed`
-3. Relancer `docker-compose restart api`
-4. Refaire le setup avec une nouvelle clé
-5. Les nouveaux backups utiliseront la nouvelle clé
+## 📄 License
 
-**Q : Comment partager l'accès aux fichiers sans partager la clé ?**
-R : Utilisez SMB/WebDAV avec des comptes séparés. La clé Restic reste privée et sert uniquement aux backups.
-
-**Q : Comment connecter plusieurs serveurs Anemone ensemble ?**
-R : Consultez le guide complet [INTERCONNEXION_GUIDE.md](INTERCONNEXION_GUIDE.md) ou utilisez le script `./scripts/add-peer.sh` pour un ajout interactif.
-
-## 🤝 Contribuer
-
-Les contributions sont les bienvenues ! Consultez [CONTRIBUTING.md](CONTRIBUTING.md).
-
-## 📄 Licence
+GNU Affero General Public License v3.0 (AGPLv3)
 
 Copyright (C) 2025 juste-un-gars
 
-Ce programme est un logiciel libre ; vous pouvez le redistribuer et/ou le modifier selon les termes de la **GNU Affero General Public License** telle que publiée par la Free Software Foundation ; soit la version 3 de la Licence, soit (à votre choix) toute version ultérieure.
+See [LICENSE](LICENSE) for full license text.
 
-Ce programme est distribué dans l'espoir qu'il sera utile, mais SANS AUCUNE GARANTIE ; sans même la garantie implicite de COMMERCIALISATION ou D'ADÉQUATION À UN USAGE PARTICULIER. Voir la GNU Affero General Public License pour plus de détails.
+## 📚 Old Version
 
-Vous devriez avoir reçu une copie de la GNU Affero General Public License avec ce programme. Si ce n'est pas le cas, consultez <https://www.gnu.org/licenses/>.
+The previous Python/Bash version is archived in `_old/` directory for reference.
 
-### Pourquoi AGPLv3 ?
+## 🆘 Support
 
-L'AGPLv3 garantit que :
-- ✅ Le code reste **libre et open source**
-- ✅ Toute modification doit être **partagée avec la communauté**
-- ✅ Même un service web utilisant Anemone doit **publier son code source**
-- ✅ Vous pouvez **utiliser, modifier et distribuer** librement
-- ✅ Les **prestations de service** sont autorisées (installation, maintenance, support)
-
-Voir le fichier [LICENSE](LICENSE) pour le texte complet
-
-## 🙏 Remerciements
-
-Construit avec :
-- [WireGuard](https://www.wireguard.com/) - VPN moderne
-- [Restic](https://restic.net/) - Backup incrémental chiffré
-- [Samba](https://www.samba.org/) - Partage SMB
-- [Docker](https://www.docker.com/) - Conteneurisation
-- [FastAPI](https://fastapi.tiangolo.com/) - API web
-
----
-
-Fait avec ❤️ pour partager des fichiers entre proches, sans dépendre du cloud.
-
-**⚠️ RAPPEL IMPORTANT** : Sauvegardez votre clé de chiffrement dans Bitwarden dès la première configuration !
+- **Issues**: https://github.com/juste-un-gars/anemone/issues
+- **Discussions**: https://github.com/juste-un-gars/anemone/discussions

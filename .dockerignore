@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+CONTRIBUTING.md
+LICENSE
+_old/
+
+# Data and runtime
+data/
+*.db
+*.log
+
+# Development
+.vscode/
+.idea/
+*.swp
+*~
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+anemone
+
+# Test files
+*_test.go
+testdata/
+
+# Temporary
+tmp/
+temp/
+*.tmp
+*.bak

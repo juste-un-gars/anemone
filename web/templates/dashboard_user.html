@@ -1,0 +1,157 @@
+{{define "content"}}
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <h1 class="text-2xl font-bold text-gray-900">
+                        🪸 Anemone
+                    </h1>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700">{{.Session.Username}}</span>
+                    <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
+                        {{.T "dashboard.logout"}}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Welcome Message -->
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-gray-900">
+                {{.T "dashboard.user.title"}}
+            </h2>
+            <p class="mt-2 text-gray-600">
+                Bienvenue, {{.Session.Username}} !
+            </p>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <!-- Storage Used -->
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                            </svg>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">
+                                    Espace utilisé
+                                </dt>
+                                <dd class="text-2xl font-semibold text-gray-900">
+                                    {{.Stats.StorageUsed}}
+                                </dd>
+                                <dd class="text-sm text-gray-500">
+                                    sur {{.Stats.StorageQuota}}
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <!-- Progress Bar -->
+                <div class="bg-gray-50 px-5 py-3">
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="anemone-gradient h-2 rounded-full" style="width: {{.Stats.StoragePercent}}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Last Backup -->
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                            </svg>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">
+                                    Dernière sauvegarde
+                                </dt>
+                                <dd class="text-lg font-semibold text-gray-900">
+                                    {{.Stats.LastBackup}}
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trash Items -->
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">
+                                    Corbeille
+                                </dt>
+                                <dd class="text-2xl font-semibold text-gray-900">
+                                    {{.Stats.TrashCount}}
+                                </dd>
+                                <dd class="text-sm text-gray-500">
+                                    éléments
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- File Shares -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">
+                    📂 Mes partages
+                </h3>
+                <p class="text-sm text-gray-600 mb-4">
+                    Accéder à vos dossiers partagés via SMB
+                </p>
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
+                        <span class="text-sm font-medium">{{.Session.Username}}-backup</span>
+                        <span class="text-xs text-gray-500">Synchronisé</span>
+                    </div>
+                </div>
+                <div class="mt-4 text-sm text-gray-600">
+                    <p class="font-medium">Accès SMB :</p>
+                    <code class="block mt-1 p-2 bg-gray-100 rounded text-xs">
+                        smb://nas.local/{{.Session.Username}}-backup
+                    </code>
+                </div>
+            </div>
+
+            <!-- Trash -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">
+                    🗑️ Corbeille
+                </h3>
+                <p class="text-sm text-gray-600 mb-4">
+                    Récupérer vos fichiers supprimés (conservation 30 jours)
+                </p>
+                <a href="/trash" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
+                    Voir la corbeille
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}
