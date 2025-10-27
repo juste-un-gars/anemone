@@ -1,3 +1,4 @@
+{{define "base"}}
 <!DOCTYPE html>
 <html lang="{{.Lang}}">
 <head>
@@ -20,6 +21,7 @@
     </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
-    {{template "content" .}}
+    {{block "content" .}}{{end}}
 </body>
 </html>
+{{end}}
