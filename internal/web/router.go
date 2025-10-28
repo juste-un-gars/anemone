@@ -21,6 +21,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/auth"
 	"github.com/juste-un-gars/anemone/internal/config"
 	"github.com/juste-un-gars/anemone/internal/i18n"
+	"github.com/juste-un-gars/anemone/internal/peers"
 	"github.com/juste-un-gars/anemone/internal/users"
 )
 
@@ -106,8 +107,12 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/admin/users/add", auth.RequireAdmin(server.handleAdminUsersAdd))
 	mux.HandleFunc("/admin/users/", auth.RequireAdmin(server.handleAdminUsersActions))
 
-	// Admin routes - Other
+	// Admin routes - Peers
 	mux.HandleFunc("/admin/peers", auth.RequireAdmin(server.handleAdminPeers))
+	mux.HandleFunc("/admin/peers/add", auth.RequireAdmin(server.handleAdminPeersAdd))
+	mux.HandleFunc("/admin/peers/", auth.RequireAdmin(server.handleAdminPeersActions))
+
+	// Admin routes - Settings
 	mux.HandleFunc("/admin/settings", auth.RequireAdmin(server.handleAdminSettings))
 
 	// User routes
@@ -924,7 +929,239 @@ func (s *Server) handleActivateConfirm(w http.ResponseWriter, r *http.Request) {
 
 // Placeholder handlers for future implementation
 func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Admin Peers Page (Coming soon)")
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	lang := s.getLang(r)
+
+	// Get all peers
+	peersList, err := peers.GetAll(s.db)
+	if err != nil {
+		log.Printf("Error getting peers: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	data := struct {
+		Lang    string
+		Title   string
+		Session *auth.Session
+		Peers   []*peers.Peer
+	}{
+		Lang:    lang,
+		Title:   i18n.T(lang, "peers.title"),
+		Session: session,
+		Peers:   peersList,
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "admin_peers.html", data); err != nil {
+		log.Printf("Error rendering peers template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	lang := s.getLang(r)
+
+	if r.Method == http.MethodGet {
+		// Show add peer form
+		data := struct {
+			Lang    string
+			Title   string
+			Session *auth.Session
+			Error   string
+		}{
+			Lang:    lang,
+			Title:   i18n.T(lang, "peers.add.title"),
+			Session: session,
+		}
+
+		if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
+			log.Printf("Error rendering peers add template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		// Parse form
+		name := r.FormValue("name")
+		address := r.FormValue("address")
+		portStr := r.FormValue("port")
+		publicKey := r.FormValue("public_key")
+		enabled := r.FormValue("enabled") == "on"
+
+		// Validate
+		if name == "" || address == "" {
+			data := struct {
+				Lang    string
+				Title   string
+				Session *auth.Session
+				Error   string
+			}{
+				Lang:    lang,
+				Title:   i18n.T(lang, "peers.add.title"),
+				Session: session,
+				Error:   "Le nom et l'adresse sont requis",
+			}
+			if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
+				log.Printf("Error rendering peers add template: %v", err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// Parse port
+		port := 8443
+		if portStr != "" {
+			var err error
+			port, err = strconv.Atoi(portStr)
+			if err != nil || port < 1 || port > 65535 {
+				data := struct {
+					Lang    string
+					Title   string
+					Session *auth.Session
+					Error   string
+				}{
+					Lang:    lang,
+					Title:   i18n.T(lang, "peers.add.title"),
+					Session: session,
+					Error:   "Port invalide",
+				}
+				if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
+					log.Printf("Error rendering peers add template: %v", err)
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				}
+				return
+			}
+		}
+
+		// Create peer
+		peer := &peers.Peer{
+			Name:      name,
+			Address:   address,
+			Port:      port,
+			PublicKey: publicKey,
+			Enabled:   enabled,
+			Status:    "unknown",
+		}
+
+		if err := peers.Create(s.db, peer); err != nil {
+			log.Printf("Error creating peer: %v", err)
+			data := struct {
+				Lang    string
+				Title   string
+				Session *auth.Session
+				Error   string
+			}{
+				Lang:    lang,
+				Title:   i18n.T(lang, "peers.add.title"),
+				Session: session,
+				Error:   fmt.Sprintf("Erreur lors de la création du pair: %v", err),
+			}
+			if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
+				log.Printf("Error rendering peers add template: %v", err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		log.Printf("Created peer: %s (ID: %d)", peer.Name, peer.ID)
+		http.Redirect(w, r, "/admin/peers", http.StatusSeeOther)
+		return
+	}
+
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request) {
+	// Extract peer ID and action from URL
+	// URL format: /admin/peers/{id}/{action}
+	path := strings.TrimPrefix(r.URL.Path, "/admin/peers/")
+	parts := strings.Split(path, "/")
+
+	if len(parts) < 2 {
+		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		return
+	}
+
+	peerID, err := strconv.Atoi(parts[0])
+	if err != nil {
+		http.Error(w, "Invalid peer ID", http.StatusBadRequest)
+		return
+	}
+
+	action := parts[1]
+
+	switch action {
+	case "delete":
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		if err := peers.Delete(s.db, peerID); err != nil {
+			log.Printf("Error deleting peer: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("Deleted peer ID: %d", peerID)
+		w.WriteHeader(http.StatusOK)
+		return
+
+	case "test":
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		peer, err := peers.GetByID(s.db, peerID)
+		if err != nil {
+			log.Printf("Error getting peer: %v", err)
+			http.Error(w, "Peer not found", http.StatusNotFound)
+			return
+		}
+
+		online, err := peers.TestConnection(peer)
+		if err != nil {
+			log.Printf("Error testing peer connection: %v", err)
+		}
+
+		status := "offline"
+		if online {
+			status = "online"
+		}
+
+		// Update peer status
+		if err := peers.UpdateStatus(s.db, peerID, status); err != nil {
+			log.Printf("Error updating peer status: %v", err)
+		}
+
+		// Return JSON response
+		w.Header().Set("Content-Type", "application/json")
+		if online {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{"status": "online", "message": "Connexion réussie"}`)
+		} else {
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w, `{"status": "offline", "message": "Impossible de se connecter"}`)
+		}
+		return
+
+	default:
+		http.Error(w, "Unknown action", http.StatusBadRequest)
+		return
+	}
 }
 
 func (s *Server) handleAdminSettings(w http.ResponseWriter, r *http.Request) {

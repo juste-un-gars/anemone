@@ -78,10 +78,15 @@ func Migrate(db *sql.DB) error {
 		`CREATE TABLE IF NOT EXISTS peers (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT UNIQUE NOT NULL,
-			url TEXT NOT NULL,
+			address TEXT NOT NULL,
+			port INTEGER DEFAULT 8443,
+			public_key TEXT,
 			enabled BOOLEAN DEFAULT 1,
+			status TEXT DEFAULT 'unknown',
+			last_seen DATETIME,
 			last_sync DATETIME,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
 
 		// Sync log (track synchronization history)
@@ -110,6 +115,107 @@ func Migrate(db *sql.DB) error {
 	for i, migration := range migrations {
 		if _, err := db.Exec(migration); err != nil {
 			return fmt.Errorf("migration %d failed: %w", i+1, err)
+		}
+	}
+
+	// Migration pour ajouter les nouvelles colonnes à la table peers si elles n'existent pas
+	if err := migratePeersTable(db); err != nil {
+		return fmt.Errorf("peers table migration failed: %w", err)
+	}
+
+	return nil
+}
+
+// migratePeersTable adds missing columns to peers table
+func migratePeersTable(db *sql.DB) error {
+	// Check which columns exist
+	rows, err := db.Query("PRAGMA table_info(peers)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	existingColumns := make(map[string]bool)
+	hasUrlColumn := false
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dfltValue sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		existingColumns[name] = true
+		if name == "url" {
+			hasUrlColumn = true
+		}
+	}
+
+	// Add missing columns
+	columnsToAdd := map[string]string{
+		"address":    "ALTER TABLE peers ADD COLUMN address TEXT DEFAULT ''",
+		"port":       "ALTER TABLE peers ADD COLUMN port INTEGER DEFAULT 8443",
+		"public_key": "ALTER TABLE peers ADD COLUMN public_key TEXT",
+		"enabled":    "ALTER TABLE peers ADD COLUMN enabled BOOLEAN DEFAULT 1",
+		"status":     "ALTER TABLE peers ADD COLUMN status TEXT DEFAULT 'unknown'",
+		"last_seen":  "ALTER TABLE peers ADD COLUMN last_seen DATETIME",
+		"last_sync":  "ALTER TABLE peers ADD COLUMN last_sync DATETIME",
+		"updated_at": "ALTER TABLE peers ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP",
+	}
+
+	for column, query := range columnsToAdd {
+		if !existingColumns[column] {
+			if _, err := db.Exec(query); err != nil {
+				return fmt.Errorf("failed to add column %s: %w", column, err)
+			}
+		}
+	}
+
+	// If old 'url' column exists, we need to recreate the table without it
+	// SQLite doesn't support DROP COLUMN in older versions, so we recreate
+	if hasUrlColumn {
+		// Create new table with correct schema
+		_, err := db.Exec(`
+			CREATE TABLE IF NOT EXISTS peers_new (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				name TEXT UNIQUE NOT NULL,
+				address TEXT NOT NULL,
+				port INTEGER DEFAULT 8443,
+				public_key TEXT,
+				enabled BOOLEAN DEFAULT 1,
+				status TEXT DEFAULT 'unknown',
+				last_seen DATETIME,
+				last_sync DATETIME,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to create peers_new table: %w", err)
+		}
+
+		// Copy data from old table, using address and port from url if needed
+		_, err = db.Exec(`
+			INSERT INTO peers_new (id, name, address, port, public_key, enabled, status, last_seen, last_sync, created_at, updated_at)
+			SELECT id, name,
+				CASE WHEN address = '' OR address IS NULL THEN '' ELSE address END,
+				CASE WHEN port IS NULL THEN 8443 ELSE port END,
+				public_key, enabled, status, last_seen, last_sync, created_at, updated_at
+			FROM peers
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to copy peers data: %w", err)
+		}
+
+		// Drop old table and rename new one
+		_, err = db.Exec("DROP TABLE peers")
+		if err != nil {
+			return fmt.Errorf("failed to drop old peers table: %w", err)
+		}
+
+		_, err = db.Exec("ALTER TABLE peers_new RENAME TO peers")
+		if err != nil {
+			return fmt.Errorf("failed to rename peers_new table: %w", err)
 		}
 	}
 
