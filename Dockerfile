@@ -41,7 +41,7 @@ RUN addgroup -g 1000 anemone && \
     adduser -D -u 1000 -G anemone anemone
 
 # Create directories
-RUN mkdir -p /app/data/db /app/data/shares /app/data/config && \
+RUN mkdir -p /app/data/db /app/data/shares /app/data/config /app/data/certs && \
     chown -R anemone:anemone /app
 
 # Copy binary from builder
@@ -56,16 +56,20 @@ WORKDIR /app
 USER anemone
 
 # Expose ports
+EXPOSE 8443
 EXPOSE 8080
 EXPOSE 445
 
 # Set environment
 ENV ANEMONE_DATA_DIR=/app/data
+ENV HTTPS_PORT=8443
 ENV PORT=8080
+ENV ENABLE_HTTPS=true
+ENV ENABLE_HTTP=false
 
-# Health check
+# Health check (use HTTPS by default, fallback to HTTP if enabled)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -fk https://localhost:8443/health || curl -f http://localhost:8080/health || exit 1
 
 # Run
 ENTRYPOINT ["/app/anemone"]

@@ -8,14 +8,18 @@ services:
     container_name: anemone
     restart: unless-stopped
     ports:
-      - "8080:8080"   # Web UI
+      - "8443:8443"   # Web UI (HTTPS)
+      - "8080:8080"   # Web UI (HTTP - disabled by default)
       - "445:445"     # SMB
     volumes:
       - ./data:/app/data
       - /etc/localtime:/etc/localtime:ro
     environment:
       - ANEMONE_DATA_DIR=/app/data
+      - HTTPS_PORT=8443
       - PORT=8080
+      - ENABLE_HTTPS=true
+      - ENABLE_HTTP=false
       - LANGUAGE=fr
       - TZ=Europe/Paris
     cap_add:
@@ -23,7 +27,7 @@ services:
     networks:
       - anemone-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "sh", "-c", "curl -fk https://localhost:8443/health || curl -f http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
