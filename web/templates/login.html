@@ -1,6 +1,22 @@
-{{template "base.html" .}}
-{{define "content"}}
-<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gray-100">
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
     <div class="max-w-md w-full space-y-8">
         <!-- Header -->
         <div class="text-center">
@@ -24,7 +40,7 @@
                     </div>
                     <div class="ml-3">
                         <p class="text-sm text-red-700">
-                            {{.T "login.error"}}
+                            {{.Error}}
                         </p>
                     </div>
                 </div>
@@ -37,9 +53,9 @@
                     <label for="username" class="block text-sm font-medium text-gray-700">
                         {{.T "login.username"}}
                     </label>
-                    <input type="text" id="username" name="username" required autofocus
+                    <input type="text" id="username" name="username" required
                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                           autocomplete="username">
+                           autofocus>
                 </div>
 
                 <!-- Password -->
@@ -63,4 +79,6 @@
         </div>
     </div>
 </div>
-{{end}}
+
+</body>
+</html>
