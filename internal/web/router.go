@@ -125,10 +125,24 @@ func (s *Server) isSetupCompleted() bool {
 
 // getLang gets language from query param or config
 func (s *Server) getLang(r *http.Request) string {
-	if lang := r.URL.Query().Get("lang"); lang != "" {
-		return lang
+	lang := ""
+	if l := r.URL.Query().Get("lang"); l != "" {
+		lang = l
+	} else {
+		lang = s.cfg.Language
 	}
-	return s.cfg.Language
+
+	// Normalize language code (fr_FR -> fr, en_US -> en, etc.)
+	if len(lang) > 2 {
+		lang = lang[:2]
+	}
+
+	// Default to fr if unknown
+	if lang != "fr" && lang != "en" {
+		lang = "fr"
+	}
+
+	return lang
 }
 
 // handleHome handles the root path
