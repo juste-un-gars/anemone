@@ -140,20 +140,11 @@
                     📂 Mes partages
                 </h3>
                 <p class="text-sm text-gray-600 mb-4">
-                    Accéder à vos dossiers partagés via SMB
+                    Gérer vos dossiers partagés via SMB/NFS
                 </p>
-                <div class="space-y-2">
-                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded">
-                        <span class="text-sm font-medium">{{.Session.Username}}-backup</span>
-                        <span class="text-xs text-gray-500">Synchronisé</span>
-                    </div>
-                </div>
-                <div class="mt-4 text-sm text-gray-600">
-                    <p class="font-medium">Accès SMB :</p>
-                    <code class="block mt-1 p-2 bg-gray-100 rounded text-xs">
-                        smb://nas.local/{{.Session.Username}}-backup
-                    </code>
-                </div>
+                <a href="/shares" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
+                    Gérer mes partages
+                </a>
             </div>
 
             <!-- Trash -->
