@@ -878,6 +878,51 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 
 		log.Printf("User activated: %s (ID: %d)", token.Username, token.UserID)
 
+		// Create SMB user with same password
+		if err := smb.AddSMBUser(token.Username, password); err != nil {
+			log.Printf("Warning: Failed to create SMB user: %v", err)
+		}
+
+		// Create default shares: backup and data
+		backupShare := &shares.Share{
+			UserID:      token.UserID,
+			Name:        fmt.Sprintf("backup_%s", token.Username),
+			Path:        filepath.Join(s.cfg.SharesDir, token.Username, "backup"),
+			Protocol:    "smb",
+			SyncEnabled: true,
+		}
+		if err := shares.Create(s.db, backupShare); err != nil {
+			log.Printf("Warning: Failed to create backup share: %v", err)
+		} else {
+			log.Printf("Created backup share: backup_%s", token.Username)
+		}
+
+		dataShare := &shares.Share{
+			UserID:      token.UserID,
+			Name:        fmt.Sprintf("data_%s", token.Username),
+			Path:        filepath.Join(s.cfg.SharesDir, token.Username, "data"),
+			Protocol:    "smb",
+			SyncEnabled: false,
+		}
+		if err := shares.Create(s.db, dataShare); err != nil {
+			log.Printf("Warning: Failed to create data share: %v", err)
+		} else {
+			log.Printf("Created data share: data_%s", token.Username)
+		}
+
+		// Regenerate SMB config
+		smbCfg := &smb.Config{
+			ConfigPath: filepath.Join(s.cfg.DataDir, "smb", "smb.conf"),
+			WorkGroup:  "ANEMONE",
+			ServerName: "Anemone NAS",
+			SharesDir:  s.cfg.SharesDir,
+		}
+		if err := smb.GenerateConfig(s.db, smbCfg); err != nil {
+			log.Printf("Warning: Failed to regenerate SMB config: %v", err)
+		} else {
+			smb.ReloadConfig()
+		}
+
 		// Store encryption key in cookie temporarily
 		http.SetCookie(w, &http.Cookie{
 			Name:     "activation_key",
