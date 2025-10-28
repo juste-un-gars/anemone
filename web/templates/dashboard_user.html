@@ -1,5 +1,21 @@
-{{template "base.html" .}}
-{{define "content"}}
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{T .Lang "dashboard.user.title"}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
 <div class="min-h-screen bg-gray-50">
     <!-- Navigation Bar -->
     <nav class="bg-white shadow-sm">
@@ -13,7 +29,7 @@
                 <div class="flex items-center space-x-4">
                     <span class="text-sm text-gray-700">{{.Session.Username}}</span>
                     <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
-                        {{.T "dashboard.logout"}}
+                        {{T .Lang "dashboard.logout"}}
                     </a>
                 </div>
             </div>
@@ -25,7 +41,7 @@
         <!-- Welcome Message -->
         <div class="mb-8">
             <h2 class="text-3xl font-bold text-gray-900">
-                {{.T "dashboard.user.title"}}
+                {{T .Lang "dashboard.user.title"}}
             </h2>
             <p class="mt-2 text-gray-600">
                 Bienvenue, {{.Session.Username}} !
@@ -155,4 +171,6 @@
         </div>
     </div>
 </div>
-{{end}}
+
+</body>
+</html>

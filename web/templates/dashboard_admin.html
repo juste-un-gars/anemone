@@ -1,5 +1,21 @@
-{{template "base.html" .}}
-{{define "content"}}
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{T .Lang "dashboard.admin.title"}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
 <div class="min-h-screen bg-gray-50">
     <!-- Navigation Bar -->
     <nav class="bg-white shadow-sm">
@@ -10,13 +26,13 @@
                         🪸 Anemone
                     </h1>
                     <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
-                        {{.T "users.role.admin"}}
+                        {{T .Lang "users.role.admin"}}
                     </span>
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-sm text-gray-700">{{.Session.Username}}</span>
                     <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
-                        {{.T "dashboard.logout"}}
+                        {{T .Lang "dashboard.logout"}}
                     </a>
                 </div>
             </div>
@@ -28,7 +44,7 @@
         <!-- Welcome Message -->
         <div class="mb-8">
             <h2 class="text-3xl font-bold text-gray-900">
-                {{.T "dashboard.admin.title"}}
+                {{T .Lang "dashboard.admin.title"}}
             </h2>
             <p class="mt-2 text-gray-600">
                 Bienvenue, {{.Session.Username}} !
@@ -49,7 +65,7 @@
                         <div class="ml-5 w-0 flex-1">
                             <dl>
                                 <dt class="text-sm font-medium text-gray-500 truncate">
-                                    {{.T "dashboard.stats.users"}}
+                                    {{T .Lang "dashboard.stats.users"}}
                                 </dt>
                                 <dd class="text-3xl font-semibold text-gray-900">
                                     {{.Stats.UserCount}}
@@ -72,7 +88,7 @@
                         <div class="ml-5 w-0 flex-1">
                             <dl>
                                 <dt class="text-sm font-medium text-gray-500 truncate">
-                                    {{.T "dashboard.stats.storage"}}
+                                    {{T .Lang "dashboard.stats.storage"}}
                                 </dt>
                                 <dd class="text-3xl font-semibold text-gray-900">
                                     {{.Stats.StorageUsed}}
@@ -95,7 +111,7 @@
                         <div class="ml-5 w-0 flex-1">
                             <dl>
                                 <dt class="text-sm font-medium text-gray-500 truncate">
-                                    {{.T "dashboard.stats.backups"}}
+                                    {{T .Lang "dashboard.stats.backups"}}
                                 </dt>
                                 <dd class="text-lg font-semibold text-gray-900">
                                     {{.Stats.LastBackup}}
@@ -118,7 +134,7 @@
                         <div class="ml-5 w-0 flex-1">
                             <dl>
                                 <dt class="text-sm font-medium text-gray-500 truncate">
-                                    {{.T "dashboard.stats.peers"}}
+                                    {{T .Lang "dashboard.stats.peers"}}
                                 </dt>
                                 <dd class="text-3xl font-semibold text-gray-900">
                                     {{.Stats.PeerCount}}
@@ -135,20 +151,20 @@
             <!-- Users Card -->
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    {{.T "dashboard.users"}}
+                    {{T .Lang "dashboard.users"}}
                 </h3>
                 <p class="text-sm text-gray-600 mb-4">
                     Gérer les utilisateurs et créer des comptes
                 </p>
                 <a href="/admin/users" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
-                    {{.T "users.title"}}
+                    {{T .Lang "users.title"}}
                 </a>
             </div>
 
             <!-- Peers Card -->
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    {{.T "dashboard.peers"}}
+                    {{T .Lang "dashboard.peers"}}
                 </h3>
                 <p class="text-sm text-gray-600 mb-4">
                     Gérer les pairs pour la synchronisation P2P
@@ -161,7 +177,7 @@
             <!-- Settings Card -->
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    {{.T "dashboard.settings"}}
+                    {{T .Lang "dashboard.settings"}}
                 </h3>
                 <p class="text-sm text-gray-600 mb-4">
                     Configuration du système
@@ -173,4 +189,6 @@
         </div>
     </div>
 </div>
-{{end}}
+
+</body>
+</html>
