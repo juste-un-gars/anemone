@@ -1,5 +1,21 @@
-{{template "base.html" .}}
-{{define "content"}}
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{T .Lang "users.add.title"}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
 <div class="min-h-screen bg-gray-50">
     <!-- Navigation Bar -->
     <nav class="bg-white shadow-sm">
@@ -10,13 +26,13 @@
                         🪸 Anemone
                     </a>
                     <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
-                        {{.T "users.role.admin"}}
+                        {{T .Lang "users.role.admin"}}
                     </span>
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-sm text-gray-700">{{.Session.Username}}</span>
                     <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
-                        {{.T "dashboard.logout"}}
+                        {{T .Lang "dashboard.logout"}}
                     </a>
                 </div>
             </div>
@@ -31,10 +47,10 @@
                 <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                 </svg>
-                {{.T "common.back"}}
+                {{T .Lang "common.back"}}
             </a>
             <h2 class="text-3xl font-bold text-gray-900 mt-2">
-                {{.T "users.add.title"}}
+                {{T .Lang "users.add.title"}}
             </h2>
         </div>
 
@@ -59,7 +75,7 @@
                 <!-- Username -->
                 <div>
                     <label for="username" class="block text-sm font-medium text-gray-700">
-                        {{.T "users.username"}} *
+                        {{T .Lang "users.username"}} *
                     </label>
                     <input type="text" id="username" name="username" required
                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
@@ -69,7 +85,7 @@
                 <!-- Email -->
                 <div>
                     <label for="email" class="block text-sm font-medium text-gray-700">
-                        {{.T "users.email"}}
+                        {{T .Lang "users.email"}}
                     </label>
                     <input type="email" id="email" name="email"
                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
@@ -79,18 +95,18 @@
                 <!-- Role -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">
-                        {{.T "users.role"}}
+                        {{T .Lang "users.role"}}
                     </label>
                     <div class="flex items-center space-x-4">
                         <label class="inline-flex items-center">
                             <input type="radio" name="is_admin" value="false" checked
                                    class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
-                            <span class="ml-2 text-sm text-gray-700">{{.T "users.role.user"}}</span>
+                            <span class="ml-2 text-sm text-gray-700">{{T .Lang "users.role.user"}}</span>
                         </label>
                         <label class="inline-flex items-center">
                             <input type="radio" name="is_admin" value="true"
                                    class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300">
-                            <span class="ml-2 text-sm text-gray-700">{{.T "users.role.admin"}}</span>
+                            <span class="ml-2 text-sm text-gray-700">{{T .Lang "users.role.admin"}}</span>
                         </label>
                     </div>
                 </div>
@@ -99,14 +115,14 @@
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label for="quota_total" class="block text-sm font-medium text-gray-700">
-                            {{.T "users.quota_total"}}
+                            {{T .Lang "users.quota_total"}}
                         </label>
                         <input type="number" id="quota_total" name="quota_total" value="100" min="1"
                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                     </div>
                     <div>
                         <label for="quota_backup" class="block text-sm font-medium text-gray-700">
-                            {{.T "users.quota_backup"}}
+                            {{T .Lang "users.quota_backup"}}
                         </label>
                         <input type="number" id="quota_backup" name="quota_backup" value="50" min="1"
                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
@@ -132,14 +148,16 @@
                 <!-- Buttons -->
                 <div class="flex justify-end space-x-3">
                     <a href="/admin/users" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                        {{.T "common.cancel"}}
+                        {{T .Lang "common.cancel"}}
                     </a>
                     <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white anemone-gradient hover:opacity-90">
-                        {{.T "users.add"}}
+                        {{T .Lang "users.add"}}
                     </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
-{{end}}
+
+</body>
+</html>

@@ -1,5 +1,21 @@
-{{template "base.html" .}}
-{{define "content"}}
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{T .Lang "users.title"}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
 <div class="min-h-screen bg-gray-50">
     <!-- Navigation Bar -->
     <nav class="bg-white shadow-sm">
@@ -10,13 +26,13 @@
                         🪸 Anemone
                     </a>
                     <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
-                        {{.T "users.role.admin"}}
+                        {{T .Lang "users.role.admin"}}
                     </span>
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-sm text-gray-700">{{.Session.Username}}</span>
                     <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
-                        {{.T "dashboard.logout"}}
+                        {{T .Lang "dashboard.logout"}}
                     </a>
                 </div>
             </div>
@@ -29,7 +45,7 @@
         <div class="flex justify-between items-center mb-8">
             <div>
                 <h2 class="text-3xl font-bold text-gray-900">
-                    {{.T "users.title"}}
+                    {{T .Lang "users.title"}}
                 </h2>
                 <p class="mt-2 text-gray-600">
                     Gérer les comptes utilisateurs et créer de nouveaux comptes
@@ -39,32 +55,33 @@
                 <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
-                {{.T "users.add"}}
+                {{T .Lang "users.add"}}
             </a>
         </div>
 
         <!-- Users Table -->
+        {{if .Users}}
         <div class="bg-white shadow rounded-lg overflow-hidden">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {{.T "users.username"}}
+                            {{T .Lang "users.username"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {{.T "users.email"}}
+                            {{T .Lang "users.email"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {{.T "users.role"}}
+                            {{T .Lang "users.role"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {{.T "users.status"}}
+                            {{T .Lang "users.status"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {{.T "users.created"}}
+                            {{T .Lang "users.created"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {{.T "users.actions"}}
+                            {{T .Lang "users.actions"}}
                         </th>
                     </tr>
                 </thead>
@@ -84,22 +101,22 @@
                         <td class="px-6 py-4 whitespace-nowrap">
                             {{if .IsAdmin}}
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                                {{$.T "users.role.admin"}}
+                                {{T $.Lang "users.role.admin"}}
                             </span>
                             {{else}}
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                                {{$.T "users.role.user"}}
+                                {{T $.Lang "users.role.user"}}
                             </span>
                             {{end}}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             {{if .ActivatedAt}}
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                                {{$.T "users.status.active"}}
+                                {{T $.Lang "users.status.active"}}
                             </span>
                             {{else}}
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                {{$.T "users.status.pending"}}
+                                {{T $.Lang "users.status.pending"}}
                             </span>
                             {{end}}
                         </td>
@@ -109,11 +126,11 @@
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             {{if not .ActivatedAt}}
                             <a href="/admin/users/{{.ID}}/token" class="text-indigo-600 hover:text-indigo-900 mr-3">
-                                {{$.T "users.action.copy_link"}}
+                                {{T $.Lang "users.action.copy_link"}}
                             </a>
                             {{end}}
                             <button onclick="deleteUser({{.ID}}, '{{.Username}}')" class="text-red-600 hover:text-red-900">
-                                {{$.T "users.action.delete"}}
+                                {{T $.Lang "users.action.delete"}}
                             </button>
                         </td>
                     </tr>
@@ -121,8 +138,7 @@
                 </tbody>
             </table>
         </div>
-
-        {{if not .Users}}
+        {{else}}
         <div class="bg-white shadow rounded-lg p-12 text-center">
             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -134,7 +150,7 @@
                     <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
-                    {{.T "users.add"}}
+                    {{T .Lang "users.add"}}
                 </a>
             </div>
         </div>
@@ -144,7 +160,7 @@
 
 <script>
 function deleteUser(userId, username) {
-    if (confirm('{{.T "users.delete.confirm"}}\n\nUtilisateur : ' + username)) {
+    if (confirm('{{T .Lang "users.delete.confirm"}}\n\nUtilisateur : ' + username)) {
         fetch('/admin/users/' + userId + '/delete', {
             method: 'POST',
         }).then(response => {
@@ -157,4 +173,6 @@ function deleteUser(userId, username) {
     }
 }
 </script>
-{{end}}
+
+</body>
+</html>

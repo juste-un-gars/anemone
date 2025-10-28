@@ -1,5 +1,21 @@
-{{template "base.html" .}}
-{{define "content"}}
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{T .Lang "users.token.title"}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
 <div class="min-h-screen bg-gray-50">
     <!-- Navigation Bar -->
     <nav class="bg-white shadow-sm">
@@ -10,13 +26,13 @@
                         🪸 Anemone
                     </a>
                     <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
-                        {{.T "users.role.admin"}}
+                        {{T .Lang "users.role.admin"}}
                     </span>
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-sm text-gray-700">{{.Session.Username}}</span>
                     <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
-                        {{.T "dashboard.logout"}}
+                        {{T .Lang "dashboard.logout"}}
                     </a>
                 </div>
             </div>
@@ -33,7 +49,7 @@
                 </svg>
             </div>
             <h2 class="text-3xl font-bold text-gray-900">
-                {{.T "users.token.title"}}
+                {{T .Lang "users.token.title"}}
             </h2>
             <p class="mt-2 text-gray-600">
                 Pour l'utilisateur <strong>{{.Username}}</strong>
@@ -52,7 +68,7 @@
                     </div>
                     <div class="ml-3">
                         <p class="text-sm text-yellow-700 font-bold">
-                            {{.T "users.token.warning"}}
+                            {{T .Lang "users.token.warning"}}
                         </p>
                     </div>
                 </div>
@@ -61,7 +77,7 @@
             <!-- Info -->
             <div class="mb-6">
                 <p class="text-sm text-gray-600">
-                    {{.T "users.token.info"}}
+                    {{T .Lang "users.token.info"}}
                 </p>
             </div>
 
@@ -75,7 +91,7 @@
                            class="block w-full border-2 border-indigo-500 rounded-md shadow-sm py-3 px-3 bg-gray-50 font-mono text-sm pr-24">
                     <button type="button" onclick="copyLink()"
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">
-                        {{.T "users.token.copy"}}
+                        {{T .Lang "users.token.copy"}}
                     </button>
                 </div>
             </div>
@@ -114,7 +130,7 @@
             <!-- Actions -->
             <div class="mt-8 flex justify-end">
                 <a href="/admin/users" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white anemone-gradient hover:opacity-90">
-                    {{.T "users.token.done"}}
+                    {{T .Lang "users.token.done"}}
                 </a>
             </div>
         </div>
@@ -140,4 +156,6 @@ function copyLink() {
     }, 2000);
 }
 </script>
-{{end}}
+
+</body>
+</html>
