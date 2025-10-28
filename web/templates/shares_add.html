@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/dashboard" class="text-2xl font-bold text-gray-900">
+                        🪸 Anemone
+                    </a>
+                    {{if .Session.IsAdmin}}
+                    <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                        {{T .Lang "common.admin"}}
+                    </span>
+                    {{end}}
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700">{{.Session.Username}}</span>
+                    <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
+                        {{T .Lang "nav.logout"}}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Content -->
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-8">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">
+                    {{T .Lang "shares.add.title"}}
+                </h2>
+
+                <form method="POST" action="/shares/add" class="space-y-6">
+                    <!-- Share name -->
+                    <div>
+                        <label for="name" class="block text-sm font-medium text-gray-700">
+                            {{T .Lang "shares.name"}}
+                        </label>
+                        <input type="text" id="name" name="name" required
+                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                        <p class="mt-1 text-sm text-gray-500">
+                            {{T .Lang "shares.name.help"}}
+                        </p>
+                    </div>
+
+                    <!-- Protocol -->
+                    <div>
+                        <label for="protocol" class="block text-sm font-medium text-gray-700">
+                            {{T .Lang "shares.protocol"}}
+                        </label>
+                        <select id="protocol" name="protocol" required
+                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500">
+                            <option value="smb">{{T .Lang "shares.protocol.smb"}}</option>
+                            <option value="nfs">{{T .Lang "shares.protocol.nfs"}}</option>
+                        </select>
+                    </div>
+
+                    <!-- Sync enabled -->
+                    <div>
+                        <div class="flex items-start">
+                            <div class="flex items-center h-5">
+                                <input id="sync_enabled" name="sync_enabled" type="checkbox" value="true" checked
+                                       class="focus:ring-purple-500 h-4 w-4 text-purple-600 border-gray-300 rounded">
+                            </div>
+                            <div class="ml-3 text-sm">
+                                <label for="sync_enabled" class="font-medium text-gray-700">
+                                    {{T .Lang "shares.sync_enabled"}}
+                                </label>
+                                <p class="text-gray-500">
+                                    {{T .Lang "shares.sync_enabled.help"}}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Info box -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0">
+                                <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm text-blue-700">
+                                    {{T .Lang "shares.info"}}
+                                </p>
+                                <p class="text-sm text-blue-700 mt-2">
+                                    {{T .Lang "shares.access_info"}}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex justify-end space-x-3">
+                        <a href="/shares"
+                           class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                            {{T .Lang "common.cancel"}}
+                        </a>
+                        <button type="submit"
+                                class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                            {{T .Lang "common.submit"}}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
