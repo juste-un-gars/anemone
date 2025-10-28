@@ -35,7 +35,6 @@ type Server struct {
 type TemplateData struct {
 	Lang          string
 	Title         string
-	T             func(string) string
 	EncryptionKey string
 	Error         string
 	Session       *auth.Session
@@ -61,8 +60,14 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		log.Printf("Warning: Failed to initialize i18n: %v", err)
 	}
 
-	// Load templates
-	templates := template.Must(template.ParseGlob(filepath.Join("web", "templates", "*.html")))
+	// Create template with translation function
+	funcMap := template.FuncMap{
+		"T": func(lang, key string) string {
+			return i18n.T(lang, key)
+		},
+	}
+
+	templates := template.Must(template.New("").Funcs(funcMap).ParseGlob(filepath.Join("web", "templates", "*.html")))
 
 	server := &Server{
 		db:        db,
@@ -153,9 +158,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		data := TemplateData{
 			Lang:  lang,
 			Title: i18n.T(lang, "login.title"),
-			T: func(key string) string {
-				return i18n.T(lang, key)
-			},
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "login.html", data); err != nil {
@@ -182,9 +184,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 				Lang:  lang,
 				Title: i18n.T(lang, "login.title"),
 				Error: i18n.T(lang, "login.error"),
-				T: func(key string) string {
-					return i18n.T(lang, key)
-				},
 			}
 
 			if err := s.templates.ExecuteTemplate(w, "login.html", data); err != nil {
@@ -252,9 +251,6 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		Title:   i18n.T(lang, "dashboard.title"),
 		Session: session,
 		Stats:   stats,
-		T: func(key string) string {
-			return i18n.T(lang, key)
-		},
 	}
 
 	// Choose template based on role
@@ -312,9 +308,6 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		data := TemplateData{
 			Lang:  lang,
 			Title: i18n.T(lang, "setup.title"),
-			T: func(key string) string {
-				return i18n.T(lang, key)
-			},
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "setup.html", data); err != nil {
@@ -419,9 +412,6 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 			Lang:          lang,
 			Title:         i18n.T(lang, "setup.success.title"),
 			EncryptionKey: encryptionKey,
-			T: func(key string) string {
-				return i18n.T(lang, key)
-			},
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "setup_success.html", data); err != nil {
@@ -490,9 +480,6 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 		Title:   i18n.T(lang, "users.title"),
 		Session: session,
 		Users:   allUsers,
-		T: func(key string) string {
-			return i18n.T(lang, key)
-		},
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_users.html", data); err != nil {
@@ -518,9 +505,6 @@ func (s *Server) handleAdminUsersAdd(w http.ResponseWriter, r *http.Request) {
 			Lang:    lang,
 			Title:   i18n.T(lang, "users.add.title"),
 			Session: session,
-			T: func(key string) string {
-				return i18n.T(lang, key)
-			},
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "admin_users_add.html", data); err != nil {
@@ -549,9 +533,6 @@ func (s *Server) handleAdminUsersAdd(w http.ResponseWriter, r *http.Request) {
 				Title:   i18n.T(lang, "users.add.title"),
 				Session: session,
 				Error:   i18n.T(lang, "users.errors.username_required"),
-				T: func(key string) string {
-					return i18n.T(lang, key)
-				},
 			}
 			s.templates.ExecuteTemplate(w, "admin_users_add.html", data)
 			return
@@ -565,9 +546,6 @@ func (s *Server) handleAdminUsersAdd(w http.ResponseWriter, r *http.Request) {
 				Title:   i18n.T(lang, "users.add.title"),
 				Session: session,
 				Error:   i18n.T(lang, "users.errors.username_exists"),
-				T: func(key string) string {
-					return i18n.T(lang, key)
-				},
 			}
 			s.templates.ExecuteTemplate(w, "admin_users_add.html", data)
 			return
@@ -696,9 +674,6 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 			Email:         user.Email,
 			ActivationURL: activationURL,
 			ExpiresAt:     token.ExpiresAt,
-			T: func(key string) string {
-				return i18n.T(lang, key)
-			},
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "admin_users_token.html", data); err != nil {
@@ -751,9 +726,6 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			Lang:  lang,
 			Title: i18n.T(lang, "activate.title"),
 			Error: i18n.T(lang, "activate.errors.invalid_token"),
-			T: func(key string) string {
-				return i18n.T(lang, key)
-			},
 		}
 		s.templates.ExecuteTemplate(w, "activate.html", data)
 		return
@@ -772,9 +744,6 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			Lang:  lang,
 			Title: i18n.T(lang, "activate.title"),
 			Error: errorMsg,
-			T: func(key string) string {
-				return i18n.T(lang, key)
-			},
 		}
 		s.templates.ExecuteTemplate(w, "activate.html", data)
 		return
@@ -794,9 +763,6 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			Title:    i18n.T(lang, "activate.title"),
 			Username: token.Username,
 			Token:    tokenString,
-			T: func(key string) string {
-				return i18n.T(lang, key)
-			},
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "activate.html", data); err != nil {
@@ -830,9 +796,6 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 				Username: token.Username,
 				Token:    tokenString,
 				Error:    i18n.T(lang, "activate.errors.password_mismatch"),
-				T: func(key string) string {
-					return i18n.T(lang, key)
-				},
 			}
 			s.templates.ExecuteTemplate(w, "activate.html", data)
 			return
@@ -852,9 +815,6 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 				Username: token.Username,
 				Token:    tokenString,
 				Error:    i18n.T(lang, "activate.errors.password_length"),
-				T: func(key string) string {
-					return i18n.T(lang, key)
-				},
 			}
 			s.templates.ExecuteTemplate(w, "activate.html", data)
 			return
@@ -906,9 +866,6 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			Title:         i18n.T(lang, "activate.success.title"),
 			Username:      token.Username,
 			EncryptionKey: encryptionKey,
-			T: func(key string) string {
-				return i18n.T(lang, key)
-			},
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "activate_success.html", data); err != nil {
