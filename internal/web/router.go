@@ -667,9 +667,19 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 		// Build activation URL
 		host := r.Host
 		if host == "" {
-			host = "localhost:8080"
+			// Use HTTPS port by default
+		if s.cfg.EnableHTTPS {
+			host = fmt.Sprintf("localhost:%s", s.cfg.HTTPSPort)
+		} else {
+			host = fmt.Sprintf("localhost:%s", s.cfg.Port)
 		}
-		activationURL := fmt.Sprintf("http://%s/activate/%s", host, token.Token)
+		}
+			// Use HTTPS if enabled, otherwise HTTP
+		protocol := "https"
+		if !s.cfg.EnableHTTPS {
+			protocol = "http"
+		}
+		activationURL := fmt.Sprintf("%s://%s/activate/%s", protocol, host, token.Token)
 
 		data := struct {
 			Lang          string
