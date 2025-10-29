@@ -47,6 +47,9 @@ const smbConfigTemplate = `[global]
    server min protocol = SMB2
    server max protocol = SMB3
 
+   # Privacy - Only show shares the user has access to
+   access based share enum = yes
+
 {{range .Shares}}
 [{{.Name}}]
    path = {{.Path}}
