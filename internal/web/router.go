@@ -119,9 +119,9 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 
 	// User routes
 	mux.HandleFunc("/trash", auth.RequireAuth(server.handleTrash))
-	mux.HandleFunc("/shares", auth.RequireAuth(server.handleShares))
-	mux.HandleFunc("/shares/add", auth.RequireAuth(server.handleSharesAdd))
-	mux.HandleFunc("/shares/", auth.RequireAuth(server.handleSharesActions))
+
+	// Admin routes - Shares
+	mux.HandleFunc("/admin/shares", auth.RequireAdmin(server.handleAdminShares))
 
 	return mux
 }
@@ -1222,8 +1222,8 @@ func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "Trash Page (Coming soon)")
 }
 
-// handleShares displays all shares for the current user
-func (s *Server) handleShares(w http.ResponseWriter, r *http.Request) {
+// handleAdminShares displays all shares for all users (admin only)
+func (s *Server) handleAdminShares(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.GetSessionFromContext(r)
 	if !ok {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -1231,8 +1231,8 @@ func (s *Server) handleShares(w http.ResponseWriter, r *http.Request) {
 	}
 	lang := s.getLang(r)
 
-	// Get user's shares
-	userShares, err := shares.GetByUser(s.db, session.UserID)
+	// Get all shares
+	allShares, err := shares.GetAll(s.db)
 	if err != nil {
 		log.Printf("Error getting shares: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -1254,174 +1254,14 @@ func (s *Server) handleShares(w http.ResponseWriter, r *http.Request) {
 		Lang:         lang,
 		Title:        i18n.T(lang, "shares.title"),
 		Session:      session,
-		Shares:       userShares,
+		Shares:       allShares,
 		SMBStatus:    smbStatus,
 		SMBInstalled: smbInstalled,
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "shares.html", data); err != nil {
+	if err := s.templates.ExecuteTemplate(w, "admin_shares.html", data); err != nil {
 		log.Printf("Error rendering shares template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-}
-
-// handleSharesAdd handles creating a new share
-func (s *Server) handleSharesAdd(w http.ResponseWriter, r *http.Request) {
-	session, ok := auth.GetSessionFromContext(r)
-	if !ok {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-	lang := s.getLang(r)
-
-	if r.Method == http.MethodGet {
-		// Show form
-		data := struct {
-			Lang    string
-			Title   string
-			Session *auth.Session
-		}{
-			Lang:    lang,
-			Title:   i18n.T(lang, "shares.add.title"),
-			Session: session,
-		}
-
-		if err := s.templates.ExecuteTemplate(w, "shares_add.html", data); err != nil {
-			log.Printf("Error rendering add share template: %v", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-
-	} else if r.Method == http.MethodPost {
-		// Process form
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, "Invalid form data", http.StatusBadRequest)
-			return
-		}
-
-		name := strings.TrimSpace(r.FormValue("name"))
-		protocol := r.FormValue("protocol")
-		syncEnabled := r.FormValue("sync_enabled") == "true"
-
-		// Validate
-		if name == "" {
-			http.Error(w, "Share name is required", http.StatusBadRequest)
-			return
-		}
-
-		// Get username for path
-		user, err := users.GetByID(s.db, session.UserID)
-		if err != nil {
-			log.Printf("Error getting user: %v", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-
-		// Create share path
-		sharePath := filepath.Join(s.cfg.SharesDir, user.Username, name)
-
-		// Create share
-		share := &shares.Share{
-			UserID:      session.UserID,
-			Name:        name,
-			Path:        sharePath,
-			Protocol:    protocol,
-			SyncEnabled: syncEnabled,
-		}
-
-		if err := shares.Create(s.db, share); err != nil {
-			log.Printf("Error creating share: %v", err)
-			http.Error(w, fmt.Sprintf("Failed to create share: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		log.Printf("Created share: %s for user %s (ID: %d)", name, user.Username, session.UserID)
-
-		// Regenerate SMB config if protocol is SMB
-		if protocol == "smb" {
-			smbCfg := &smb.Config{
-				ConfigPath: filepath.Join(s.cfg.DataDir, "smb", "smb.conf"),
-				WorkGroup:  "ANEMONE",
-				ServerName: "Anemone NAS",
-				SharesDir:  s.cfg.SharesDir,
-			}
-			if err := smb.GenerateConfig(s.db, smbCfg); err != nil {
-				log.Printf("Warning: Failed to regenerate SMB config: %v", err)
-			} else {
-				smb.ReloadConfig() // Try to reload, ignore errors
-			}
-		}
-
-		http.Redirect(w, r, "/shares", http.StatusSeeOther)
-	}
-}
-
-// handleSharesActions handles share actions (delete, edit, etc.)
-func (s *Server) handleSharesActions(w http.ResponseWriter, r *http.Request) {
-	session, ok := auth.GetSessionFromContext(r)
-	if !ok {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	// Parse URL: /shares/{id}/{action}
-	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) != 3 {
-		http.Error(w, "Invalid URL", http.StatusBadRequest)
-		return
-	}
-
-	shareID, err := strconv.Atoi(parts[1])
-	if err != nil {
-		http.Error(w, "Invalid share ID", http.StatusBadRequest)
-		return
-	}
-	action := parts[2]
-
-	// Get share and verify ownership
-	share, err := shares.GetByID(s.db, shareID)
-	if err != nil {
-		http.Error(w, "Share not found", http.StatusNotFound)
-		return
-	}
-
-	// Check if user owns this share (or is admin)
-	if share.UserID != session.UserID && !session.IsAdmin {
-		http.Error(w, "Forbidden", http.StatusForbidden)
-		return
-	}
-
-	switch action {
-	case "delete":
-		if err := shares.Delete(s.db, shareID); err != nil {
-			log.Printf("Error deleting share: %v", err)
-			http.Error(w, "Failed to delete share", http.StatusInternalServerError)
-			return
-		}
-
-		log.Printf("Deleted share ID %d", shareID)
-
-		// Regenerate SMB config
-		if share.Protocol == "smb" {
-			smbCfg := &smb.Config{
-				ConfigPath: filepath.Join(s.cfg.DataDir, "smb", "smb.conf"),
-				WorkGroup:  "ANEMONE",
-				ServerName: "Anemone NAS",
-				SharesDir:  s.cfg.SharesDir,
-			}
-			if err := smb.GenerateConfig(s.db, smbCfg); err != nil {
-				log.Printf("Warning: Failed to regenerate SMB config: %v", err)
-			} else {
-				smb.ReloadConfig()
-			}
-		}
-
-		w.WriteHeader(http.StatusOK)
-		return
-
-	default:
-		http.Error(w, "Unknown action", http.StatusBadRequest)
 		return
 	}
 }
