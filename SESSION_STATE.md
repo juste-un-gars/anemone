@@ -1,422 +1,496 @@
-# État de la session - 2025-10-27 (Matin)
+# État de la session - 29 Octobre 2025
 
-## 📍 Contexte
+## 📍 Contexte de cette session
 
-Cette session est une **continuation** d'une session précédente qui avait atteint la limite de contexte.
+**Session précédente** : Phase 1-4 complètes (setup, auth, users, activation)
+**Cette session** : P2P Peers + SMB Shares (automatisation activation)
 
-### Décision majeure prise
-L'utilisateur a demandé une **refonte complète** du projet Anemone :
-- **Avant** : Python/Bash avec services Docker séparés + VPN management
-- **Après** : Go monolithique + SQLite + Multi-utilisateurs + Sans VPN management
+## ✅ Fonctionnalités implémentées aujourd'hui
 
-## ✅ Ce qui a été accompli dans cette session
+### 1. Gestion P2P Peers (Complète ✅)
+- CRUD complet pour pairs de synchronisation
+- Test de connexion HTTPS entre pairs
+- Gestion statuts (online/offline/error/unknown)
+- Interface admin avec actions (test, delete)
+- **État actuel** : 2 pairs connectés et testés
+  - DEV (192.168.83.132:8443) ↔ FR1 (192.168.83.96:8443)
 
-### Phase 1 : Setup initial (Terminé ✅)
-1. Sauvegarde de l'ancien code dans `_old/`
-2. Nettoyage et réinitialisation du projet
-3. Structure Go complète avec packages organisés
-4. Base SQLite avec migrations (7 tables)
-5. Système i18n FR/EN
-6. Module de cryptographie (AES-256-GCM, bcrypt)
-7. Page de setup initial avec :
-   - Choix de langue
-   - Configuration NAS
-   - Création premier admin
-   - Génération et affichage unique de clé de chiffrement
-8. Docker + docker-compose prêts
+### 2. Partages SMB Automatisés (Complète ✅)
+- Création automatique lors activation utilisateur
+- 2 partages par user : `backup_username` + `data_username`
+- Permissions et ownership automatiques
+- Génération dynamique smb.conf depuis DB
+- Copie auto vers /etc/samba/smb.conf
+- Reload auto service Samba
+- **État actuel** : Architecture complète, tests en cours
 
-**Fichiers** : `PHASE1_SETUP_COMPLETE.md`
+### 3. Corrections et Améliorations
+- Lien activation avec IP serveur (plus localhost)
+- Support multi-distro Samba (smb vs smbd)
+- Configuration sudoers complète
+- Chemins absolus pour Samba
+- Interface admin partages (vue globale)
 
-### Phase 2 : Authentification (Terminé ✅)
-1. Système de sessions en mémoire avec expiration (24h)
-2. Middlewares d'authentification :
-   - `RequireAuth` - Routes protégées
-   - `RequireAdmin` - Routes admin uniquement
-   - `RedirectIfAuthenticated` - Pour /login
-3. Page de login/logout complète
-4. Dashboard admin (4 stats + 3 actions rapides)
-5. Dashboard utilisateur (3 stats + partages SMB)
-6. Protection complète des routes
+## 🔧 Commits de cette session (10 commits)
 
-**Fichiers** : `PHASE2_AUTH_COMPLETE.md`
+1. `2f1f118` - Support multi-distro Samba (smb/smbd)
+2. `353079a` - Copie auto smb.conf → /etc/samba
+3. `2a73f25` - Chemins absolus pour partages SMB
+4. `d49da1a` - Correction permissions SMB et noms
+5. `375ecc5` - Ajout sudo pour commandes SMB + sudoers
+6. `74c6cc5` - Config auto reload SMB via sudoers
+7. `867b5bb` - Fix lien activation (IP au lieu localhost)
+8. `87ab49b` - **Création auto partages lors activation**
+9. `1ec6f88` - Partages en admin uniquement
+10. `e4ff47e` - Implémentation gestion pairs P2P
 
-### Phase 3 : Gestion utilisateurs Admin (Terminé ✅)
-1. Module de tokens d'activation (24h, sécurisés)
-2. Fonctions utilisateurs étendues :
-   - CreatePendingUser
-   - ActivateUser
-   - GetAllUsers
-   - DeleteUser
-3. Page liste des utilisateurs (tableau avec statuts)
-4. Page ajout d'utilisateur (formulaire complet)
-5. Page affichage lien d'activation (avec copie)
-6. +18 traductions FR/EN
+## 📁 Nouveaux fichiers créés
 
-**Fichiers** : `PHASE3_USER_MANAGEMENT_COMPLETE.md`
+### Packages Go
+- `internal/peers/peers.go` (164 lignes) - Gestion pairs P2P
+- `internal/shares/shares.go` (178 lignes) - Gestion partages
+- `internal/smb/smb.go` (217 lignes) - Configuration Samba
 
-### Phase 4 : Activation utilisateur (Terminé ✅)
-1. +18 traductions FR/EN pour activation
-2. Page d'activation (formulaire de mot de passe)
-3. Page de succès avec affichage unique de la clé
-4. Handlers complets :
-   - Validation du token (existe, non expiré, non utilisé)
-   - Génération de clé de chiffrement
-   - Activation du compte
-5. Flux complet : lien → choix password → génération clé → login
+### Templates HTML
+- `web/templates/admin_peers.html` (199 lignes) - Liste pairs
+- `web/templates/admin_peers_add.html` (169 lignes) - Ajout pair
+- `web/templates/admin_shares.html` - Vue globale partages
 
-**Fichiers** : `PHASE4_ACTIVATION_COMPLETE.md`
+### Scripts
+- `scripts/configure-smb-reload.sh` - Configuration sudoers
+- `scripts/README.md` - Documentation
 
-### Analyse Statique et Corrections (Terminé ✅)
-
-**Date** : 2025-10-27 après-midi
-
-Analyse complète du code avant la première compilation. **3 problèmes critiques identifiés et corrigés** :
-
-1. **Schéma SQL incorrect** - Table `activation_tokens`
-   - ❌ Colonnes manquantes : `id`, `username`, `email`, `created_at`
-   - ✅ Corrigé : Schéma SQL mis à jour avec toutes les colonnes nécessaires
-   - 📍 Fichier : `internal/database/migrations.go`
-
-2. **Index manquant** - Performance des recherches
-   - ❌ Pas d'index sur `activation_tokens.token`
-   - ✅ Corrigé : Index ajouté pour optimiser les recherches
-   - 📍 Fichier : `internal/database/migrations.go`
-
-3. **Healthcheck Docker défaillant**
-   - ❌ Utilisation de `wget` non installé dans Alpine
-   - ✅ Corrigé : Installation de `curl` + mise à jour des healthchecks
-   - 📍 Fichiers : `Dockerfile`, `docker-compose.yml`
-
-**Vérifications effectuées** :
-- ✅ Cohérence structures Go ↔ SQL
-- ✅ Existence de tous les templates HTML (11/11)
-- ✅ Validité des imports et dépendances
-- ✅ Configuration Docker correcte
-- ✅ Analyse de ~2,500 lignes de code Go
-
-**Rapport complet** : `CODE_ANALYSIS_REPORT.md` (6,000 mots)
-
-**Statut** : ✅ Code prêt pour la compilation
-
-## 📁 Structure actuelle du projet
+## 🏗️ Architecture du flux d'activation
 
 ```
-anemone/
-├── _old/                          # ✅ Backup Python/Bash
-├── cmd/anemone/main.go           # ✅ Point d'entrée
-├── internal/
-│   ├── activation/               # ✅ NOUVEAU - Tokens activation
-│   │   └── tokens.go
-│   ├── auth/                     # ✅ NOUVEAU - Sessions + middleware
-│   │   ├── session.go
-│   │   └── middleware.go
-│   ├── config/                   # ✅ Configuration
-│   │   └── config.go
-│   ├── crypto/                   # ✅ NOUVEAU - Chiffrement
-│   │   └── crypto.go
-│   ├── database/                 # ✅ SQLite + migrations
-│   │   ├── database.go
-│   │   └── migrations.go
-│   ├── i18n/                     # ✅ NOUVEAU - Traductions FR/EN
-│   │   └── i18n.go
-│   ├── users/                    # ✅ NOUVEAU - Gestion utilisateurs
-│   │   └── users.go
-│   └── web/                      # ✅ Routeur HTTP
-│       └── router.go
-├── web/
-│   ├── templates/                # ✅ 10 templates HTML
-│   │   ├── base.html
-│   │   ├── setup.html
-│   │   ├── setup_success.html
-│   │   ├── login.html
-│   │   ├── dashboard_admin.html
-│   │   ├── dashboard_user.html
-│   │   ├── admin_users.html
-│   │   ├── admin_users_add.html
-│   │   ├── admin_users_token.html
-│   │   ├── activate.html
-│   │   └── activate_success.html
-│   └── static/
-│       └── style.css
-├── data/                         # ✅ Gitignored (runtime)
-├── go.mod                        # ✅ Module Go
-├── go.sum                        # ✅ Dependencies lock
-├── Dockerfile                    # ✅ Container build
-├── docker-compose.yml            # ✅ Orchestration
-├── .dockerignore                 # ✅ Build optimization
-├── .gitignore                    # ✅ Updated for Go
-├── README.md                     # ✅ Documentation complète
-├── QUICKSTART.md                 # ✅ Guide de démarrage
-├── PHASE1_SETUP_COMPLETE.md      # ✅ Récap Phase 1
-├── PHASE2_AUTH_COMPLETE.md       # ✅ Récap Phase 2
-├── PHASE3_USER_MANAGEMENT_COMPLETE.md  # ✅ Récap Phase 3
-└── SESSION_STATE.md              # ✅ Ce fichier
+Admin crée user → Génère lien activation → User clique lien
+                                              ↓
+                                   User définit mot de passe
+                                              ↓
+                            ┌─────────────────┴─────────────────┐
+                            │   Activation déclenche (auto):    │
+                            ├───────────────────────────────────┤
+                            │ 1. Création user système (sudo)   │
+                            │ 2. Création user SMB (sudo)       │
+                            │ 3. Création backup_username       │
+                            │    - Sync P2P activé              │
+                            │    - Chiffré                      │
+                            │ 4. Création data_username         │
+                            │    - Local uniquement             │
+                            │ 5. Chown répertoires (sudo)       │
+                            │ 6. Génération smb.conf            │
+                            │ 7. Copie → /etc/samba (sudo)      │
+                            │ 8. Reload Samba (sudo)            │
+                            └───────────────────────────────────┘
 ```
 
-## 🎯 État actuel
+## 📂 Structure partages
 
-### Fonctionnalités opérationnelles (théoriquement)
-
-1. ✅ **Setup initial complet**
-   - Choix langue FR/EN
-   - Configuration NAS (nom, timezone)
-   - Création premier admin
-   - Génération et sauvegarde clé de chiffrement
-
-2. ✅ **Authentification complète**
-   - Login/logout
-   - Sessions sécurisées (24h)
-   - Middlewares de protection
-   - Dashboards adaptatifs (admin/user)
-
-3. ✅ **Gestion utilisateurs (Admin)**
-   - Liste de tous les utilisateurs
-   - Création d'utilisateurs (pending)
-   - Génération de liens d'activation (24h)
-   - Suppression d'utilisateurs
-
-### Routes implémentées
-
-**Publiques** :
-- `GET /` - Redirection setup/login/dashboard
-- `GET /setup` - Configuration initiale
-- `POST /setup` - Traitement setup
-- `POST /setup/confirm` - Finalisation setup
-- `GET /login` - Page de connexion
-- `POST /login` - Authentification
-- `GET /logout` - Déconnexion
-- `GET /health` - Health check
-
-**Protégées (authentifié)** :
-- `GET /dashboard` - Dashboard adaptatif
-
-**Admin uniquement** :
-- `GET /admin/users` - Liste utilisateurs
-- `GET /admin/users/add` - Formulaire ajout
-- `POST /admin/users/add` - Création utilisateur
-- `GET /admin/users/{id}/token` - Affichage lien
-- `POST /admin/users/{id}/delete` - Suppression
-- `GET /admin/peers` - (placeholder)
-- `GET /admin/settings` - (placeholder)
-
-**User** :
-- `GET /trash` - (placeholder)
-
-### Base de données (SQLite)
-
-**7 tables créées** :
-1. `system_config` - Configuration système
-2. `users` - Comptes utilisateurs
-3. `activation_tokens` - Liens d'activation temporaires
-4. `shares` - Partages de fichiers
-5. `trash_items` - Corbeille
-6. `peers` - Serveurs pairs P2P
-7. `sync_log` - Logs de synchronisation
-
-## ❌ Ce qui n'est PAS encore fait
-
-### Phase 5 : Partages et quotas (À faire)
-- [ ] Configuration Samba dynamique
-- [ ] Création automatique des répertoires
-- [ ] Calcul de l'usage réel du stockage
-- [ ] Monitoring des quotas
-- [ ] Alertes de dépassement
-
-### Phase 6 : Synchronisation P2P (À faire)
-- [ ] Adaptation rclone pour multi-users
-- [ ] Configuration de la synchronisation
-- [ ] Gestion des pairs
-- [ ] Logs de synchronisation
-
-### Autres (À faire)
-- [ ] Page de gestion des pairs (`/admin/peers`)
-- [ ] Page des paramètres (`/admin/settings`)
-- [ ] Page de la corbeille (`/trash`)
-- [x] ~~Analyse statique du code~~ ✅ **Terminé**
-- [ ] Tests de compilation et exécution
-- [ ] Tests fonctionnels end-to-end
-
-## 🚀 Prochaines étapes
-
-### Ordre recommandé
-
-1. **Test de compilation** (Priorité 1) 🔴 **URGENT**
-   - ✅ Analyse statique terminée - 3 problèmes corrigés
-   - ⏭️ Installer Go si nécessaire ou utiliser Docker
-   - ⏭️ Compiler le projet : `go build ./cmd/anemone`
-   - ⏭️ Tester le démarrage de l'application
-   - ⏭️ Vérifier le flux complet end-to-end
-
-   **Commandes à exécuter** :
-   ```bash
-   # Option 1 : Go local
-   go mod download
-   CGO_ENABLED=1 go build -o anemone ./cmd/anemone
-   ./anemone
-
-   # Option 2 : Docker (recommandé)
-   docker compose build
-   docker compose up
-   ```
-
-2. **Phase 5 : Partages et quotas** (Priorité 2)
-   - Configuration Samba dynamique
-   - Création automatique des répertoires
-   - Calcul de l'usage du stockage
-   - Monitoring des quotas
-
-3. **Phase 6 : Synchronisation P2P** (Priorité 3)
-   - Adaptation rclone pour multi-users
-   - Gestion des pairs
-   - Configuration de la synchronisation
-
-### Phase 4 en détail
-
-**Fichiers à créer** :
-- `web/templates/activate.html` - Formulaire de mot de passe
-- `web/templates/activate_success.html` - Affichage de la clé
-- Traductions i18n pour l'activation
-
-**Fichiers à modifier** :
-- `internal/web/router.go` - Ajouter routes `/activate/{token}`
-- `internal/i18n/i18n.go` - Ajouter traductions activation
-
-**Logique** :
-1. GET /activate/{token} :
-   - Vérifier token (existe, non expiré, non utilisé)
-   - Afficher formulaire mot de passe
-2. POST /activate/{token} :
-   - Valider mot de passe (min 8 chars, confirmation)
-   - Appeler users.ActivateUser() (génère clé + hash password)
-   - Marquer token comme utilisé
-   - Afficher clé avec avertissements (comme setup)
-3. POST /activate/confirm :
-   - Rediriger vers /login
-
-## 📝 Notes importantes
-
-### Technologies
-- **Go 1.21+** (requis)
-- **SQLite** (CGO_ENABLED=1)
-- **Tailwind CSS** (CDN)
-- **HTMX** (CDN)
-
-### Dépendances Go
-```go
-require (
-    github.com/mattn/go-sqlite3 v1.14.18  // SQLite driver
-    golang.org/x/crypto v0.17.0            // bcrypt
-)
+```
+data/shares/
+├── username/
+│   ├── backup/  → backup_username  (Sync P2P ✅, chiffré)
+│   └── data/    → data_username    (Local uniquement)
 ```
 
-### Compilation
-```bash
-# Avec Docker (recommandé)
-docker compose build
+**Nomenclature** : `backup_franck`, `data_franck`, etc.
 
-# Avec Go local
-go mod download
-CGO_ENABLED=1 go build -o anemone ./cmd/anemone
-```
+## 🔐 Configuration Sudoers
 
-### Démarrage
-```bash
-# Docker
-docker compose up
-
-# Local
-./anemone
-# OU
-go run cmd/anemone/main.go
-```
-
-### Premier accès
-```
-http://localhost:8080
-→ Redirige automatiquement vers /setup
-```
-
-## 🔍 Points d'attention
-
-### Sécurité
-- ✅ Sessions en mémoire (OK pour MVP, Redis pour prod)
-- ✅ Cookies HttpOnly (protection XSS)
-- ✅ Middlewares de protection des routes
-- ✅ Mots de passe hashés avec bcrypt
-- ✅ Clés de chiffrement chiffrées avec master key
-- ✅ Tokens d'activation avec expiration
-
-### Architecture
-- ✅ Séparation claire des responsabilités (packages)
-- ✅ Migrations SQLite automatiques au démarrage
-- ✅ Templates HTML séparés du code
-- ✅ Configuration via environnement
-
-### UX
-- ✅ Interface moderne avec Tailwind CSS
-- ✅ Feedback visuels (toasts, badges, etc.)
-- ✅ Support multilingue FR/EN
-- ✅ Responsive design
-
-## 📊 Statistiques du code
-
-- **Lignes Go** : ~2,500 lignes (13 fichiers)
-- **Templates HTML** : ~1,400 lignes (11 templates)
-- **Traductions** : ~110 clés (FR + EN)
-- **Routes HTTP** : 18 routes
-- **Packages internes** : 7 packages
-- **Templates** : 11 templates ✅
-- **Tables SQLite** : 7 tables ✅
-- **Fichiers modifiés** : 34 fichiers
-- **Total lignes** : ~6,085 lignes
-
-## 💡 Pour reprendre
-
-1. **Lire ce fichier** pour se remettre en contexte
-2. **Lire CODE_ANALYSIS_REPORT.md** pour les détails de l'analyse statique
-3. **Lire PHASE4_ACTIVATION_COMPLETE.md** pour les détails de la dernière phase
-4. **Prochaine action** : Tester la compilation (priorité 1)
-
-## 📞 Commandes utiles pour reprendre
+**Fichier** : `/etc/sudoers.d/anemone-smb`
 
 ```bash
-# Voir l'état du projet
-ls -la
-git status
+franck ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload smb
+franck ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload smb.service
+franck ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload smbd
+franck ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload smbd.service
+franck ALL=(ALL) NOPASSWD: /usr/sbin/useradd -M -s /usr/sbin/nologin *
+franck ALL=(ALL) NOPASSWD: /usr/bin/smbpasswd
+franck ALL=(ALL) NOPASSWD: /usr/bin/chown -R *
+franck ALL=(ALL) NOPASSWD: /usr/bin/cp * /etc/samba/smb.conf
+```
 
-# Lire les récapitulatifs
-cat PHASE1_SETUP_COMPLETE.md
-cat PHASE2_AUTH_COMPLETE.md
-cat PHASE3_USER_MANAGEMENT_COMPLETE.md
-cat PHASE4_ACTIVATION_COMPLETE.md
-cat CODE_ANALYSIS_REPORT.md
+**Installation** :
+```bash
+sudo ./scripts/configure-smb-reload.sh franck
+```
 
-# Vérifier la structure
-tree -I 'data|_old' -L 3
+## ❌ Problèmes résolus cette session
 
-# Tester la compilation (si Go installé)
-go mod download
+### 1. Popup sudo lors activation
+- **Cause** : Commandes SMB sans sudo, demandait mdp
+- **Solution** : Sudo + configuration sudoers complète
+
+### 2. Lien activation avec localhost
+- **Cause** : Hardcodé localhost au lieu IP serveur
+- **Solution** : Utilise `r.Host` pour conserver l'IP
+
+### 3. Partages SMB inaccessibles (multi-causes)
+- **Nom incorrect** : `backup_test-test` → Corrigé template
+- **Permissions** : Root au lieu user → Ajout chown auto
+- **Chemins relatifs** → Conversion absolus via filepath.Abs()
+- **Config pas utilisée** → Copie auto vers /etc/samba/smb.conf
+- **Mauvais service** : smbd vs smb → Fallback multi-distro
+
+### 4. Erreur création user SMB
+- **Cause** : smbpasswd sans sudo
+- **Solution** : Ajout sudo partout + sudoers
+
+## 🗄️ Base de données
+
+### Table `peers`
+```sql
+id, name, address, port, public_key, enabled, status,
+last_seen, last_sync, created_at, updated_at
+```
+
+**Exemple** :
+```sql
+INSERT INTO peers VALUES (
+  1, 'FR1', '192.168.83.96', 8443, NULL, 1, 'online',
+  '2025-10-29 10:00:00', NULL, NOW(), NOW()
+);
+```
+
+### Table `shares`
+```sql
+id, user_id, name, path, protocol, sync_enabled, created_at
+```
+
+**Exemple** :
+```sql
+INSERT INTO shares VALUES (
+  1, 5, 'backup_test',
+  '/home/franck/anemone/data/shares/test/backup',
+  'smb', 1, NOW()
+);
+```
+
+## 🌐 Traductions ajoutées
+
+**Peers** : 30+ clés FR/EN
+- peers.title, peers.add, peers.status.*, etc.
+
+**Shares** : 28 clés FR/EN
+- shares.title, shares.protocol.*, shares.smb_status, etc.
+
+## 🚀 Configuration requise
+
+### 1. Samba installé
+```bash
+# Fedora/RHEL
+sudo dnf install samba
+
+# Debian/Ubuntu
+sudo apt install samba
+```
+
+### 2. Service actif
+```bash
+# Fedora
+sudo systemctl enable --now smb
+
+# Debian
+sudo systemctl enable --now smbd
+```
+
+### 3. Sudoers configuré
+```bash
+cd ~/anemone
+sudo ./scripts/configure-smb-reload.sh franck
+```
+
+## 📊 Variables d'environnement
+
+```bash
+PORT=8080                    # Port HTTP (défaut)
+HTTPS_PORT=8443              # Port HTTPS (défaut)
+ENABLE_HTTP=false            # Activer HTTP
+ENABLE_HTTPS=true            # Activer HTTPS (défaut)
+ANEMONE_DATA_DIR=./data      # Répertoire données
+LANGUAGE=fr                  # Langue (fr/en)
+TLS_CERT_PATH=/path/cert.crt # Certificat custom
+TLS_KEY_PATH=/path/cert.key  # Clé custom
+```
+
+## 🖥️ État des serveurs
+
+### Serveur DEV (192.168.83.132)
+- ✅ Code à jour (commit 2f1f118)
+- ✅ Serveur actif :8443
+- ✅ Utilisateur test créé
+- ✅ Sudoers configuré
+- ✅ Partages créés (backup_test, data_test)
+
+### Serveur FR1 (192.168.83.96)
+- ✅ Code à jour (commit 2f1f118)
+- ✅ Sudoers configuré
+- ✅ Service smb actif
+- ⏳ Tests SMB en cours
+
+### Connexion P2P
+- ✅ FR1 ↔ DEV : Testée, en ligne
+- ✅ Test connexion fonctionne
+- ✅ Statuts mis à jour
+
+## 🔍 Diagnostic SMB
+
+### Vérifications
+```bash
+# User SMB créé ?
+sudo pdbedit -L
+
+# Config Samba
+sudo testparm -s
+
+# Service actif ?
+sudo systemctl status smb   # Fedora
+sudo systemctl status smbd  # Debian
+
+# Permissions répertoires
+ls -la data/shares/username/
+
+# Config copiée ?
+diff data/smb/smb.conf /etc/samba/smb.conf
+
+# Partages en DB
+sqlite3 data/db/anemone.db "SELECT * FROM shares;"
+```
+
+### Connexion depuis Windows
+```
+Chemin : \\192.168.83.132\backup_test
+User   : test
+Pass   : [mot de passe activation]
+```
+
+## ⚠️ Problème IDENTIFIÉ - Session 29 Oct 09:20
+
+**Symptôme** : Accès refusé depuis Windows aux partages SMB
+
+**Diagnostic complet** :
+- ✅ User système créé (uid=1001)
+- ✅ User SMB créé et enabled (mot de passe OK)
+- ✅ Répertoires avec permissions (test:test)
+- ✅ smb.conf correct (chemins absolus)
+- ✅ Config copiée /etc/samba/smb.conf
+- ✅ Service Samba rechargé
+
+**ROOT CAUSE TROUVÉE** 🎯 :
+```bash
+# Logs Samba :
+chdir_current_service: vfs_ChDir(/home/franck/anemone/data/shares/test/backup)
+failed: Permission non accordée. Current token: uid=1001, gid=1001
+
+# Analyse permissions :
+$ namei -l /home/franck/anemone/data/shares/test/backup
+drwx------ franck franck /home/franck  ← PROBLÈME ICI !
+```
+
+**Le problème** : `/home/franck` a les permissions `700` (drwx------), donc l'utilisateur `test` (uid=1001) ne peut pas traverser ce répertoire pour accéder aux partages en dessous.
+
+**Solution testée** : `chmod o+x /home/franck` fonctionnerait MAIS n'est pas propre
+
+**Solution PROPRE décidée** : 🚀 **Migration vers `/srv/anemone`**
+
+## 📝 Commandes utiles
+
+```bash
+# Rebuild
 CGO_ENABLED=1 go build -o anemone ./cmd/anemone
 
-# Ou avec Docker (recommandé)
-docker compose build
-docker compose up
+# Start
+ANEMONE_DATA_DIR=./data ./anemone
+
+# Sudoers
+sudo ./scripts/configure-smb-reload.sh franck
+
+# Reload Samba
+sudo systemctl reload smb    # Fedora
+sudo systemctl reload smbd   # Debian
+
+# Test Samba config
+sudo testparm -s | head -50
+
+# Check SMB users
+sudo pdbedit -L -v
+
+# Clean test user
+sudo smbpasswd -x test
+sudo userdel test
+rm -rf data/shares/test
+
+# Database
+sqlite3 data/db/anemone.db "SELECT * FROM shares;"
+sqlite3 data/db/anemone.db "SELECT * FROM peers;"
 ```
 
-## ✅ Checklist de reprise
+## 🎯 PROCHAINE SESSION : Migration vers /srv/anemone
 
-- [x] ~~Relire SESSION_STATE.md (ce fichier)~~ ✅
-- [x] ~~Relire PHASE4_ACTIVATION_COMPLETE.md~~ ✅
-- [x] ~~Analyse statique du code~~ ✅ **3 problèmes corrigés**
-- [ ] Installer Go ou Docker
-- [ ] Tester la compilation
-- [ ] Exécuter et valider le flux complet
-- [ ] Passer à Phase 5 (Partages/Quotas)
+### ⚠️ ACTION IMMÉDIATE REQUISE
+
+**Problème** : Les données sont dans `/home/franck/anemone/data/` ce qui crée un problème de permissions pour Samba.
+
+**Migration complète à faire** :
+
+#### 1. Préparation (avec sudo)
+```bash
+# Créer structure /srv/anemone
+sudo mkdir -p /srv/anemone
+sudo chown franck:franck /srv/anemone
+
+# Arrêter le serveur
+killall anemone
+```
+
+#### 2. Migration des données
+```bash
+# Déplacer tout le contenu
+mv ~/anemone/data/* /srv/anemone/
+
+# Vérifier
+ls -la /srv/anemone/
+# Devrait contenir : db/ shares/ certs/ smb/
+```
+
+#### 3. Ajuster les permissions
+```bash
+# Permissions de base
+sudo chown -R franck:franck /srv/anemone
+sudo chmod 755 /srv/anemone
+
+# Permissions des partages utilisateurs
+sudo chown -R test:test /srv/anemone/shares/test/
+sudo chmod 755 /srv/anemone/shares/test/
+```
+
+#### 4. Mise à jour configuration
+```bash
+# Modifier /etc/sudoers.d/anemone-smb si chemins hardcodés
+# Ou relancer le script :
+sudo ./scripts/configure-smb-reload.sh franck
+```
+
+#### 5. Mise à jour config Samba
+```bash
+# La config sera regénérée automatiquement au prochain reload
+# mais vérifier que les chemins dans la DB pointent vers /srv
+sqlite3 /srv/anemone/db/anemone.db "SELECT * FROM shares;"
+```
+
+#### 6. Redémarrer avec nouveau chemin
+```bash
+cd ~/anemone
+ANEMONE_DATA_DIR=/srv/anemone ./anemone
+```
+
+#### 7. Tests post-migration
+- [ ] Connexion web admin OK
+- [ ] User test peut se connecter
+- [ ] Partages SMB visibles depuis Windows
+- [ ] Accès SMB fonctionne (écriture/lecture)
+- [ ] Config Samba correcte (`sudo testparm -s`)
+
+### Fichiers à modifier (peut-être)
+
+**Aucun fichier Go à modifier** : La variable `ANEMONE_DATA_DIR` est déjà utilisée partout !
+
+**Documentation à mettre à jour** :
+- README.md : Changer exemples avec `/srv/anemone`
+- QUICKSTART.md : Idem
+- SESSION_STATE.md : Mise à jour après migration
+
+### Avantages de /srv/anemone
+
+✅ **Standard FHS (Filesystem Hierarchy Standard)**
+✅ **Sécurité** : Isolation /home vs données NAS
+✅ **Permissions claires** : Plus de problème traversée répertoire
+✅ **Production-ready** : Comme TrueNAS, Synology, etc.
+✅ **Portabilité** : Indépendant de l'utilisateur système
+✅ **Backups** : `/srv` peut avoir sa propre stratégie backup
+
+### Après migration : Tâches suivantes
+
+#### Court terme
+1. **Validation complète SMB** - Tests read/write depuis Windows
+2. **Page Paramètres** - Config système, workgroup, etc.
+3. **Quotas** - Monitoring espace disque
+4. **Corbeille** - Gestion fichiers supprimés (30j)
+
+#### Moyen terme
+1. **Synchronisation P2P** - Logique sync réelle
+2. **Chiffrement** - Implémentation chiffrement partages backup
+3. **Monitoring** - Dashboard stats utilisation
+
+## 💡 Notes importantes
+
+- **Sudoers essentiel** : Sans le script, popups sudo
+- **Multi-distro** : Support smb (Fedora) + smbd (Debian)
+- **Chemins absolus** : Samba requiert chemins absolus
+- **Pas de création manuelle** : Users ne créent PAS de partages
+- **Admin only** : Vue globale partages réservée admin
+- **2 partages auto** : backup (sync) + data (local)
+
+## 📈 Statistiques sessions cumulées
+
+### Session précédente (09:00-09:15)
+- **Commits** : 10 commits
+- **Fichiers créés** : 6 fichiers Go + 3 templates + 2 scripts
+- **Lignes ajoutées** : ~1,200 lignes Go + 600 lignes HTML
+- **Traductions** : 58 nouvelles clés FR/EN
+- **Problèmes résolus** : 7 bugs majeurs
+
+### Session actuelle (09:20-09:30)
+- **Commits** : 0 (diagnostic uniquement)
+- **Root cause trouvée** : Problème permissions `/home/franck` (700)
+- **Outils diagnostic utilisés** :
+  - `journalctl -u smb` → Logs Samba
+  - `namei -l` → Analyse permissions chemin complet
+  - `id test` → Vérification UID/GID
+- **Décision architecture** : Migration vers `/srv/anemone` (standard FHS)
+
+## 📞 Pour reprendre la PROCHAINE session
+
+### 🚨 PRIORITÉ 1 : Migration /srv/anemone
+
+1. **Lire ce fichier SESSION_STATE.md** (section "🎯 PROCHAINE SESSION")
+2. **Suivre étapes migration** (7 étapes détaillées ci-dessus)
+3. **Tester connexion SMB** depuis Windows
+4. **Valider** : Lecture/écriture fichiers OK
+
+### Après migration réussie
+
+5. Mettre à jour README.md et QUICKSTART.md
+6. Commit la mise à jour docs
+7. Continuer avec Page Paramètres
+
+### Si problèmes pendant migration
+
+- Vérifier logs : `journalctl -u smb -f`
+- Vérifier permissions : `namei -l /srv/anemone/shares/test/backup`
+- Vérifier config : `sudo testparm -s`
+- Vérifier DB : `sqlite3 /srv/anemone/db/anemone.db "SELECT * FROM shares;"`
 
 ---
 
-**Session sauvegardée le** : 2025-10-27
-**Dernière mise à jour** : Après-midi (analyse statique)
-**État** : 4 phases terminées + analyse statique complète
-**Code analysé** : ~6,085 lignes / 34 fichiers
-**Prêt à compiler** : ✅
+## 📸 État actuel du système
+
+**Serveur DEV (192.168.83.132)** :
+- ✅ Code à jour (commit 2f1f118)
+- ✅ Serveur HTTPS actif sur :8443
+- ✅ Utilisateur test créé et activé
+- ✅ Partages créés (backup_test, data_test)
+- ⚠️ **Bloqué** : Permissions /home/franck empêchent accès SMB
+- 🚀 **Prochaine action** : Migration vers /srv/anemone
+
+**Serveur FR1 (192.168.83.96)** :
+- ✅ Code à jour
+- ✅ P2P peer connecté à DEV
+- ⏸️ En attente validation DEV avant tests
+
+---
+
+**Session sauvegardée le** : 2025-10-29 09:30
+**Tokens utilisés** : ~34k/200k (17%)
+**État** : Root cause identifiée, plan migration défini
+**Prochaine action** : Migration complète vers /srv/anemone
