@@ -674,15 +674,15 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 			}
 		}
 
-		// Build activation URL
+		// Build activation URL - use Host from request (includes IP if accessed via IP)
 		host := r.Host
-		if host == "" {
-			// Use HTTPS port by default
-		if s.cfg.EnableHTTPS {
-			host = fmt.Sprintf("localhost:%s", s.cfg.HTTPSPort)
-		} else {
-			host = fmt.Sprintf("localhost:%s", s.cfg.Port)
-		}
+		if host == "" || host == "localhost" || strings.HasPrefix(host, "localhost:") {
+			// Fallback to configured port if Host is empty or localhost
+			if s.cfg.EnableHTTPS {
+				host = fmt.Sprintf("localhost:%s", s.cfg.HTTPSPort)
+			} else {
+				host = fmt.Sprintf("localhost:%s", s.cfg.Port)
+			}
 		}
 			// Use HTTPS if enabled, otherwise HTTP
 		protocol := "https"
@@ -910,7 +910,7 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Created data share: data_%s", token.Username)
 		}
 
-		// Regenerate SMB config
+		// Regenerate SMB config (reload done manually by admin)
 		smbCfg := &smb.Config{
 			ConfigPath: filepath.Join(s.cfg.DataDir, "smb", "smb.conf"),
 			WorkGroup:  "ANEMONE",
@@ -919,9 +919,8 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := smb.GenerateConfig(s.db, smbCfg); err != nil {
 			log.Printf("Warning: Failed to regenerate SMB config: %v", err)
-		} else {
-			smb.ReloadConfig()
 		}
+		log.Printf("SMB config updated. Admin should run: sudo systemctl reload smbd")
 
 		// Store encryption key in cookie temporarily
 		http.SetCookie(w, &http.Cookie{
