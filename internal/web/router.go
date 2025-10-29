@@ -910,7 +910,7 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Created data share: data_%s", token.Username)
 		}
 
-		// Regenerate SMB config (reload done manually by admin)
+		// Regenerate SMB config
 		smbCfg := &smb.Config{
 			ConfigPath: filepath.Join(s.cfg.DataDir, "smb", "smb.conf"),
 			WorkGroup:  "ANEMONE",
@@ -919,8 +919,14 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 		}
 		if err := smb.GenerateConfig(s.db, smbCfg); err != nil {
 			log.Printf("Warning: Failed to regenerate SMB config: %v", err)
+		} else {
+			// Try to reload smbd (requires sudoers configuration)
+			if err := smb.ReloadConfig(); err != nil {
+				log.Printf("Warning: Could not reload smbd automatically. Run: sudo systemctl reload smbd")
+			} else {
+				log.Printf("✅ SMB config reloaded successfully")
+			}
 		}
-		log.Printf("SMB config updated. Admin should run: sudo systemctl reload smbd")
 
 		// Store encryption key in cookie temporarily
 		http.SetCookie(w, &http.Cookie{
