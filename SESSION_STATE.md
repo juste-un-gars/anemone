@@ -1,26 +1,64 @@
-# ✅ Migration /srv/anemone COMPLÈTE
+# 🪸 Anemone - État du Projet
 
-**Date migration** : 2025-10-29 14:05
-**Status** : 🟢 OPÉRATIONNEL
+**Dernière session** : 2025-10-29 14:00-16:00
+**Status** : 🟢 PRODUCTION READY
 
 ---
 
-## ✅ Migration réussie
+## 🎯 État actuel (Fin session 29 Oct)
 
-Les données ont été migrées vers `/srv/anemone` avec succès.
+### ✅ Fonctionnalités complètes et testées
+
+1. **Configuration initiale (Setup)**
+   - Choix langue (FR/EN)
+   - Création premier admin
+   - Génération clé de chiffrement
+
+2. **Authentification & Sécurité**
+   - Login/logout multi-utilisateurs
+   - Sessions sécurisées
+   - HTTPS avec certificat auto-signé
+
+3. **Gestion utilisateurs**
+   - Création utilisateurs par admin
+   - Activation par lien temporaire (24h)
+   - Création automatique user système + SMB
+
+4. **Partages SMB automatiques**
+   - 2 partages par user : `backup_username` + `data_username`
+   - Création auto lors activation
+   - Permissions et ownership automatiques
+   - Configuration SELinux automatique
+   - **Privacy** : Chaque user ne voit que ses partages
+
+5. **Gestion pairs P2P**
+   - CRUD complet
+   - Test connexion HTTPS
+   - Statuts (online/offline/error)
+
+6. **Installation automatisée**
+   - Script `install.sh` zéro-touch
+   - Configuration complète système
+   - Support multi-distro (Fedora/RHEL/Debian)
+
+### 🚀 Déploiement
+
+**DEV (192.168.83.99)** : ✅ Migration /srv/anemone complète + Tests validés
+**FR1 (192.168.83.96)** : ✅ Installation fraîche + 2 utilisateurs actifs (test + doe)
 
 **Tests validés** :
 - ✅ Accès SMB depuis Windows : OK
 - ✅ Accès SMB depuis Android : OK
 - ✅ Création/lecture/écriture fichiers : OK
-- ✅ Permissions UNIX : OK (test:test)
-- ✅ SELinux : OK (samba_share_t + samba_export_all_rw)
+- ✅ Privacy SMB (chaque user voit uniquement ses partages) : OK
+- ✅ Multi-utilisateurs : OK
+- ✅ SELinux (Fedora) : OK
 
-**Structure actuelle** :
-- Code : `~/anemone/` (binaire, templates, scripts)
+**Structure de production** :
+- Code : `~/anemone/` (repo git, binaire)
 - Données : `/srv/anemone/` (db, certs, shares, smb)
+- Service : `systemd` (démarrage automatique)
 
----
 ---
 
 # État de la session - 29 Octobre 2025
@@ -56,8 +94,9 @@ Les données ont été migrées vers `/srv/anemone` avec succès.
 - Chemins absolus pour Samba
 - Interface admin partages (vue globale)
 
-## 🔧 Commits de cette session (10 commits)
+## 🔧 Commits de cette session (14 commits au total)
 
+### Session matin (10 commits) - P2P + SMB
 1. `2f1f118` - Support multi-distro Samba (smb/smbd)
 2. `353079a` - Copie auto smb.conf → /etc/samba
 3. `2a73f25` - Chemins absolus pour partages SMB
@@ -68,6 +107,12 @@ Les données ont été migrées vers `/srv/anemone` avec succès.
 8. `87ab49b` - **Création auto partages lors activation**
 9. `1ec6f88` - Partages en admin uniquement
 10. `e4ff47e` - Implémentation gestion pairs P2P
+
+### Session après-midi (4 commits) - Migration + Installation
+11. `aada0ad` - **Migration complète vers /srv/anemone + SELinux**
+12. `0c870d6` - **Installation automatisée (install.sh) + Auto-config SELinux**
+13. `c837410` - **Privacy SMB (access based share enum)**
+14. (à venir) - Mise à jour documentation finale
 
 ## 📁 Nouveaux fichiers créés
 
@@ -409,76 +454,196 @@ sudo setsebool -P samba_export_all_rw on
 - **Admin only** : Vue globale partages réservée admin
 - **2 partages auto** : backup (sync) + data (local)
 
-## 📈 Statistiques sessions cumulées
+## 📈 Statistiques session 29 Octobre 2025
 
-### Session précédente (09:00-09:15)
+### Session matin (09:00-09:30) - P2P + SMB + Diagnostic
 - **Commits** : 10 commits
 - **Fichiers créés** : 6 fichiers Go + 3 templates + 2 scripts
 - **Lignes ajoutées** : ~1,200 lignes Go + 600 lignes HTML
 - **Traductions** : 58 nouvelles clés FR/EN
 - **Problèmes résolus** : 7 bugs majeurs
+- **Diagnostic** : Root cause permissions `/home/franck` trouvée
 
-### Session actuelle (09:20-09:30)
-- **Commits** : 0 (diagnostic uniquement)
-- **Root cause trouvée** : Problème permissions `/home/franck` (700)
-- **Outils diagnostic utilisés** :
-  - `journalctl -u smb` → Logs Samba
-  - `namei -l` → Analyse permissions chemin complet
-  - `id test` → Vérification UID/GID
-- **Décision architecture** : Migration vers `/srv/anemone` (standard FHS)
+### Session après-midi (14:00-16:00) - Migration + Installation + Privacy
+- **Commits** : 4 commits
+- **Migration /srv/anemone** : COMPLÈTE (15 min)
+  - Déplacement données
+  - Configuration SELinux
+  - Tests Windows + Android validés
+- **Script install.sh** : CRÉÉ (300 lignes bash)
+  - Installation complètement automatisée
+  - Support multi-distro
+  - Test réussi sur FR1
+- **Auto-config SELinux** : IMPLÉMENTÉE
+  - Fonction `configureSELinux()` dans shares.go
+  - Application automatique contexte Samba
+- **Privacy SMB** : AJOUTÉE
+  - Option `access based share enum`
+  - Chaque user voit uniquement ses partages
+
+### Totaux journée
+- **Commits** : 14 commits
+- **Temps total** : ~5 heures
+- **Fichiers créés** : 7 fichiers (6 Go + 1 bash)
+- **Lignes de code** : ~1,500 lignes
+- **Tests** : 2 serveurs validés (DEV + FR1)
+- **Utilisateurs testés** : 3 users (test sur DEV, test + doe sur FR1)
 
 ## 📸 État actuel du système
 
 **Serveur DEV (192.168.83.99)** :
-- ✅ Code à jour
-- ✅ **Migration /srv/anemone : COMPLÈTE**
+- ✅ Code à jour (commit c837410)
+- ✅ Migration /srv/anemone : COMPLÈTE
 - ✅ Serveur HTTPS actif sur :8443
 - ✅ Utilisateur test créé et activé
 - ✅ Partages SMB fonctionnels (backup_test, data_test)
-- ✅ SELinux configuré (samba_share_t)
+- ✅ SELinux configuré (samba_share_t + samba_export_all_rw)
 - ✅ Tests Windows + Android : OK
 
 **Serveur FR1 (192.168.83.96)** :
-- ✅ Code à jour
-- ✅ P2P peer connecté à DEV
-- ⏸️ En attente réinstallation complète
+- ✅ Code à jour (commit c837410)
+- ✅ Installation fraîche via `install.sh` : RÉUSSIE
+- ✅ Serveur HTTPS actif sur :8443
+- ✅ 2 utilisateurs actifs : test + doe
+- ✅ Partages SMB fonctionnels (4 partages : backup + data pour chaque user)
+- ✅ Privacy SMB : OK (chaque user voit uniquement ses partages)
+- ✅ SELinux configuré automatiquement
+- ✅ Tests Windows + Android : OK
 
 ---
 
 ## 📞 Pour reprendre la PROCHAINE session
 
-### PRIORITÉ 1 : Script d'installation automatique
+### ✅ Fonctionnalités de base : TERMINÉES
 
-**Objectif** : L'admin ne doit RIEN faire en ligne de commande après le démarrage.
+Le système est **production-ready** pour un usage NAS de base :
+- ✅ Multi-utilisateurs
+- ✅ Partages SMB automatiques
+- ✅ Installation automatisée
+- ✅ Sécurité (HTTPS, SELinux, permissions)
+- ✅ Privacy (isolation des partages)
 
-**Créer `install.sh`** qui fait :
-1. Vérifier prérequis (Go, git, sudo)
-2. Compiler le binaire
-3. Créer `/srv/anemone`
-4. Installer Samba
-5. Configurer SELinux (contexte + boolean)
-6. Configurer sudoers
-7. Configurer firewall
-8. Créer service systemd (démarrage auto)
-9. Générer certificat TLS
-10. Premier démarrage
+### 🎯 Prochaines fonctionnalités à implémenter
 
-**Utilisation** :
-```bash
-git clone <repo> ~/anemone
-cd ~/anemone
-sudo ./install.sh
-```
+#### PRIORITÉ 1 : Synchronisation P2P (fonctionnalité clé)
 
-### PRIORITÉ 2 : Auto-config SELinux dans le code
+**Objectif** : Synchroniser automatiquement les partages `backup_*` entre pairs.
 
-Modifier `internal/shares/shares.go` pour appeler automatiquement :
-- `sudo semanage fcontext` lors création partage
-- `sudo restorecon` sur les répertoires créés
+**À faire** :
+1. **Implémentation rclone** dans `internal/sync/`
+   - Configuration rclone par utilisateur
+   - Chiffrement avec clé utilisateur
+   - Sync bidirectionnel ou unidirectionnel ?
+
+2. **Scheduler de synchronisation**
+   - Cron job ou timer systemd ?
+   - Fréquence configurable par admin
+   - Détection changements (inotify ou polling)
+
+3. **Interface web sync**
+   - Statut sync par utilisateur
+   - Dernière sync (date/heure)
+   - Logs de synchronisation
+   - Bouton sync manuel
+
+4. **Gestion des conflits**
+   - Stratégie de résolution (newer wins ?)
+   - Notification conflits à l'utilisateur
+
+**Références** :
+- Architecture définie dans les phases précédentes
+- Table `sync_log` déjà en DB
+- Pairs P2P déjà configurables
+
+#### PRIORITÉ 2 : Quotas utilisateur
+
+**Objectif** : Limiter l'espace disque par utilisateur.
+
+**À faire** :
+1. **Backend quotas** dans `internal/quota/`
+   - Calcul taille utilisée (`du` ou Walk)
+   - Vérification avant écriture
+   - Blocage si quota dépassé
+
+2. **Interface admin**
+   - Définir quota par user (GB)
+   - Vue utilisation globale
+   - Alertes approche limite
+
+3. **Interface utilisateur**
+   - Dashboard : quota utilisé / total
+   - Barre de progression
+   - Alerte si > 90%
+
+#### PRIORITÉ 3 : Corbeille (Trash)
+
+**Objectif** : Récupération fichiers supprimés (30 jours).
+
+**À faire** :
+1. **Backend trash** dans `internal/trash/`
+   - Intercepter suppressions SMB
+   - Déplacer dans `.trash/` au lieu supprimer
+   - Purge automatique > 30j
+
+2. **Interface web**
+   - Liste fichiers en corbeille
+   - Restauration fichier
+   - Vidage corbeille
+   - Purge manuelle
+
+#### PRIORITÉ 4 : Monitoring & Dashboard
+
+**Objectif** : Visibilité sur l'état du système.
+
+**À faire** :
+1. **Métriques système**
+   - Espace disque total/utilisé
+   - Charge CPU/RAM
+   - Température (si disponible)
+
+2. **Statistiques utilisateurs**
+   - Nombre fichiers
+   - Taille totale par user
+   - Activité récente
+
+3. **Dashboard admin amélioré**
+   - Graphiques utilisation
+   - Logs système
+   - État services (Samba, Anemone)
+
+#### PRIORITÉ 5 : Page Paramètres (Settings)
+
+**Objectif** : Configuration système via web.
+
+**À faire** :
+1. **Paramètres Samba**
+   - Workgroup
+   - Server name
+   - Description
+
+2. **Paramètres réseau**
+   - Ports HTTP/HTTPS
+   - Certificat TLS custom
+
+3. **Paramètres sync**
+   - Fréquence synchronisation
+   - Stratégie conflits
+   - Activation/désactivation sync globale
 
 ---
 
-**Session sauvegardée le** : 2025-10-29 14:10
-**Tokens utilisés** : ~45k/200k (22%)
-**État** : Migration complète et validée
-**Prochaine action** : Script install.sh + auto-config SELinux
+### 🛠️ Améliorations techniques (optionnelles)
+
+- **Tests automatisés** : Tests unitaires + intégration
+- **CI/CD** : GitHub Actions pour build/test
+- **Docker** : Image Docker officielle
+- **Logs structurés** : Améliorer logging (niveaux, rotation)
+- **API REST** : Endpoints API pour intégration externe
+- **Documentation API** : Swagger/OpenAPI
+
+---
+
+**Session sauvegardée le** : 2025-10-29 16:00
+**Tokens utilisés** : ~82k/200k (41%)
+**État** : Production ready - Fonctionnalités de base complètes
+**Prochaine action** : Synchronisation P2P (fonctionnalité principale du projet)
