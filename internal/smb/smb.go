@@ -85,10 +85,16 @@ func GenerateConfig(db *sql.DB, cfg *Config) error {
 			return fmt.Errorf("failed to get username for share %d: %w", share.ID, err)
 		}
 
+		// Convert path to absolute (Samba requires absolute paths)
+		absPath, err := filepath.Abs(share.Path)
+		if err != nil {
+			absPath = share.Path // Fallback to original if Abs fails
+		}
+
 		shareConfigs = append(shareConfigs, ShareConfig{
 			Name:     share.Name,
 			Username: username,
-			Path:     share.Path,
+			Path:     absPath,
 		})
 	}
 
