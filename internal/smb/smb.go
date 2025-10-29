@@ -134,23 +134,23 @@ func AddSMBUser(username, password string) error {
 	// Check if user already exists
 	_, err := exec.Command("id", username).Output()
 	if err != nil {
-		// User doesn't exist, create it
-		cmd := exec.Command("useradd", "-M", "-s", "/usr/sbin/nologin", username)
+		// User doesn't exist, create it (requires sudo)
+		cmd := exec.Command("sudo", "useradd", "-M", "-s", "/usr/sbin/nologin", username)
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to create system user: %w", err)
 		}
 	}
 
-	// Set SMB password using smbpasswd
-	cmd := exec.Command("smbpasswd", "-a", "-s", username)
+	// Set SMB password using smbpasswd (requires sudo)
+	cmd := exec.Command("sudo", "smbpasswd", "-a", "-s", username)
 	cmd.Stdin = strings.NewReader(password + "\n" + password + "\n")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to set SMB password: %w (output: %s)", err, string(output))
 	}
 
-	// Enable the SMB user
-	cmd = exec.Command("smbpasswd", "-e", username)
+	// Enable the SMB user (requires sudo)
+	cmd = exec.Command("sudo", "smbpasswd", "-e", username)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to enable SMB user: %w", err)
 	}
@@ -179,7 +179,7 @@ func RemoveSMBUser(username string) error {
 
 // ReloadConfig reloads the Samba configuration
 func ReloadConfig() error {
-	cmd := exec.Command("systemctl", "reload", "smbd")
+	cmd := exec.Command("sudo", "systemctl", "reload", "smbd")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to reload smbd: %w", err)
 	}
