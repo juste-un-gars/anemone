@@ -53,6 +53,29 @@ func Create(db *sql.DB, share *Share, username string) error {
 		}
 	}
 
+	// Configure SELinux for Samba (only on RHEL/Fedora)
+	if err := configureSELinux(share.Path); err != nil {
+		// Log error but don't fail - SELinux might not be installed
+		fmt.Printf("Warning: SELinux configuration failed: %v\n", err)
+	}
+
+	return nil
+}
+
+// configureSELinux sets the appropriate SELinux context for Samba shares
+func configureSELinux(sharePath string) error {
+	// Check if SELinux is available
+	if _, err := exec.LookPath("restorecon"); err != nil {
+		// SELinux not available (Debian/Ubuntu)
+		return nil
+	}
+
+	// Apply Samba context to the share directory
+	cmd := exec.Command("sudo", "restorecon", "-Rv", sharePath)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to apply SELinux context: %w", err)
+	}
+
 	return nil
 }
 
