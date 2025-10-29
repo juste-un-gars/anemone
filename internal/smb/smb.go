@@ -132,6 +132,12 @@ func GenerateConfig(db *sql.DB, cfg *Config) error {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
+	// Copy to /etc/samba/smb.conf (Samba's default location)
+	cmd := exec.Command("sudo", "cp", cfg.ConfigPath, "/etc/samba/smb.conf")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to copy config to /etc/samba/smb.conf: %w", err)
+	}
+
 	return nil
 }
 

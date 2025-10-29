@@ -25,6 +25,7 @@ $ANEMONE_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload smbd.service
 $ANEMONE_USER ALL=(ALL) NOPASSWD: /usr/sbin/useradd -M -s /usr/sbin/nologin *
 $ANEMONE_USER ALL=(ALL) NOPASSWD: /usr/bin/smbpasswd
 $ANEMONE_USER ALL=(ALL) NOPASSWD: /usr/bin/chown -R *
+$ANEMONE_USER ALL=(ALL) NOPASSWD: /usr/bin/cp * /etc/samba/smb.conf
 EOF
 
 # Set correct permissions (sudoers files must be 0440)
