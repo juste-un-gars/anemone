@@ -1,60 +1,24 @@
-# ⚠️ ACTION REQUISE AVANT PROCHAINE UTILISATION
+# ✅ Migration /srv/anemone COMPLÈTE
 
-**Date** : 2025-10-29 09:30
-**Status** : 🔴 MIGRATION NÉCESSAIRE
-
----
-
-## 🚨 Problème actuel
-
-Les partages SMB ne sont **pas accessibles** car les données sont dans `/home/franck/anemone/data/`.
-
-Le répertoire `/home/franck` a des permissions `700` qui empêchent les utilisateurs SMB d'y accéder.
-
-**Erreur Samba** :
-```
-chdir_current_service: vfs_ChDir(/home/franck/anemone/data/shares/test/backup)
-failed: Permission non accordée
-```
+**Date migration** : 2025-10-29 14:05
+**Status** : 🟢 OPÉRATIONNEL
 
 ---
 
-## ✅ Solution : Migration vers /srv/anemone
+## ✅ Migration réussie
 
-### Fichiers à lire AVANT de continuer :
+Les données ont été migrées vers `/srv/anemone` avec succès.
 
-1. **`MIGRATION_PLAN.md`** ← Plan détaillé étape par étape (15-30 min)
-2. Continuer la lecture de ce fichier pour le contexte complet
+**Tests validés** :
+- ✅ Accès SMB depuis Windows : OK
+- ✅ Accès SMB depuis Android : OK
+- ✅ Création/lecture/écriture fichiers : OK
+- ✅ Permissions UNIX : OK (test:test)
+- ✅ SELinux : OK (samba_share_t + samba_export_all_rw)
 
----
-
-## 🎯 Résumé migration (ultra rapide)
-
-```bash
-# 1. Arrêter
-killall anemone
-
-# 2. Créer destination
-sudo mkdir -p /srv/anemone
-sudo chown franck:franck /srv/anemone
-
-# 3. Déplacer données
-mv ~/anemone/data/* /srv/anemone/
-
-# 4. Permissions
-sudo chown -R test:test /srv/anemone/shares/test/
-sudo chmod 755 /srv/anemone/shares/test/
-
-# 5. Redémarrer avec nouveau chemin
-cd ~/anemone
-ANEMONE_DATA_DIR=/srv/anemone ./anemone
-
-# 6. Tester depuis Windows
-# Connecter à \\192.168.83.132\backup_test
-```
-
-**⚠️ Ne pas utiliser le NAS avant migration !**
-**⚠️ Les partages SMB ne fonctionneront pas !**
+**Structure actuelle** :
+- Code : `~/anemone/` (binaire, templates, scripts)
+- Données : `/srv/anemone/` (db, certs, shares, smb)
 
 ---
 ---
@@ -386,80 +350,30 @@ sqlite3 data/db/anemone.db "SELECT * FROM shares;"
 sqlite3 data/db/anemone.db "SELECT * FROM peers;"
 ```
 
-## 🎯 PROCHAINE SESSION : Migration vers /srv/anemone
+## 🎯 Session de migration - 29 Octobre 14:00-14:10
 
-### ⚠️ ACTION IMMÉDIATE REQUISE
+### Migration /srv/anemone COMPLÈTE ✅
 
-**Problème** : Les données sont dans `/home/franck/anemone/data/` ce qui crée un problème de permissions pour Samba.
+**Problèmes résolus** :
+1. ❌ Permissions `/home/franck` (700) → ✅ Migration `/srv/anemone` (755)
+2. ❌ SELinux `user_home_t` → ✅ Contexte `samba_share_t` appliqué
+3. ❌ Boolean SELinux off → ✅ `samba_export_all_rw` activé
 
-**Migration complète à faire** :
+**Étapes réalisées** :
+1. ✅ Création `/srv/anemone` avec permissions 755
+2. ✅ Déplacement toutes données (db, certs, shares, smb)
+3. ✅ Ajustement permissions (test:test pour partages)
+4. ✅ Mise à jour chemins absolus dans DB
+5. ✅ Mise à jour smb.conf avec nouveaux chemins
+6. ✅ Configuration SELinux (contexte + boolean)
+7. ✅ Tests Windows + Android : OK
 
-#### 1. Préparation (avec sudo)
+**Commandes SELinux appliquées** :
 ```bash
-# Créer structure /srv/anemone
-sudo mkdir -p /srv/anemone
-sudo chown franck:franck /srv/anemone
-
-# Arrêter le serveur
-killall anemone
+sudo semanage fcontext -a -t samba_share_t "/srv/anemone/shares(/.*)?"
+sudo restorecon -Rv /srv/anemone/shares/
+sudo setsebool -P samba_export_all_rw on
 ```
-
-#### 2. Migration des données
-```bash
-# Déplacer tout le contenu
-mv ~/anemone/data/* /srv/anemone/
-
-# Vérifier
-ls -la /srv/anemone/
-# Devrait contenir : db/ shares/ certs/ smb/
-```
-
-#### 3. Ajuster les permissions
-```bash
-# Permissions de base
-sudo chown -R franck:franck /srv/anemone
-sudo chmod 755 /srv/anemone
-
-# Permissions des partages utilisateurs
-sudo chown -R test:test /srv/anemone/shares/test/
-sudo chmod 755 /srv/anemone/shares/test/
-```
-
-#### 4. Mise à jour configuration
-```bash
-# Modifier /etc/sudoers.d/anemone-smb si chemins hardcodés
-# Ou relancer le script :
-sudo ./scripts/configure-smb-reload.sh franck
-```
-
-#### 5. Mise à jour config Samba
-```bash
-# La config sera regénérée automatiquement au prochain reload
-# mais vérifier que les chemins dans la DB pointent vers /srv
-sqlite3 /srv/anemone/db/anemone.db "SELECT * FROM shares;"
-```
-
-#### 6. Redémarrer avec nouveau chemin
-```bash
-cd ~/anemone
-ANEMONE_DATA_DIR=/srv/anemone ./anemone
-```
-
-#### 7. Tests post-migration
-- [ ] Connexion web admin OK
-- [ ] User test peut se connecter
-- [ ] Partages SMB visibles depuis Windows
-- [ ] Accès SMB fonctionne (écriture/lecture)
-- [ ] Config Samba correcte (`sudo testparm -s`)
-
-### Fichiers à modifier (peut-être)
-
-**Aucun fichier Go à modifier** : La variable `ANEMONE_DATA_DIR` est déjà utilisée partout !
-
-**Documentation à mettre à jour** :
-- README.md : Changer exemples avec `/srv/anemone`
-- QUICKSTART.md : Idem
-- SESSION_STATE.md : Mise à jour après migration
 
 ### Avantages de /srv/anemone
 
@@ -469,19 +383,22 @@ ANEMONE_DATA_DIR=/srv/anemone ./anemone
 ✅ **Production-ready** : Comme TrueNAS, Synology, etc.
 ✅ **Portabilité** : Indépendant de l'utilisateur système
 ✅ **Backups** : `/srv` peut avoir sa propre stratégie backup
+✅ **SELinux** : Contexte dédié pour Samba
 
-### Après migration : Tâches suivantes
+### Tâches suivantes
 
 #### Court terme
-1. **Validation complète SMB** - Tests read/write depuis Windows
-2. **Page Paramètres** - Config système, workgroup, etc.
-3. **Quotas** - Monitoring espace disque
-4. **Corbeille** - Gestion fichiers supprimés (30j)
+1. **Script d'installation automatique** - install.sh pour nouvelle installation
+2. **Auto-config SELinux** - Dans le code lors activation utilisateur
+3. **Service systemd** - Démarrage automatique
+4. **Page Paramètres** - Config système, workgroup, etc.
+5. **Quotas** - Monitoring espace disque
 
 #### Moyen terme
 1. **Synchronisation P2P** - Logique sync réelle
 2. **Chiffrement** - Implémentation chiffrement partages backup
 3. **Monitoring** - Dashboard stats utilisation
+4. **Corbeille** - Gestion fichiers supprimés (30j)
 
 ## 💡 Notes importantes
 
@@ -510,48 +427,58 @@ ANEMONE_DATA_DIR=/srv/anemone ./anemone
   - `id test` → Vérification UID/GID
 - **Décision architecture** : Migration vers `/srv/anemone` (standard FHS)
 
-## 📞 Pour reprendre la PROCHAINE session
-
-### 🚨 PRIORITÉ 1 : Migration /srv/anemone
-
-1. **Lire ce fichier SESSION_STATE.md** (section "🎯 PROCHAINE SESSION")
-2. **Suivre étapes migration** (7 étapes détaillées ci-dessus)
-3. **Tester connexion SMB** depuis Windows
-4. **Valider** : Lecture/écriture fichiers OK
-
-### Après migration réussie
-
-5. Mettre à jour README.md et QUICKSTART.md
-6. Commit la mise à jour docs
-7. Continuer avec Page Paramètres
-
-### Si problèmes pendant migration
-
-- Vérifier logs : `journalctl -u smb -f`
-- Vérifier permissions : `namei -l /srv/anemone/shares/test/backup`
-- Vérifier config : `sudo testparm -s`
-- Vérifier DB : `sqlite3 /srv/anemone/db/anemone.db "SELECT * FROM shares;"`
-
----
-
 ## 📸 État actuel du système
 
-**Serveur DEV (192.168.83.132)** :
-- ✅ Code à jour (commit 2f1f118)
+**Serveur DEV (192.168.83.99)** :
+- ✅ Code à jour
+- ✅ **Migration /srv/anemone : COMPLÈTE**
 - ✅ Serveur HTTPS actif sur :8443
 - ✅ Utilisateur test créé et activé
-- ✅ Partages créés (backup_test, data_test)
-- ⚠️ **Bloqué** : Permissions /home/franck empêchent accès SMB
-- 🚀 **Prochaine action** : Migration vers /srv/anemone
+- ✅ Partages SMB fonctionnels (backup_test, data_test)
+- ✅ SELinux configuré (samba_share_t)
+- ✅ Tests Windows + Android : OK
 
 **Serveur FR1 (192.168.83.96)** :
 - ✅ Code à jour
 - ✅ P2P peer connecté à DEV
-- ⏸️ En attente validation DEV avant tests
+- ⏸️ En attente réinstallation complète
 
 ---
 
-**Session sauvegardée le** : 2025-10-29 09:30
-**Tokens utilisés** : ~34k/200k (17%)
-**État** : Root cause identifiée, plan migration défini
-**Prochaine action** : Migration complète vers /srv/anemone
+## 📞 Pour reprendre la PROCHAINE session
+
+### PRIORITÉ 1 : Script d'installation automatique
+
+**Objectif** : L'admin ne doit RIEN faire en ligne de commande après le démarrage.
+
+**Créer `install.sh`** qui fait :
+1. Vérifier prérequis (Go, git, sudo)
+2. Compiler le binaire
+3. Créer `/srv/anemone`
+4. Installer Samba
+5. Configurer SELinux (contexte + boolean)
+6. Configurer sudoers
+7. Configurer firewall
+8. Créer service systemd (démarrage auto)
+9. Générer certificat TLS
+10. Premier démarrage
+
+**Utilisation** :
+```bash
+git clone <repo> ~/anemone
+cd ~/anemone
+sudo ./install.sh
+```
+
+### PRIORITÉ 2 : Auto-config SELinux dans le code
+
+Modifier `internal/shares/shares.go` pour appeler automatiquement :
+- `sudo semanage fcontext` lors création partage
+- `sudo restorecon` sur les répertoires créés
+
+---
+
+**Session sauvegardée le** : 2025-10-29 14:10
+**Tokens utilisés** : ~45k/200k (22%)
+**État** : Migration complète et validée
+**Prochaine action** : Script install.sh + auto-config SELinux

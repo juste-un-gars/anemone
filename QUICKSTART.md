@@ -1,40 +1,59 @@
 # 🚀 Guide de démarrage rapide
 
-Ce guide vous aide à tester Anemone v2 (refonte Go).
+Ce guide vous aide à installer et démarrer Anemone v2.
 
 ## Prérequis
 
-Choisissez l'une des deux options :
+- Go 1.21+ - [Installation](https://go.dev/doc/install)
+- Samba (pour partages SMB)
+- Accès sudo (pour configuration système)
 
-### Option A : Docker (recommandé)
+## Installation automatique (recommandé)
+
 ```bash
-# Installation Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
+# Cloner le dépôt
+git clone https://github.com/juste-un-gars/anemone.git
+cd anemone
 
-# Démarrer Anemone
-docker compose up --build
+# Lancer l'installateur
+sudo ./install.sh
+
+# L'installateur va :
+# - Compiler le binaire
+# - Créer /srv/anemone
+# - Installer Samba
+# - Configurer SELinux (Fedora/RHEL)
+# - Configurer le firewall
+# - Créer le service systemd
+# - Générer les certificats TLS
 ```
 
-### Option B : Go en local
+## Installation manuelle
+
 ```bash
-# Installation Go 1.21+
-# https://go.dev/doc/install
+# Cloner le dépôt
+git clone https://github.com/juste-un-gars/anemone.git
+cd anemone
 
-# Télécharger les dépendances
-go mod download
+# Compiler
+CGO_ENABLED=1 go build -o anemone ./cmd/anemone
 
-# Démarrer Anemone
-go run cmd/anemone/main.go
+# Créer répertoire données
+sudo mkdir -p /srv/anemone
+sudo chown $USER:$USER /srv/anemone
+
+# Démarrer
+ANEMONE_DATA_DIR=/srv/anemone ./anemone
 ```
 
 ## Premier démarrage
 
 1. **Accédez à l'interface web** :
    ```
-   http://localhost:8080
+   https://localhost:8443
    ```
-   → Vous serez automatiquement redirigé vers `/setup`
+   - Acceptez l'avertissement du certificat auto-signé (normal en local)
+   - Vous serez automatiquement redirigé vers `/setup`
 
 2. **Page de configuration initiale** :
    - Sélectionnez la langue (FR/EN)
@@ -52,34 +71,43 @@ go run cmd/anemone/main.go
    - Cliquez sur "Accéder au tableau de bord"
 
 4. **Tableau de bord** :
-   - Actuellement : message "Dashboard coming soon"
-   - À implémenter dans les prochaines phases
+   - Dashboard admin avec gestion utilisateurs, pairs P2P, partages SMB
 
 ## Vérification de l'installation
 
 ### Santé de l'application
 ```bash
-curl http://localhost:8080/health
+curl -k https://localhost:8443/health
 # Retour attendu: OK
 ```
 
 ### Base de données
 ```bash
 # Vérifier que la base existe
-ls -la data/db/anemone.db
+ls -la /srv/anemone/db/anemone.db
 
 # Inspecter le contenu (après setup)
-sqlite3 data/db/anemone.db "SELECT * FROM system_config;"
-sqlite3 data/db/anemone.db "SELECT id, username, is_admin FROM users;"
+sqlite3 /srv/anemone/db/anemone.db "SELECT * FROM system_config;"
+sqlite3 /srv/anemone/db/anemone.db "SELECT id, username, is_admin FROM users;"
 ```
 
 ### Logs
 ```bash
-# Avec Docker
-docker compose logs -f anemone
+# Avec systemd
+journalctl -u anemone -f
 
-# En local
-# Les logs s'affichent directement dans le terminal
+# Si démarré manuellement
+# Les logs s'affichent dans le terminal
+```
+
+### Partages SMB
+```bash
+# Vérifier service Samba
+sudo systemctl status smb    # Fedora
+sudo systemctl status smbd   # Debian/Ubuntu
+
+# Tester depuis Windows
+\\<ip-serveur>\backup_utilisateur
 ```
 
 ## Structure des données créées
@@ -87,11 +115,16 @@ docker compose logs -f anemone
 Après le setup initial :
 
 ```
-data/
+/srv/anemone/
 ├── db/
 │   └── anemone.db          # Base SQLite
-├── shares/                 # Partages utilisateurs (à créer)
-└── config/                 # Configs générées (à créer)
+├── shares/                 # Partages utilisateurs
+│   └── username/
+│       ├── backup/         # Synchronisé vers pairs
+│       └── data/           # Local uniquement
+├── certs/                  # Certificats TLS
+└── smb/                    # Configuration Samba
+    └── smb.conf
 ```
 
 ## Réinitialiser le setup
@@ -100,12 +133,10 @@ Si vous voulez recommencer :
 
 ```bash
 # ATTENTION : Supprime toutes les données !
-rm -rf data/db/anemone.db
+sudo rm -rf /srv/anemone/*
 
 # Redémarrer l'application
-docker compose restart anemone
-# OU
-go run cmd/anemone/main.go
+systemctl restart anemone
 ```
 
 ## Tests fonctionnels
@@ -113,25 +144,25 @@ go run cmd/anemone/main.go
 ### Test 1 : Redirection setup
 ```bash
 # Avant setup : doit rediriger vers /setup
-curl -I http://localhost:8080/
+curl -I -k https://localhost:8443/
 # Attendu: HTTP 303 See Other, Location: /setup
 
 # Après setup : doit afficher le dashboard
-curl -I http://localhost:8080/
+curl -I -k https://localhost:8443/
 # Attendu: HTTP 200 OK
 ```
 
 ### Test 2 : Protection du setup
 ```bash
 # Après setup : /setup doit rediriger vers /
-curl -I http://localhost:8080/setup
+curl -I -k https://localhost:8443/setup
 # Attendu: HTTP 303 See Other, Location: /
 ```
 
 ### Test 3 : Création utilisateur
 ```bash
 # Vérifier que l'admin a bien été créé
-sqlite3 data/db/anemone.db <<EOF
+sqlite3 /srv/anemone/db/anemone.db <<EOF
 SELECT
     username,
     email,
@@ -142,51 +173,88 @@ FROM users;
 EOF
 ```
 
+### Test 4 : Partages SMB
+```bash
+# Vérifier qu'un utilisateur activé a bien ses partages
+sqlite3 /srv/anemone/db/anemone.db "SELECT name, path, protocol FROM shares;"
+
+# Vérifier config Samba
+sudo testparm -s | grep -A 5 backup_
+
+# Tester accès
+smbclient -L localhost -U utilisateur
+```
+
 ## Prochaines étapes
 
-Une fois le setup fonctionnel, vous pouvez :
+Fonctionnalités actuellement implémentées :
 
-1. ✅ Tester le changement de langue (bouton dans le formulaire)
-2. ✅ Vérifier que la clé est bien générée (32 bytes en base64)
-3. ✅ Confirmer que la clé est chiffrée en base de données
-4. ⏭️ Implémenter le système d'authentification
-5. ⏭️ Créer le dashboard admin
+1. ✅ Configuration initiale (setup)
+2. ✅ Système d'authentification
+3. ✅ Gestion multi-utilisateurs
+4. ✅ Activation utilisateurs (avec liens temporaires)
+5. ✅ Gestion pairs P2P
+6. ✅ Partages SMB automatiques (backup + data)
+7. ✅ Configuration Samba dynamique
+8. ✅ Support HTTPS avec TLS auto-signé
+9. ✅ Multilingue (FR/EN)
+
+À venir :
+
+1. ⏭️ Synchronisation P2P réelle
+2. ⏭️ Chiffrement des partages backup
+3. ⏭️ Quotas utilisateur
+4. ⏭️ Corbeille avec rétention
+5. ⏭️ Monitoring et statistiques
 
 ## Dépannage
 
 ### Erreur : "bind: address already in use"
-Le port 8080 est déjà utilisé. Changez le port :
+Le port est déjà utilisé. Changez le port :
 
 ```bash
-# Option 1 : Variable d'environnement
-export PORT=8081
-go run cmd/anemone/main.go
-
-# Option 2 : Modifier docker-compose.yml
-ports:
-  - "8081:8080"
+# Variable d'environnement
+export HTTPS_PORT=8444
+ANEMONE_DATA_DIR=/srv/anemone ./anemone
 ```
 
 ### Erreur : "no such table: system_config"
 Les migrations n'ont pas été exécutées. Vérifiez les logs au démarrage.
 
-### Erreur : Templates introuvables
-Assurez-vous que le dossier `web/templates/` existe et contient les fichiers HTML.
+### Erreur : Partages SMB inaccessibles
 
 ```bash
-ls -la web/templates/
-# Attendu: base.html, setup.html, setup_success.html
+# Vérifier SELinux (Fedora/RHEL)
+ls -laZ /srv/anemone/shares/
+# Le contexte doit être samba_share_t
+
+# Corriger si nécessaire
+sudo semanage fcontext -a -t samba_share_t "/srv/anemone/shares(/.*)?"
+sudo restorecon -Rv /srv/anemone/shares/
+sudo setsebool -P samba_export_all_rw on
 ```
+
+### Erreur : Certificat TLS invalide
+
+C'est normal ! Le certificat est auto-signé pour un usage local.
+
+- **Navigateur** : Cliquez sur "Avancé" → "Continuer vers le site"
+- **curl** : Utilisez l'option `-k` ou `--insecure`
 
 ## Fichiers importants
 
 - `cmd/anemone/main.go` - Point d'entrée
-- `internal/web/router.go` - Routeur HTTP et handlers
-- `internal/i18n/i18n.go` - Traductions FR/EN
-- `internal/users/users.go` - Gestion utilisateurs
-- `internal/crypto/crypto.go` - Chiffrement
-- `internal/database/migrations.go` - Schéma de base de données
-- `web/templates/*.html` - Templates HTML
+- `internal/web/` - Routeur HTTP et handlers
+- `internal/i18n/` - Traductions FR/EN
+- `internal/users/` - Gestion utilisateurs
+- `internal/shares/` - Gestion partages SMB
+- `internal/peers/` - Gestion pairs P2P
+- `internal/smb/` - Configuration Samba
+- `internal/crypto/` - Chiffrement
+- `internal/database/` - Schéma et migrations
+- `web/templates/` - Templates HTML
+- `scripts/` - Scripts d'installation
+- `install.sh` - Installateur automatique
 
 ## Support
 

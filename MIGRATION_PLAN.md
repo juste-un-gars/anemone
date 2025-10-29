@@ -1,10 +1,19 @@
-# Plan de Migration vers /srv/anemone
+# ✅ Migration vers /srv/anemone - COMPLÉTÉE
 
-**Date** : 2025-10-29
-**Problème** : `/home/franck` (permissions 700) empêche Samba d'accéder aux partages
-**Solution** : Migration complète vers `/srv/anemone` (standard FHS)
+**Date migration** : 2025-10-29 14:05
+**Statut** : ✅ TERMINÉE ET VALIDÉE
+
+**Problème résolu** : `/home/franck` (permissions 700) empêchait Samba d'accéder aux partages
+**Solution appliquée** : Migration complète vers `/srv/anemone` (standard FHS) + Configuration SELinux
+
+**Tests validés** :
+- ✅ Accès SMB depuis Windows
+- ✅ Accès SMB depuis Android
+- ✅ Création/lecture/écriture fichiers
 
 ---
+
+## 📋 Plan suivi (référence historique)
 
 ## 🚀 Étapes de migration (30 min max)
 

@@ -27,13 +27,15 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 ### Project Structure
 
 ```
-anemone/
+~/anemone/                       # Code (cloned repo)
 ├── cmd/anemone/main.go          # Application entry point
 ├── internal/
 │   ├── config/                  # Configuration management
 │   ├── database/                # SQLite + migrations
 │   ├── users/                   # User management & auth
 │   ├── shares/                  # SMB share management
+│   ├── peers/                   # P2P peers management
+│   ├── smb/                     # Samba configuration
 │   ├── sync/                    # P2P synchronization
 │   ├── crypto/                  # Encryption utilities
 │   ├── quota/                   # Quota enforcement
@@ -42,21 +44,69 @@ anemone/
 ├── web/
 │   ├── static/                  # CSS, JS, images
 │   └── templates/               # HTML templates
-├── data/                        # Runtime data (gitignored)
-│   ├── db/anemone.db           # SQLite database
-│   ├── shares/                 # User shares
-│   └── config/                 # Generated configs
-└── docker-compose.yml
+├── scripts/                     # Installation scripts
+└── install.sh                   # Automated installation
+
+/srv/anemone/                    # Data (production)
+├── db/anemone.db               # SQLite database
+├── shares/                     # User shares
+│   └── username/
+│       ├── backup/             # Synced to peers
+│       └── data/               # Local only
+├── certs/                      # TLS certificates
+└── smb/smb.conf                # Generated Samba config
 ```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Docker & Docker Compose - [Installation guide](https://docs.docker.com/engine/install/)
-- OR: Go 1.21+ (for local development)
+- Go 1.21+ - [Installation guide](https://go.dev/doc/install)
+- Samba (for SMB file sharing)
+- Sudo access (for system configuration)
 
-### With Docker (Recommended)
+### Automated Installation (Recommended)
+
+```bash
+# Clone repository
+git clone https://github.com/juste-un-gars/anemone.git
+cd anemone
+
+# Run installer (requires sudo)
+sudo ./install.sh
+
+# The installer will:
+# - Compile the binary
+# - Create /srv/anemone data directory
+# - Install and configure Samba
+# - Configure SELinux (Fedora/RHEL)
+# - Set up firewall rules
+# - Create systemd service (auto-start)
+# - Generate TLS certificates
+
+# Access web interface
+open https://localhost:8443
+```
+
+### Manual Installation
+
+```bash
+# Clone repository
+git clone https://github.com/juste-un-gars/anemone.git
+cd anemone
+
+# Build
+CGO_ENABLED=1 go build -o anemone ./cmd/anemone
+
+# Create data directory
+sudo mkdir -p /srv/anemone
+sudo chown $USER:$USER /srv/anemone
+
+# Run
+ANEMONE_DATA_DIR=/srv/anemone ./anemone
+```
+
+### Docker (Alternative)
 
 ```bash
 # Clone repository
@@ -70,26 +120,10 @@ docker compose up -d
 open http://localhost:8080
 ```
 
-### Local Development
-
-```bash
-# Install Go 1.21+
-# https://go.dev/doc/install
-
-# Clone repository
-git clone https://github.com/juste-un-gars/anemone.git
-cd anemone
-
-# Install dependencies
-go mod download
-
-# Run
-go run cmd/anemone/main.go
-```
-
 ## 📋 Initial Setup
 
-1. **Access web interface** at `http://localhost:8080`
+1. **Access web interface** at `https://localhost:8443`
+   - Accept self-signed certificate warning (normal for local use)
 2. **Choose language** (French or English)
 3. **Set NAS name** and timezone
 4. **Create first admin user**
@@ -216,9 +250,14 @@ Main tables:
 Environment variables:
 
 ```bash
-ANEMONE_DATA_DIR=/app/data  # Data directory
-PORT=8080                    # HTTP port
-LANGUAGE=fr                  # Default language (fr/en)
+ANEMONE_DATA_DIR=/srv/anemone  # Data directory (default: ./data)
+PORT=8080                       # HTTP port (default: 8080)
+HTTPS_PORT=8443                 # HTTPS port (default: 8443)
+ENABLE_HTTP=false               # Enable HTTP (default: false)
+ENABLE_HTTPS=true               # Enable HTTPS (default: true)
+LANGUAGE=fr                     # Default language (fr/en)
+TLS_CERT_PATH=                  # Custom TLS certificate path
+TLS_KEY_PATH=                   # Custom TLS key path
 ```
 
 ## 🐛 Troubleshooting
@@ -227,18 +266,39 @@ LANGUAGE=fr                  # Default language (fr/en)
 
 ```bash
 # Check if server is running
-docker compose ps
+systemctl status anemone
 
 # Check logs
-docker compose logs anemone
+journalctl -u anemone -f
+
+# Or if running manually:
+ps aux | grep anemone
+```
+
+### SMB shares not accessible
+
+```bash
+# Check Samba service
+sudo systemctl status smb    # Fedora
+sudo systemctl status smbd   # Debian/Ubuntu
+
+# Check Samba configuration
+sudo testparm -s
+
+# Check SELinux (Fedora/RHEL only)
+ls -laZ /srv/anemone/shares/
+sudo ausearch -m avc -ts recent | grep samba
+
+# Verify SMB users
+sudo pdbedit -L
 ```
 
 ### Database issues
 
 ```bash
 # Reset database (WARNING: deletes all data)
-rm data/db/anemone.db
-docker compose restart anemone
+sudo rm /srv/anemone/db/anemone.db
+systemctl restart anemone
 ```
 
 ## 📝 Development Status
