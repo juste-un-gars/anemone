@@ -20,6 +20,8 @@ echo "User: $ANEMONE_USER"
 cat > /etc/sudoers.d/anemone-smb << EOF
 # Allow anemone to manage SMB users and reload service without password
 # Created by Anemone setup script
+$ANEMONE_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload smb
+$ANEMONE_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload smb.service
 $ANEMONE_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload smbd
 $ANEMONE_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload smbd.service
 $ANEMONE_USER ALL=(ALL) NOPASSWD: /usr/sbin/useradd -M -s /usr/sbin/nologin *

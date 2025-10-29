@@ -191,9 +191,14 @@ func RemoveSMBUser(username string) error {
 
 // ReloadConfig reloads the Samba configuration
 func ReloadConfig() error {
-	cmd := exec.Command("sudo", "systemctl", "reload", "smbd")
+	// Try smb first (Fedora/RHEL), then smbd (Debian/Ubuntu)
+	cmd := exec.Command("sudo", "systemctl", "reload", "smb")
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to reload smbd: %w", err)
+		// Try smbd if smb fails
+		cmd = exec.Command("sudo", "systemctl", "reload", "smbd")
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to reload samba service: %w", err)
+		}
 	}
 	return nil
 }
