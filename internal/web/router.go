@@ -891,7 +891,7 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			Protocol:    "smb",
 			SyncEnabled: true,
 		}
-		if err := shares.Create(s.db, backupShare); err != nil {
+		if err := shares.Create(s.db, backupShare, token.Username); err != nil {
 			log.Printf("Warning: Failed to create backup share: %v", err)
 		} else {
 			log.Printf("Created backup share: backup_%s", token.Username)
@@ -904,7 +904,7 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			Protocol:    "smb",
 			SyncEnabled: false,
 		}
-		if err := shares.Create(s.db, dataShare); err != nil {
+		if err := shares.Create(s.db, dataShare, token.Username); err != nil {
 			log.Printf("Warning: Failed to create data share: %v", err)
 		} else {
 			log.Printf("Created data share: data_%s", token.Username)

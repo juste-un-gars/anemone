@@ -48,13 +48,13 @@ const smbConfigTemplate = `[global]
    server max protocol = SMB3
 
 {{range .Shares}}
-[{{.Name}}-{{.Username}}]
+[{{.Name}}]
    path = {{.Path}}
    valid users = {{.Username}}
    read only = no
    browseable = yes
-   create mask = 0644
-   directory mask = 0755
+   create mask = 0664
+   directory mask = 0775
    force user = {{.Username}}
    force group = {{.Username}}
 {{end}}

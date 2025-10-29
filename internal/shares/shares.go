@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 )
@@ -24,9 +25,9 @@ type Share struct {
 }
 
 // Create creates a new share for a user
-func Create(db *sql.DB, share *Share) error {
+func Create(db *sql.DB, share *Share, username string) error {
 	// Ensure the share directory exists
-	if err := os.MkdirAll(share.Path, 0755); err != nil {
+	if err := os.MkdirAll(share.Path, 0775); err != nil {
 		return fmt.Errorf("failed to create share directory: %w", err)
 	}
 
@@ -42,6 +43,16 @@ func Create(db *sql.DB, share *Share) error {
 		return fmt.Errorf("failed to get share ID: %w", err)
 	}
 	share.ID = int(id)
+
+	// Change owner to the share user (requires sudo)
+	// This allows the SMB user to access their own directories
+	if username != "" {
+		cmd := exec.Command("sudo", "chown", "-R", fmt.Sprintf("%s:%s", username, username), share.Path)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to set directory ownership: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -144,7 +155,7 @@ func CreateDefaultShare(db *sql.DB, userID int, username, sharesDir string) erro
 		Protocol:    "smb",
 		SyncEnabled: true,
 	}
-	return Create(db, share)
+	return Create(db, share, username)
 }
 
 // GetSharePath returns the full path to a share
