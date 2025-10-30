@@ -25,6 +25,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/shares"
 	"github.com/juste-un-gars/anemone/internal/smb"
 	"github.com/juste-un-gars/anemone/internal/sync"
+	"github.com/juste-un-gars/anemone/internal/trash"
 	"github.com/juste-un-gars/anemone/internal/users"
 )
 
@@ -68,6 +69,9 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	funcMap := template.FuncMap{
 		"T": func(lang, key string) string {
 			return i18n.T(lang, key)
+		},
+		"divf": func(a, b int64) float64 {
+			return float64(a) / float64(b)
 		},
 	}
 
@@ -120,6 +124,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 
 	// User routes
 	mux.HandleFunc("/trash", auth.RequireAuth(server.handleTrash))
+	mux.HandleFunc("/trash/", auth.RequireAuth(server.handleTrashActions))
 
 	// Admin routes - Shares
 	mux.HandleFunc("/admin/shares", auth.RequireAdmin(server.handleAdminShares))
@@ -1231,7 +1236,160 @@ func (s *Server) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Trash Page (Coming soon)")
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	// Get user info
+	user, err := users.GetByID(s.db, session.UserID)
+	if err != nil {
+		log.Printf("Error getting user: %v", err)
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Get user's shares
+	userShares, err := shares.GetByUser(s.db, session.UserID)
+	if err != nil {
+		log.Printf("Error getting shares: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Collect all trash items from all user's shares
+	type TrashItemWithShare struct {
+		*trash.TrashItem
+		ShareName string
+	}
+
+	var allTrashItems []TrashItemWithShare
+	for _, share := range userShares {
+		items, err := trash.ListTrashItems(share.Path, user.Username)
+		if err != nil {
+			log.Printf("Error listing trash for share %s: %v", share.Name, err)
+			continue
+		}
+
+		for _, item := range items {
+			allTrashItems = append(allTrashItems, TrashItemWithShare{
+				TrashItem: item,
+				ShareName: share.Name,
+			})
+		}
+	}
+
+	data := struct {
+		Lang    string
+		Title   string
+		Session *auth.Session
+		Items   []TrashItemWithShare
+	}{
+		Lang:    lang,
+		Title:   i18n.T(lang, "trash.title"),
+		Session: session,
+		Items:   allTrashItems,
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "trash.html", data); err != nil {
+		log.Printf("Error rendering trash template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}
+
+// handleTrashActions handles trash item actions (restore, delete)
+func (s *Server) handleTrashActions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse URL: /trash/{action}?share={shareName}&path={relPath}
+	path := strings.TrimPrefix(r.URL.Path, "/trash/")
+	action := path
+
+	// Get parameters
+	shareName := r.URL.Query().Get("share")
+	relPath := r.URL.Query().Get("path")
+
+	if shareName == "" || relPath == "" {
+		http.Error(w, "Missing parameters", http.StatusBadRequest)
+		return
+	}
+
+	// Get user
+	user, err := users.GetByID(s.db, session.UserID)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Find the share
+	userShares, err := shares.GetByUser(s.db, session.UserID)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	var targetShare *shares.Share
+	for _, share := range userShares {
+		if share.Name == shareName {
+			targetShare = share
+			break
+		}
+	}
+
+	if targetShare == nil {
+		http.Error(w, "Share not found", http.StatusNotFound)
+		return
+	}
+
+	// Execute action
+	switch action {
+	case "restore":
+		err = trash.RestoreItem(targetShare.Path, user.Username, relPath)
+		if err != nil {
+			log.Printf("Error restoring item: %v", err)
+			http.Error(w, fmt.Sprintf("Failed to restore: %v", err), http.StatusInternalServerError)
+			return
+		}
+		log.Printf("User %s restored file: %s from %s", user.Username, relPath, shareName)
+		w.WriteHeader(http.StatusOK)
+
+	case "delete":
+		err = trash.DeleteItem(targetShare.Path, user.Username, relPath)
+		if err != nil {
+			log.Printf("Error deleting item: %v", err)
+			http.Error(w, fmt.Sprintf("Failed to delete: %v", err), http.StatusInternalServerError)
+			return
+		}
+		log.Printf("User %s permanently deleted file: %s from %s", user.Username, relPath, shareName)
+		w.WriteHeader(http.StatusOK)
+
+	case "empty":
+		// Empty entire trash for this share
+		err = trash.EmptyTrash(targetShare.Path, user.Username)
+		if err != nil {
+			log.Printf("Error emptying trash: %v", err)
+			http.Error(w, fmt.Sprintf("Failed to empty trash: %v", err), http.StatusInternalServerError)
+			return
+		}
+		log.Printf("User %s emptied trash for share %s", user.Username, shareName)
+		w.WriteHeader(http.StatusOK)
+
+	default:
+		http.Error(w, "Unknown action", http.StatusBadRequest)
+	}
 }
 
 // handleAdminShares displays all shares for all users (admin only)

@@ -60,6 +60,16 @@ const smbConfigTemplate = `[global]
    directory mask = 0775
    force user = {{.Username}}
    force group = {{.Username}}
+
+   # Recycle bin (trash) configuration
+   vfs objects = recycle
+   recycle:repository = .trash/%U
+   recycle:keeptree = yes
+   recycle:versions = yes
+   recycle:touch = yes
+   recycle:maxsize = 0
+   recycle:exclude = *.tmp,*.temp,~$*
+   recycle:exclude_dir = .trash,.Trash*
 {{end}}
 `
 

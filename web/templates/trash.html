@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/dashboard" class="text-2xl font-bold text-gray-900">
+                        🪸 Anemone
+                    </a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700">{{.Session.Username}}</span>
+                    <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
+                        Déconnexion
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h2 class="text-3xl font-bold text-gray-900">
+                    🗑️ Corbeille
+                </h2>
+                <p class="mt-2 text-gray-600">
+                    Fichiers supprimés récemment
+                </p>
+            </div>
+        </div>
+
+        <!-- Trash items list -->
+        {{if .Items}}
+        <div class="bg-white shadow rounded-lg overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Fichier
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Partage
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Taille
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Supprimé le
+                        </th>
+                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {{range .Items}}
+                    <tr>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center">
+                                <svg class="h-5 w-5 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                </svg>
+                                <div>
+                                    <div class="text-sm font-medium text-gray-900">{{.Name}}</div>
+                                    <div class="text-xs text-gray-500">{{.RelativePath}}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                {{.ShareName}}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{if lt .Size 1024}}
+                                {{.Size}} B
+                            {{else if lt .Size 1048576}}
+                                {{printf "%.1f" (divf .Size 1024)}} KB
+                            {{else if lt .Size 1073741824}}
+                                {{printf "%.1f" (divf .Size 1048576)}} MB
+                            {{else}}
+                                {{printf "%.2f" (divf .Size 1073741824)}} GB
+                            {{end}}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {{.TrashedAt.Format "02/01/2006 15:04"}}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-4">
+                            <button onclick="restoreFile('{{.ShareName}}', '{{.RelativePath}}')" class="text-green-600 hover:text-green-900">
+                                <svg class="inline h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                                Restaurer
+                            </button>
+                            <button onclick="deleteFile('{{.ShareName}}', '{{.RelativePath}}')" class="text-red-600 hover:text-red-900">
+                                <svg class="inline h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                Supprimer
+                            </button>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{else}}
+        <!-- Empty state -->
+        <div class="text-center py-12 bg-white rounded-lg shadow">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">Corbeille vide</h3>
+            <p class="mt-1 text-sm text-gray-500">Aucun fichier supprimé</p>
+        </div>
+        {{end}}
+    </div>
+</div>
+
+<script>
+function restoreFile(shareName, relPath) {
+    if (!confirm('Restaurer ce fichier ?\n\n' + relPath)) {
+        return;
+    }
+
+    const button = event.target.closest('button');
+    const originalContent = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<svg class="inline animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Restauration...';
+
+    fetch('/trash/restore?share=' + encodeURIComponent(shareName) + '&path=' + encodeURIComponent(relPath), {
+        method: 'POST',
+    }).then(response => {
+        if (response.ok) {
+            alert('✅ Fichier restauré avec succès');
+            window.location.reload();
+        } else {
+            response.text().then(text => {
+                alert('❌ Erreur: ' + text);
+                button.disabled = false;
+                button.innerHTML = originalContent;
+            });
+        }
+    }).catch(error => {
+        alert('❌ Erreur: ' + error);
+        button.disabled = false;
+        button.innerHTML = originalContent;
+    });
+}
+
+function deleteFile(shareName, relPath) {
+    if (!confirm('⚠️ ATTENTION: Supprimer définitivement ce fichier ?\n\nCette action est irréversible.\n\n' + relPath)) {
+        return;
+    }
+
+    fetch('/trash/delete?share=' + encodeURIComponent(shareName) + '&path=' + encodeURIComponent(relPath), {
+        method: 'POST',
+    }).then(response => {
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            response.text().then(text => alert('❌ Erreur: ' + text));
+        }
+    });
+}
+</script>
+
+</body>
+</html>
