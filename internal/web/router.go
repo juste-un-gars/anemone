@@ -24,6 +24,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/peers"
 	"github.com/juste-un-gars/anemone/internal/shares"
 	"github.com/juste-un-gars/anemone/internal/smb"
+	"github.com/juste-un-gars/anemone/internal/sync"
 	"github.com/juste-un-gars/anemone/internal/users"
 )
 
@@ -122,6 +123,9 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 
 	// Admin routes - Shares
 	mux.HandleFunc("/admin/shares", auth.RequireAdmin(server.handleAdminShares))
+
+	// Sync routes
+	mux.HandleFunc("/sync/share/", auth.RequireAuth(server.handleSyncShare))
 
 	return mux
 }
@@ -1268,5 +1272,106 @@ func (s *Server) handleAdminShares(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error rendering shares template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
+	}
+}
+
+// handleSyncShare triggers manual synchronization of a share to all enabled peers
+func (s *Server) handleSyncShare(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Extract share ID from URL: /sync/share/{id}
+	path := strings.TrimPrefix(r.URL.Path, "/sync/share/")
+	shareID, err := strconv.Atoi(path)
+	if err != nil {
+		http.Error(w, "Invalid share ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get share
+	share, err := shares.GetByID(s.db, shareID)
+	if err != nil {
+		log.Printf("Error getting share: %v", err)
+		http.Error(w, "Share not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if user has permission (either owner or admin)
+	if !session.IsAdmin && share.UserID != session.UserID {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	// Check if sync is enabled for this share
+	if !share.SyncEnabled {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{"success": false, "message": "Synchronisation non activée pour ce partage"}`)
+		return
+	}
+
+	// Get all enabled peers
+	allPeers, err := peers.GetAll(s.db)
+	if err != nil {
+		log.Printf("Error getting peers: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	enabledPeers := []*peers.Peer{}
+	for _, peer := range allPeers {
+		if peer.Enabled {
+			enabledPeers = append(enabledPeers, peer)
+		}
+	}
+
+	if len(enabledPeers) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"success": false, "message": "Aucun pair actif configuré"}`)
+		return
+	}
+
+	// Synchronize to each enabled peer
+	successCount := 0
+	errorCount := 0
+	var lastError string
+
+	for _, peer := range enabledPeers {
+		req := &sync.SyncRequest{
+			ShareID:     shareID,
+			PeerID:      peer.ID,
+			UserID:      share.UserID,
+			SharePath:   share.Path,
+			PeerAddress: peer.Address,
+			PeerPort:    peer.Port,
+		}
+
+		err := sync.SyncShare(s.db, req)
+		if err != nil {
+			errorCount++
+			lastError = err.Error()
+			log.Printf("Error syncing to peer %s: %v", peer.Name, err)
+		} else {
+			successCount++
+			log.Printf("Successfully synced share %d to peer %s", shareID, peer.Name)
+		}
+	}
+
+	// Return JSON response
+	w.Header().Set("Content-Type", "application/json")
+	if errorCount > 0 {
+		fmt.Fprintf(w, `{"success": false, "message": "Synchronisation partielle: %d réussis, %d échecs. Dernière erreur: %s"}`,
+			successCount, errorCount, lastError)
+	} else {
+		fmt.Fprintf(w, `{"success": true, "message": "Synchronisation réussie vers %d pair(s)"}`, successCount)
 	}
 }
