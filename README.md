@@ -2,6 +2,26 @@
 
 **Multi-user NAS with P2P encrypted backup synchronization**
 
+---
+
+## ⚠️ BETA WARNING
+
+**This project is currently in BETA and should NOT be used in production environments.**
+
+Anemone is under active development and may contain bugs, security vulnerabilities, or data loss risks. Use at your own risk for testing purposes only.
+
+---
+
+## 💖 Support the Project
+
+If you find this project useful and would like to support its development:
+
+**[Support via PayPal](https://paypal.me/justeungars83)**
+
+Your support helps maintain and improve Anemone. Thank you!
+
+---
+
 ## 🎯 Overview
 
 Anemone is a self-hosted Network Attached Storage (NAS) solution designed for families and small teams. It provides:
@@ -303,15 +323,32 @@ systemctl restart anemone
 
 ## 📝 Development Status
 
-**Current**: ✅ Base structure created
+**Current Status**: 🟡 BETA (Core features complete)
 
-**Next**:
-- [ ] Setup page implementation
-- [ ] User authentication
-- [ ] Activation tokens system
-- [ ] Samba dynamic configuration
-- [ ] rclone multi-user sync
-- [ ] Dashboard pages
+**Implemented** ✅:
+- [x] Setup page & initial configuration
+- [x] User authentication (login/logout)
+- [x] Multi-user management
+- [x] Activation tokens system (24h validity)
+- [x] Automatic SMB share creation (backup + data per user)
+- [x] Samba dynamic configuration & auto-reload
+- [x] P2P peers management (CRUD, connection testing)
+- [x] HTTPS with self-signed certificates
+- [x] SELinux configuration (Fedora/RHEL)
+- [x] Automated installation script
+- [x] Privacy (users only see their own shares)
+
+**In Progress** 🔨:
+- [ ] P2P synchronization (rclone with encryption)
+- [ ] User quotas & monitoring
+- [ ] Trash system (30 days retention)
+- [ ] System dashboard & statistics
+
+**Planned** 📅:
+- [ ] Settings page (workgroup, network config)
+- [ ] Conflict resolution for sync
+- [ ] API endpoints for external integrations
+- [ ] Docker official image
 
 ## 🤝 Contributing
 
