@@ -1,11 +1,11 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-10-29 14:00-16:00
-**Status** : 🟢 PRODUCTION READY
+**Dernière session** : 2025-10-30 09:00-10:00
+**Status** : 🟢 BETA - Production Ready (fonctionnalités de base)
 
 ---
 
-## 🎯 État actuel (Fin session 29 Oct)
+## 🎯 État actuel (Fin session 30 Oct)
 
 ### ✅ Fonctionnalités complètes et testées
 
@@ -23,6 +23,8 @@
    - Création utilisateurs par admin
    - Activation par lien temporaire (24h)
    - Création automatique user système + SMB
+   - **Suppression complète** : Efface DB, fichiers disque, user SMB, user système
+   - **Confirmation renforcée** : Double confirmation + saisie nom utilisateur
 
 4. **Partages SMB automatiques**
    - 2 partages par user : `backup_username` + `data_username`
@@ -30,13 +32,23 @@
    - Permissions et ownership automatiques
    - Configuration SELinux automatique
    - **Privacy** : Chaque user ne voit que ses partages
+   - **Corbeille intégrée** : VFS recycle module Samba
 
-5. **Gestion pairs P2P**
+5. **Corbeille (Trash/Recycle Bin)** ✨ NOUVEAU
+   - Interception suppressions SMB via Samba VFS
+   - Déplacement fichiers dans `.trash/%U/`
+   - Interface web de gestion
+   - Restauration fichiers
+   - Suppression définitive
+   - Vidage corbeille complet
+
+6. **Gestion pairs P2P**
    - CRUD complet
    - Test connexion HTTPS
    - Statuts (online/offline/error)
+   - **Synchronisation manuelle** : Bouton sync par partage (tar.gz over HTTPS)
 
-6. **Installation automatisée**
+7. **Installation automatisée**
    - Script `install.sh` zéro-touch
    - Configuration complète système
    - Support multi-distro (Fedora/RHEL/Debian)
@@ -509,6 +521,218 @@ sudo setsebool -P samba_export_all_rw on
 - ✅ Privacy SMB : OK (chaque user voit uniquement ses partages)
 - ✅ SELinux configuré automatiquement
 - ✅ Tests Windows + Android : OK
+
+---
+
+## 🎯 Session du 30 Octobre 2025 (09:00-10:00)
+
+### Contexte
+- **Objectif initial** : Implémenter synchronisation P2P
+- **Détours nécessaires** : Corbeille + Suppression complète utilisateurs
+
+### ✅ Réalisations de la session
+
+#### 1. Synchronisation P2P (Prototype fonctionnel)
+
+**Fichiers créés** :
+- `internal/sync/sync.go` - Package de synchronisation
+
+**Fonctionnalités** :
+- Création archives tar.gz des partages
+- Envoi via HTTPS POST vers pairs
+- Endpoint `/api/sync/receive` pour réception
+- Logs dans table `sync_log`
+- Bouton sync manuel dans interface admin partages
+
+**Architecture choisie** :
+- ✅ tar.gz over HTTPS (plus simple que rsync/SSH)
+- ✅ Utilise infrastructure HTTPS existante
+- ✅ Mapping user_id + share_name entre pairs
+- ❌ Pas encore de sync automatique (scheduler)
+- ❌ Pas encore de détection changements (inotify)
+
+**Commits** :
+- `7c1e3f2` - Sync package initial
+- `3a8109f` - HTTP API sync
+- `3ddaf32` - Fix path mapping
+
+#### 2. Corbeille / Recycle Bin (COMPLET ✅)
+
+**Problème identifié** :
+- User : "Si je supprime un fichier via SMB, il n'apparaît pas dans la corbeille"
+- Cause : Aucune fonctionnalité de corbeille implémentée
+
+**Solution implémentée** :
+
+**A. Configuration Samba (VFS Recycle)**
+- Ajouté module `vfs objects = recycle` dans smb.conf
+- Configuration : `.trash/%U/` (par utilisateur)
+- Options : keeptree, versions, touch, maxsize
+- Exclusions : fichiers temporaires
+
+**B. Backend Go** - `internal/trash/trash.go`
+```go
+- ListTrashItems()    // Liste fichiers en corbeille
+- RestoreItem()       // Restaure fichier
+- DeleteItem()        // Supprime définitivement
+- EmptyTrash()        // Vide corbeille
+```
+
+**C. Interface Web** - `web/templates/trash.html`
+- Liste tous fichiers supprimés
+- Affichage : nom, partage, taille, date suppression
+- Actions : Restaurer, Supprimer définitivement
+- Action globale : Vider la corbeille
+
+**D. Fonction template divf**
+- Formatage tailles fichiers (B, KB, MB, GB, TB)
+
+**Problème de permissions découvert** :
+```
+Symptôme : Fichiers en .trash mais pas visibles dans web UI
+Cause : .trash/ créé avec permissions 700 (drwx------)
+Impact : Serveur Anemone (user franck) ne peut pas lire .trash de autres users
+```
+
+**Solutions appliquées** :
+1. **Fix immédiat** : `sudo chmod -R 755 /srv/anemone/shares/*/backup/.trash`
+2. **Fix permanent** : Ajout dans smb.conf :
+   ```
+   force create mode = 0664
+   force directory mode = 0755
+   ```
+3. Régénération config et reload Samba
+
+**Commit** : `042f0e8` - Implémentation corbeille complète
+
+#### 3. Suppression complète utilisateur
+
+**Problème identifié** :
+- User : "Si on supprime l'utilisateur, est-ce que ça supprime les partages SMB et les fichiers sur le disque?"
+- Réponse : NON, il manquait la suppression physique des fichiers
+
+**Solution implémentée** :
+
+**A. Backend** - Modification `DeleteUser()` dans `internal/users/users.go`
+```go
+func DeleteUser(db *sql.DB, userID int) error {
+    // 1. Récupérer infos user et ses partages
+    // 2. Supprimer de la DB (transaction)
+    // 3. Supprimer TOUS les fichiers disque (os.RemoveAll)
+    // 4. Supprimer user SMB (smbpasswd -x)
+    // 5. Supprimer user système (userdel)
+}
+```
+
+**B. Interface** - `web/templates/admin_users.html`
+```javascript
+function deleteUser(userId, username) {
+    // 1. Alert détaillée des conséquences
+    // 2. Demande saisie nom utilisateur (confirmation)
+    // 3. Double confirmation
+    // 4. Exécution suppression
+}
+```
+
+**Message d'avertissement** :
+```
+⚠️ ATTENTION : SUPPRESSION DÉFINITIVE ⚠️
+
+Cette action va supprimer DÉFINITIVEMENT :
+• L'utilisateur "username" de la base de données
+• TOUS les partages SMB de cet utilisateur
+• TOUS LES FICHIERS sur le disque (backup + data)
+• L'utilisateur système Linux
+• L'utilisateur Samba
+
+Cette action est IRRÉVERSIBLE !
+Tapez le nom d'utilisateur pour confirmer : "username"
+```
+
+**Commit** : `0ff7c45` - Suppression complète utilisateur
+
+#### 4. Documentation
+
+**README.md** - Ajouts :
+- Section "⚠️ BETA WARNING" en haut
+- Lien PayPal pour support
+- Section "Complete Uninstall" (8 étapes)
+- One-liner dangereux pour désinstallation rapide
+
+**Commits** :
+- `e14f8fc` - BETA warning + PayPal
+- `8531ec7` - Documentation désinstallation
+
+### 📊 Statistiques session 30 Octobre
+
+- **Durée** : ~1h
+- **Commits** : 7 commits
+- **Nouveaux packages** : 2 (sync, trash)
+- **Lignes ajoutées** : ~600 lignes Go + 200 lignes HTML
+- **Bugs résolus** : 2 majeurs (trash permissions, suppression incomplète)
+- **Fonctionnalités complètes** : 2 (trash, suppression user)
+- **Prototypes** : 1 (sync P2P manuel)
+
+### 🐛 Problèmes résolus
+
+**1. Trash files not visible in web UI**
+- **Root cause** : .trash directories with 700 permissions
+- **Solution** : force_directory_mode = 0755 in Samba config
+- **Status** : ✅ RÉSOLU
+
+**2. User deletion incomplete**
+- **Root cause** : Only deleted from DB, not from disk/system
+- **Solution** : Enhanced DeleteUser() to remove everything
+- **Status** : ✅ RÉSOLU
+
+### 🔍 Commits de la session
+
+```
+e14f8fc - docs: BETA warning + PayPal support link
+7c1e3f2 - feat: P2P sync initial implementation
+3a8109f - feat: HTTP sync endpoint
+3ddaf32 - fix: Sync path mapping between peers
+8531ec7 - docs: Complete uninstall documentation
+042f0e8 - feat: Trash/Recycle bin complete implementation
+0ff7c45 - feat: Complete user deletion (files + SMB + system)
+```
+
+### 📁 Nouveaux fichiers
+
+**Go Packages** :
+- `internal/sync/sync.go` (185 lignes)
+- `internal/trash/trash.go` (234 lignes)
+
+**Templates HTML** :
+- `web/templates/trash.html` (158 lignes)
+
+### 🧪 Tests effectués
+
+- ✅ Suppression fichiers via SMB → Apparaît dans corbeille web
+- ✅ Restauration fichier depuis corbeille → Réapparaît dans partage
+- ✅ Suppression définitive depuis corbeille → Fichier effacé
+- ✅ Vidage corbeille → Tous fichiers supprimés
+- ✅ Permissions .trash (700 → 755) → Lisible par serveur
+- ✅ force_directory_mode → Futurs .trash créés en 755
+
+### 🎯 État synchronisation P2P
+
+**Fonctionnel** :
+- ✅ Création archive tar.gz
+- ✅ Envoi HTTPS vers pair
+- ✅ Réception et extraction
+- ✅ Bouton sync manuel dans UI
+- ✅ Logs de synchronisation
+
+**Manquant** :
+- ❌ Sync automatique (scheduler)
+- ❌ Détection changements (inotify/polling)
+- ❌ Sync bidirectionnel intelligent
+- ❌ Gestion conflits
+- ❌ Chiffrement archives
+- ❌ Compression optimisée (delta sync)
+- ❌ Retry en cas d'échec
+- ❌ Bandwidth limiting
 
 ---
 
