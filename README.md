@@ -321,6 +321,127 @@ sudo rm /srv/anemone/db/anemone.db
 systemctl restart anemone
 ```
 
+## 🗑️ Complete Uninstall
+
+To completely remove Anemone from your system, follow these steps:
+
+### 1. Stop the server
+
+```bash
+# If running as systemd service
+sudo systemctl stop anemone
+sudo systemctl disable anemone
+
+# If running manually
+pkill -f anemone
+# Or force kill if needed
+killall -9 anemone
+```
+
+### 2. Remove all data
+
+**⚠️ WARNING**: This will delete ALL user data, shares, and configuration permanently!
+
+```bash
+# Remove all Anemone data (database, shares, certificates, SMB config)
+sudo rm -rf /srv/anemone
+
+# Explanation:
+# - /srv/anemone/db/       → SQLite database (users, shares, sync logs)
+# - /srv/anemone/shares/   → All user files (backup + data shares)
+# - /srv/anemone/certs/    → TLS certificates
+# - /srv/anemone/smb/      → Generated Samba configuration
+```
+
+### 3. Remove system users (optional)
+
+Anemone creates system users for each activated user. Remove them if needed:
+
+```bash
+# List Anemone users (non-system users typically have UID > 1000)
+awk -F: '$3 >= 1000 {print $1}' /etc/passwd
+
+# Remove a specific user (replace 'username' with actual username)
+sudo userdel username
+
+# Remove user's home directory (if any)
+sudo rm -rf /home/username
+```
+
+### 4. Remove SMB users
+
+```bash
+# List SMB users
+sudo pdbedit -L
+
+# Remove a specific SMB user (replace 'username')
+sudo smbpasswd -x username
+
+# Or remove all non-standard SMB users
+for user in $(sudo pdbedit -L | cut -d: -f1); do
+    if [ "$user" != "root" ] && [ "$user" != "nobody" ]; then
+        echo "Removing SMB user: $user"
+        sudo smbpasswd -x "$user"
+    fi
+done
+```
+
+### 5. Clean Samba configuration
+
+```bash
+# Remove Anemone's SMB configuration
+sudo rm -f /etc/samba/smb.conf.anemone
+
+# If you replaced the main smb.conf, restore the original
+sudo cp /etc/samba/smb.conf.orig /etc/samba/smb.conf 2>/dev/null || true
+
+# Reload Samba
+sudo systemctl reload smb     # Fedora
+sudo systemctl reload smbd    # Debian/Ubuntu
+```
+
+### 6. Remove sudoers configuration
+
+```bash
+# Remove Anemone sudoers rules
+sudo rm -f /etc/sudoers.d/anemone-smb
+```
+
+### 7. Remove systemd service (if installed)
+
+```bash
+# Remove service file
+sudo rm -f /etc/systemd/system/anemone.service
+
+# Reload systemd
+sudo systemctl daemon-reload
+```
+
+### 8. Remove binary and source code
+
+```bash
+# Remove installed binary
+sudo rm -f /usr/local/bin/anemone
+
+# Remove source code (if you want to delete the git repo)
+rm -rf ~/anemone
+```
+
+### Complete one-liner (dangerous!)
+
+**⚠️ USE WITH EXTREME CAUTION**: This removes everything in one command:
+
+```bash
+sudo systemctl stop anemone 2>/dev/null; \
+sudo systemctl disable anemone 2>/dev/null; \
+killall -9 anemone 2>/dev/null; \
+sudo rm -rf /srv/anemone; \
+sudo rm -f /etc/sudoers.d/anemone-smb; \
+sudo rm -f /etc/systemd/system/anemone.service; \
+sudo systemctl daemon-reload; \
+echo "✓ Anemone removed (system users and SMB users NOT removed - see above)"
+```
+
 ## 📝 Development Status
 
 **Current Status**: 🟡 BETA (Core features complete)
