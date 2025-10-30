@@ -158,7 +158,10 @@ func SyncShare(db *sql.DB, req *SyncRequest) error {
 
 	// Add metadata fields
 	writer.WriteField("share_id", fmt.Sprintf("%d", req.ShareID))
-	writer.WriteField("share_path", req.SharePath)
+	writer.WriteField("user_id", fmt.Sprintf("%d", req.UserID))
+	// Extract share name from path (last directory)
+	shareName := filepath.Base(filepath.Dir(req.SharePath))
+	writer.WriteField("share_name", shareName)
 
 	// Add archive file
 	part, err := writer.CreateFormFile("archive", "share.tar.gz")

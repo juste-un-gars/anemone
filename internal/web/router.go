@@ -1393,10 +1393,40 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get share_path from form
-	sharePath := r.FormValue("share_path")
-	if sharePath == "" {
-		http.Error(w, "Missing share_path", http.StatusBadRequest)
+	// Get metadata from form
+	userIDStr := r.FormValue("user_id")
+	shareName := r.FormValue("share_name")
+
+	if userIDStr == "" || shareName == "" {
+		http.Error(w, "Missing user_id or share_name", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	// Find matching share in local database
+	userShares, err := shares.GetByUser(s.db, userID)
+	if err != nil {
+		log.Printf("Error getting user shares: %v", err)
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	var targetShare *shares.Share
+	for _, share := range userShares {
+		if share.Name == shareName || share.Name == "backup_"+shareName || shareName == "backup" {
+			targetShare = share
+			break
+		}
+	}
+
+	if targetShare == nil {
+		log.Printf("No matching share found for user %d, share %s", userID, shareName)
+		http.Error(w, "Share not found", http.StatusNotFound)
 		return
 	}
 
@@ -1409,14 +1439,14 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Extract archive to share path
-	if err := sync.ExtractTarGz(file, sharePath); err != nil {
+	// Extract archive to local share path
+	if err := sync.ExtractTarGz(file, targetShare.Path); err != nil {
 		log.Printf("Error extracting archive: %v", err)
 		http.Error(w, fmt.Sprintf("Failed to extract archive: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Successfully received and extracted sync to: %s", sharePath)
+	log.Printf("Successfully received and extracted sync to: %s (user %d, share %s)", targetShare.Path, userID, shareName)
 
 	// Return success
 	w.Header().Set("Content-Type", "application/json")
