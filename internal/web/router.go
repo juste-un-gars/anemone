@@ -127,6 +127,9 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// Sync routes
 	mux.HandleFunc("/sync/share/", auth.RequireAuth(server.handleSyncShare))
 
+	// API routes - Sync (no auth for peer-to-peer sync)
+	mux.HandleFunc("/api/sync/receive", server.handleAPISyncReceive)
+
 	return mux
 }
 
@@ -1374,4 +1377,49 @@ func (s *Server) handleSyncShare(w http.ResponseWriter, r *http.Request) {
 	} else {
 		fmt.Fprintf(w, `{"success": true, "message": "Synchronisation réussie vers %d pair(s)"}`, successCount)
 	}
+}
+
+// handleAPISyncReceive receives and extracts a share archive from a peer
+func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse multipart form (max 10GB)
+	if err := r.ParseMultipartForm(10 << 30); err != nil {
+		log.Printf("Error parsing multipart form: %v", err)
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	// Get share_path from form
+	sharePath := r.FormValue("share_path")
+	if sharePath == "" {
+		http.Error(w, "Missing share_path", http.StatusBadRequest)
+		return
+	}
+
+	// Get archive file
+	file, _, err := r.FormFile("archive")
+	if err != nil {
+		log.Printf("Error getting archive file: %v", err)
+		http.Error(w, "Missing archive file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Extract archive to share path
+	if err := sync.ExtractTarGz(file, sharePath); err != nil {
+		log.Printf("Error extracting archive: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to extract archive: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Successfully received and extracted sync to: %s", sharePath)
+
+	// Return success
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"success": true, "message": "Sync received and extracted"}`)
 }
