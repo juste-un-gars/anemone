@@ -7,6 +7,8 @@ package users
 import (
 	"database/sql"
 	"fmt"
+	"os"
+	"os/exec"
 	"time"
 
 	"github.com/juste-un-gars/anemone/internal/crypto"
@@ -298,15 +300,44 @@ func GetAllUsers(db *sql.DB) ([]*User, error) {
 }
 
 // DeleteUser deletes a user and their associated data
+// This includes: database entries, SMB shares, system user, and all files on disk
 func DeleteUser(db *sql.DB, userID int) error {
-	// Start transaction
+	// Get user info before deleting
+	user, err := GetByID(db, userID)
+	if err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+
+	// Get user's shares to delete files from disk
+	var shares []struct {
+		ID   int
+		Path string
+	}
+	rows, err := db.Query("SELECT id, path FROM shares WHERE user_id = ?", userID)
+	if err != nil {
+		return fmt.Errorf("failed to query shares: %w", err)
+	}
+	for rows.Next() {
+		var share struct {
+			ID   int
+			Path string
+		}
+		if err := rows.Scan(&share.ID, &share.Path); err != nil {
+			rows.Close()
+			return fmt.Errorf("failed to scan share: %w", err)
+		}
+		shares = append(shares, share)
+	}
+	rows.Close()
+
+	// Start transaction for database cleanup
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// Delete user (cascading deletes will handle related data)
+	// Delete user from database (cascading deletes will handle related data)
 	_, err = tx.Exec("DELETE FROM users WHERE id = ?", userID)
 	if err != nil {
 		return fmt.Errorf("failed to delete user: %w", err)
@@ -314,6 +345,28 @@ func DeleteUser(db *sql.DB, userID int) error {
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	// Delete files from disk for each share
+	for _, share := range shares {
+		if err := os.RemoveAll(share.Path); err != nil {
+			// Log error but continue (don't fail if directory doesn't exist)
+			fmt.Printf("Warning: failed to delete share directory %s: %v\n", share.Path, err)
+		}
+	}
+
+	// Remove SMB user
+	cmd := exec.Command("sudo", "smbpasswd", "-x", user.Username)
+	if err := cmd.Run(); err != nil {
+		// Log error but don't fail (user might not exist in SMB)
+		fmt.Printf("Warning: failed to remove SMB user %s: %v\n", user.Username, err)
+	}
+
+	// Remove system user
+	cmd = exec.Command("sudo", "userdel", user.Username)
+	if err := cmd.Run(); err != nil {
+		// Log error but don't fail (user might not exist)
+		fmt.Printf("Warning: failed to remove system user %s: %v\n", user.Username, err)
 	}
 
 	return nil

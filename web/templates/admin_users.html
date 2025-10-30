@@ -160,16 +160,39 @@
 
 <script>
 function deleteUser(userId, username) {
-    if (confirm('{{T .Lang "users.delete.confirm"}}\n\nUtilisateur : ' + username)) {
-        fetch('/admin/users/' + userId + '/delete', {
-            method: 'POST',
-        }).then(response => {
-            if (response.ok) {
-                window.location.reload();
-            } else {
-                alert('Erreur lors de la suppression');
-            }
-        });
+    const warningMessage = `⚠️ ATTENTION : SUPPRESSION DÉFINITIVE ⚠️
+
+Cette action va supprimer DÉFINITIVEMENT :
+• L'utilisateur "${username}" de la base de données
+• TOUS les partages SMB de cet utilisateur
+• TOUS LES FICHIERS sur le disque (backup + data)
+• L'utilisateur système Linux
+• L'utilisateur Samba
+
+Cette action est IRRÉVERSIBLE !
+Tous les fichiers de l'utilisateur seront perdus.
+
+Tapez le nom d'utilisateur pour confirmer : "${username}"`;
+
+    const confirmation = prompt(warningMessage);
+
+    if (confirmation === username) {
+        if (confirm('Dernière confirmation : Êtes-vous absolument certain de vouloir supprimer cet utilisateur et TOUTES ses données ?')) {
+            fetch('/admin/users/' + userId + '/delete', {
+                method: 'POST',
+            }).then(response => {
+                if (response.ok) {
+                    alert('✅ Utilisateur et toutes ses données supprimés avec succès');
+                    window.location.reload();
+                } else {
+                    response.text().then(text => alert('❌ Erreur lors de la suppression : ' + text));
+                }
+            }).catch(error => {
+                alert('❌ Erreur : ' + error);
+            });
+        }
+    } else if (confirmation !== null) {
+        alert('❌ Le nom d\'utilisateur ne correspond pas. Suppression annulée.');
     }
 }
 </script>
