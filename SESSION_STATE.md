@@ -1266,3 +1266,312 @@ Le système est maintenant **production-ready** pour un usage NAS de base avec c
 - ⚠️ Installations existantes (avant commit 1f180cb) nécessitent chmod manuel sur .trash
 - ✅ Nouvelles installations : corbeille fonctionne automatiquement
 - ✅ Tests validés sur 3 serveurs (DEV, FR1, FR2 neuf)
+
+---
+
+## 🎯 Mini-session du 31 Octobre 2025 (10:30-11:00)
+
+### Contexte
+- **Suite de** : Session principale du 31 Oct (corbeille + stats)
+- **Objectif** : Paramètre langue installation + Traductions
+
+### ✅ Réalisations de la mini-session
+
+#### 1. Paramètre langue dans script installation (commit `01c51ab`)
+
+**Problème** : Installation toujours en français, pas de choix de langue
+
+**Solution implémentée** :
+
+**A. Modification install.sh** :
+```bash
+# Usage
+sudo ./install.sh fr      # Français (défaut)
+sudo ./install.sh en      # Anglais
+sudo ./install.sh         # Défaut français si pas de paramètre
+```
+
+**Changements** :
+- Variable `LANGUAGE="${1:-fr}"` : Parse paramètre ou défaut fr
+- Fonction `validate_language()` : Valide fr/en, erreur sinon
+- Variable d'environnement `LANGUAGE=$LANGUAGE` dans service systemd
+- En-tête script avec documentation usage + exemples
+
+**B. Mise à jour README.md** :
+- Section "One-Line Installation" avec exemples fr/en
+- Debian/Ubuntu : Exemples complets pour les deux langues
+- RHEL/Fedora : Idem
+- Section "Standard Installation" : Montre choix langue
+
+**Impact** :
+- Installation avec langue choisie dès le départ
+- Persistance via systemd (LANGUAGE dans Environment)
+- Application Go lit LANGUAGE depuis config.Load()
+
+#### 2. Traductions complètes page corbeille (commit `2f0ad3e`)
+
+**Problème** : Page trash.html entièrement en français hardcodé
+
+**Solution** : Ajout de 26 clés de traduction dans `internal/i18n/i18n.go`
+
+**Clés ajoutées (FR + EN)** :
+
+**Général** :
+- `trash.title` : "Corbeille" / "Trash"
+- `trash.description` : "Fichiers supprimés récemment" / "Recently deleted files"
+- `trash.logout` : "Déconnexion" / "Logout"
+
+**Sélection multiple** :
+- `trash.selected_count` : "fichier(s) sélectionné(s)" / "file(s) selected"
+- `trash.restore_selected` : "Restaurer la sélection" / "Restore selection"
+- `trash.delete_selected` : "Supprimer définitivement" / "Delete permanently"
+- `trash.deselect_all` : "Tout désélectionner" / "Deselect all"
+
+**Colonnes tableau** :
+- `trash.column_file` : "Fichier" / "File"
+- `trash.column_share` : "Partage" / "Share"
+- `trash.column_size` : "Taille" / "Size"
+- `trash.column_deleted` : "Supprimé le" / "Deleted on"
+- `trash.column_actions` : "Actions" / "Actions"
+
+**Actions** :
+- `trash.action_restore` : "Restaurer" / "Restore"
+- `trash.action_delete` : "Supprimer" / "Delete"
+
+**État vide** :
+- `trash.empty_title` : "Corbeille vide" / "Trash is empty"
+- `trash.empty_message` : "Aucun fichier supprimé" / "No deleted files"
+
+**Confirmations** :
+- `trash.confirm_restore` : "Restaurer ce fichier ?" / "Restore this file?"
+- `trash.confirm_delete` : Message avec avertissement
+- `trash.confirm_restore_bulk` : "Restaurer {count} fichier(s) ?" (avec placeholder)
+- `trash.confirm_delete_bulk` : Message bulk avec avertissement
+
+**Résultats** :
+- `trash.restored_success` : "✅ Fichier restauré avec succès"
+- `trash.restored_bulk` : "✅ {success} fichier(s) restauré(s)"
+- `trash.deleted_bulk` : "✅ {success} fichier(s) supprimé(s)"
+- `trash.failed_bulk` : "\n❌ {failed} échec(s)"
+- `trash.restoring` : "Restauration..." / "Restoring..."
+- `trash.error` : "❌ Erreur:" / "❌ Error:"
+
+**Placeholders dynamiques** :
+- `{count}` : Nombre de fichiers
+- `{success}` : Nombre de succès
+- `{failed}` : Nombre d'échecs
+
+**Note** : Nécessite remplacement dans template (str.replace en JS)
+
+### 📊 Statistiques mini-session
+
+- **Durée** : ~30 min
+- **Commits** : 2 commits
+- **Fichiers modifiés** : 3 fichiers (install.sh, README.md, i18n.go)
+- **Lignes ajoutées** : ~100 lignes
+- **Traductions ajoutées** : 26 clés x 2 langues = 52 traductions
+
+### 🔍 Commits de la mini-session
+
+```
+01c51ab - feat: Paramètre langue pour install.sh
+2f0ad3e - feat: Traductions complètes page corbeille (FR/EN)
+```
+
+### ❌ Ce qui N'A PAS été fait
+
+#### Template trash.html NON traduit
+
+**Problème** : Le fichier `web/templates/trash.html` contient **encore du texte hardcodé en français**
+
+**Ce qu'il faut faire** :
+1. Remplacer tous les textes HTML par `{{T .Lang "trash.key"}}`
+2. Modifier JavaScript pour utiliser les traductions
+3. Implémenter fonction JS pour remplacer placeholders ({count}, {success}, {failed})
+
+**Exemple de ce qui reste à faire** :
+```html
+<!-- AVANT (actuel - hardcodé) -->
+<h2 class="text-3xl font-bold text-gray-900">
+    🗑️ Corbeille
+</h2>
+<p class="mt-2 text-gray-600">
+    Fichiers supprimés récemment
+</p>
+
+<!-- APRÈS (à faire) -->
+<h2 class="text-3xl font-bold text-gray-900">
+    🗑️ {{T .Lang "trash.title"}}
+</h2>
+<p class="mt-2 text-gray-600">
+    {{T .Lang "trash.description"}}
+</p>
+```
+
+**JavaScript à modifier** :
+```javascript
+// AVANT
+if (!confirm(`Restaurer ${files.length} fichier(s) ?`)) return;
+
+// APRÈS (avec fonction helper)
+const msg = replacePlaceholders(
+    i18n["trash.confirm_restore_bulk"], 
+    {count: files.length}
+);
+if (!confirm(msg)) return;
+```
+
+**Éléments à traduire dans trash.html** :
+- [ ] Ligne 32: "Déconnexion" → `{{T .Lang "trash.logout"}}`
+- [ ] Ligne 45: "🗑️ Corbeille" → `🗑️ {{T .Lang "trash.title"}}`
+- [ ] Ligne 48: "Fichiers supprimés récemment" → `{{T .Lang "trash.description"}}`
+- [ ] Ligne 58: "0 fichier(s) sélectionné(s)" → JS dynamique avec traduction
+- [ ] Ligne 63: "Restaurer la sélection" → `{{T .Lang "trash.restore_selected"}}`
+- [ ] Ligne 69: "Supprimer définitivement" → `{{T .Lang "trash.delete_selected"}}`
+- [ ] Ligne 72: "Tout désélectionner" → `{{T .Lang "trash.deselect_all"}}`
+- [ ] Lignes 87-99: En-têtes colonnes → `{{T .Lang "trash.column_*"}}`
+- [ ] Lignes 147-153: Boutons actions → `{{T .Lang "trash.action_*"}}`
+- [ ] Lignes 167-168: État vide → `{{T .Lang "trash.empty_*"}}`
+- [ ] JavaScript (lignes 221-317): Messages confirm/alert → Utiliser traductions
+
+**Approche recommandée** :
+1. Passer les traductions JS en data attributes ou variable globale
+2. Créer fonction `replacePlaceholders(text, params)` en JS
+3. Remplacer tous les textes hardcodés par appels traduction
+
+#### Autres pages à vérifier
+
+**dashboard_admin.html** :
+- Ligne 180-181: "🗑️ Corbeille" / "Récupérer vos fichiers supprimés" → Vérifier si traduit
+- Autres textes à vérifier
+
+**dashboard_user.html** :
+- Ligne 140-143: Section corbeille → Vérifier traductions
+
+### 📞 Pour reprendre la PROCHAINE session
+
+### ✅ Installation avec choix langue : FONCTIONNEL
+
+```bash
+# Maintenant vous pouvez installer en choisissant la langue
+sudo ./install.sh fr     # Installation française
+sudo ./install.sh en     # Installation anglaise
+```
+
+Le serveur démarrera avec la langue choisie (via LANGUAGE dans systemd).
+
+### 🎯 TÂCHE PRIORITAIRE : Traductions templates HTML
+
+**Objectif** : Finaliser internationalisation complète
+
+**À faire immédiatement** :
+
+#### 1. Modifier trash.html pour utiliser traductions
+
+**Fichier** : `web/templates/trash.html`
+
+**Étapes** :
+1. Remplacer textes HTML par `{{T .Lang "trash.key"}}`
+2. Ajouter variable JS avec traductions :
+```html
+<script>
+const i18n = {
+    "trash.confirm_restore": "{{T .Lang "trash.confirm_restore"}}",
+    "trash.confirm_delete": "{{T .Lang "trash.confirm_delete"}}",
+    // ... etc
+};
+
+function replacePlaceholders(text, params) {
+    let result = text;
+    for (const [key, value] of Object.entries(params)) {
+        result = result.replace(`{${key}}`, value);
+    }
+    return result;
+}
+</script>
+```
+3. Remplacer tous les confirm/alert hardcodés
+
+#### 2. Vérifier dashboards
+
+**Fichiers** : 
+- `web/templates/dashboard_admin.html`
+- `web/templates/dashboard_user.html`
+
+**Vérifier** :
+- Tous les textes utilisent {{T .Lang "key"}}
+- Aucun texte hardcodé français/anglais
+- Ajouter clés manquantes dans i18n.go si besoin
+
+#### 3. Autres templates à vérifier
+
+**Templates à auditer** :
+```bash
+# Trouver tous les templates avec texte hardcodé
+grep -l "Corbeille\|Restaurer\|Supprimer" web/templates/*.html
+grep -l "Déconnexion\|Partage\|Fichier" web/templates/*.html
+```
+
+**Pour chaque template** :
+1. Identifier textes hardcodés
+2. Ajouter clés dans i18n.go si manquantes
+3. Remplacer par `{{T .Lang "key"}}`
+
+### 🛠️ Prochaines fonctionnalités (après traductions)
+
+#### PRIORITÉ 1 : Synchronisation P2P automatique
+
+*Voir section précédente de SESSION_STATE.md pour détails complets*
+
+#### PRIORITÉ 2 : Quotas utilisateur
+
+#### PRIORITÉ 3 : Monitoring & Dashboard
+
+#### PRIORITÉ 4 : Page Paramètres
+
+### 📁 État actuel du projet
+
+**Fonctionnalités COMPLÈTES** :
+- ✅ Installation avec choix langue (fr/en)
+- ✅ Multi-utilisateurs avec authentification
+- ✅ Partages SMB automatiques (backup + data)
+- ✅ Corbeille fonctionnelle (permissions 755 auto)
+- ✅ Sélection multiple dans corbeille
+- ✅ Dashboard stats réelles (espace, trash, sync)
+- ✅ Suppression complète utilisateurs
+- ✅ Privacy SMB totale
+- ✅ Traductions i18n.go complètes (26 clés corbeille)
+
+**Fonctionnalités PARTIELLES** :
+- ⚠️ Traductions templates HTML : **INCOMPLET**
+  - i18n.go : ✅ Complet (FR + EN)
+  - trash.html : ❌ Texte hardcodé français
+  - dashboards : ⚠️ À vérifier
+- ⚠️ Sync P2P : Prototype manuel uniquement
+
+**Fonctionnalités MANQUANTES** :
+- ❌ Templates HTML internationalisés (trash.html prioritaire)
+- ❌ Sync P2P automatique
+- ❌ Chiffrement archives sync
+- ❌ Quotas utilisateur
+- ❌ Monitoring système
+- ❌ Page Paramètres
+
+---
+
+**Session sauvegardée le** : 2025-10-31 11:00
+**Tokens utilisés** : ~115k/200k (57.5%)
+**État** : Installation multilingue OK - Templates HTML à traduire
+**Prochaine action URGENTE** : Modifier trash.html pour utiliser traductions i18n
+
+**Commits depuis dernière sauvegarde** :
+- baa85c0 : Sélection multiple corbeille + Documentation
+- 01c51ab : Paramètre langue install.sh
+- 2f0ad3e : Traductions i18n.go complètes (FR/EN)
+
+**Notes importantes** :
+- ✅ Script installation accepte paramètre langue
+- ✅ Service systemd configure LANGUAGE
+- ✅ Toutes traductions corbeille dans i18n.go
+- ❌ Templates HTML pas encore modifiés (PRIORITÉ)
+- 🎯 Prochaine étape : Modifier trash.html ligne par ligne
