@@ -25,6 +25,7 @@ type User struct {
 	IsAdmin                bool
 	QuotaTotalGB           int
 	QuotaBackupGB          int
+	Language               string
 	CreatedAt              time.Time
 	ActivatedAt            *time.Time
 	LastLogin              *time.Time
@@ -99,13 +100,13 @@ func GetByUsername(db *sql.DB, username string) (*User, error) {
 	err := db.QueryRow(`
 		SELECT id, username, password_hash, email,
 		       encryption_key_hash, encryption_key_encrypted,
-		       is_admin, quota_total_gb, quota_backup_gb,
+		       is_admin, quota_total_gb, quota_backup_gb, language,
 		       created_at, activated_at, last_login
 		FROM users WHERE username = ?
 	`, username).Scan(
 		&user.ID, &user.Username, &user.PasswordHash, &user.Email,
 		&user.EncryptionKeyHash, &user.EncryptionKeyEncrypted,
-		&user.IsAdmin, &user.QuotaTotalGB, &user.QuotaBackupGB,
+		&user.IsAdmin, &user.QuotaTotalGB, &user.QuotaBackupGB, &user.Language,
 		&user.CreatedAt, &activatedAt, &lastLogin,
 	)
 
@@ -229,13 +230,13 @@ func GetByID(db *sql.DB, userID int) (*User, error) {
 	err := db.QueryRow(`
 		SELECT id, username, password_hash, email,
 		       encryption_key_hash, encryption_key_encrypted,
-		       is_admin, quota_total_gb, quota_backup_gb,
+		       is_admin, quota_total_gb, quota_backup_gb, language,
 		       created_at, activated_at, last_login
 		FROM users WHERE id = ?
 	`, userID).Scan(
 		&user.ID, &user.Username, &user.PasswordHash, &user.Email,
 		&user.EncryptionKeyHash, &user.EncryptionKeyEncrypted,
-		&user.IsAdmin, &user.QuotaTotalGB, &user.QuotaBackupGB,
+		&user.IsAdmin, &user.QuotaTotalGB, &user.QuotaBackupGB, &user.Language,
 		&user.CreatedAt, &activatedAt, &lastLogin,
 	)
 
@@ -261,7 +262,7 @@ func GetAllUsers(db *sql.DB) ([]*User, error) {
 	rows, err := db.Query(`
 		SELECT id, username, password_hash, email,
 		       encryption_key_hash, encryption_key_encrypted,
-		       is_admin, quota_total_gb, quota_backup_gb,
+		       is_admin, quota_total_gb, quota_backup_gb, language,
 		       created_at, activated_at, last_login
 		FROM users
 		ORDER BY created_at DESC
@@ -279,7 +280,7 @@ func GetAllUsers(db *sql.DB) ([]*User, error) {
 		err := rows.Scan(
 			&user.ID, &user.Username, &user.PasswordHash, &user.Email,
 			&user.EncryptionKeyHash, &user.EncryptionKeyEncrypted,
-			&user.IsAdmin, &user.QuotaTotalGB, &user.QuotaBackupGB,
+			&user.IsAdmin, &user.QuotaTotalGB, &user.QuotaBackupGB, &user.Language,
 			&user.CreatedAt, &activatedAt, &lastLogin,
 		)
 		if err != nil {
@@ -375,4 +376,19 @@ func DeleteUser(db *sql.DB, userID int) error {
 // IsActivated checks if the user account is activated
 func (u *User) IsActivated() bool {
 	return u.ActivatedAt != nil
+}
+
+// UpdateUserLanguage updates the language preference for a user
+func UpdateUserLanguage(db *sql.DB, userID int, language string) error {
+	// Validate language code
+	if language != "fr" && language != "en" {
+		return fmt.Errorf("invalid language code: %s (must be 'fr' or 'en')", language)
+	}
+
+	_, err := db.Exec("UPDATE users SET language = ? WHERE id = ?", language, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update user language: %w", err)
+	}
+
+	return nil
 }

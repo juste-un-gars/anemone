@@ -126,6 +126,8 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// User routes
 	mux.HandleFunc("/trash", auth.RequireAuth(server.handleTrash))
 	mux.HandleFunc("/trash/", auth.RequireAuth(server.handleTrashActions))
+	mux.HandleFunc("/settings", auth.RequireAuth(server.handleSettings))
+	mux.HandleFunc("/settings/language", auth.RequireAuth(server.handleSettingsLanguage))
 
 	// Admin routes - Shares
 	mux.HandleFunc("/admin/shares", auth.RequireAdmin(server.handleAdminShares))
@@ -146,12 +148,27 @@ func (s *Server) isSetupCompleted() bool {
 	return err == nil && count > 0
 }
 
-// getLang gets language from query param or config
+// getLang gets language from user preference (DB), query param, or config
 func (s *Server) getLang(r *http.Request) string {
 	lang := ""
-	if l := r.URL.Query().Get("lang"); l != "" {
-		lang = l
-	} else {
+
+	// Priority 1: User language preference from database (if logged in)
+	if session, ok := auth.GetSessionFromContext(r); ok {
+		user, err := users.GetByID(s.db, session.UserID)
+		if err == nil && user.Language != "" {
+			lang = user.Language
+		}
+	}
+
+	// Priority 2: Query parameter (e.g., ?lang=en)
+	if lang == "" {
+		if l := r.URL.Query().Get("lang"); l != "" {
+			lang = l
+		}
+	}
+
+	// Priority 3: Config (environment variable or default)
+	if lang == "" {
 		lang = s.cfg.Language
 	}
 
@@ -1686,4 +1703,69 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"success": true, "message": "Sync received and extracted"}`)
+}
+
+// handleSettings shows the user settings page
+func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	session, _ := auth.GetSessionFromContext(r)
+
+	// Get user from database
+	user, err := users.GetByID(s.db, session.UserID)
+	if err != nil {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	data := struct {
+		Lang    string
+		Title   string
+		Session *auth.Session
+		User    *users.User
+		Success string
+		Error   string
+	}{
+		Lang:    s.getLang(r),
+		Title:   "Settings",
+		Session: session,
+		User:    user,
+		Success: r.URL.Query().Get("success"),
+		Error:   r.URL.Query().Get("error"),
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "settings.html", data); err != nil {
+		log.Printf("Error executing settings template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// handleSettingsLanguage handles language change
+func (s *Server) handleSettingsLanguage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	session, _ := auth.GetSessionFromContext(r)
+
+	// Parse form
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/settings?error=Invalid+form+data", http.StatusSeeOther)
+		return
+	}
+
+	language := r.FormValue("language")
+
+	// Update user language in database
+	if err := users.UpdateUserLanguage(s.db, session.UserID, language); err != nil {
+		log.Printf("Error updating user language: %v", err)
+		http.Redirect(w, r, "/settings?error=Failed+to+update+language", http.StatusSeeOther)
+		return
+	}
+
+	// Redirect back to settings with success message
+	successMsg := "Language changed successfully"
+	if language == "fr" {
+		successMsg = "Langue modifiée avec succès"
+	}
+	http.Redirect(w, r, "/settings?success="+successMsg, http.StatusSeeOther)
 }

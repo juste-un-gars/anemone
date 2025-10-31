@@ -28,6 +28,9 @@
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-sm text-gray-700">{{.Session.Username}}</span>
+                    <a href="/settings" class="text-sm text-gray-600 hover:text-gray-900">
+                        ⚙️ {{T .Lang "settings.title"}}
+                    </a>
                     <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
                         {{T .Lang "dashboard.logout"}}
                     </a>

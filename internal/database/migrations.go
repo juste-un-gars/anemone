@@ -123,6 +123,11 @@ func Migrate(db *sql.DB) error {
 		return fmt.Errorf("peers table migration failed: %w", err)
 	}
 
+	// Migration pour ajouter la colonne language à la table users
+	if err := migrateUsersTable(db); err != nil {
+		return fmt.Errorf("users table migration failed: %w", err)
+	}
+
 	return nil
 }
 
@@ -216,6 +221,37 @@ func migratePeersTable(db *sql.DB) error {
 		_, err = db.Exec("ALTER TABLE peers_new RENAME TO peers")
 		if err != nil {
 			return fmt.Errorf("failed to rename peers_new table: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// migrateUsersTable adds missing columns to users table
+func migrateUsersTable(db *sql.DB) error {
+	// Check which columns exist
+	rows, err := db.Query("PRAGMA table_info(users)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	existingColumns := make(map[string]bool)
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dfltValue sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		existingColumns[name] = true
+	}
+
+	// Add language column if it doesn't exist
+	if !existingColumns["language"] {
+		if _, err := db.Exec("ALTER TABLE users ADD COLUMN language VARCHAR(2) DEFAULT 'fr'"); err != nil {
+			return fmt.Errorf("failed to add language column: %w", err)
 		}
 	}
 
