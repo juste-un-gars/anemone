@@ -67,9 +67,11 @@
                                 <dd class="text-2xl font-semibold text-gray-900">
                                     {{.Stats.StorageUsed}}
                                 </dd>
+                                {{if ne .Stats.StorageQuota "∞"}}
                                 <dd class="text-sm text-gray-500">
                                     sur {{.Stats.StorageQuota}}
                                 </dd>
+                                {{end}}
                             </dl>
                         </div>
                     </div>

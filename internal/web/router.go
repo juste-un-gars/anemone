@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"html/template"
+	"io/fs"
 	"log"
 	"net/http"
 	"path/filepath"
@@ -305,8 +306,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 // getDashboardStats retrieves dashboard statistics
 func (s *Server) getDashboardStats(session *auth.Session) *DashboardStats {
 	stats := &DashboardStats{
-		StorageUsed:    "0 GB",
-		StorageQuota:   "100 GB",
+		StorageUsed:    "0 B",
+		StorageQuota:   "∞",
 		StoragePercent: 0,
 		LastBackup:     "Jamais",
 		UserCount:      0,
@@ -320,13 +321,88 @@ func (s *Server) getDashboardStats(session *auth.Session) *DashboardStats {
 		s.db.QueryRow("SELECT COUNT(*) FROM peers").Scan(&stats.PeerCount)
 	}
 
-	// Count trash items for this user
-	s.db.QueryRow("SELECT COUNT(*) FROM trash_items WHERE user_id = ?", session.UserID).Scan(&stats.TrashCount)
+	// Get user's shares
+	userShares, err := shares.GetByUser(s.db, session.UserID)
+	if err != nil {
+		log.Printf("Error getting shares for stats: %v", err)
+		return stats
+	}
 
-	// TODO: Calculate actual storage usage
-	// TODO: Get last backup time from sync_log
+	// Calculate storage usage and trash count
+	var totalSize int64
+	totalTrashCount := 0
+
+	for _, share := range userShares {
+		// Calculate share size
+		shareSize := calculateDirectorySize(share.Path)
+		totalSize += shareSize
+
+		// Count trash items
+		username := session.Username
+		trashItems, err := trash.ListTrashItems(share.Path, username)
+		if err != nil {
+			log.Printf("Error listing trash for share %s: %v", share.Name, err)
+			continue
+		}
+		totalTrashCount += len(trashItems)
+	}
+
+	stats.TrashCount = totalTrashCount
+	stats.StorageUsed = formatBytes(totalSize)
+
+	// Get last backup time from sync_log
+	var lastSync sql.NullTime
+	err = s.db.QueryRow(`
+		SELECT MAX(timestamp)
+		FROM sync_log
+		WHERE user_id = ? AND status = 'success'
+	`, session.UserID).Scan(&lastSync)
+
+	if err == nil && lastSync.Valid {
+		duration := time.Since(lastSync.Time)
+		if duration < 24*time.Hour {
+			stats.LastBackup = fmt.Sprintf("Il y a %d heures", int(duration.Hours()))
+		} else {
+			stats.LastBackup = fmt.Sprintf("Il y a %d jours", int(duration.Hours()/24))
+		}
+	}
 
 	return stats
+}
+
+// calculateDirectorySize calculates the total size of a directory
+func calculateDirectorySize(path string) int64 {
+	var size int64
+	err := filepath.WalkDir(path, func(_ string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil // Skip errors
+		}
+		if !d.IsDir() {
+			info, err := d.Info()
+			if err == nil {
+				size += info.Size()
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		log.Printf("Error calculating directory size for %s: %v", path, err)
+	}
+	return size
+}
+
+// formatBytes formats bytes to human-readable format
+func formatBytes(bytes int64) string {
+	const unit = 1024
+	if bytes < unit {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	div, exp := int64(unit), 0
+	for n := bytes / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
 // handleSetup handles the setup page
