@@ -29,7 +29,7 @@
                 <div class="flex items-center space-x-4">
                     <span class="text-sm text-gray-700">{{.Session.Username}}</span>
                     <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
-                        Déconnexion
+                        {{T .Lang "trash.logout"}}
                     </a>
                 </div>
             </div>
@@ -42,10 +42,10 @@
         <div class="flex justify-between items-center mb-8">
             <div>
                 <h2 class="text-3xl font-bold text-gray-900">
-                    🗑️ Corbeille
+                    🗑️ {{T .Lang "trash.title"}}
                 </h2>
                 <p class="mt-2 text-gray-600">
-                    Fichiers supprimés récemment
+                    {{T .Lang "trash.description"}}
                 </p>
             </div>
         </div>
@@ -55,22 +55,22 @@
         <div id="bulkActions" class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 hidden">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
-                    <span id="selectedCount" class="text-sm font-medium text-blue-900">0 fichier(s) sélectionné(s)</span>
+                    <span id="selectedCount" class="text-sm font-medium text-blue-900">0 {{T .Lang "trash.selected_count"}}</span>
                     <button onclick="bulkRestore()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
                         <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
-                        Restaurer la sélection
+                        {{T .Lang "trash.restore_selected"}}
                     </button>
                     <button onclick="bulkDelete()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
                         <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
-                        Supprimer définitivement
+                        {{T .Lang "trash.delete_selected"}}
                     </button>
                 </div>
                 <button onclick="deselectAll()" class="text-sm text-blue-600 hover:text-blue-800">
-                    Tout désélectionner
+                    {{T .Lang "trash.deselect_all"}}
                 </button>
             </div>
         </div>
@@ -84,19 +84,19 @@
                             <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Fichier
+                            {{T .Lang "trash.column_file"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Partage
+                            {{T .Lang "trash.column_share"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Taille
+                            {{T .Lang "trash.column_size"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Supprimé le
+                            {{T .Lang "trash.column_deleted"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
+                            {{T .Lang "trash.column_actions"}}
                         </th>
                     </tr>
                 </thead>
@@ -144,13 +144,13 @@
                                 <svg class="inline h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                 </svg>
-                                Restaurer
+                                {{T .Lang "trash.action_restore"}}
                             </button>
                             <button onclick="deleteFile('{{.ShareName}}', '{{.RelativePath}}')" class="text-red-600 hover:text-red-900">
                                 <svg class="inline h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
-                                Supprimer
+                                {{T .Lang "trash.action_delete"}}
                             </button>
                         </td>
                     </tr>
@@ -164,14 +164,38 @@
             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">Corbeille vide</h3>
-            <p class="mt-1 text-sm text-gray-500">Aucun fichier supprimé</p>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">{{T .Lang "trash.empty_title"}}</h3>
+            <p class="mt-1 text-sm text-gray-500">{{T .Lang "trash.empty_message"}}</p>
         </div>
         {{end}}
     </div>
 </div>
 
 <script>
+// Translations for JavaScript
+const i18n = {
+    selected_count: "{{T .Lang "trash.selected_count"}}",
+    confirm_restore: "{{T .Lang "trash.confirm_restore"}}",
+    confirm_delete: "{{T .Lang "trash.confirm_delete"}}",
+    confirm_restore_bulk: "{{T .Lang "trash.confirm_restore_bulk"}}",
+    confirm_delete_bulk: "{{T .Lang "trash.confirm_delete_bulk"}}",
+    restored_success: "{{T .Lang "trash.restored_success"}}",
+    restored_bulk: "{{T .Lang "trash.restored_bulk"}}",
+    deleted_bulk: "{{T .Lang "trash.deleted_bulk"}}",
+    failed_bulk: "{{T .Lang "trash.failed_bulk"}}",
+    restoring: "{{T .Lang "trash.restoring"}}",
+    error: "{{T .Lang "trash.error"}}"
+};
+
+// Replace placeholders in translation strings
+function replacePlaceholders(text, params) {
+    let result = text;
+    for (const [key, value] of Object.entries(params)) {
+        result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+    }
+    return result;
+}
+
 function toggleSelectAll() {
     const selectAll = document.getElementById('selectAll');
     const checkboxes = document.querySelectorAll('.file-checkbox');
@@ -187,7 +211,7 @@ function updateBulkActions() {
 
     if (checkboxes.length > 0) {
         bulkActions.classList.remove('hidden');
-        selectedCount.textContent = checkboxes.length + ' fichier(s) sélectionné(s)';
+        selectedCount.textContent = checkboxes.length + ' ' + i18n.selected_count;
     } else {
         bulkActions.classList.add('hidden');
     }
@@ -218,7 +242,8 @@ async function bulkRestore() {
     const files = getSelectedFiles();
     if (files.length === 0) return;
 
-    if (!confirm(`Restaurer ${files.length} fichier(s) ?`)) return;
+    const msg = replacePlaceholders(i18n.confirm_restore_bulk, {count: files.length});
+    if (!confirm(msg)) return;
 
     let success = 0;
     let failed = 0;
@@ -238,7 +263,11 @@ async function bulkRestore() {
         }
     }
 
-    alert(`✅ ${success} fichier(s) restauré(s)${failed > 0 ? '\n❌ ' + failed + ' échec(s)' : ''}`);
+    let resultMsg = replacePlaceholders(i18n.restored_bulk, {success: success});
+    if (failed > 0) {
+        resultMsg += replacePlaceholders(i18n.failed_bulk, {failed: failed});
+    }
+    alert(resultMsg);
     window.location.reload();
 }
 
@@ -246,7 +275,8 @@ async function bulkDelete() {
     const files = getSelectedFiles();
     if (files.length === 0) return;
 
-    if (!confirm(`⚠️ ATTENTION: Supprimer définitivement ${files.length} fichier(s) ?\n\nCette action est irréversible.`)) return;
+    const msg = replacePlaceholders(i18n.confirm_delete_bulk, {count: files.length});
+    if (!confirm(msg)) return;
 
     let success = 0;
     let failed = 0;
@@ -266,42 +296,46 @@ async function bulkDelete() {
         }
     }
 
-    alert(`✅ ${success} fichier(s) supprimé(s)${failed > 0 ? '\n❌ ' + failed + ' échec(s)' : ''}`);
+    let resultMsg = replacePlaceholders(i18n.deleted_bulk, {success: success});
+    if (failed > 0) {
+        resultMsg += replacePlaceholders(i18n.failed_bulk, {failed: failed});
+    }
+    alert(resultMsg);
     window.location.reload();
 }
 
 function restoreFile(shareName, relPath) {
-    if (!confirm('Restaurer ce fichier ?\n\n' + relPath)) {
+    if (!confirm(i18n.confirm_restore + '\n\n' + relPath)) {
         return;
     }
 
     const button = event.target.closest('button');
     const originalContent = button.innerHTML;
     button.disabled = true;
-    button.innerHTML = '<svg class="inline animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Restauration...';
+    button.innerHTML = '<svg class="inline animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> ' + i18n.restoring;
 
     fetch('/trash/restore?share=' + encodeURIComponent(shareName) + '&path=' + encodeURIComponent(relPath), {
         method: 'POST',
     }).then(response => {
         if (response.ok) {
-            alert('✅ Fichier restauré avec succès');
+            alert(i18n.restored_success);
             window.location.reload();
         } else {
             response.text().then(text => {
-                alert('❌ Erreur: ' + text);
+                alert(i18n.error + ' ' + text);
                 button.disabled = false;
                 button.innerHTML = originalContent;
             });
         }
     }).catch(error => {
-        alert('❌ Erreur: ' + error);
+        alert(i18n.error + ' ' + error);
         button.disabled = false;
         button.innerHTML = originalContent;
     });
 }
 
 function deleteFile(shareName, relPath) {
-    if (!confirm('⚠️ ATTENTION: Supprimer définitivement ce fichier ?\n\nCette action est irréversible.\n\n' + relPath)) {
+    if (!confirm(i18n.confirm_delete + '\n\n' + relPath)) {
         return;
     }
 
@@ -311,7 +345,7 @@ function deleteFile(shareName, relPath) {
         if (response.ok) {
             window.location.reload();
         } else {
-            response.text().then(text => alert('❌ Erreur: ' + text));
+            response.text().then(text => alert(i18n.error + ' ' + text));
         }
     });
 }

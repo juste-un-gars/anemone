@@ -119,13 +119,13 @@
                         <div class="ml-5 w-0 flex-1">
                             <dl>
                                 <dt class="text-sm font-medium text-gray-500 truncate">
-                                    Corbeille
+                                    {{T .Lang "trash.title"}}
                                 </dt>
                                 <dd class="text-2xl font-semibold text-gray-900">
                                     {{.Stats.TrashCount}}
                                 </dd>
                                 <dd class="text-sm text-gray-500">
-                                    éléments
+                                    {{T .Lang "trash.items"}}
                                 </dd>
                             </dl>
                         </div>
@@ -139,13 +139,13 @@
             <!-- Trash -->
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    🗑️ Corbeille
+                    🗑️ {{T .Lang "trash.title"}}
                 </h3>
                 <p class="text-sm text-gray-600 mb-4">
-                    Récupérer vos fichiers supprimés (conservation 30 jours)
+                    {{T .Lang "trash.card_description_retention"}}
                 </p>
                 <a href="/trash" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
-                    Voir la corbeille
+                    {{T .Lang "trash.view_button"}}
                 </a>
             </div>
         </div>

@@ -242,6 +242,10 @@ func (t *Translator) loadTranslations() error {
 		// Trash page
 		"trash.title":              "Corbeille",
 		"trash.description":        "Fichiers supprimés récemment",
+		"trash.card_description":   "Récupérer vos fichiers supprimés",
+		"trash.card_description_retention": "Récupérer vos fichiers supprimés (conservation 30 jours)",
+		"trash.view_button":        "Voir la corbeille",
+		"trash.items":              "éléments",
 		"trash.logout":             "Déconnexion",
 		"trash.selected_count":     "fichier(s) sélectionné(s)",
 		"trash.restore_selected":   "Restaurer la sélection",
@@ -453,6 +457,10 @@ func (t *Translator) loadTranslations() error {
 		// Trash page
 		"trash.title":              "Trash",
 		"trash.description":        "Recently deleted files",
+		"trash.card_description":   "Recover your deleted files",
+		"trash.card_description_retention": "Recover your deleted files (30 days retention)",
+		"trash.view_button":        "View trash",
+		"trash.items":              "items",
 		"trash.logout":             "Logout",
 		"trash.selected_count":     "file(s) selected",
 		"trash.restore_selected":   "Restore selection",
