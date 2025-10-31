@@ -31,6 +31,23 @@ func Create(db *sql.DB, share *Share, username string) error {
 		return fmt.Errorf("failed to create share directory: %w", err)
 	}
 
+	// Pre-create .trash directory with correct permissions (755)
+	// This prevents Samba VFS recycle from creating it with restrictive permissions (700)
+	// The VFS module ignores force_directory_mode for internally-created directories
+	if username != "" {
+		trashDir := filepath.Join(share.Path, ".trash", username)
+		if err := os.MkdirAll(trashDir, 0755); err != nil {
+			return fmt.Errorf("failed to create trash directory: %w", err)
+		}
+
+		// Set ownership of .trash to the share user
+		trashRoot := filepath.Join(share.Path, ".trash")
+		cmd := exec.Command("sudo", "chown", "-R", fmt.Sprintf("%s:%s", username, username), trashRoot)
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to set trash directory ownership: %w", err)
+		}
+	}
+
 	query := `INSERT INTO shares (user_id, name, path, protocol, sync_enabled, created_at)
 	          VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
 	result, err := db.Exec(query, share.UserID, share.Name, share.Path, share.Protocol, share.SyncEnabled)
