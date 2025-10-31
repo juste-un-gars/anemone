@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"time"
 )
@@ -95,8 +96,9 @@ func RestoreItem(sharePath, username, relPath string) error {
 		originalPath = filepath.Join(parentDir, fmt.Sprintf("%s.restored-%s%s", nameWithoutExt, timestamp, ext))
 	}
 
-	// Move file from trash to original location
-	if err := os.Rename(trashPath, originalPath); err != nil {
+	// Move file from trash to original location (using sudo for permission)
+	cmd := exec.Command("sudo", "mv", trashPath, originalPath)
+	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to restore file: %w", err)
 	}
 
@@ -115,8 +117,9 @@ func DeleteItem(sharePath, username, relPath string) error {
 		return fmt.Errorf("file not found in trash")
 	}
 
-	// Delete the file
-	if err := os.Remove(trashPath); err != nil {
+	// Delete the file (using sudo for permission)
+	cmd := exec.Command("sudo", "rm", "-f", trashPath)
+	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to delete file: %w", err)
 	}
 
@@ -135,9 +138,15 @@ func EmptyTrash(sharePath, username string) error {
 		return nil // Already empty
 	}
 
-	// Remove the entire trash directory
-	if err := os.RemoveAll(trashPath); err != nil {
+	// Remove the entire trash directory (using sudo for permission)
+	cmd := exec.Command("sudo", "rm", "-rf", trashPath)
+	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to empty trash: %w", err)
+	}
+
+	// Recreate the trash directory for future use
+	if err := os.MkdirAll(trashPath, 0755); err != nil {
+		return fmt.Errorf("failed to recreate trash directory: %w", err)
 	}
 
 	return nil
@@ -146,8 +155,9 @@ func EmptyTrash(sharePath, username string) error {
 // cleanupEmptyDirs removes empty directories up to but not including the base directory
 func cleanupEmptyDirs(dir, base string) {
 	for dir != base && dir != "." && dir != "/" {
-		// Try to remove the directory (will fail if not empty)
-		if err := os.Remove(dir); err != nil {
+		// Try to remove the directory (will fail if not empty) - using sudo for permission
+		cmd := exec.Command("sudo", "rmdir", dir)
+		if err := cmd.Run(); err != nil {
 			break // Directory not empty or error, stop
 		}
 		dir = filepath.Dir(dir)

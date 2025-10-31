@@ -60,6 +60,8 @@ const smbConfigTemplate = `[global]
    directory mask = 0775
    force user = {{.Username}}
    force group = {{.Username}}
+   force create mode = 0664
+   force directory mode = 0755
 
    # Recycle bin (trash) configuration
    vfs objects = recycle

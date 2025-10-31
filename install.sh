@@ -139,9 +139,15 @@ configure_sudoers() {
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload $SMB_SERVICE
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload $SMB_SERVICE.service
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/useradd -M -s /usr/sbin/nologin *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/userdel *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/smbpasswd
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/chown -R *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/chmod *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/cp * /etc/samba/smb.conf
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/mv *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/rm *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/rmdir *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/mkdir *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/semanage fcontext *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/restorecon *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/setsebool *
