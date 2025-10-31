@@ -3,6 +3,17 @@ set -e
 
 # 🪸 Anemone NAS - Automated Installer
 # This script installs and configures Anemone on your system
+#
+# Usage:
+#   sudo ./install.sh [language]
+#
+# Parameters:
+#   language: "fr" (French) or "en" (English) - defaults to "fr" if not specified
+#
+# Examples:
+#   sudo ./install.sh fr      # Install with French language
+#   sudo ./install.sh en      # Install with English language
+#   sudo ./install.sh         # Install with default French language
 
 # Colors for output
 RED='\033[0;31m'
@@ -16,6 +27,7 @@ INSTALL_DIR="$(pwd)"
 BINARY_NAME="anemone"
 SERVICE_NAME="anemone"
 CURRENT_USER="${SUDO_USER:-$USER}"
+LANGUAGE="${1:-fr}"  # Parse language parameter, default to French
 
 # Functions
 log_info() {
@@ -28,6 +40,14 @@ log_warn() {
 
 log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
+}
+
+validate_language() {
+    if [ "$LANGUAGE" != "fr" ] && [ "$LANGUAGE" != "en" ]; then
+        log_error "Invalid language: $LANGUAGE. Use 'fr' (French) or 'en' (English)"
+        exit 1
+    fi
+    log_info "Language set to: $LANGUAGE"
 }
 
 check_root() {
@@ -228,6 +248,7 @@ WorkingDirectory=$INSTALL_DIR
 Environment="ANEMONE_DATA_DIR=$DATA_DIR"
 Environment="ENABLE_HTTPS=true"
 Environment="HTTPS_PORT=8443"
+Environment="LANGUAGE=$LANGUAGE"
 ExecStart=$INSTALL_DIR/$BINARY_NAME
 Restart=on-failure
 RestartSec=5s
@@ -302,6 +323,7 @@ main() {
     echo ""
 
     check_root
+    validate_language
     detect_distro
     check_prerequisites
     install_samba

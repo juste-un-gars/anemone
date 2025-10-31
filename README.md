@@ -90,23 +90,38 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 For a completely new server installation, you can install all dependencies and Anemone in one command:
 
 ```bash
-# Update system and install dependencies + Anemone (Debian/Ubuntu)
+# Update system and install dependencies + Anemone (Debian/Ubuntu) - French
 sudo apt update -y && \
 sudo apt upgrade -y && \
 sudo apt-get install -y golang-go samba git && \
 git clone https://github.com/juste-un-gars/anemone.git && \
 cd anemone && \
-sudo ./install.sh -y
+sudo ./install.sh fr
+
+# English version
+sudo apt update -y && \
+sudo apt upgrade -y && \
+sudo apt-get install -y golang-go samba git && \
+git clone https://github.com/juste-un-gars/anemone.git && \
+cd anemone && \
+sudo ./install.sh en
 ```
 
 **For RHEL/Fedora:**
 ```bash
-# Update system and install dependencies + Anemone (RHEL/Fedora)
+# Update system and install dependencies + Anemone (RHEL/Fedora) - French
 sudo dnf update -y && \
 sudo dnf install -y golang samba git && \
 git clone https://github.com/juste-un-gars/anemone.git && \
 cd anemone && \
-sudo ./install.sh -y
+sudo ./install.sh fr
+
+# English version
+sudo dnf update -y && \
+sudo dnf install -y golang samba git && \
+git clone https://github.com/juste-un-gars/anemone.git && \
+cd anemone && \
+sudo ./install.sh en
 ```
 
 ### Standard Installation
@@ -122,8 +137,12 @@ sudo apt install -y samba               # Install Samba server
 git clone https://github.com/juste-un-gars/anemone.git
 cd anemone
 
-# Run installer (requires sudo)
-sudo ./install.sh
+# Run installer with language (requires sudo)
+sudo ./install.sh fr       # For French
+# OR
+sudo ./install.sh en       # For English
+# OR
+sudo ./install.sh          # Defaults to French
 
 # The installer will:
 # - Compile the binary
