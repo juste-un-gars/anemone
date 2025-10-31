@@ -871,3 +871,398 @@ Le système est **production-ready** pour un usage NAS de base :
 **Tokens utilisés** : ~82k/200k (41%)
 **État** : Production ready - Fonctionnalités de base complètes
 **Prochaine action** : Synchronisation P2P (fonctionnalité principale du projet)
+
+---
+
+## 🎯 Session du 31 Octobre 2025 (08:30-10:30)
+
+### Contexte
+- **Serveurs** : DEV (192.168.83.99) + FR1 (192.168.83.96) + FR2 (installation neuve)
+- **Objectif initial** : Tests corbeille et résolution bugs
+- **Découvertes** : Problèmes critiques permissions .trash
+
+### ✅ Réalisations de la session
+
+#### 1. Corrections permissions corbeille (CRITIQUE)
+
+**Problèmes identifiés** :
+1. Dossiers `.trash` créés en 700 (drwx------) au lieu de 755
+2. Serveur Anemone (user franck) ne peut pas lire .trash des users SMB
+3. Restauration/suppression impossible (permission denied)
+4. Dashboard affiche 0 fichiers alors que fichiers présents
+
+**Root cause découverte** :
+- Module VFS `recycle` de Samba **ignore** `force_directory_mode`
+- Crée `.trash` avec umask par défaut de l'utilisateur (700)
+- Les directives Samba ne s'appliquent PAS aux dossiers créés par VFS
+
+**Solutions implémentées** :
+
+**A. Ajout `force_directory_mode` dans smb.conf** (commit `c0d02e9`)
+- Ajout dans `internal/smb/smb.go` : `force_create_mode = 0664` et `force_directory_mode = 0755`
+- MAIS ne suffit pas car VFS ignore ces directives !
+
+**B. Opérations corbeille avec sudo** (commit `c0d02e9`)
+- Modification `internal/trash/trash.go` :
+  - `RestoreItem()` : Utilise `sudo mv`
+  - `DeleteItem()` : Utilise `sudo rm -f`  
+  - `EmptyTrash()` : Utilise `sudo rm -rf`
+  - `cleanupEmptyDirs()` : Utilise `sudo rmdir`
+
+**C. Permissions sudo complètes** (commit `c0d02e9`)
+- Mise à jour `install.sh` et `scripts/configure-smb-reload.sh` :
+  - `userdel` : Suppression utilisateurs
+  - `chmod` : Modifier permissions
+  - `mv` : Restaurer fichiers
+  - `rm`, `rmdir` : Supprimer fichiers/dossiers
+  - `mkdir` : Créer dossiers
+
+**D. Pré-création dossiers .trash** (commit `1f180cb`) ⭐ SOLUTION FINALE
+- Modification `internal/shares/shares.go` : `Create()`
+- Crée `.trash/%U` avec permissions 755 **avant** première suppression
+- Samba VFS recycle utilise alors les dossiers existants
+- Évite création automatique avec mauvaises permissions
+
+#### 2. Statistiques dashboard réelles (commit `38122a6`)
+
+**Problèmes** :
+- Espace utilisé : Hardcodé "0 GB"
+- Corbeille : Toujours 0 éléments (table SQL inexistante)
+- Dernière sauvegarde : Toujours "Jamais"
+
+**Solutions** :
+- **Espace utilisé** : Calcul réel via `calculateDirectorySize()`
+  - Parcourt tous partages de l'utilisateur
+  - Formatage intelligent (B, KB, MB, GB, TB, PB, EB)
+- **Corbeille** : Utilise `trash.ListTrashItems()`
+  - Compte fichiers dans chaque `.trash/` de tous les partages
+- **Dernière sauvegarde** : Interroge table `sync_log`
+  - Affiche "Il y a X heures" ou "Il y a X jours"
+- **Quota** : Changé de "100 GB" à "∞" (en attendant implémentation)
+
+**Fonctions ajoutées** :
+```go
+calculateDirectorySize(path string) int64
+formatBytes(bytes int64) string
+```
+
+#### 3. Interface corbeille améliorée (commit `98e8d4f`)
+
+**Fonctionnalités ajoutées** :
+- ✅ Cases à cocher pour sélection multiple
+- ✅ Case "Tout sélectionner" dans header
+- ✅ Actions groupées (restaurer/supprimer plusieurs fichiers)
+- ✅ Compteur de sélection dynamique
+- ✅ Barre d'actions contextuelle (apparaît si sélection)
+- ✅ Bouton "Tout désélectionner"
+- ✅ Feedbacks visuels (hover, compteurs, confirmations)
+
+**Fonctions JavaScript** :
+```javascript
+toggleSelectAll()          // Tout sélectionner/désélectionner
+updateBulkActions()        // Affiche/cache barre actions
+getSelectedFiles()         // Récupère fichiers cochés
+bulkRestore()             // Restaure sélection
+bulkDelete()              // Supprime sélection définitivement
+deselectAll()             // Décocher tout
+```
+
+#### 4. Accès corbeille dashboard admin (commit `0a645aa`)
+
+**Problème** : Dashboard admin n'avait pas de lien vers corbeille (user oui)
+
+**Solution** :
+- Ajout carte "🗑️ Corbeille" dans dashboard admin
+- Changement grille de 4 à 3 colonnes (5 cartes au total)
+- Lien vers `/trash`
+
+#### 5. Documentation installation (commit `98e8d4f`)
+
+**README.md** :
+- Ajout section "One-Line Installation" pour serveurs neufs
+- Commandes complètes commentées (Debian/Ubuntu + RHEL/Fedora)
+- Installation de toutes dépendances en une commande
+
+### 📊 Statistiques session 31 Octobre
+
+- **Durée** : ~2h
+- **Commits** : 5 commits
+- **Fichiers modifiés** : 8 fichiers
+- **Lignes ajoutées** : ~300 lignes
+- **Bugs critiques résolus** : 3 (permissions trash, stats dashboard, sélection multiple)
+- **Tests** : 3 serveurs (DEV + FR1 + FR2 installation neuve validée)
+
+### 🔍 Commits de la session
+
+```
+c0d02e9 - fix: Corbeille - Permissions et opérations sudo
+0a645aa - feat: Ajout accès corbeille dans dashboard admin
+38122a6 - feat: Calcul réel des statistiques dashboard
+1f180cb - fix: Pré-création dossiers .trash avec permissions correctes (755)
+98e8d4f - feat: Sélection multiple corbeille + One-line installation README
+```
+
+### 🐛 Problèmes résolus
+
+**1. Permissions .trash en 700**
+- **Root cause** : VFS recycle ignore force_directory_mode
+- **Solution finale** : Pré-création en 755 lors activation user
+- **Status** : ✅ RÉSOLU DÉFINITIVEMENT
+
+**2. Opérations corbeille impossible (permission denied)**
+- **Root cause** : Serveur franck ne peut pas modifier fichiers de users SMB
+- **Solution** : Toutes opérations via sudo (mv, rm, rmdir)
+- **Status** : ✅ RÉSOLU
+
+**3. Dashboard stats hardcodées**
+- **Root cause** : Pas de calcul réel, valeurs par défaut
+- **Solution** : Calcul dynamique espace + trash + sync
+- **Status** : ✅ RÉSOLU
+
+**4. Sélection fichiers corbeille un par un**
+- **Root cause** : Pas d'interface sélection multiple
+- **Solution** : Cases à cocher + actions groupées
+- **Status** : ✅ RÉSOLU
+
+### 📁 Fichiers modifiés
+
+**Code backend** :
+- `internal/smb/smb.go` : Ajout force_directory_mode
+- `internal/trash/trash.go` : Opérations sudo (mv, rm, rmdir)
+- `internal/shares/shares.go` : Pré-création .trash en 755
+- `internal/web/router.go` : Calcul stats dashboard réelles
+
+**Templates** :
+- `web/templates/trash.html` : Sélection multiple + actions groupées
+- `web/templates/dashboard_admin.html` : Ajout carte corbeille
+- `web/templates/dashboard_user.html` : Masquage quota si ∞
+
+**Scripts & docs** :
+- `install.sh` : Permissions sudo complètes
+- `scripts/configure-smb-reload.sh` : Idem
+- `README.md` : One-line installation + commentaires
+
+### 🧪 Tests effectués (FR2 - installation neuve)
+
+✅ **Installation one-line** :
+```bash
+sudo apt update -y && \
+sudo apt upgrade -y && \
+sudo apt-get install -y golang-go samba git && \
+git clone https://github.com/juste-un-gars/anemone.git && \
+cd anemone && \
+sudo ./install.sh -y
+```
+
+✅ **Tests corbeille** :
+- Création utilisateur via interface web
+- Activation utilisateur (lien email)
+- Connexion SMB depuis Windows
+- Suppression fichiers via SMB
+- Vérification apparition dans corbeille web
+- Vérification permissions .trash (755 ✅)
+- Restauration fichier unique : OK
+- Sélection multiple : OK
+- Restauration groupée : OK
+- Suppression définitive groupée : OK
+- Tout sélectionner/désélectionner : OK
+
+✅ **Dashboard stats** :
+- Espace utilisé : Affiche taille réelle ✅
+- Corbeille : Affiche nombre correct ✅
+- Dernière sauvegarde : "Jamais" (aucune sync) ✅
+
+### 🎯 État actuel du système
+
+**Fonctionnalités COMPLÈTES** :
+- ✅ Multi-utilisateurs avec authentification
+- ✅ Partages SMB automatiques (backup + data)
+- ✅ Corbeille avec VFS Samba (création, restauration, suppression)
+- ✅ Sélection multiple dans corbeille
+- ✅ Suppression complète utilisateurs
+- ✅ Dashboard stats réelles (espace, trash, sync)
+- ✅ Installation automatisée one-line
+- ✅ Privacy SMB (isolation partages)
+- ✅ Gestion pairs P2P (CRUD + test connexion)
+- ✅ Permissions .trash correctes automatiquement
+
+**Fonctionnalités PARTIELLES** :
+- ⚠️ Sync P2P manuel : Prototype (bouton sync, tar.gz over HTTPS)
+
+**Fonctionnalités MANQUANTES** :
+- ❌ Sync P2P automatique (scheduler, détection changements)
+- ❌ Chiffrement archives sync
+- ❌ Quotas utilisateur
+- ❌ Monitoring système
+- ❌ Page Paramètres
+- ❌ Gestion conflits sync
+
+### 📞 Pour reprendre la PROCHAINE session
+
+### ✅ Ce qui fonctionne parfaitement
+
+Le système est maintenant **production-ready** pour un usage NAS de base avec corbeille :
+- ✅ Installation one-line sur serveur neuf
+- ✅ Multi-utilisateurs avec partages isolés
+- ✅ Corbeille fonctionnelle (permissions automatiques)
+- ✅ Sélection multiple dans interface web
+- ✅ Stats dashboard réelles
+- ✅ Suppression complète utilisateurs
+- ✅ Privacy SMB totale
+- ✅ Installation automatisée complète
+
+### 🎯 Prochaines fonctionnalités à implémenter
+
+#### PRIORITÉ 1 : Synchronisation P2P automatique ⭐
+
+**Objectif** : Synchroniser automatiquement les partages `backup_*` entre pairs
+
+**État actuel** :
+- ✅ Infrastructure P2P (gestion pairs, test connexion)
+- ✅ Prototype sync manuel (tar.gz over HTTPS)
+- ✅ Table `sync_log` en DB
+- ✅ Bouton sync manuel dans interface
+
+**À implémenter** :
+1. **Scheduler de synchronisation**
+   - Cron job ou timer systemd ?
+   - Fréquence configurable par admin
+   - Détection changements (inotify ou polling)
+
+2. **Chiffrement archives**
+   - Utiliser clé de chiffrement utilisateur
+   - Chiffrement avant envoi
+   - Déchiffrement après réception
+
+3. **Gestion conflits**
+   - Stratégie newer wins ?
+   - Versionning fichiers ?
+   - Notification conflits à l'utilisateur
+
+4. **Optimisation**
+   - Delta sync (rsync-like) au lieu de tar.gz complet
+   - Compression optimisée
+   - Retry automatique en cas d'échec
+   - Bandwidth limiting
+
+5. **Interface monitoring**
+   - Dashboard sync par utilisateur
+   - Logs temps réel
+   - Statut sync (en cours, réussi, échec)
+   - Dernière sync par partage
+
+**Fichiers concernés** :
+- `internal/sync/sync.go` : À améliorer
+- Nouveau : `internal/scheduler/` pour cron jobs
+- Nouveau : `internal/crypto/` pour chiffrement sync
+
+#### PRIORITÉ 2 : Quotas utilisateur
+
+**Objectif** : Limiter l'espace disque par utilisateur
+
+**À faire** :
+1. **Backend quotas** dans `internal/quota/`
+   - Calcul taille utilisée (réutiliser calculateDirectorySize)
+   - Vérification avant écriture
+   - Blocage si quota dépassé
+
+2. **Interface admin**
+   - Définir quota par user (GB)
+   - Vue utilisation globale
+   - Alertes approche limite
+
+3. **Interface utilisateur**
+   - Dashboard : quota utilisé / total (remplacer ∞)
+   - Barre de progression
+   - Alerte si > 90%
+
+#### PRIORITÉ 3 : Monitoring & Dashboard amélioré
+
+**Objectif** : Visibilité sur l'état du système
+
+**À faire** :
+1. **Métriques système**
+   - Espace disque total/utilisé (/srv/anemone)
+   - Charge CPU/RAM
+   - Température (si disponible)
+   - Statut services (Samba, Anemone)
+
+2. **Statistiques utilisateurs**
+   - Nombre fichiers par user
+   - Activité récente (dernière connexion)
+   - Graphiques utilisation (Chart.js ?)
+
+3. **Logs système**
+   - Interface visualisation logs
+   - Filtrage par niveau (info, warn, error)
+   - Recherche dans logs
+
+#### PRIORITÉ 4 : Page Paramètres (Settings)
+
+**Objectif** : Configuration système via web
+
+**À faire** :
+1. **Paramètres Samba**
+   - Workgroup
+   - Server name
+   - Description
+
+2. **Paramètres réseau**
+   - Ports HTTP/HTTPS
+   - Certificat TLS custom
+
+3. **Paramètres sync**
+   - Fréquence synchronisation
+   - Stratégie conflits
+   - Activation/désactivation sync globale
+
+4. **Paramètres corbeille**
+   - Durée conservation (30 jours par défaut)
+   - Purge automatique activée/désactivée
+
+### 🛠️ Améliorations techniques (optionnelles)
+
+- **Tests automatisés** : Tests unitaires + intégration
+- **CI/CD** : GitHub Actions pour build/test
+- **Docker** : Image Docker officielle
+- **Logs structurés** : Améliorer logging (niveaux, rotation)
+- **API REST** : Endpoints API pour intégration externe
+- **Documentation API** : Swagger/OpenAPI
+- **Webhooks** : Notifications externes (Discord, Slack, etc.)
+
+### 💡 Recommandations pour suite développement
+
+1. **Tests sur plusieurs distros** :
+   - Debian 12
+   - Ubuntu 22.04/24.04
+   - Fedora 40/41
+   - RHEL 9
+
+2. **Documentation utilisateur** :
+   - Guide configuration réseau
+   - Guide connexion clients (Windows, Mac, Linux, Android, iOS)
+   - FAQ troubleshooting
+   - Vidéos tutoriels ?
+
+3. **Sécurité** :
+   - Audit sécurité complet
+   - Rate limiting connexions
+   - 2FA optionnel ?
+   - Logs audit (qui a fait quoi quand)
+
+4. **Performance** :
+   - Benchmark calcul espace disque (peut être lent)
+   - Cache stats dashboard ?
+   - Pagination liste corbeille si > 100 fichiers
+
+---
+
+**Session sauvegardée le** : 2025-10-31 10:30
+**Tokens utilisés** : ~94k/200k (47%)
+**État** : Production ready - Corbeille complète + Stats réelles + Sélection multiple
+**Prochaine action** : Synchronisation P2P automatique (fonctionnalité principale)
+
+**Notes importantes** :
+- ⚠️ Installations existantes (avant commit 1f180cb) nécessitent chmod manuel sur .trash
+- ✅ Nouvelles installations : corbeille fonctionne automatiquement
+- ✅ Tests validés sur 3 serveurs (DEV, FR1, FR2 neuf)

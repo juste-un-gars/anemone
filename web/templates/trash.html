@@ -50,12 +50,39 @@
             </div>
         </div>
 
-        <!-- Trash items list -->
+        <!-- Bulk actions (hidden by default) -->
         {{if .Items}}
+        <div id="bulkActions" class="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 hidden">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <span id="selectedCount" class="text-sm font-medium text-blue-900">0 fichier(s) sélectionné(s)</span>
+                    <button onclick="bulkRestore()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Restaurer la sélection
+                    </button>
+                    <button onclick="bulkDelete()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Supprimer définitivement
+                    </button>
+                </div>
+                <button onclick="deselectAll()" class="text-sm text-blue-600 hover:text-blue-800">
+                    Tout désélectionner
+                </button>
+            </div>
+        </div>
+
+        <!-- Trash items list -->
         <div class="bg-white shadow rounded-lg overflow-hidden">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
+                        <th scope="col" class="px-6 py-3 text-left">
+                            <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                        </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Fichier
                         </th>
@@ -75,7 +102,13 @@
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                     {{range .Items}}
-                    <tr>
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4">
+                            <input type="checkbox" class="file-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                   data-share="{{.ShareName}}"
+                                   data-path="{{.RelativePath}}"
+                                   onchange="updateBulkActions()">
+                        </td>
                         <td class="px-6 py-4">
                             <div class="flex items-center">
                                 <svg class="h-5 w-5 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,6 +172,104 @@
 </div>
 
 <script>
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.file-checkbox');
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    updateBulkActions();
+}
+
+function updateBulkActions() {
+    const checkboxes = document.querySelectorAll('.file-checkbox:checked');
+    const bulkActions = document.getElementById('bulkActions');
+    const selectedCount = document.getElementById('selectedCount');
+    const selectAll = document.getElementById('selectAll');
+
+    if (checkboxes.length > 0) {
+        bulkActions.classList.remove('hidden');
+        selectedCount.textContent = checkboxes.length + ' fichier(s) sélectionné(s)';
+    } else {
+        bulkActions.classList.add('hidden');
+    }
+
+    // Update "select all" checkbox state
+    const allCheckboxes = document.querySelectorAll('.file-checkbox');
+    selectAll.checked = allCheckboxes.length > 0 && checkboxes.length === allCheckboxes.length;
+}
+
+function deselectAll() {
+    document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('selectAll').checked = false;
+    updateBulkActions();
+}
+
+function getSelectedFiles() {
+    const selected = [];
+    document.querySelectorAll('.file-checkbox:checked').forEach(cb => {
+        selected.push({
+            share: cb.dataset.share,
+            path: cb.dataset.path
+        });
+    });
+    return selected;
+}
+
+async function bulkRestore() {
+    const files = getSelectedFiles();
+    if (files.length === 0) return;
+
+    if (!confirm(`Restaurer ${files.length} fichier(s) ?`)) return;
+
+    let success = 0;
+    let failed = 0;
+
+    for (const file of files) {
+        try {
+            const response = await fetch('/trash/restore?share=' + encodeURIComponent(file.share) + '&path=' + encodeURIComponent(file.path), {
+                method: 'POST',
+            });
+            if (response.ok) {
+                success++;
+            } else {
+                failed++;
+            }
+        } catch (error) {
+            failed++;
+        }
+    }
+
+    alert(`✅ ${success} fichier(s) restauré(s)${failed > 0 ? '\n❌ ' + failed + ' échec(s)' : ''}`);
+    window.location.reload();
+}
+
+async function bulkDelete() {
+    const files = getSelectedFiles();
+    if (files.length === 0) return;
+
+    if (!confirm(`⚠️ ATTENTION: Supprimer définitivement ${files.length} fichier(s) ?\n\nCette action est irréversible.`)) return;
+
+    let success = 0;
+    let failed = 0;
+
+    for (const file of files) {
+        try {
+            const response = await fetch('/trash/delete?share=' + encodeURIComponent(file.share) + '&path=' + encodeURIComponent(file.path), {
+                method: 'POST',
+            });
+            if (response.ok) {
+                success++;
+            } else {
+                failed++;
+            }
+        } catch (error) {
+            failed++;
+        }
+    }
+
+    alert(`✅ ${success} fichier(s) supprimé(s)${failed > 0 ? '\n❌ ' + failed + ' échec(s)' : ''}`);
+    window.location.reload();
+}
+
 function restoreFile(shareName, relPath) {
     if (!confirm('Restaurer ce fichier ?\n\n' + relPath)) {
         return;

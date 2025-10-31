@@ -85,9 +85,39 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 - Samba (for SMB file sharing)
 - Sudo access (for system configuration)
 
-### Automated Installation (Recommended)
+### One-Line Installation (Fresh Server)
+
+For a completely new server installation, you can install all dependencies and Anemone in one command:
 
 ```bash
+# Update system and install dependencies + Anemone (Debian/Ubuntu)
+sudo apt update -y && \
+sudo apt upgrade -y && \
+sudo apt-get install -y golang-go samba git && \
+git clone https://github.com/juste-un-gars/anemone.git && \
+cd anemone && \
+sudo ./install.sh -y
+```
+
+**For RHEL/Fedora:**
+```bash
+# Update system and install dependencies + Anemone (RHEL/Fedora)
+sudo dnf update -y && \
+sudo dnf install -y golang samba git && \
+git clone https://github.com/juste-un-gars/anemone.git && \
+cd anemone && \
+sudo ./install.sh -y
+```
+
+### Standard Installation
+
+```bash
+# Install dependencies first
+sudo apt update -y                      # Update package lists
+sudo apt upgrade -y                     # Upgrade existing packages
+sudo apt-get install -y golang-go       # Install Go compiler
+sudo apt install -y samba               # Install Samba server
+
 # Clone repository
 git clone https://github.com/juste-un-gars/anemone.git
 cd anemone
