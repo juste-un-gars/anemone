@@ -1575,3 +1575,421 @@ grep -l "Déconnexion\|Partage\|Fichier" web/templates/*.html
 - ✅ Toutes traductions corbeille dans i18n.go
 - ❌ Templates HTML pas encore modifiés (PRIORITÉ)
 - 🎯 Prochaine étape : Modifier trash.html ligne par ligne
+
+---
+
+## 🎯 Session du 31 Octobre 2025 (13:00-14:00)
+
+### Contexte
+- **Suite de** : Mini-session traductions (10:30-11:00)
+- **Objectif** : Finaliser traductions templates HTML + Planifier page Paramètres
+
+### ✅ Réalisations de la session
+
+#### 1. Traduction complète templates HTML (commit `e9a7660`)
+
+**Problème résolu** : Les traductions étaient dans i18n.go mais les templates HTML contenaient encore du texte hardcodé en français.
+
+**Templates traduits** :
+
+**A. trash.html** - Traduction 100% complète
+- **Textes HTML** : Tous les textes remplacés par `{{T .Lang "trash.key"}}`
+  - Navigation : "Déconnexion" → `{{T .Lang "trash.logout"}}`
+  - Header : "Corbeille", "Fichiers supprimés récemment"
+  - Actions bulk : "Restaurer la sélection", "Supprimer définitivement", "Tout désélectionner"
+  - Colonnes tableau : Fichier, Partage, Taille, Supprimé le, Actions
+  - Boutons : Restaurer, Supprimer
+  - État vide : "Corbeille vide", "Aucun fichier supprimé"
+
+- **JavaScript internationalisé** :
+  ```javascript
+  // Ajout objet i18n avec traductions dynamiques
+  const i18n = {
+      selected_count: "{{T .Lang "trash.selected_count"}}",
+      confirm_restore: "{{T .Lang "trash.confirm_restore"}}",
+      confirm_delete: "{{T .Lang "trash.confirm_delete"}}",
+      confirm_restore_bulk: "{{T .Lang "trash.confirm_restore_bulk"}}",
+      confirm_delete_bulk: "{{T .Lang "trash.confirm_delete_bulk"}}",
+      restored_success: "{{T .Lang "trash.restored_success"}}",
+      restored_bulk: "{{T .Lang "trash.restored_bulk"}}",
+      deleted_bulk: "{{T .Lang "trash.deleted_bulk"}}",
+      failed_bulk: "{{T .Lang "trash.failed_bulk"}}",
+      restoring: "{{T .Lang "trash.restoring"}}",
+      error: "{{T .Lang "trash.error"}}"
+  };
+
+  // Fonction pour remplacer placeholders {count}, {success}, {failed}
+  function replacePlaceholders(text, params) {
+      let result = text;
+      for (const [key, value] of Object.entries(params)) {
+          result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+      }
+      return result;
+  }
+  ```
+
+- **Messages dynamiques** :
+  - `bulkRestore()` : Utilise `replacePlaceholders(i18n.confirm_restore_bulk, {count: files.length})`
+  - `bulkDelete()` : Idem avec placeholders pour succès/échecs
+  - `restoreFile()` : Messages de confirmation et erreur traduits
+  - `deleteFile()` : Idem
+
+**B. dashboard_admin.html** - Carte corbeille traduite
+- Titre : `{{T .Lang "trash.title"}}`
+- Description : `{{T .Lang "trash.card_description"}}`
+- Bouton : `{{T .Lang "trash.view_button"}}`
+
+**C. dashboard_user.html** - Stats + carte corbeille traduites
+- Stats corbeille :
+  - Titre : `{{T .Lang "trash.title"}}`
+  - Label : `{{T .Lang "trash.items"}}`
+- Carte complète :
+  - Titre, description avec rétention 30 jours, bouton
+
+**Traductions i18n.go ajoutées** (4 nouvelles clés) :
+```go
+"trash.card_description":   "Récupérer vos fichiers supprimés" / "Recover your deleted files"
+"trash.card_description_retention": "Récupérer vos fichiers supprimés (conservation 30 jours)" / "Recover your deleted files (30 days retention)"
+"trash.view_button":        "Voir la corbeille" / "View trash"
+"trash.items":              "éléments" / "items"
+```
+
+**Impact** :
+- ✅ Interface corbeille 100% traduite (FR/EN)
+- ✅ Dashboards admin/user traduits
+- ✅ Messages JavaScript dynamiques avec placeholders
+- ✅ Installation multilingue complète (install.sh + backend + templates)
+
+**Commit** : `e9a7660` - "feat: Traduction complète templates HTML corbeille et dashboards (FR/EN)"
+
+### 📊 Statistiques session
+
+- **Durée** : ~1h
+- **Commits** : 1 commit
+- **Fichiers modifiés** : 4 fichiers
+  - `internal/i18n/i18n.go` (4 clés ajoutées)
+  - `web/templates/trash.html` (refonte complète JS + HTML)
+  - `web/templates/dashboard_admin.html` (carte corbeille)
+  - `web/templates/dashboard_user.html` (stats + carte)
+- **Lignes modifiées** : 78 insertions, 36 suppressions
+- **Traductions ajoutées** : 4 clés x 2 langues = 8 traductions
+
+### 🎯 État actuel après traductions
+
+**Internationalisation COMPLÈTE** ✅ :
+- ✅ Installation (install.sh avec paramètre fr/en)
+- ✅ Backend (i18n.go avec 30 clés trash)
+- ✅ Templates HTML (trash.html, dashboards)
+- ✅ JavaScript dynamique (messages avec placeholders)
+
+**Systeme fonctionne en FR/EN** selon la variable `LANGUAGE` définie dans systemd.
+
+---
+
+## 🎯 PLAN - Fonctionnalités Page Paramètres & Gestion Mots de Passe
+
+### Contexte de la demande
+
+**Besoin utilisateur** :
+1. Sélecteur de langue dans l'interface (au lieu de juste au moment de l'installation)
+2. Page Paramètres utilisateur pour gérer ses options
+3. Changement de mot de passe par l'utilisateur
+4. Réinitialisation de mot de passe par l'admin (avec lien)
+
+**Question technique résolue** : Clé de chiffrement et changement de mot de passe
+- ✅ **La clé de chiffrement est INDÉPENDANTE du mot de passe**
+- ✅ Mot de passe = authentification (web + SMB)
+- ✅ Clé de chiffrement = chiffrement données synchronisées
+- ✅ **On peut changer le mot de passe SANS toucher la clé de chiffrement**
+- ✅ Mise à jour : hash DB + mot de passe SMB
+
+### Architecture technique
+
+#### 1. Préférence langue utilisateur
+
+**Stockage** : Nouvelle colonne en DB
+```sql
+ALTER TABLE users ADD COLUMN language VARCHAR(2) DEFAULT 'fr';
+```
+
+**Ordre de priorité** :
+1. Préférence utilisateur stockée en DB
+2. Si NULL : variable d'environnement `LANGUAGE`
+3. Si absente : défaut `fr`
+
+**Middleware** : Charger la langue depuis DB au moment de la session
+
+#### 2. Changement mot de passe utilisateur
+
+**Flux utilisateur** :
+1. Page `/settings` avec formulaire
+2. Champs : Ancien mot de passe + Nouveau + Confirmation
+3. Validation backend : vérifier ancien mot de passe
+4. Si OK : Mise à jour DB + SMB
+5. Clé de chiffrement reste intacte
+
+**Backend** :
+```go
+func ChangePassword(db *sql.DB, userID int, oldPassword, newPassword string) error {
+    // 1. Récupérer user en DB
+    // 2. Vérifier ancien mot de passe (bcrypt.CompareHashAndPassword)
+    // 3. Hasher nouveau mot de passe
+    // 4. UPDATE users SET password = ? WHERE id = ?
+    // 5. Mettre à jour SMB : exec smbpasswd -s username (avec sudo)
+    // 6. Ne PAS toucher à encryption_key
+}
+```
+
+#### 3. Réinitialisation mot de passe par admin
+
+**Flux admin** :
+1. Admin clique "Réinitialiser mot de passe" dans liste utilisateurs
+2. Confirmation : "Envoyer un lien de réinitialisation à username ?"
+3. Génération token (comme activation) : durée 24h
+4. Affichage lien : `https://server:8443/reset-password?token=xxx`
+
+**Flux utilisateur** :
+1. User clique sur le lien
+2. Page `/reset-password?token=xxx`
+3. Formulaire : Nouveau mot de passe + Confirmation
+4. Validation token (vérifie expiration)
+5. Mise à jour DB + SMB
+6. Clé de chiffrement reste intacte
+
+**Backend** :
+```go
+// Table password_reset_tokens (ou réutiliser activation_tokens)
+type PasswordResetToken struct {
+    ID        int
+    UserID    int
+    Token     string
+    ExpiresAt time.Time
+    Used      bool
+}
+
+func GeneratePasswordResetToken(db *sql.DB, userID int) (string, error)
+func ResetPasswordWithToken(db *sql.DB, token, newPassword string) error
+```
+
+### Plan d'implémentation détaillé
+
+#### Phase 1 : Migration DB + Backend langue
+
+**Fichiers à créer/modifier** :
+- `internal/migrations/008_add_user_language.sql`
+  ```sql
+  ALTER TABLE users ADD COLUMN language VARCHAR(2) DEFAULT 'fr';
+  ```
+
+- `internal/users/users.go`
+  - Ajouter champ `Language` à struct `User`
+  - Fonction `UpdateUserLanguage(db, userID, lang string)`
+
+- `internal/web/middleware.go`
+  - Middleware `LanguageMiddleware()` : charge langue depuis DB ou fallback
+
+#### Phase 2 : Page Paramètres Utilisateur
+
+**Fichiers à créer** :
+- `web/templates/settings.html`
+  - Section Langue : Dropdown FR/EN avec sélection actuelle
+  - Section Mot de passe : Formulaire changement
+  - Section Info : Afficher username, email, date création
+
+- `internal/web/router.go`
+  - Route GET `/settings` : Afficher page
+  - Route POST `/settings/language` : Changer langue
+  - Route POST `/settings/password` : Changer mot de passe
+
+**Traductions i18n.go** (environ 20 clés) :
+```go
+"settings.title":                "Paramètres" / "Settings"
+"settings.language.title":       "Langue" / "Language"
+"settings.language.description": "Langue d'affichage" / "Display language"
+"settings.password.title":       "Mot de passe" / "Password"
+"settings.password.current":     "Mot de passe actuel" / "Current password"
+"settings.password.new":         "Nouveau mot de passe" / "New password"
+"settings.password.confirm":     "Confirmer" / "Confirm"
+"settings.password.button":      "Changer le mot de passe" / "Change password"
+// ... etc
+```
+
+#### Phase 3 : Changement mot de passe utilisateur
+
+**Fichiers à modifier** :
+- `internal/users/users.go`
+  - Fonction `ChangePassword(db, userID, oldPassword, newPassword string) error`
+    - Vérifier ancien mot de passe
+    - Hasher nouveau mot de passe
+    - UPDATE DB
+    - Exécuter `echo -e "newpassword\nNewPassword" | sudo smbpasswd -s username`
+    - Retourner erreur si échec
+
+- `internal/web/handlers_settings.go` (nouveau fichier)
+  - Handler POST `/settings/password`
+  - Validation formulaire
+  - Appel `ChangePassword()`
+  - Gestion erreurs + succès
+
+**Permissions sudo** :
+- Ajouter dans `scripts/configure-smb-reload.sh` :
+  ```bash
+  franck ALL=(ALL) NOPASSWD: /usr/bin/smbpasswd *
+  ```
+
+#### Phase 4 : Réinitialisation mot de passe par admin
+
+**Fichiers à créer/modifier** :
+
+**A. Migration DB** :
+- `internal/migrations/009_password_reset_tokens.sql`
+  ```sql
+  CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      expires_at DATETIME NOT NULL,
+      used BOOLEAN DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+  ```
+
+**B. Backend** :
+- `internal/reset/reset.go` (nouveau package)
+  - `GenerateToken(db, userID int) (string, error)`
+  - `ValidateToken(db, token string) (userID int, err error)`
+  - `MarkTokenUsed(db, token string) error`
+  - `CleanupExpiredTokens(db *sql.DB)` (cron job)
+
+- `internal/users/users.go`
+  - `ResetPasswordWithToken(db, token, newPassword string) error`
+
+**C. Interface admin** :
+- `web/templates/admin_users.html`
+  - Ajouter bouton "Réinitialiser mot de passe" à côté de "Supprimer"
+  - Modal confirmation : "Envoyer un lien à username ?"
+  - Affichage lien généré (copier/coller)
+
+- `web/templates/reset_password.html` (nouveau)
+  - Formulaire : Nouveau mot de passe + Confirmation
+  - Similaire à `activate.html` mais sans clé de chiffrement
+
+**D. Routes** :
+- GET `/admin/users/:id/reset-password` : Générer token + afficher lien
+- GET `/reset-password?token=xxx` : Afficher formulaire
+- POST `/reset-password` : Valider + changer mot de passe
+
+**Traductions i18n.go** (environ 15 clés) :
+```go
+"reset.title":              "Réinitialiser le mot de passe" / "Reset Password"
+"reset.button":             "Réinitialiser" / "Reset Password"
+"reset.confirm":            "Envoyer un lien à {username} ?" / "Send reset link to {username}?"
+"reset.link_generated":     "Lien généré" / "Link Generated"
+"reset.link_expires":       "Expire dans 24h" / "Expires in 24h"
+"reset.token_invalid":      "Lien invalide ou expiré" / "Invalid or expired link"
+"reset.success":            "Mot de passe changé avec succès" / "Password changed successfully"
+// ... etc
+```
+
+### Ordre d'implémentation recommandé
+
+**Session 1** (2-3h) :
+1. Migration DB : Colonne `language`
+2. Backend langue : Middleware + fonction UpdateUserLanguage
+3. Page `/settings` : Interface de base
+4. Sélecteur langue fonctionnel
+
+**Session 2** (2-3h) :
+5. Changement mot de passe utilisateur
+6. Fonction backend ChangePassword (DB + SMB)
+7. Interface formulaire dans `/settings`
+8. Tests validation
+
+**Session 3** (2-3h) :
+9. Migration DB : Table `password_reset_tokens`
+10. Backend réinitialisation : Package `reset`
+11. Interface admin : Bouton + modal
+12. Page `/reset-password` + handler
+
+**Session 4** (1h) :
+13. Traductions complètes FR/EN (toutes les clés)
+14. Tests end-to-end
+15. Documentation mise à jour
+
+### Fichiers à créer (9 nouveaux) :
+```
+internal/migrations/008_add_user_language.sql
+internal/migrations/009_password_reset_tokens.sql
+internal/reset/reset.go
+internal/web/handlers_settings.go
+web/templates/settings.html
+web/templates/reset_password.html
+```
+
+### Fichiers à modifier (6 existants) :
+```
+internal/users/users.go
+internal/web/router.go
+internal/web/middleware.go
+internal/i18n/i18n.go
+web/templates/admin_users.html
+scripts/configure-smb-reload.sh
+```
+
+### Traductions à ajouter :
+- Environ 35 nouvelles clés FR/EN
+- Sections : settings, password, reset
+
+### Sécurité
+
+**Validations** :
+- Ancien mot de passe vérifié avant changement
+- Nouveaux mots de passe : minimum 8 caractères
+- Tokens de réinitialisation : expiration 24h
+- Tokens à usage unique (marqués `used = 1`)
+- Nettoyage automatique tokens expirés
+
+**Permissions** :
+- `/settings` : Authentification requise
+- `/admin/users/:id/reset-password` : Admin uniquement
+- `/reset-password` : Token valide requis
+
+### Tests à effectuer
+
+**Changement mot de passe utilisateur** :
+- ✅ Connexion web avec nouveau mot de passe
+- ✅ Connexion SMB avec nouveau mot de passe
+- ✅ Ancien mot de passe ne fonctionne plus
+- ✅ Clé de chiffrement reste la même
+- ✅ Messages d'erreur (mauvais ancien mot de passe)
+
+**Réinitialisation par admin** :
+- ✅ Token unique généré
+- ✅ Token expire après 24h
+- ✅ Token ne peut être utilisé qu'une fois
+- ✅ Connexion web + SMB fonctionne après reset
+- ✅ Clé de chiffrement reste intacte
+
+**Changement de langue** :
+- ✅ Interface change immédiatement
+- ✅ Préférence persistée en DB
+- ✅ Langue conservée après déconnexion/reconnexion
+
+---
+
+**Session sauvegardée le** : 2025-10-31 14:00
+**Tokens utilisés** : ~135k/200k (67.5%)
+**État** : Traductions HTML complètes - Plan Paramètres documenté
+**Prochaine action** : Implémenter page Paramètres (Session 1-4 du plan)
+
+**Commits de cette session** :
+- e9a7660 : Traduction complète templates HTML corbeille et dashboards (FR/EN)
+
+**Notes importantes** :
+- ✅ Interface 100% traduite FR/EN (backend + templates + JS)
+- ✅ Plan complet Page Paramètres documenté (4 sessions)
+- ✅ Architecture technique définie (DB, backend, frontend)
+- ✅ Sécurité : Clé de chiffrement indépendante du mot de passe
+- 🎯 Prochaine étape : Session 1 du plan (langue + page settings de base)
+- ⚠️ Utilisateur proche limite hebdomadaire - Plan documenté pour reprise
