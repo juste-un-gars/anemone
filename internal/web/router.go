@@ -128,6 +128,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/trash/", auth.RequireAuth(server.handleTrashActions))
 	mux.HandleFunc("/settings", auth.RequireAuth(server.handleSettings))
 	mux.HandleFunc("/settings/language", auth.RequireAuth(server.handleSettingsLanguage))
+	mux.HandleFunc("/settings/password", auth.RequireAuth(server.handleSettingsPassword))
 
 	// Admin routes - Shares
 	mux.HandleFunc("/admin/shares", auth.RequireAdmin(server.handleAdminShares))
@@ -1767,5 +1768,66 @@ func (s *Server) handleSettingsLanguage(w http.ResponseWriter, r *http.Request) 
 	if language == "fr" {
 		successMsg = "Langue modifiée avec succès"
 	}
+	http.Redirect(w, r, "/settings?success="+successMsg, http.StatusSeeOther)
+}
+
+// handleSettingsPassword handles password change
+func (s *Server) handleSettingsPassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	session, _ := auth.GetSessionFromContext(r)
+
+	// Parse form
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/settings?error=Invalid+form+data", http.StatusSeeOther)
+		return
+	}
+
+	currentPassword := r.FormValue("current_password")
+	newPassword := r.FormValue("new_password")
+	confirmPassword := r.FormValue("confirm_password")
+
+	// Validate inputs
+	if currentPassword == "" || newPassword == "" || confirmPassword == "" {
+		http.Redirect(w, r, "/settings?error=All+fields+are+required", http.StatusSeeOther)
+		return
+	}
+
+	if newPassword != confirmPassword {
+		http.Redirect(w, r, "/settings?error=New+passwords+do+not+match", http.StatusSeeOther)
+		return
+	}
+
+	if len(newPassword) < 8 {
+		http.Redirect(w, r, "/settings?error=Password+must+be+at+least+8+characters", http.StatusSeeOther)
+		return
+	}
+
+	// Change password (DB + SMB)
+	if err := users.ChangePassword(s.db, session.UserID, currentPassword, newPassword); err != nil {
+		log.Printf("Error changing password for user %d: %v", session.UserID, err)
+
+		// Check for specific error messages
+		errMsg := err.Error()
+		if errMsg == "incorrect current password" {
+			http.Redirect(w, r, "/settings?error=Incorrect+current+password", http.StatusSeeOther)
+		} else if errMsg == "new password must be at least 8 characters" {
+			http.Redirect(w, r, "/settings?error=Password+must+be+at+least+8+characters", http.StatusSeeOther)
+		} else {
+			http.Redirect(w, r, "/settings?error=Failed+to+change+password", http.StatusSeeOther)
+		}
+		return
+	}
+
+	// Get user to determine language for success message
+	user, _ := users.GetByID(s.db, session.UserID)
+	successMsg := "Password changed successfully"
+	if user != nil && user.Language == "fr" {
+		successMsg = "Mot de passe modifié avec succès"
+	}
+
 	http.Redirect(w, r, "/settings?success="+successMsg, http.StatusSeeOther)
 }

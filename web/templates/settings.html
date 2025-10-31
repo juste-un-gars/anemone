@@ -92,35 +92,36 @@
             </form>
         </div>
 
-        <!-- Password Section (UI ready for Phase 2) -->
-        <div class="bg-white shadow rounded-lg p-6 mb-6 opacity-50 cursor-not-allowed">
+        <!-- Password Section -->
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
             <h3 class="text-lg font-medium text-gray-900 mb-4">
                 {{T .Lang "settings.password.title"}}
             </h3>
             <p class="text-sm text-gray-600 mb-4">
-                {{T .Lang "settings.password.description"}} (Bientôt disponible)
+                {{T .Lang "settings.password.description"}}
             </p>
-            <form class="space-y-4">
+            <form method="POST" action="/settings/password" class="space-y-4">
                 <div>
                     <label for="current_password" class="block text-sm font-medium text-gray-700">
                         {{T .Lang "settings.password.current"}}
                     </label>
-                    <input type="password" id="current_password" name="current_password" disabled class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-100">
+                    <input type="password" id="current_password" name="current_password" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                 </div>
                 <div>
                     <label for="new_password" class="block text-sm font-medium text-gray-700">
                         {{T .Lang "settings.password.new"}}
                     </label>
-                    <input type="password" id="new_password" name="new_password" disabled class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-100">
+                    <input type="password" id="new_password" name="new_password" required minlength="8" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <p class="mt-1 text-xs text-gray-500">Minimum 8 caractères</p>
                 </div>
                 <div>
                     <label for="confirm_password" class="block text-sm font-medium text-gray-700">
                         {{T .Lang "settings.password.confirm"}}
                     </label>
-                    <input type="password" id="confirm_password" name="confirm_password" disabled class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-100">
+                    <input type="password" id="confirm_password" name="confirm_password" required minlength="8" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
                 </div>
                 <div>
-                    <button type="submit" disabled class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-gray-200 cursor-not-allowed">
+                    <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
                         {{T .Lang "settings.password.button"}}
                     </button>
                 </div>
