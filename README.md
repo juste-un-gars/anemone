@@ -224,6 +224,43 @@ open http://localhost:8080
    - User must re-type key to confirm
 5. Account activated → Redirect to dashboard
 
+### Password Management
+
+#### User: Change Own Password
+
+1. Go to **Settings** (user menu)
+2. Click **Change Password**
+3. Enter current password
+4. Enter new password (minimum 8 characters)
+5. Confirm new password
+6. System updates:
+   - Database password hash
+   - SMB password (automatic sync)
+   - Encryption key remains unchanged
+
+#### Admin: Reset User Password
+
+1. Go to **Users** section
+2. Find activated user
+3. Click **Reset Password**
+4. System generates a **password reset link** (valid 24h)
+5. Copy link and send to user via email/chat
+
+**User receives link**:
+1. User clicks reset link
+2. User enters new password (minimum 8 characters)
+3. Confirms new password
+4. System updates:
+   - Database password hash
+   - SMB password (automatic sync)
+   - Encryption key remains unchanged
+5. Redirect to login with success message
+
+**Security notes**:
+- Reset tokens are single-use and expire after 24 hours
+- Admin does not see or set the new password
+- Encryption key is preserved (no data loss)
+
 ## 🔐 Security
 
 ### Encryption Keys
@@ -296,10 +333,14 @@ Linux:   smb://nas.local/username-backup
 ## 🌍 Internationalization
 
 Supported languages:
-- 🇫🇷 French
+- 🇫🇷 French (Français)
 - 🇬🇧 English
 
-Language selected during initial setup.
+**Language Selection**:
+- Default language chosen during initial setup
+- Users can change their language anytime in **Settings** page
+- Language preference saved per user in database
+- All UI elements fully translated (templates, forms, buttons, messages)
 
 ## 📊 Database Schema
 
@@ -307,8 +348,9 @@ See `internal/database/migrations.go` for complete schema.
 
 Main tables:
 - `system_config` - System settings
-- `users` - User accounts
-- `activation_tokens` - Temporary activation links
+- `users` - User accounts (with language preference)
+- `activation_tokens` - Temporary activation links (24h validity)
+- `password_reset_tokens` - Password reset links (24h validity, single-use)
 - `shares` - File shares
 - `trash_items` - Deleted files
 - `peers` - Connected Anemone instances
@@ -500,6 +542,30 @@ echo "✓ Anemone removed (system users and SMB users NOT removed - see above)"
 - [x] User authentication (login/logout)
 - [x] Multi-user management
 - [x] Activation tokens system (24h validity)
+- [x] Password management:
+  - [x] User: Change own password (Settings page)
+  - [x] Admin: Reset user password (24h tokens)
+  - [x] Automatic DB + SMB sync
+  - [x] Encryption key preservation
+- [x] Settings page:
+  - [x] Language selector (FR/EN)
+  - [x] Password change form
+  - [x] Account information display
+- [x] Internationalization (i18n):
+  - [x] French (100% complete)
+  - [x] English (100% complete)
+  - [x] Per-user language preference
+  - [x] All UI translated (templates, dashboards, forms)
+- [x] Trash system:
+  - [x] Per-user SMB recycle bin
+  - [x] File listing with restore/delete
+  - [x] Bulk operations support
+  - [x] Dashboard statistics
+- [x] Dashboard & Statistics:
+  - [x] Storage usage (real-time)
+  - [x] Trash count
+  - [x] Last sync timestamp
+  - [x] User information
 - [x] Automatic SMB share creation (backup + data per user)
 - [x] Samba dynamic configuration & auto-reload
 - [x] P2P peers management (CRUD, connection testing)
@@ -510,15 +576,14 @@ echo "✓ Anemone removed (system users and SMB users NOT removed - see above)"
 
 **In Progress** 🔨:
 - [ ] P2P synchronization (rclone with encryption)
-- [ ] User quotas & monitoring
-- [ ] Trash system (30 days retention)
-- [ ] System dashboard & statistics
+- [ ] User quotas enforcement & monitoring
 
 **Planned** 📅:
-- [ ] Settings page (workgroup, network config)
+- [ ] Advanced settings (workgroup, network config)
 - [ ] Conflict resolution for sync
 - [ ] API endpoints for external integrations
 - [ ] Docker official image
+- [ ] Email notifications (password reset, quota alerts)
 
 ## 🤝 Contributing
 
