@@ -1169,12 +1169,10 @@ func (s *Server) handleResetPasswordForm(w http.ResponseWriter, r *http.Request)
 			Lang    string
 			Title   string
 			Error   string
-			T       func(string) string
 		}{
 			Lang:  lang,
 			Title: i18n.T(lang, "reset.title"),
 			Error: i18n.T(lang, "reset.token_invalid"),
-			T:     func(key string) string { return i18n.T(lang, key) },
 		}
 		if err := s.templates.ExecuteTemplate(w, "reset_password.html", data); err != nil {
 			log.Printf("Error rendering reset password template: %v", err)
@@ -1189,12 +1187,10 @@ func (s *Server) handleResetPasswordForm(w http.ResponseWriter, r *http.Request)
 			Lang    string
 			Title   string
 			Error   string
-			T       func(string) string
 		}{
 			Lang:  lang,
 			Title: i18n.T(lang, "reset.title"),
 			Error: i18n.T(lang, "reset.token_invalid"),
-			T:     func(key string) string { return i18n.T(lang, key) },
 		}
 		if err := s.templates.ExecuteTemplate(w, "reset_password.html", data); err != nil {
 			log.Printf("Error rendering reset password template: %v", err)
@@ -1218,14 +1214,12 @@ func (s *Server) handleResetPasswordForm(w http.ResponseWriter, r *http.Request)
 		Token    string
 		Username string
 		Error    string
-		T        func(string) string
 	}{
 		Lang:     lang,
 		Title:    i18n.T(lang, "reset.title"),
 		Token:    tokenString,
 		Username: user.Username,
 		Error:    r.URL.Query().Get("error"),
-		T:        func(key string) string { return i18n.T(lang, key) },
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "reset_password.html", data); err != nil {
