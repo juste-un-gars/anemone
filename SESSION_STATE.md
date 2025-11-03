@@ -2446,3 +2446,90 @@ Admin clique "Réinitialiser mot de passe" sur user
 - 🎯 Tests manuels recommandés (génération lien, reset, connexion)
 - 🎯 Plan Page Paramètres : 3/4 sessions complètes
 
+
+---
+
+## 🐛 Corrections bugs - Session 3 (3 Novembre 2025)
+
+### Bug 1 : Template reset_password.html - Fonction T avec mauvais nombre d'arguments
+
+**Symptôme** : "Internal Server Error" lors de l'ouverture du lien de réinitialisation de mot de passe
+
+**Erreur** :
+```
+Error rendering reset password template: template: reset_password.html:6:13: 
+executing "reset_password.html" at <T>: wrong number of args for T: want 2 got 1
+```
+
+**Cause** :
+- Template utilisait `{{T "key"}}` au lieu de `{{T .Lang "key"}}`
+- La fonction T nécessite 2 arguments : langue + clé
+
+**Correction** (commit `18d7127`) :
+- ✅ Remplacement de tous les `{{T "key"}}` par `{{T .Lang "key"}}`
+- ✅ Suppression des champs `T func(string)` inutiles dans les handlers
+- ✅ 8 corrections dans reset_password.html
+- ✅ 3 structs corrigées dans router.go
+
+**Fichiers modifiés** :
+- `web/templates/reset_password.html` (8 corrections)
+- `internal/web/router.go` (3 structs)
+
+**Test** : ✅ Réinitialisation mot de passe fonctionnelle
+
+
+### Bug 2 : Template trash.html - Accès incorrect à .Lang dans boucle {{range}}
+
+**Symptôme** : 
+- "Internal Server Error" à droite des fichiers dans la page corbeille
+- Boutons "Restaurer" et "Supprimer" non affichés
+
+**Erreur** :
+```
+Error rendering trash template: template: trash.html:147:36: 
+executing "trash.html" at <.Lang>: can't evaluate field Lang in type web.TrashItemWithShare
+```
+
+**Cause** :
+- Dans une boucle `{{range}}`, `.Lang` fait référence au contexte de l'élément courant
+- Il faut utiliser `$.Lang` pour accéder au contexte racine
+
+**Correction** (commit `5f231af`) :
+- ✅ Ligne 147 : `{{T .Lang "trash.action_restore"}}` → `{{T $.Lang "trash.action_restore"}}`
+- ✅ Ligne 153 : `{{T .Lang "trash.action_delete"}}` → `{{T $.Lang "trash.action_delete"}}`
+
+**Fichiers modifiés** :
+- `web/templates/trash.html` (2 corrections)
+
+**Test** : ✅ Corbeille affiche correctement tous les fichiers avec boutons fonctionnels
+
+
+### 📊 Résumé corrections Session 3
+
+**Commits** :
+- `4e9adc6` : Session 3 - Réinitialisation mot de passe par admin (760 lignes)
+- `18d7127` : Bug fix - Template reset_password.html (fonction T)
+- `5f231af` : Bug fix - Template trash.html ($.Lang dans boucle)
+
+**Tests effectués** :
+- ✅ Génération lien de réinitialisation par admin
+- ✅ Ouverture lien et affichage formulaire réinitialisation
+- ✅ Réinitialisation mot de passe utilisateur "test" réussie
+- ✅ Connexion avec nouveau mot de passe OK
+- ✅ Affichage corbeille avec 5 fichiers OK
+- ✅ Boutons Restaurer/Supprimer fonctionnels
+
+**État final** : Session 3 COMPLÈTE et FONCTIONNELLE ✅
+
+
+---
+
+**Session mise à jour le** : 2025-11-03 (après tests et corrections)
+**État final** : 🎉 Session 3 - Réinitialisation mot de passe par admin - 100% FONCTIONNELLE
+**Prochaine session** : Session 4 (tests end-to-end + documentation) ou nouvelle fonctionnalité
+
+**Commits totaux cette session** :
+- 4e9adc6 : feat: Réinitialisation mot de passe par admin (Session 3 complète)
+- 18d7127 : fix: Correction template reset_password.html (fonction T avec 2 args)
+- 5f231af : fix: Correction template trash.html ($.Lang au lieu de .Lang dans boucle)
+
