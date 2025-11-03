@@ -48,6 +48,17 @@ func Migrate(db *sql.DB) error {
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		)`,
 
+		// Password reset tokens (temporary links for password reset)
+		`CREATE TABLE IF NOT EXISTS password_reset_tokens (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL,
+			token TEXT NOT NULL UNIQUE,
+			expires_at DATETIME NOT NULL,
+			used BOOLEAN DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		)`,
+
 		// Shares (backup + optional other shares)
 		`CREATE TABLE IF NOT EXISTS shares (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -108,6 +119,8 @@ func Migrate(db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`,
 		`CREATE INDEX IF NOT EXISTS idx_activation_tokens_token ON activation_tokens(token)`,
 		`CREATE INDEX IF NOT EXISTS idx_activation_tokens_expires ON activation_tokens(expires_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token)`,
+		`CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires ON password_reset_tokens(expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_trash_expires ON trash_items(expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_sync_log_user ON sync_log(user_id)`,
 	}

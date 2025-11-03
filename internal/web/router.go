@@ -23,6 +23,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/config"
 	"github.com/juste-un-gars/anemone/internal/i18n"
 	"github.com/juste-un-gars/anemone/internal/peers"
+	"github.com/juste-un-gars/anemone/internal/reset"
 	"github.com/juste-un-gars/anemone/internal/shares"
 	"github.com/juste-un-gars/anemone/internal/smb"
 	"github.com/juste-un-gars/anemone/internal/sync"
@@ -106,6 +107,10 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// Activation routes (public)
 	mux.HandleFunc("/activate/", server.handleActivate)
 	mux.HandleFunc("/activate/confirm", server.handleActivateConfirm)
+
+	// Password reset routes (public)
+	mux.HandleFunc("/reset-password", server.handleResetPasswordForm)
+	mux.HandleFunc("/reset-password/confirm", server.handleResetPasswordSubmit)
 
 	// Protected routes
 	mux.HandleFunc("/dashboard", auth.RequireAuth(server.handleDashboard))
@@ -822,6 +827,63 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
+	case "reset":
+		// Generate password reset token
+		user, err := users.GetByID(s.db, userID)
+		if err != nil {
+			log.Printf("Error getting user: %v", err)
+			http.NotFound(w, r)
+			return
+		}
+
+		// Create reset token
+		token, err := reset.CreatePasswordResetToken(s.db, user.ID)
+		if err != nil {
+			log.Printf("Error creating reset token: %v", err)
+			http.Error(w, "Failed to create reset token", http.StatusInternalServerError)
+			return
+		}
+
+		// Build reset URL - use Host from request
+		host := r.Host
+		if host == "" || host == "localhost" || strings.HasPrefix(host, "localhost:") {
+			if s.cfg.EnableHTTPS {
+				host = fmt.Sprintf("localhost:%s", s.cfg.HTTPSPort)
+			} else {
+				host = fmt.Sprintf("localhost:%s", s.cfg.Port)
+			}
+		}
+		protocol := "https"
+		if !s.cfg.EnableHTTPS {
+			protocol = "http"
+		}
+		resetURL := fmt.Sprintf("%s://%s/reset-password?token=%s", protocol, host, token.Token)
+
+		data := struct {
+			Lang      string
+			Title     string
+			Session   *auth.Session
+			Username  string
+			Email     string
+			ResetURL  string
+			ExpiresAt time.Time
+			T         func(string) string
+		}{
+			Lang:      lang,
+			Title:     i18n.T(lang, "reset.token.title"),
+			Session:   session,
+			Username:  user.Username,
+			Email:     user.Email,
+			ResetURL:  resetURL,
+			ExpiresAt: token.ExpiresAt,
+		}
+
+		if err := s.templates.ExecuteTemplate(w, "admin_users_reset_token.html", data); err != nil {
+			log.Printf("Error rendering reset token template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
 	case "delete":
 		// Delete user
 		if r.Method != http.MethodPost {
@@ -1086,6 +1148,159 @@ func (s *Server) handleActivateConfirm(w http.ResponseWriter, r *http.Request) {
 
 	// Redirect to login
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+// handleResetPasswordForm displays the password reset form
+func (s *Server) handleResetPasswordForm(w http.ResponseWriter, r *http.Request) {
+	lang := s.getLang(r)
+
+	// Get token from query string
+	tokenString := r.URL.Query().Get("token")
+	if tokenString == "" {
+		http.Error(w, "Token required", http.StatusBadRequest)
+		return
+	}
+
+	// Get token from database
+	token, err := reset.GetTokenByString(s.db, tokenString)
+	if err != nil {
+		log.Printf("Token not found: %v", err)
+		data := struct {
+			Lang    string
+			Title   string
+			Error   string
+			T       func(string) string
+		}{
+			Lang:  lang,
+			Title: i18n.T(lang, "reset.title"),
+			Error: i18n.T(lang, "reset.token_invalid"),
+			T:     func(key string) string { return i18n.T(lang, key) },
+		}
+		if err := s.templates.ExecuteTemplate(w, "reset_password.html", data); err != nil {
+			log.Printf("Error rendering reset password template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Check if token is valid
+	if !token.IsValid() {
+		data := struct {
+			Lang    string
+			Title   string
+			Error   string
+			T       func(string) string
+		}{
+			Lang:  lang,
+			Title: i18n.T(lang, "reset.title"),
+			Error: i18n.T(lang, "reset.token_invalid"),
+			T:     func(key string) string { return i18n.T(lang, key) },
+		}
+		if err := s.templates.ExecuteTemplate(w, "reset_password.html", data); err != nil {
+			log.Printf("Error rendering reset password template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Get user info
+	user, err := users.GetByID(s.db, token.UserID)
+	if err != nil {
+		log.Printf("Error getting user: %v", err)
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
+
+	// Show form
+	data := struct {
+		Lang     string
+		Title    string
+		Token    string
+		Username string
+		Error    string
+		T        func(string) string
+	}{
+		Lang:     lang,
+		Title:    i18n.T(lang, "reset.title"),
+		Token:    tokenString,
+		Username: user.Username,
+		Error:    r.URL.Query().Get("error"),
+		T:        func(key string) string { return i18n.T(lang, key) },
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "reset_password.html", data); err != nil {
+		log.Printf("Error rendering reset password template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}
+
+// handleResetPasswordSubmit processes the password reset form
+func (s *Server) handleResetPasswordSubmit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse form
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/reset-password?error=Invalid+form+data", http.StatusSeeOther)
+		return
+	}
+
+	tokenString := r.FormValue("token")
+	newPassword := r.FormValue("new_password")
+	confirmPassword := r.FormValue("confirm_password")
+
+	// Validate
+	if tokenString == "" || newPassword == "" || confirmPassword == "" {
+		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=All+fields+are+required", tokenString), http.StatusSeeOther)
+		return
+	}
+
+	if newPassword != confirmPassword {
+		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=Passwords+do+not+match", tokenString), http.StatusSeeOther)
+		return
+	}
+
+	if len(newPassword) < 8 {
+		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=Password+must+be+at+least+8+characters", tokenString), http.StatusSeeOther)
+		return
+	}
+
+	// Get token from database
+	token, err := reset.GetTokenByString(s.db, tokenString)
+	if err != nil || !token.IsValid() {
+		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=Invalid+or+expired+token", tokenString), http.StatusSeeOther)
+		return
+	}
+
+	// Get user
+	user, err := users.GetByID(s.db, token.UserID)
+	if err != nil {
+		log.Printf("Error getting user: %v", err)
+		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=User+not+found", tokenString), http.StatusSeeOther)
+		return
+	}
+
+	// Reset password (update DB + SMB)
+	err = users.ResetPassword(s.db, user.ID, user.Username, newPassword)
+	if err != nil {
+		log.Printf("Error resetting password: %v", err)
+		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=Failed+to+reset+password", tokenString), http.StatusSeeOther)
+		return
+	}
+
+	// Mark token as used
+	if err := token.MarkAsUsed(s.db); err != nil {
+		log.Printf("Error marking token as used: %v", err)
+		// Non-critical, continue
+	}
+
+	log.Printf("Password reset successfully for user: %s", user.Username)
+
+	// Redirect to login with success message
+	http.Redirect(w, r, "/login?success=Password+reset+successfully", http.StatusSeeOther)
 }
 
 // Placeholder handlers for future implementation

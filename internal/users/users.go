@@ -452,3 +452,52 @@ func ChangePassword(db *sql.DB, userID int, oldPassword, newPassword string) err
 	fmt.Printf("Password changed successfully for user: %s\n", user.Username)
 	return nil
 }
+
+// ResetPassword resets a user's password (used by admin for password reset)
+// It updates both the database and SMB password, without verifying the old password
+func ResetPassword(db *sql.DB, userID int, username, newPassword string) error {
+	// Validate new password length
+	if len(newPassword) < 8 {
+		return fmt.Errorf("new password must be at least 8 characters")
+	}
+
+	// Hash new password
+	newPasswordHash, err := crypto.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("failed to hash new password: %w", err)
+	}
+
+	// Update password in database
+	_, err = db.Exec("UPDATE users SET password_hash = ? WHERE id = ?", newPasswordHash, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update password in database: %w", err)
+	}
+
+	// Update SMB password
+	// Use smbpasswd with stdin to change password
+	cmd := exec.Command("sudo", "smbpasswd", "-s", username)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("failed to create stdin pipe: %w", err)
+	}
+
+	// Start the command
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start smbpasswd: %w", err)
+	}
+
+	// Write new password twice (smbpasswd asks for password twice)
+	_, err = fmt.Fprintf(stdin, "%s\n%s\n", newPassword, newPassword)
+	stdin.Close()
+	if err != nil {
+		return fmt.Errorf("failed to write to smbpasswd: %w", err)
+	}
+
+	// Wait for command to complete
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("failed to update SMB password: %w", err)
+	}
+
+	fmt.Printf("Password reset successfully for user: %s\n", username)
+	return nil
+}

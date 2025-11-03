@@ -129,6 +129,11 @@
                                 {{T $.Lang "users.action.copy_link"}}
                             </a>
                             {{end}}
+                            {{if .ActivatedAt}}
+                            <a href="/admin/users/{{.ID}}/reset" class="text-yellow-600 hover:text-yellow-900 mr-3">
+                                {{T $.Lang "users.action.reset_password"}}
+                            </a>
+                            {{end}}
                             <button onclick="deleteUser({{.ID}}, '{{.Username}}')" class="text-red-600 hover:text-red-900">
                                 {{T $.Lang "users.action.delete"}}
                             </button>

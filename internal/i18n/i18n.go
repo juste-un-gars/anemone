@@ -299,6 +299,33 @@ func (t *Translator) loadTranslations() error {
 		"settings.info.email":           "Email",
 		"settings.info.created":         "Compte créé le",
 
+		// Password reset
+		"reset.title":                "Réinitialiser le mot de passe",
+		"reset.reset_for":            "Réinitialisation pour",
+		"reset.new_password":         "Nouveau mot de passe",
+		"reset.confirm_password":     "Confirmer le mot de passe",
+		"reset.password.help":        "Minimum 8 caractères",
+		"reset.info":                 "Votre mot de passe sera réinitialisé. Vous pourrez vous connecter avec ce nouveau mot de passe.",
+		"reset.submit":               "Réinitialiser le mot de passe",
+		"reset.back_to_login":        "Retour à la connexion",
+		"reset.token_invalid":        "Lien de réinitialisation invalide ou expiré",
+		"reset.success":              "Mot de passe réinitialisé avec succès",
+		"reset.token.title":          "Lien de réinitialisation généré",
+		"reset.token.for_user":       "Pour l'utilisateur",
+		"reset.token.warning":        "Attention : Ce lien est valable 24 heures",
+		"reset.token.info":           "Envoyez ce lien à l'utilisateur pour qu'il puisse réinitialiser son mot de passe. Le lien expirera automatiquement après 24 heures.",
+		"reset.token.link":           "Lien de réinitialisation",
+		"reset.token.copy":           "Copier",
+		"reset.token.copied":         "Copié !",
+		"reset.token.expires":        "Expire le :",
+		"reset.token.user_info":      "Informations utilisateur",
+		"reset.token.username":       "Nom d'utilisateur",
+		"reset.token.email":          "Email",
+		"reset.token.done":           "Retour aux utilisateurs",
+
+		// Users actions
+		"users.action.reset_password": "Réinitialiser mot de passe",
+
 		// Common
 		"common.submit":            "Envoyer",
 		"common.cancel":            "Annuler",
@@ -541,6 +568,33 @@ func (t *Translator) loadTranslations() error {
 		"settings.info.username":        "Username",
 		"settings.info.email":           "Email",
 		"settings.info.created":         "Account created on",
+
+		// Password reset
+		"reset.title":                "Reset Password",
+		"reset.reset_for":            "Password reset for",
+		"reset.new_password":         "New password",
+		"reset.confirm_password":     "Confirm password",
+		"reset.password.help":        "Minimum 8 characters",
+		"reset.info":                 "Your password will be reset. You will be able to log in with this new password.",
+		"reset.submit":               "Reset Password",
+		"reset.back_to_login":        "Back to login",
+		"reset.token_invalid":        "Invalid or expired reset link",
+		"reset.success":              "Password reset successfully",
+		"reset.token.title":          "Reset Link Generated",
+		"reset.token.for_user":       "For user",
+		"reset.token.warning":        "Warning: This link is valid for 24 hours",
+		"reset.token.info":           "Send this link to the user so they can reset their password. The link will automatically expire after 24 hours.",
+		"reset.token.link":           "Reset link",
+		"reset.token.copy":           "Copy",
+		"reset.token.copied":         "Copied!",
+		"reset.token.expires":        "Expires on:",
+		"reset.token.user_info":      "User information",
+		"reset.token.username":       "Username",
+		"reset.token.email":          "Email",
+		"reset.token.done":           "Back to users",
+
+		// Users actions
+		"users.action.reset_password": "Reset password",
 
 		// Common
 		"common.submit":            "Submit",
