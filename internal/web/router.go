@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -662,7 +663,7 @@ func (s *Server) handleAdminUsersAdd(w http.ResponseWriter, r *http.Request) {
 		username := strings.TrimSpace(r.FormValue("username"))
 		email := strings.TrimSpace(r.FormValue("email"))
 		isAdminStr := r.FormValue("is_admin")
-		quotaTotalStr := r.FormValue("quota_total")
+		quotaDataStr := r.FormValue("quota_data")
 		quotaBackupStr := r.FormValue("quota_backup")
 
 		// Validate
@@ -691,15 +692,18 @@ func (s *Server) handleAdminUsersAdd(w http.ResponseWriter, r *http.Request) {
 		}
 
 		isAdmin := isAdminStr == "true"
-		quotaTotal, _ := strconv.Atoi(quotaTotalStr)
+		quotaData, _ := strconv.Atoi(quotaDataStr)
 		quotaBackup, _ := strconv.Atoi(quotaBackupStr)
 
-		if quotaTotal <= 0 {
-			quotaTotal = 100
+		if quotaData <= 0 {
+			quotaData = 50
 		}
 		if quotaBackup <= 0 {
 			quotaBackup = 50
 		}
+
+		// Calculate total quota (backup + data)
+		quotaTotal := quotaBackup + quotaData
 
 		// Create pending user
 		user, err := users.CreatePendingUser(s.db, username, email, isAdmin, quotaTotal, quotaBackup)
@@ -1091,6 +1095,12 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Warning: Failed to create backup quota directory: %v", err)
 			} else {
 				log.Printf("Created backup subvolume with %dGB quota", user.QuotaBackupGB)
+
+				// Set ownership of subvolume to user (needed for .trash creation)
+				chownCmd := exec.Command("sudo", "chown", fmt.Sprintf("%s:%s", token.Username, token.Username), backupPath)
+				if err := chownCmd.Run(); err != nil {
+					log.Printf("Warning: Failed to set backup subvolume ownership: %v", err)
+				}
 			}
 		}
 
@@ -1113,6 +1123,12 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Warning: Failed to create data quota directory: %v", err)
 			} else {
 				log.Printf("Created data subvolume with %dGB quota", dataQuotaGB)
+
+				// Set ownership of subvolume to user (needed for .trash creation)
+				chownCmd := exec.Command("sudo", "chown", fmt.Sprintf("%s:%s", token.Username, token.Username), dataPath)
+				if err := chownCmd.Run(); err != nil {
+					log.Printf("Warning: Failed to set data subvolume ownership: %v", err)
+				}
 			}
 		}
 

@@ -381,3 +381,36 @@ Plus **AUCUNE trace** de l'utilisateur après suppression :
 
 **Statut** : 🟢 PRODUCTION READY
 **Tests** : Validé avec 3 utilisateurs (test, doe, smith) supprimés complètement
+
+---
+
+## 🔧 Session 4 - Suite 4 (4 Nov 19:30-19:40) - Corrections finales
+
+### ✅ Fix création utilisateur : Permissions subvolumes Btrfs
+
+**Problème** : Subvolumes créés avec owner `root:root` → permissions denied pour créer `.trash/`
+
+**Solution** : Ajout `chown` après création subvolume (router.go lignes 1096, 1124)
+
+### ✅ Fix interface création utilisateur
+
+**Avant** : "Quota Total" + "Quota Backup"
+**Maintenant** : "Quota Backup" + "Quota Data"
+**Calcul auto** : Total = Backup + Data
+
+**Fichiers modifiés** :
+- `web/templates/admin_users_add.html` : Changé les champs de formulaire
+- `internal/web/router.go` : Ajout `os/exec` import + calcul total auto + chown subvolumes
+
+---
+
+## 📋 Prochaines étapes (Roadmap)
+
+1. **Tests utilisateur** : Créer john, valider quotas + accès partages
+2. **Support ext4/ZFS** : Implémenter `ProjectQuotaManager` et `ZFSQuotaManager`
+3. **Tests production** : Valider sur autre serveur
+4. **Restore config** : Sauvegarde/restauration configuration complète
+5. **P2P sync** : Finaliser synchronisation P2P automatique
+
+**Statut global** : 🟢 PRODUCTION READY
+**Session 4 complète** : Quotas Btrfs + Suppression complète + Fixes création user
