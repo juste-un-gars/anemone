@@ -73,6 +73,9 @@
                                 {{if ne .Stats.StorageQuota "∞"}}
                                 <dd class="text-sm text-gray-500">
                                     sur {{.Stats.StorageQuota}}
+                                    {{if .Stats.QuotaInfo}}
+                                    ({{.Stats.QuotaInfo.PercentUsed | printf "%.1f"}}%)
+                                    {{end}}
                                 </dd>
                                 {{end}}
                             </dl>
@@ -82,8 +85,29 @@
                 <!-- Progress Bar -->
                 <div class="bg-gray-50 px-5 py-3">
                     <div class="w-full bg-gray-200 rounded-full h-2">
+                        {{if .Stats.QuotaInfo}}
+                            {{if eq .Stats.QuotaInfo.AlertLevel "critical"}}
+                            <div class="bg-red-600 h-2 rounded-full" style="width: {{.Stats.StoragePercent}}%"></div>
+                            {{else if eq .Stats.QuotaInfo.AlertLevel "danger"}}
+                            <div class="bg-orange-600 h-2 rounded-full" style="width: {{.Stats.StoragePercent}}%"></div>
+                            {{else if eq .Stats.QuotaInfo.AlertLevel "warning"}}
+                            <div class="bg-yellow-500 h-2 rounded-full" style="width: {{.Stats.StoragePercent}}%"></div>
+                            {{else}}
+                            <div class="bg-green-600 h-2 rounded-full" style="width: {{.Stats.StoragePercent}}%"></div>
+                            {{end}}
+                        {{else}}
                         <div class="anemone-gradient h-2 rounded-full" style="width: {{.Stats.StoragePercent}}%"></div>
+                        {{end}}
                     </div>
+                    {{if .Stats.QuotaInfo}}
+                        {{if eq .Stats.QuotaInfo.AlertLevel "critical"}}
+                        <p class="text-xs text-red-600 mt-2 font-medium">⚠️ Quota dépassé</p>
+                        {{else if eq .Stats.QuotaInfo.AlertLevel "danger"}}
+                        <p class="text-xs text-orange-600 mt-2 font-medium">⚠️ Quota presque atteint (90%)</p>
+                        {{else if eq .Stats.QuotaInfo.AlertLevel "warning"}}
+                        <p class="text-xs text-yellow-700 mt-2">⚠️ 75% du quota utilisé</p>
+                        {{end}}
+                    {{end}}
                 </div>
             </div>
 

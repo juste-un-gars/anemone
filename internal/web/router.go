@@ -23,6 +23,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/config"
 	"github.com/juste-un-gars/anemone/internal/i18n"
 	"github.com/juste-un-gars/anemone/internal/peers"
+	"github.com/juste-un-gars/anemone/internal/quota"
 	"github.com/juste-un-gars/anemone/internal/reset"
 	"github.com/juste-un-gars/anemone/internal/shares"
 	"github.com/juste-un-gars/anemone/internal/smb"
@@ -58,6 +59,7 @@ type DashboardStats struct {
 	LastBackup     string
 	PeerCount      int
 	TrashCount     int
+	QuotaInfo      *quota.QuotaInfo
 }
 
 // NewRouter creates and configures the HTTP router
@@ -344,23 +346,27 @@ func (s *Server) getDashboardStats(session *auth.Session) *DashboardStats {
 		s.db.QueryRow("SELECT COUNT(*) FROM peers").Scan(&stats.PeerCount)
 	}
 
-	// Get user's shares
+	// Get quota information
+	quotaInfo, err := quota.GetUserQuota(s.db, session.UserID)
+	if err != nil {
+		log.Printf("Error getting quota info: %v", err)
+	} else {
+		stats.QuotaInfo = quotaInfo
+		stats.StorageUsed = fmt.Sprintf("%.2f GB", quotaInfo.UsedTotalGB)
+		stats.StorageQuota = fmt.Sprintf("%d GB", quotaInfo.QuotaTotalGB)
+		stats.StoragePercent = int(quotaInfo.PercentUsed)
+	}
+
+	// Get user's shares for trash count
 	userShares, err := shares.GetByUser(s.db, session.UserID)
 	if err != nil {
 		log.Printf("Error getting shares for stats: %v", err)
 		return stats
 	}
 
-	// Calculate storage usage and trash count
-	var totalSize int64
+	// Count trash items
 	totalTrashCount := 0
-
 	for _, share := range userShares {
-		// Calculate share size
-		shareSize := calculateDirectorySize(share.Path)
-		totalSize += shareSize
-
-		// Count trash items
 		username := session.Username
 		trashItems, err := trash.ListTrashItems(share.Path, username)
 		if err != nil {
@@ -369,9 +375,7 @@ func (s *Server) getDashboardStats(session *auth.Session) *DashboardStats {
 		}
 		totalTrashCount += len(trashItems)
 	}
-
 	stats.TrashCount = totalTrashCount
-	stats.StorageUsed = formatBytes(totalSize)
 
 	// Get last backup time from sync_log
 	var lastSync sql.NullTime
@@ -883,6 +887,11 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
+
+	case "quota":
+		// Edit user quota
+		s.handleAdminUserQuota(w, r, userID, session, lang)
+		return
 
 	case "delete":
 		// Delete user
@@ -2039,4 +2048,80 @@ func (s *Server) handleSettingsPassword(w http.ResponseWriter, r *http.Request) 
 	}
 
 	http.Redirect(w, r, "/settings?success="+successMsg, http.StatusSeeOther)
+}
+
+// handleAdminUserQuota handles quota management for a user
+func (s *Server) handleAdminUserQuota(w http.ResponseWriter, r *http.Request, userID int, session *auth.Session, lang string) {
+	if r.Method == http.MethodGet {
+		// Display quota edit form
+		user, err := users.GetByID(s.db, userID)
+		if err != nil {
+			log.Printf("Error getting user: %v", err)
+			http.NotFound(w, r)
+			return
+		}
+
+		// Get quota info
+		quotaInfo, err := quota.GetUserQuota(s.db, userID)
+		if err != nil {
+			log.Printf("Error getting quota info: %v", err)
+			http.Error(w, "Failed to get quota information", http.StatusInternalServerError)
+			return
+		}
+
+		data := struct {
+			Lang      string
+			Title     string
+			Session   *auth.Session
+			User      *users.User
+			QuotaInfo *quota.QuotaInfo
+		}{
+			Lang:      lang,
+			Title:     i18n.T(lang, "users.quota.title"),
+			Session:   session,
+			User:      user,
+			QuotaInfo: quotaInfo,
+		}
+
+		if err := s.templates.ExecuteTemplate(w, "admin_users_quota.html", data); err != nil {
+			log.Printf("Error rendering quota template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+	} else if r.Method == http.MethodPost {
+		// Update quotas
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "Invalid form data", http.StatusBadRequest)
+			return
+		}
+
+		quotaTotalGB, err := strconv.Atoi(r.FormValue("quota_total_gb"))
+		if err != nil || quotaTotalGB < 1 {
+			http.Error(w, "Invalid total quota", http.StatusBadRequest)
+			return
+		}
+
+		quotaBackupGB, err := strconv.Atoi(r.FormValue("quota_backup_gb"))
+		if err != nil || quotaBackupGB < 1 {
+			http.Error(w, "Invalid backup quota", http.StatusBadRequest)
+			return
+		}
+
+		// Update quota
+		if err := quota.UpdateUserQuota(s.db, userID, quotaTotalGB, quotaBackupGB); err != nil {
+			log.Printf("Error updating quota: %v", err)
+			http.Error(w, "Failed to update quota", http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("Admin %s updated quotas for user %d: total=%dGB, backup=%dGB",
+			session.Username, userID, quotaTotalGB, quotaBackupGB)
+
+		// Redirect back to users page with success message
+		http.Redirect(w, r, "/admin/users?success="+i18n.T(lang, "users.quota.success"), http.StatusSeeOther)
+
+	} else {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }

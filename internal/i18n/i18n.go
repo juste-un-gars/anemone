@@ -125,6 +125,7 @@ func (t *Translator) loadTranslations() error {
 		"dashboard.stats.storage":  "Stockage utilisé",
 		"dashboard.stats.backups":  "Dernière sauvegarde",
 		"dashboard.stats.peers":    "Pairs actifs",
+		"dashboard.support":        "Supporter le projet",
 
 		// Users management
 		"users.title":              "Gestion des utilisateurs",
@@ -147,6 +148,13 @@ func (t *Translator) loadTranslations() error {
 		"users.quota_total":        "Quota total (GB)",
 		"users.quota_backup":       "Quota sauvegarde (GB)",
 		"users.is_admin":           "Administrateur",
+		"users.quota.title":        "Modifier les quotas",
+		"users.quota.edit":         "Modifier quotas",
+		"users.quota.usage":        "Utilisation actuelle",
+		"users.quota.used":         "Utilisé",
+		"users.quota.available":    "Disponible",
+		"users.quota.update":       "Mettre à jour",
+		"users.quota.success":      "Quotas mis à jour avec succès",
 		"users.token.title":        "Lien d'activation créé",
 		"users.token.info":         "Envoyez ce lien au nouvel utilisateur",
 		"users.token.warning":      "⚠️ Ce lien expire dans 24 heures",
@@ -395,6 +403,7 @@ func (t *Translator) loadTranslations() error {
 		"dashboard.stats.storage":  "Storage Used",
 		"dashboard.stats.backups":  "Last Backup",
 		"dashboard.stats.peers":    "Active Peers",
+		"dashboard.support":        "Support the project",
 
 		// Users management
 		"users.title":              "User Management",
@@ -417,6 +426,13 @@ func (t *Translator) loadTranslations() error {
 		"users.quota_total":        "Total Quota (GB)",
 		"users.quota_backup":       "Backup Quota (GB)",
 		"users.is_admin":           "Administrator",
+		"users.quota.title":        "Edit Quotas",
+		"users.quota.edit":         "Edit Quotas",
+		"users.quota.usage":        "Current Usage",
+		"users.quota.used":         "Used",
+		"users.quota.available":    "Available",
+		"users.quota.update":       "Update",
+		"users.quota.success":      "Quotas updated successfully",
 		"users.token.title":        "Activation Link Created",
 		"users.token.info":         "Send this link to the new user",
 		"users.token.warning":      "⚠️ This link expires in 24 hours",
