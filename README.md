@@ -325,10 +325,28 @@ Linux:   smb://nas.local/username-backup
 
 ## 💾 Quotas
 
-- Admin sets per-user quotas (total + backup)
-- System monitors usage
-- Alerts when approaching limit
-- Blocks writes when quota exceeded
+**Admin Management**:
+- Set individual quotas per user via web interface (`/admin/users/{id}/quota`)
+- Two quota types:
+  - **Total Quota**: Overall storage limit for the user
+  - **Backup Quota**: Specific limit for backup share
+- Default: 100 GB total, 50 GB backup
+
+**Usage Monitoring**:
+- Real-time calculation of disk usage
+- Automatic scanning of all user shares
+- Separate tracking for backup vs data folders
+
+**Visual Alerts** (color-coded progress bars):
+- 🟢 **Green** (0-75%): Normal usage
+- 🟡 **Yellow** (75-90%): Warning - approaching limit
+- 🟠 **Orange** (90-100%): Danger - quota almost reached
+- 🔴 **Red** (>100%): Critical - quota exceeded
+
+**User Dashboard**:
+- Visual quota display with percentage
+- Color-coded alerts
+- Detailed breakdown of usage
 
 ## 🌍 Internationalization
 

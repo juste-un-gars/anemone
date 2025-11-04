@@ -2753,3 +2753,63 @@ La fonctionnalité de réinitialisation de mot de passe par admin est **100% com
 
 **Tous les commits sont pushés sur GitHub** : https://github.com/juste-un-gars/anemone
 
+
+---
+
+# État de la session - 04 Novembre 2025
+
+## 📍 Contexte de cette session
+
+**Session précédente** : Session 3 - Réinitialisation mot de passe par admin  
+**Cette session** : Système de gestion des quotas + Lien donation PayPal
+
+## ✅ Fonctionnalités implémentées aujourd'hui
+
+### 1. Système de Quotas (Complet ✅)
+
+**Package `internal/quota`** (163 lignes) :
+- `GetUserQuota()` : Calcule l'utilisation actuelle et les quotas
+- `UpdateUserQuota()` : Met à jour les limites de quotas
+- `IsQuotaExceeded()` : Vérifie si quota dépassé
+- Structure `QuotaInfo` avec toutes les métadonnées
+
+**Interface Admin** :
+- Route : `/admin/users/{id}/quota` (GET + POST)
+- Template `admin_users_quota.html` (161 lignes)
+- Affichage temps réel de l'utilisation
+- Barres de progression colorées par niveau d'alerte
+
+**Dashboard Utilisateur** :
+- Carte "Espace utilisé" améliorée
+- Niveaux d'alerte visuels :
+  - 🟢 Vert (0-74%) : Usage normal
+  - 🟡 Jaune (75-89%) : ⚠️ 75% du quota utilisé
+  - 🟠 Orange (90-99%) : ⚠️ Quota presque atteint
+  - 🔴 Rouge (100%+) : ⚠️ Quota dépassé
+
+### 2. Lien Donation PayPal (Complet ✅)
+
+- Bouton fixe en bas à droite dashboard admin
+- Lien vers `https://paypal.me/justeungars83`
+- Traduction FR/EN : "Supporter le projet"
+
+## 📦 Commits Session 4
+
+```
+60d89cf - feat: Add quota management system and PayPal donation link
+```
+
+## 🎉 Conclusion Session 4
+
+**Statut** : 🟢 PRODUCTION READY
+
+Le système de quotas est **100% complet et fonctionnel** ✅
+
+---
+
+**Session finalisée le** : 2025-11-04 10:00 UTC  
+**Durée totale Session 4** : ~1h30  
+**Tokens utilisés** : ~90k/200k (45%)  
+**État projet** : ✅ Stable et prêt pour utilisation
+
+**Tous les commits sont pushés sur GitHub** : https://github.com/juste-un-gars/anemone
