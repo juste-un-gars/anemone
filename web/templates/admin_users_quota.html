@@ -97,12 +97,24 @@
             </div>
 
             <!-- Data Usage -->
-            <div>
+            <div class="mb-6">
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm font-medium text-gray-700">Data</span>
                     <span class="text-sm text-gray-600">
-                        {{.QuotaInfo.UsedDataGB | printf "%.2f"}} GB
+                        {{.QuotaInfo.UsedDataGB | printf "%.2f"}} GB / {{.QuotaInfo.QuotaDataGB}} GB
+                        ({{.QuotaInfo.PercentData | printf "%.1f"}}%)
                     </span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                    {{if eq .QuotaInfo.DataAlertLevel "critical"}}
+                    <div class="bg-red-600 h-2.5 rounded-full" style="width: {{.QuotaInfo.PercentData}}%"></div>
+                    {{else if eq .QuotaInfo.DataAlertLevel "danger"}}
+                    <div class="bg-orange-600 h-2.5 rounded-full" style="width: {{.QuotaInfo.PercentData}}%"></div>
+                    {{else if eq .QuotaInfo.DataAlertLevel "warning"}}
+                    <div class="bg-yellow-500 h-2.5 rounded-full" style="width: {{.QuotaInfo.PercentData}}%"></div>
+                    {{else}}
+                    <div class="bg-green-600 h-2.5 rounded-full" style="width: {{.QuotaInfo.PercentData}}%"></div>
+                    {{end}}
                 </div>
             </div>
         </div>
@@ -113,25 +125,42 @@
                 {{T .Lang "users.quota.edit"}}
             </h3>
 
-            <form method="POST" action="/admin/users/{{.User.ID}}/quota" class="space-y-4">
-                <!-- Total Quota -->
-                <div>
-                    <label for="quota_total_gb" class="block text-sm font-medium text-gray-700 mb-2">
-                        {{T .Lang "users.quota_total"}}
-                    </label>
-                    <input type="number"
-                           id="quota_total_gb"
-                           name="quota_total_gb"
-                           value="{{.User.QuotaTotalGB}}"
-                           min="1"
-                           required
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
+            <!-- Info Note about Btrfs Compression -->
+            <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3 flex-1">
+                        <h4 class="text-sm font-medium text-blue-800">
+                            {{if eq .Lang "fr"}}
+                            ℹ️ Note sur les quotas et la compression
+                            {{else}}
+                            ℹ️ Note about quotas and compression
+                            {{end}}
+                        </h4>
+                        <p class="mt-1 text-sm text-blue-700">
+                            {{if eq .Lang "fr"}}
+                            Les quotas sont appliqués sur l'espace disque <strong>réel</strong> utilisé.
+                            Grâce à la compression Btrfs, les utilisateurs peuvent stocker <strong>plus de données</strong>
+                            que la limite du quota (généralement 20-50% de plus selon le type de fichiers).
+                            {{else}}
+                            Quotas are applied to the <strong>actual</strong> disk space used.
+                            Thanks to Btrfs compression, users can store <strong>more data</strong>
+                            than the quota limit (typically 20-50% more depending on file types).
+                            {{end}}
+                        </p>
+                    </div>
                 </div>
+            </div>
 
+            <form method="POST" action="/admin/users/{{.User.ID}}/quota" class="space-y-4">
                 <!-- Backup Quota -->
                 <div>
                     <label for="quota_backup_gb" class="block text-sm font-medium text-gray-700 mb-2">
-                        {{T .Lang "users.quota_backup"}}
+                        💾 {{T .Lang "users.quota_backup"}}
                     </label>
                     <input type="number"
                            id="quota_backup_gb"
@@ -140,7 +169,68 @@
                            min="1"
                            required
                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <p class="mt-1 text-sm text-gray-500">
+                        {{if eq .Lang "fr"}}
+                        Espace alloué pour les sauvegardes synchronisées
+                        {{else}}
+                        Space allocated for synchronized backups
+                        {{end}}
+                    </p>
                 </div>
+
+                <!-- Data Quota -->
+                <div>
+                    <label for="quota_data_gb" class="block text-sm font-medium text-gray-700 mb-2">
+                        📁 {{T .Lang "users.quota_data"}}
+                    </label>
+                    <input type="number"
+                           id="quota_data_gb"
+                           name="quota_data_gb"
+                           value="{{.QuotaInfo.QuotaDataGB}}"
+                           min="1"
+                           required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
+                    <p class="mt-1 text-sm text-gray-500">
+                        {{if eq .Lang "fr"}}
+                        Espace alloué pour les données locales
+                        {{else}}
+                        Space allocated for local data
+                        {{end}}
+                    </p>
+                </div>
+
+                <!-- Total (auto-calculated, read-only) -->
+                <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm font-medium text-gray-700">
+                            {{if eq .Lang "fr"}}
+                            📊 Total (backup + data)
+                            {{else}}
+                            📊 Total (backup + data)
+                            {{end}}
+                        </span>
+                        <span class="text-lg font-semibold text-purple-600" id="quota_total_display">
+                            {{.User.QuotaTotalGB}} GB
+                        </span>
+                    </div>
+                </div>
+
+                <script>
+                    // Auto-update total when backup or data changes
+                    const backupInput = document.getElementById('quota_backup_gb');
+                    const dataInput = document.getElementById('quota_data_gb');
+                    const totalDisplay = document.getElementById('quota_total_display');
+
+                    function updateTotal() {
+                        const backup = parseInt(backupInput.value) || 0;
+                        const data = parseInt(dataInput.value) || 0;
+                        const total = backup + data;
+                        totalDisplay.textContent = total + ' GB';
+                    }
+
+                    backupInput.addEventListener('input', updateTotal);
+                    dataInput.addEventListener('input', updateTotal);
+                </script>
 
                 <!-- Buttons -->
                 <div class="flex items-center justify-between pt-4">

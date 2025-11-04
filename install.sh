@@ -171,6 +171,7 @@ $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/mkdir *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/semanage fcontext *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/restorecon *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/setsebool *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs *
 EOF
 
     chmod 440 "$SUDOERS_FILE"

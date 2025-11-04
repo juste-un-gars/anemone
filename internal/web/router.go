@@ -1060,11 +1060,44 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Warning: Failed to create SMB user: %v", err)
 		}
 
-		// Create default shares: backup and data
+		// Get user info to retrieve quotas
+		user, err := users.GetByID(s.db, token.UserID)
+		if err != nil {
+			log.Printf("Warning: Failed to get user info: %v", err)
+			// Default quotas if we can't retrieve them
+			user = &users.User{
+				QuotaBackupGB: 50,
+				QuotaTotalGB:  100,
+			}
+		}
+
+		// Calculate data quota (total - backup)
+		dataQuotaGB := user.QuotaTotalGB - user.QuotaBackupGB
+		if dataQuotaGB < 0 {
+			dataQuotaGB = user.QuotaTotalGB / 2 // Fallback: split evenly
+		}
+
+		// Initialize quota manager for creating directories with quota enforcement
+		qm, err := quota.NewQuotaManager(s.cfg.SharesDir)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize quota manager: %v", err)
+			qm = nil // Will create regular directories as fallback
+		}
+
+		// Create default shares: backup and data with quota enforcement
+		backupPath := filepath.Join(s.cfg.SharesDir, token.Username, "backup")
+		if qm != nil {
+			if err := qm.CreateQuotaDir(backupPath, user.QuotaBackupGB); err != nil {
+				log.Printf("Warning: Failed to create backup quota directory: %v", err)
+			} else {
+				log.Printf("Created backup subvolume with %dGB quota", user.QuotaBackupGB)
+			}
+		}
+
 		backupShare := &shares.Share{
 			UserID:      token.UserID,
 			Name:        fmt.Sprintf("backup_%s", token.Username),
-			Path:        filepath.Join(s.cfg.SharesDir, token.Username, "backup"),
+			Path:        backupPath,
 			Protocol:    "smb",
 			SyncEnabled: true,
 		}
@@ -1074,10 +1107,19 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Created backup share: backup_%s", token.Username)
 		}
 
+		dataPath := filepath.Join(s.cfg.SharesDir, token.Username, "data")
+		if qm != nil {
+			if err := qm.CreateQuotaDir(dataPath, dataQuotaGB); err != nil {
+				log.Printf("Warning: Failed to create data quota directory: %v", err)
+			} else {
+				log.Printf("Created data subvolume with %dGB quota", dataQuotaGB)
+			}
+		}
+
 		dataShare := &shares.Share{
 			UserID:      token.UserID,
 			Name:        fmt.Sprintf("data_%s", token.Username),
-			Path:        filepath.Join(s.cfg.SharesDir, token.Username, "data"),
+			Path:        dataPath,
 			Protocol:    "smb",
 			SyncEnabled: false,
 		}
@@ -1088,11 +1130,15 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Regenerate SMB config
+		// Use system-wide dfree wrapper
+		dfreePath := "/usr/local/bin/anemone-dfree-wrapper.sh"
+
 		smbCfg := &smb.Config{
 			ConfigPath: filepath.Join(s.cfg.DataDir, "smb", "smb.conf"),
 			WorkGroup:  "ANEMONE",
 			ServerName: "Anemone NAS",
 			SharesDir:  s.cfg.SharesDir,
+			DfreePath:  dfreePath,
 		}
 		if err := smb.GenerateConfig(s.db, smbCfg); err != nil {
 			log.Printf("Warning: Failed to regenerate SMB config: %v", err)
@@ -2096,27 +2142,57 @@ func (s *Server) handleAdminUserQuota(w http.ResponseWriter, r *http.Request, us
 			return
 		}
 
-		quotaTotalGB, err := strconv.Atoi(r.FormValue("quota_total_gb"))
-		if err != nil || quotaTotalGB < 1 {
-			http.Error(w, "Invalid total quota", http.StatusBadRequest)
-			return
-		}
-
 		quotaBackupGB, err := strconv.Atoi(r.FormValue("quota_backup_gb"))
 		if err != nil || quotaBackupGB < 1 {
 			http.Error(w, "Invalid backup quota", http.StatusBadRequest)
 			return
 		}
 
-		// Update quota
+		quotaDataGB, err := strconv.Atoi(r.FormValue("quota_data_gb"))
+		if err != nil || quotaDataGB < 1 {
+			http.Error(w, "Invalid data quota", http.StatusBadRequest)
+			return
+		}
+
+		// Calculate total (backup + data)
+		quotaTotalGB := quotaBackupGB + quotaDataGB
+
+		// Update quota in database
 		if err := quota.UpdateUserQuota(s.db, userID, quotaTotalGB, quotaBackupGB); err != nil {
 			log.Printf("Error updating quota: %v", err)
 			http.Error(w, "Failed to update quota", http.StatusInternalServerError)
 			return
 		}
 
-		log.Printf("Admin %s updated quotas for user %d: total=%dGB, backup=%dGB",
-			session.Username, userID, quotaTotalGB, quotaBackupGB)
+		// Update Btrfs quotas for user shares
+		user, err := users.GetByID(s.db, userID)
+		if err == nil {
+			backupPath := filepath.Join(s.cfg.SharesDir, user.Username, "backup")
+			dataPath := filepath.Join(s.cfg.SharesDir, user.Username, "data")
+
+			// Initialize quota manager
+			qm, err := quota.NewQuotaManager(s.cfg.SharesDir)
+			if err == nil {
+				// Update backup quota
+				if err := qm.UpdateQuota(backupPath, quotaBackupGB); err != nil {
+					log.Printf("Warning: Failed to update Btrfs quota for backup: %v", err)
+				} else {
+					log.Printf("Updated Btrfs quota for %s: %dGB", backupPath, quotaBackupGB)
+				}
+
+				// Update data quota
+				if err := qm.UpdateQuota(dataPath, quotaDataGB); err != nil {
+					log.Printf("Warning: Failed to update Btrfs quota for data: %v", err)
+				} else {
+					log.Printf("Updated Btrfs quota for %s: %dGB", dataPath, quotaDataGB)
+				}
+			} else {
+				log.Printf("Warning: Failed to initialize quota manager: %v", err)
+			}
+		}
+
+		log.Printf("Admin %s updated quotas for user %d: backup=%dGB, data=%dGB, total=%dGB",
+			session.Username, userID, quotaBackupGB, quotaDataGB, quotaTotalGB)
 
 		// Redirect back to users page with success message
 		http.Redirect(w, r, "/admin/users?success="+i18n.T(lang, "users.quota.success"), http.StatusSeeOther)

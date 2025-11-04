@@ -14,20 +14,23 @@ import (
 
 // QuotaInfo contains quota and usage information for a user
 type QuotaInfo struct {
-	UserID          int
-	Username        string
-	QuotaTotalGB    int
-	QuotaBackupGB   int
-	UsedTotalMB     int64
-	UsedBackupMB    int64
-	UsedDataMB      int64
-	UsedTotalGB     float64
-	UsedBackupGB    float64
-	UsedDataGB      float64
-	PercentUsed     float64
-	PercentBackup   float64
-	AlertLevel      string // "none", "warning" (75%), "danger" (90%), "critical" (100%+)
+	UserID           int
+	Username         string
+	QuotaTotalGB     int
+	QuotaBackupGB    int
+	QuotaDataGB      int
+	UsedTotalMB      int64
+	UsedBackupMB     int64
+	UsedDataMB       int64
+	UsedTotalGB      float64
+	UsedBackupGB     float64
+	UsedDataGB       float64
+	PercentUsed      float64
+	PercentBackup    float64
+	PercentData      float64
+	AlertLevel       string // "none", "warning" (75%), "danger" (90%), "critical" (100%+)
 	BackupAlertLevel string
+	DataAlertLevel   string
 }
 
 // GetUserQuota retrieves quota information for a user
@@ -81,15 +84,28 @@ func GetUserQuota(db *sql.DB, userID int) (*QuotaInfo, error) {
 		percentBackup = (usedBackupGB / float64(user.QuotaBackupGB)) * 100.0
 	}
 
+	// Calculate data quota (total - backup)
+	quotaDataGB := user.QuotaTotalGB - user.QuotaBackupGB
+	if quotaDataGB < 0 {
+		quotaDataGB = 0
+	}
+
+	percentData := 0.0
+	if quotaDataGB > 0 {
+		percentData = (usedDataGB / float64(quotaDataGB)) * 100.0
+	}
+
 	// Determine alert levels
 	alertLevel := getAlertLevel(percentUsed)
 	backupAlertLevel := getAlertLevel(percentBackup)
+	dataAlertLevel := getAlertLevel(percentData)
 
 	return &QuotaInfo{
 		UserID:           userID,
 		Username:         user.Username,
 		QuotaTotalGB:     user.QuotaTotalGB,
 		QuotaBackupGB:    user.QuotaBackupGB,
+		QuotaDataGB:      quotaDataGB,
 		UsedTotalMB:      totalUsedMB,
 		UsedBackupMB:     backupUsedMB,
 		UsedDataMB:       dataUsedMB,
@@ -98,8 +114,10 @@ func GetUserQuota(db *sql.DB, userID int) (*QuotaInfo, error) {
 		UsedDataGB:       usedDataGB,
 		PercentUsed:      percentUsed,
 		PercentBackup:    percentBackup,
+		PercentData:      percentData,
 		AlertLevel:       alertLevel,
 		BackupAlertLevel: backupAlertLevel,
+		DataAlertLevel:   dataAlertLevel,
 	}, nil
 }
 

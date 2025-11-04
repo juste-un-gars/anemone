@@ -52,8 +52,57 @@
         </div>
 
         <!-- Stats Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <!-- Storage Used -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Backup Storage -->
+            {{if .Stats.QuotaInfo}}
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                            </svg>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">
+                                    💾 Backup
+                                </dt>
+                                <dd class="text-2xl font-semibold text-gray-900">
+                                    {{.Stats.QuotaInfo.UsedBackupGB | printf "%.2f"}} GB
+                                </dd>
+                                <dd class="text-sm text-gray-500">
+                                    sur {{.Stats.QuotaInfo.QuotaBackupGB}} GB
+                                    ({{.Stats.QuotaInfo.PercentBackup | printf "%.1f"}}%)
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <!-- Progress Bar -->
+                <div class="bg-gray-50 px-5 py-3">
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        {{if eq .Stats.QuotaInfo.BackupAlertLevel "critical"}}
+                        <div class="bg-red-600 h-2 rounded-full" style="width: {{.Stats.QuotaInfo.PercentBackup}}%"></div>
+                        {{else if eq .Stats.QuotaInfo.BackupAlertLevel "danger"}}
+                        <div class="bg-orange-600 h-2 rounded-full" style="width: {{.Stats.QuotaInfo.PercentBackup}}%"></div>
+                        {{else if eq .Stats.QuotaInfo.BackupAlertLevel "warning"}}
+                        <div class="bg-yellow-500 h-2 rounded-full" style="width: {{.Stats.QuotaInfo.PercentBackup}}%"></div>
+                        {{else}}
+                        <div class="bg-green-600 h-2 rounded-full" style="width: {{.Stats.QuotaInfo.PercentBackup}}%"></div>
+                        {{end}}
+                    </div>
+                    {{if eq .Stats.QuotaInfo.BackupAlertLevel "critical"}}
+                    <p class="text-xs text-red-600 mt-2 font-medium">⚠️ Quota dépassé</p>
+                    {{else if eq .Stats.QuotaInfo.BackupAlertLevel "danger"}}
+                    <p class="text-xs text-orange-600 mt-2 font-medium">⚠️ Quota presque atteint</p>
+                    {{else if eq .Stats.QuotaInfo.BackupAlertLevel "warning"}}
+                    <p class="text-xs text-yellow-700 mt-2">⚠️ 75% utilisé</p>
+                    {{end}}
+                </div>
+            </div>
+
+            <!-- Data Storage -->
             <div class="bg-white overflow-hidden shadow rounded-lg">
                 <div class="p-5">
                     <div class="flex items-center">
@@ -65,19 +114,15 @@
                         <div class="ml-5 w-0 flex-1">
                             <dl>
                                 <dt class="text-sm font-medium text-gray-500 truncate">
-                                    Espace utilisé
+                                    📁 Data
                                 </dt>
                                 <dd class="text-2xl font-semibold text-gray-900">
-                                    {{.Stats.StorageUsed}}
+                                    {{.Stats.QuotaInfo.UsedDataGB | printf "%.2f"}} GB
                                 </dd>
-                                {{if ne .Stats.StorageQuota "∞"}}
                                 <dd class="text-sm text-gray-500">
-                                    sur {{.Stats.StorageQuota}}
-                                    {{if .Stats.QuotaInfo}}
-                                    ({{.Stats.QuotaInfo.PercentUsed | printf "%.1f"}}%)
-                                    {{end}}
+                                    sur {{.Stats.QuotaInfo.QuotaDataGB}} GB
+                                    ({{.Stats.QuotaInfo.PercentData | printf "%.1f"}}%)
                                 </dd>
-                                {{end}}
                             </dl>
                         </div>
                     </div>
@@ -85,31 +130,19 @@
                 <!-- Progress Bar -->
                 <div class="bg-gray-50 px-5 py-3">
                     <div class="w-full bg-gray-200 rounded-full h-2">
-                        {{if .Stats.QuotaInfo}}
-                            {{if eq .Stats.QuotaInfo.AlertLevel "critical"}}
-                            <div class="bg-red-600 h-2 rounded-full" style="width: {{.Stats.StoragePercent}}%"></div>
-                            {{else if eq .Stats.QuotaInfo.AlertLevel "danger"}}
-                            <div class="bg-orange-600 h-2 rounded-full" style="width: {{.Stats.StoragePercent}}%"></div>
-                            {{else if eq .Stats.QuotaInfo.AlertLevel "warning"}}
-                            <div class="bg-yellow-500 h-2 rounded-full" style="width: {{.Stats.StoragePercent}}%"></div>
-                            {{else}}
-                            <div class="bg-green-600 h-2 rounded-full" style="width: {{.Stats.StoragePercent}}%"></div>
-                            {{end}}
+                        {{if eq .Stats.QuotaInfo.DataAlertLevel "critical"}}
+                        <div class="bg-red-600 h-2 rounded-full" style="width: {{.Stats.QuotaInfo.PercentData}}%"></div>
+                        {{else if eq .Stats.QuotaInfo.DataAlertLevel "danger"}}
+                        <div class="bg-orange-600 h-2 rounded-full" style="width: {{.Stats.QuotaInfo.PercentData}}%"></div>
+                        {{else if eq .Stats.QuotaInfo.DataAlertLevel "warning"}}
+                        <div class="bg-yellow-500 h-2 rounded-full" style="width: {{.Stats.QuotaInfo.PercentData}}%"></div>
                         {{else}}
-                        <div class="anemone-gradient h-2 rounded-full" style="width: {{.Stats.StoragePercent}}%"></div>
+                        <div class="bg-green-600 h-2 rounded-full" style="width: {{.Stats.QuotaInfo.PercentData}}%"></div>
                         {{end}}
                     </div>
-                    {{if .Stats.QuotaInfo}}
-                        {{if eq .Stats.QuotaInfo.AlertLevel "critical"}}
-                        <p class="text-xs text-red-600 mt-2 font-medium">⚠️ Quota dépassé</p>
-                        {{else if eq .Stats.QuotaInfo.AlertLevel "danger"}}
-                        <p class="text-xs text-orange-600 mt-2 font-medium">⚠️ Quota presque atteint (90%)</p>
-                        {{else if eq .Stats.QuotaInfo.AlertLevel "warning"}}
-                        <p class="text-xs text-yellow-700 mt-2">⚠️ 75% du quota utilisé</p>
-                        {{end}}
-                    {{end}}
                 </div>
             </div>
+            {{end}}
 
             <!-- Last Backup -->
             <div class="bg-white overflow-hidden shadow rounded-lg">

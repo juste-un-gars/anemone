@@ -22,6 +22,7 @@ type Config struct {
 	WorkGroup   string // Workgroup name
 	ServerName  string // Server name
 	SharesDir   string // Base directory for shares
+	DfreePath   string // Path to dfree quota script
 }
 
 const smbConfigTemplate = `[global]
@@ -62,6 +63,9 @@ const smbConfigTemplate = `[global]
    force group = {{.Username}}
    force create mode = 0664
    force directory mode = 0755
+
+   # Quota enforcement via dfree
+   {{if $.DfreePath}}dfree command = {{$.DfreePath}}{{end}}
 
    # Recycle bin (trash) configuration
    vfs objects = recycle
@@ -117,10 +121,12 @@ func GenerateConfig(db *sql.DB, cfg *Config) error {
 	data := struct {
 		WorkGroup  string
 		ServerName string
+		DfreePath  string
 		Shares     []ShareConfig
 	}{
 		WorkGroup:  cfg.WorkGroup,
 		ServerName: cfg.ServerName,
+		DfreePath:  cfg.DfreePath,
 		Shares:     shareConfigs,
 	}
 
