@@ -263,3 +263,121 @@ Utilisateur `smith` : quota 1GB/share, usage actuel 2.6GB/share (260% over quota
 
 **Statut** : 🟢 PRODUCTION READY
 **Test validé** : Blocage écriture quota dépassé ✅
+
+---
+
+## 🔧 Session 4 - Suite 3 (4 Nov 19:00-19:30) - Suppression utilisateur complète
+
+### ❌ Problème découvert : Suppression utilisateur incomplète
+
+**Symptôme** : Après suppression d'un utilisateur via l'interface admin, les fichiers restaient sur le disque.
+
+**Investigation** :
+- ✅ Base de données : Nettoyée correctement
+- ✅ Utilisateurs SMB : Supprimés
+- ✅ Utilisateurs système : Supprimés
+- ❌ Fichiers disque : **RESTAIENT** dans `/srv/anemone/shares/username/`
+
+**Cause racine** :
+```
+Warning: failed to delete user directory /srv/anemone/shares/smith:
+  unlinkat /srv/anemone/shares/smith/data/file.txt: permission denied
+```
+
+Le processus `anemone` (utilisateur `franck`) ne pouvait pas supprimer les fichiers appartenant aux utilisateurs système qui venaient d'être supprimés (uid 1001, 1002, 1003).
+
+### ✅ Solution implémentée
+
+**Modifications dans `internal/users/users.go`** :
+
+1. **Ajout de fonctions helpers** (lignes 306-327) :
+   ```go
+   func isSubvolume(path string) bool
+   func removeShareDirectory(path string) error
+   ```
+
+2. **Suppression avec sudo** (ligne 387) :
+   ```go
+   // Avant (ne fonctionnait pas)
+   os.RemoveAll(userDir)
+
+   // Après (fonctionne)
+   exec.Command("sudo", "rm", "-rf", userDir)
+   ```
+
+3. **Suppression Btrfs subvolumes** (ligne 318) :
+   - Détection automatique si subvolume Btrfs
+   - Utilise `sudo btrfs subvolume delete` si oui
+   - Fallback `os.RemoveAll` pour dirs normaux
+
+4. **Régénération automatique SMB** (lignes 397-424) :
+   - Régénère `smb.conf` sans l'utilisateur supprimé
+   - Copie vers `/etc/samba/smb.conf`
+   - Reload service Samba (multi-distro)
+
+**Modifications dans `internal/web/router.go`** (ligne 903) :
+- Ajout du paramètre `dataDir` à l'appel `DeleteUser()`
+
+### 🧪 Tests validés
+
+**Utilisateurs supprimés** : test, doe, smith (3 utilisateurs)
+
+**Vérifications complètes** :
+```bash
+# Base de données
+sqlite3 anemone.db "SELECT * FROM users WHERE username IN ('test','doe','smith');"
+→ 0 résultats ✅
+
+sqlite3 anemone.db "SELECT * FROM shares WHERE user_id IN (3,4,5);"
+→ 0 résultats ✅
+
+# Filesystem
+ls -la /srv/anemone/shares/
+→ Répertoire vide ✅
+
+# Utilisateurs SMB
+sudo pdbedit -L | grep -E "test|doe|smith"
+→ Aucun résultat ✅
+
+# Utilisateurs système
+id test && id doe && id smith
+→ "utilisateur inexistant" ✅
+
+# Config Samba
+grep -E "test|doe|smith" /etc/samba/smb.conf
+→ Aucun résultat ✅
+```
+
+### 📝 Checklist suppression utilisateur
+
+Quand on supprime un utilisateur via l'interface admin, voici ce qui est nettoyé automatiquement :
+
+1. ✅ **Base de données** : Entrée `users` + `shares` + `activation_tokens` + quotas (CASCADE)
+2. ✅ **Subvolumes Btrfs** : Chaque partage (backup + data) supprimé avec `btrfs subvolume delete`
+3. ✅ **Répertoire parent** : `/srv/anemone/shares/username/` supprimé avec `sudo rm -rf`
+4. ✅ **Utilisateur SMB** : `sudo smbpasswd -x username`
+5. ✅ **Utilisateur système** : `sudo userdel username`
+6. ✅ **Config Samba** : Régénérée automatiquement sans les partages supprimés
+7. ✅ **Service Samba** : Rechargé automatiquement (`systemctl reload smb/smbd`)
+
+**Confirmation double requise** :
+- Saisie du nom d'utilisateur exact
+- Popup de confirmation finale
+
+### 📊 Fichiers modifiés
+
+- `internal/users/users.go` : Ajout fonctions helpers + sudo rm -rf
+- `internal/web/router.go` : Passage paramètre `dataDir`
+
+### 🎉 Résultat
+
+**Suppression utilisateur 100% complète** ✅
+
+Plus **AUCUNE trace** de l'utilisateur après suppression :
+- Base de données propre
+- Fichiers supprimés du disque
+- Comptes SMB et système supprimés
+- Configuration Samba mise à jour
+
+**Statut** : 🟢 PRODUCTION READY
+**Tests** : Validé avec 3 utilisateurs (test, doe, smith) supprimés complètement

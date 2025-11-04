@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/juste-un-gars/anemone/internal/crypto"
+	"github.com/juste-un-gars/anemone/internal/smb"
 )
 
 // User represents a user account
@@ -300,9 +302,32 @@ func GetAllUsers(db *sql.DB) ([]*User, error) {
 	return users, nil
 }
 
+// isSubvolume checks if a path is a Btrfs subvolume
+func isSubvolume(path string) bool {
+	cmd := exec.Command("btrfs", "subvolume", "show", path)
+	err := cmd.Run()
+	return err == nil
+}
+
+// removeShareDirectory removes a share directory, handling Btrfs subvolumes properly
+func removeShareDirectory(path string) error {
+	// Check if it's a Btrfs subvolume
+	if isSubvolume(path) {
+		// Use btrfs subvolume delete for proper cleanup
+		cmd := exec.Command("sudo", "btrfs", "subvolume", "delete", path)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to delete subvolume: %w\nOutput: %s", err, output)
+		}
+		return nil
+	}
+
+	// Regular directory, use standard removal
+	return os.RemoveAll(path)
+}
+
 // DeleteUser deletes a user and their associated data
 // This includes: database entries, SMB shares, system user, and all files on disk
-func DeleteUser(db *sql.DB, userID int) error {
+func DeleteUser(db *sql.DB, userID int, dataDir string) error {
 	// Get user info before deleting
 	user, err := GetByID(db, userID)
 	if err != nil {
@@ -348,12 +373,20 @@ func DeleteUser(db *sql.DB, userID int) error {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	// Delete files from disk for each share
+	// Delete files from disk for each share (handles Btrfs subvolumes properly)
+	sharesDir := filepath.Join(dataDir, "shares")
 	for _, share := range shares {
-		if err := os.RemoveAll(share.Path); err != nil {
-			// Log error but continue (don't fail if directory doesn't exist)
+		if err := removeShareDirectory(share.Path); err != nil {
 			fmt.Printf("Warning: failed to delete share directory %s: %v\n", share.Path, err)
 		}
+	}
+
+	// Delete user's parent directory (e.g., /srv/anemone/shares/username/)
+	// Use sudo because files may belong to the deleted system user
+	userDir := filepath.Join(sharesDir, user.Username)
+	rmCmd := exec.Command("sudo", "rm", "-rf", userDir)
+	if output, err := rmCmd.CombinedOutput(); err != nil {
+		fmt.Printf("Warning: failed to delete user directory %s: %v\nOutput: %s\n", userDir, err, output)
 	}
 
 	// Remove SMB user
@@ -368,6 +401,34 @@ func DeleteUser(db *sql.DB, userID int) error {
 	if err := cmd.Run(); err != nil {
 		// Log error but don't fail (user might not exist)
 		fmt.Printf("Warning: failed to remove system user %s: %v\n", user.Username, err)
+	}
+
+	// Regenerate SMB configuration (removes deleted user's shares from smb.conf)
+	smbCfg := &smb.Config{
+		ConfigPath: filepath.Join(dataDir, "smb", "smb.conf"),
+		WorkGroup:  "WORKGROUP",
+		ServerName: "Anemone NAS",
+		SharesDir:  sharesDir,
+		DfreePath:  "/usr/local/bin/anemone-dfree-wrapper.sh",
+	}
+
+	if err := smb.GenerateConfig(db, smbCfg); err != nil {
+		fmt.Printf("Warning: failed to regenerate SMB config: %v\n", err)
+	}
+
+	// Copy config to /etc/samba/smb.conf and reload Samba
+	copyCmd := exec.Command("sudo", "cp", smbCfg.ConfigPath, "/etc/samba/smb.conf")
+	if err := copyCmd.Run(); err != nil {
+		fmt.Printf("Warning: failed to copy SMB config: %v\n", err)
+	}
+
+	// Reload Samba service (try both smb and smbd for multi-distro support)
+	reloadCmd := exec.Command("sudo", "systemctl", "reload", "smb")
+	if err := reloadCmd.Run(); err != nil {
+		reloadCmd = exec.Command("sudo", "systemctl", "reload", "smbd")
+		if err := reloadCmd.Run(); err != nil {
+			fmt.Printf("Warning: failed to reload Samba: %v\n", err)
+		}
 	}
 
 	return nil

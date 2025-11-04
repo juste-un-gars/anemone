@@ -900,7 +900,7 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
-		err := users.DeleteUser(s.db, userID)
+		err := users.DeleteUser(s.db, userID, s.cfg.DataDir)
 		if err != nil {
 			log.Printf("Error deleting user: %v", err)
 			http.Error(w, "Failed to delete user", http.StatusInternalServerError)
