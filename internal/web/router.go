@@ -904,6 +904,12 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
+		// Prevent users from deleting themselves
+		if session.UserID == userID {
+			http.Error(w, "Cannot delete your own account", http.StatusForbidden)
+			return
+		}
+
 		err := users.DeleteUser(s.db, userID, s.cfg.DataDir)
 		if err != nil {
 			log.Printf("Error deleting user: %v", err)
