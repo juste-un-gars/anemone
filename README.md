@@ -325,12 +325,20 @@ Linux:   smb://nas.local/username-backup
 
 ## 💾 Quotas
 
+**Filesystem Support**:
+- ✅ **Btrfs**: Subvolumes with qgroups (tested in production)
+- ✅ **XFS**: Project quotas (ready for testing)
+- ✅ **ext4**: Project quotas (ready for testing)
+- ✅ **ZFS**: Native dataset quotas (ready for testing)
+- Automatic filesystem detection and quota manager selection
+
 **Admin Management**:
 - Set individual quotas per user via web interface (`/admin/users/{id}/quota`)
 - Two quota types:
   - **Total Quota**: Overall storage limit for the user
   - **Backup Quota**: Specific limit for backup share
 - Default: 100 GB total, 50 GB backup
+- Kernel-level enforcement (quotas enforced by the filesystem)
 
 **Usage Monitoring**:
 - Real-time calculation of disk usage

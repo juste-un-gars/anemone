@@ -475,3 +475,169 @@ a66c059 - fix: Correct sudo chown paths and .trash creation permissions
 
 **Statut** : 🟢 PRODUCTION READY
 **Durée session** : ~2h
+
+---
+
+## 🔧 Session 6 - 7 Novembre 2025 - Support multi-filesystem (ext4/XFS/ZFS)
+
+### ✅ Implémentation complète des quotas multi-filesystem
+
+**Avant** : Quotas uniquement sur Btrfs
+**Maintenant** : Support complet de 4 filesystems
+
+#### Architecture universelle implémentée
+
+**Interface `QuotaManager`** (`internal/quota/enforcement.go`) :
+- `CreateQuotaDir()` : Création avec enforcement quota
+- `UpdateQuota()` : Mise à jour limites
+- `GetUsage()` : Lecture utilisation + limites
+- `RemoveQuotaDir()` : Suppression + nettoyage
+
+**Détection automatique du filesystem** :
+```go
+func detectFilesystem(path string) (string, error)
+```
+- Utilise `syscall.Statfs()` et magic numbers du kernel
+- Détecte : btrfs, ext4, xfs, zfs
+- Retourne erreur si filesystem non supporté
+
+#### 1. ✅ BtrfsQuotaManager (Déjà existant)
+
+**Fonctionnalités** :
+- Subvolumes Btrfs avec qgroups
+- Enforcement kernel natif
+- Compression Btrfs = stockage bonus (~20-50%)
+
+**Commandes utilisées** :
+- `btrfs subvolume create`
+- `btrfs qgroup limit`
+- `btrfs qgroup show`
+
+#### 2. ✅ ProjectQuotaManager (ext4/XFS) - NOUVEAU
+
+**Implémentation complète** (~315 lignes) :
+
+**Fonctionnalités** :
+- Project quotas du kernel Linux
+- Gestion automatique des project IDs (range 10000-99999)
+- Mapping persistant dans `/etc/projects` et `/etc/projid`
+- Support XFS et ext4
+
+**Commandes XFS** :
+- `xfs_quota -x -c "project -s -p <path> <id>" <mount>`
+- `xfs_quota -x -c "limit -p bhard=<bytes> <id>" <mount>`
+- `xfs_quota -x -c "quota -p <id>" <mount>`
+
+**Commandes ext4** :
+- `setquota -P <id> 0 <limit_kb> 0 0 <mount>`
+- `quota -P -p <id>`
+
+**Fonctions clés** :
+- `getOrCreateProjectID()` : Attribution ID unique via hash du path
+- `setProjectID()` : Configure project ID sur répertoire
+- `addProjectIDMapping()` : Ajoute à `/etc/projects` et `/etc/projid`
+- `removeProjectID()` : Nettoie les mappings
+- `getXFSQuotaUsage()` / `getExt4QuotaUsage()` : Lecture quotas
+
+#### 3. ✅ ZFSQuotaManager (ZFS) - NOUVEAU
+
+**Implémentation complète** (~195 lignes) :
+
+**Fonctionnalités** :
+- Datasets ZFS natifs avec quotas intégrés
+- Création automatique de child datasets
+- Destruction récursive (snapshots inclus)
+
+**Commandes ZFS** :
+- `zfs create <dataset>`
+- `zfs set quota=<bytes> <dataset>`
+- `zfs get -Hp used,quota <dataset>`
+- `zfs destroy -r <dataset>`
+
+**Fonctions clés** :
+- `getZFSDataset()` : Trouve le dataset ZFS pour un path
+- `pathToDataset()` : Convertit path filesystem → dataset name
+- `datasetExists()` : Vérifie existence dataset
+
+#### Sélection automatique du QuotaManager
+
+```go
+func NewQuotaManager(basePath string) (QuotaManager, error) {
+    fsType := detectFilesystem(basePath)
+    switch fsType {
+        case "btrfs": return &BtrfsQuotaManager{}
+        case "ext4", "xfs": return &ProjectQuotaManager{}
+        case "zfs": return &ZFSQuotaManager{}
+    }
+}
+```
+
+### 📊 Fichiers modifiés
+
+**Code** :
+- `internal/quota/enforcement.go` : +510 lignes (ProjectQuotaManager + ZFSQuotaManager)
+
+**Binaires compilés** :
+- ✅ `anemone` : Serveur principal
+- ✅ `anemone-dfree` : Calcul quotas pour Samba
+- ✅ `anemone-smbgen` : Générateur config SMB
+- ✅ `anemone-migrate` : Migration vers subvolumes
+
+### 🎯 Compatibilité
+
+**Filesystems supportés** :
+- ✅ **Btrfs** : Subvolumes + qgroups (testé en production)
+- ✅ **XFS** : Project quotas (implémenté, prêt pour tests)
+- ✅ **ext4** : Project quotas (implémenté, prêt pour tests)
+- ✅ **ZFS** : Datasets + quotas natifs (implémenté, prêt pour tests)
+
+**Prérequis système** :
+- Btrfs : `btrfs-progs` (déjà installé)
+- XFS : `xfsprogs`, `xfs_quota` (package `xfsprogs`)
+- ext4 : `quota` tools (package `quota`)
+- ZFS : `zfsutils-linux` ou `zfs` (selon distro)
+
+### 🧪 Tests à effectuer
+
+**Prochaines validations** :
+1. ✅ Btrfs : Déjà validé en production (DEV + FR1)
+2. 🔜 XFS : Tester sur serveur avec XFS filesystem
+3. 🔜 ext4 : Tester sur serveur avec ext4 + project quota enabled
+4. 🔜 ZFS : Tester sur serveur avec ZFS pool
+
+**Note** : L'installation sur un nouveau serveur permettra de valider le support ext4/XFS selon le filesystem utilisé.
+
+### 📝 Prérequis installation selon filesystem
+
+**Pour ext4** (ajouter à `install.sh`) :
+```bash
+# Enable project quota on ext4
+# Mount options: /dev/sdX /mount ext4 prjquota 0 0
+```
+
+**Pour XFS** (ajouter à `install.sh`) :
+```bash
+# Enable project quota on XFS
+# Mount options: /dev/sdX /mount xfs prjquota 0 0
+```
+
+**Pour ZFS** (ajouter à `install.sh`) :
+```bash
+# ZFS quotas are native, no special mount options needed
+```
+
+### 🎉 Résultat
+
+**Support multi-filesystem complet** ✅
+
+Anemone peut maintenant fonctionner sur :
+- Btrfs (validation complète ✅)
+- XFS (code prêt, tests à venir)
+- ext4 (code prêt, tests à venir)
+- ZFS (code prêt, tests à venir)
+
+**Détection automatique** : Le système détecte automatiquement le filesystem et utilise le QuotaManager approprié.
+
+**Statut** : 🟢 PRODUCTION READY (Btrfs) + 🟡 READY FOR TESTING (ext4/XFS/ZFS)
+**Durée session** : ~1h30
+**Lignes ajoutées** : ~510 lignes de code
