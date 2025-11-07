@@ -17,6 +17,9 @@ docker-compose.override.yml
 go.work
 vendor/
 /anemone
+/anemone-dfree
+/anemone-smbgen
+/anemone-migrate
 
 # OS
 .DS_Store
