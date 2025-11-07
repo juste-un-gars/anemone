@@ -1,13 +1,13 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-07 (Session 5 - Fix permissions chown)
-**Status** : 🟢 PRODUCTION READY
+**Dernière session** : 2025-11-07 (Session 8 - Sync incrémentale type rclone)
+**Status** : 🟡 EN DÉVELOPPEMENT
 
 > **Note** : L'historique des sessions 1-3 a été archivé dans `SESSION_STATE_ARCHIVE.md`
 
 ---
 
-## 🎯 État actuel (Fin session 4 - 4 Nov 2025)
+## 🎯 État actuel
 
 ### ✅ Fonctionnalités complètes et testées
 
@@ -28,6 +28,7 @@
    - Création automatique user système + SMB
    - **Suppression complète** : Efface DB, fichiers disque, user SMB, user système
    - **Confirmation renforcée** : Double confirmation + saisie nom utilisateur
+   - **Clé de chiffrement unique par utilisateur** : 32 bytes, générée à l'activation
 
 4. **Partages SMB automatiques**
    - 2 partages par user : `backup_username` + `data_username`
@@ -49,17 +50,25 @@
    - CRUD complet
    - Test connexion HTTPS
    - Statuts (online/offline/error)
-   - **Synchronisation manuelle** : Bouton sync par partage (tar.gz over HTTPS)
+   - **Synchronisation manuelle** : Bouton sync par partage
+   - **Chiffrement E2E** : AES-256-GCM par utilisateur
 
-7. **Système de Quotas** ✨ Session 4
+7. **Système de Quotas**
    - **Quotas Btrfs kernel** : Enforcement automatique au niveau filesystem
    - Subvolumes Btrfs par partage
    - Interface admin : Définition quotas backup + data
    - Dashboard user : Barres progression avec alertes (vert/jaune/orange/rouge)
    - Migration automatique : `anemone-migrate` pour convertir dirs existants
-   - Architecture extensible : Support futur ext4/xfs/ZFS
+   - **Fallback mode** : ext4/XFS/ZFS fonctionnent sans enforcement
 
-8. **Installation automatisée**
+8. **Chiffrement End-to-End** ✨ Session 7
+   - Clé unique 32 bytes par utilisateur
+   - Chiffrement AES-256-GCM avec AEAD
+   - Hiérarchie : Master key → User keys (chiffrées)
+   - Backups P2P chiffrés automatiquement
+   - Protection même si peer compromis
+
+9. **Installation automatisée**
    - Script `install.sh` zéro-touch
    - Configuration complète système
    - Support multi-distro (Fedora/RHEL/Debian)
@@ -67,7 +76,7 @@
 ### 🚀 Déploiement
 
 **DEV (192.168.83.99)** : ✅ Migration /srv/anemone complète + Quotas Btrfs actifs
-**FR1 (192.168.83.96)** : ✅ Installation fraîche + 2 utilisateurs actifs (test + doe)
+**FR1 (192.168.83.96)** : ✅ Installation fraîche
 
 **Tests validés** :
 - ✅ Accès SMB depuis Windows : OK
@@ -91,329 +100,30 @@
 
 ---
 
-# État de la session - 04 Novembre 2025
+## 🔧 Session 4 - 4 Novembre 2025 - Système de Quotas
 
-## 📍 Contexte de cette session
+### ✅ Implémentation complète
 
-**Session précédente** : Session 3 - Réinitialisation mot de passe par admin
-**Cette session** : Système de gestion des quotas + Lien donation PayPal
+**Fonctionnalités** :
+- Quotas Btrfs avec enforcement kernel
+- Interface admin pour définir quotas backup + data
+- Dashboard utilisateur avec barres de progression
+- Migration automatique (dirs → subvolumes)
+- Architecture extensible multi-filesystem
 
-## ✅ Fonctionnalités implémentées aujourd'hui
+**Corrections majeures** :
+- Fix enforcement quotas (SELinux bloquait dfree command)
+- Suppression utilisateur complète (DB + disque + SMB + système)
+- Permissions subvolumes Btrfs (chown après création)
 
-### 1. Système de Quotas (Complet ✅)
-
-**Package `internal/quota`** (163 lignes) :
-- `GetUserQuota()` : Calcule l'utilisation actuelle et les quotas
-- `UpdateUserQuota()` : Met à jour les limites de quotas
-- `IsQuotaExceeded()` : Vérifie si quota dépassé
-- Structure `QuotaInfo` avec toutes les métadonnées
-
-**Interface Admin** :
-- Route : `/admin/users/{id}/quota` (GET + POST)
-- Template `admin_users_quota.html` (161 lignes)
-- Affichage temps réel de l'utilisation
-- Barres de progression colorées par niveau d'alerte
-
-**Dashboard Utilisateur** :
-- Carte "Espace utilisé" améliorée
-- Niveaux d'alerte visuels :
-  - 🟢 Vert (0-74%) : Usage normal
-  - 🟡 Jaune (75-89%) : ⚠️ 75% du quota utilisé
-  - 🟠 Orange (90-99%) : ⚠️ Quota presque atteint
-  - 🔴 Rouge (100%+) : ⚠️ Quota dépassé
-
-### 2. Lien Donation PayPal (Complet ✅)
-
-- Bouton fixe en bas à droite dashboard admin
-- Lien vers `https://paypal.me/justeungars83`
-- Traduction FR/EN : "Supporter le projet"
-
-## 📦 Commits Session 4
-
+**Commits** :
 ```
-60d89cf - feat: Add quota management system and PayPal donation link
+60d89cf - feat: Add quota management system
+46f9e6b - feat: Simplify quota strategy - Btrfs only
+a66c059 - fix: Correct sudo chown paths
 ```
-
-## 🎉 Conclusion Session 4
 
 **Statut** : 🟢 PRODUCTION READY
-
-Le système de quotas est **100% complet et fonctionnel** ✅
-
----
-
-**Session finalisée le** : 2025-11-04 10:00 UTC
-**Durée totale Session 4** : ~1h30
-**Tokens utilisés** : ~90k/200k (45%)
-**État projet** : ✅ Stable et prêt pour utilisation
-
-**Tous les commits sont pushés sur GitHub** : https://github.com/juste-un-gars/anemone
-
----
-
-## 🔧 Session 4 - Suite (Continuation après contexte perdu)
-
-### Problème découvert : Quota enforcement ne fonctionnait pas ❌
-
-**Symptôme** : L'utilisateur pouvait copier des fichiers malgré quota dépassé
-
-**Investigations** :
-1. Dashboard montrait qu'un seul quota au lieu de 2 (backup + data) → ✅ Corrigé
-2. Quota enforcement via `dfree command` ne bloquait pas les écritures
-3. Script dfree jamais appelé par Samba (aucun log créé)
-4. **Root cause** : SELinux en mode `Enforcing` bloquait l'exécution depuis `/home/franck/`
-
-### Solution implémentée ✅
-
-**Architecture finale** :
-- `/usr/local/bin/anemone-dfree` : Binaire de calcul quota
-- `/usr/local/bin/anemone-dfree-wrapper.sh` : Wrapper avec logging
-- `/usr/local/bin/anemone-smbgen` : Générateur config SMB
-- `/usr/local/bin/anemone` : Serveur web principal
-
-**Modifications code** :
-- `cmd/anemone-smbgen/main.go` : Utilise `/usr/local/bin/anemone-dfree-wrapper.sh`
-- `internal/web/router.go` : Suppression import `os` inutilisé, utilise path système
-- Dashboard : Sépare affichage backup et data avec barres de progression indépendantes
-
-**Config Samba** (`/etc/samba/smb.conf`) :
-```ini
-[data_smith]
-   dfree command = /usr/local/bin/anemone-dfree-wrapper.sh
-[backup_smith]
-   dfree command = /usr/local/bin/anemone-dfree-wrapper.sh
-```
-
-### 📊 État actuel : EN ATTENTE TEST UTILISATEUR
-
-**Setup complet** :
-- ✅ Binaires installés dans `/usr/local/bin/`
-- ✅ SMB config régénérée et rechargée
-- ✅ Wrapper fonctionne manuellement
-- ⏳ Test utilisateur depuis Android en attente
-
-**Test à effectuer** :
-Utilisateur `smith` : quota 1GB/share, usage actuel 2.6GB/share (260% over quota)
-→ La copie de nouveaux fichiers doit être **bloquée**
-
-**Fichiers modifiés** :
-- `cmd/anemone-smbgen/main.go`
-- `internal/web/router.go`
-- `web/templates/dashboard_user.html`
-
----
-
-**Session continuée le** : 2025-11-04 10:50 UTC
-**Statut** : ⏳ EN ATTENTE VALIDATION USER (test Android)
-
----
-
-## 🔧 Session 4 - Suite 2 (4 Nov 15:00-16:00)
-
-### ✅ Quotas Btrfs universels implémentés
-
-**Architecture multi-filesystem** :
-- Package `internal/quota/enforcement.go` avec interface `QuotaManager`
-- ✅ **BtrfsQuotaManager** : Subvolumes + qgroups (implémenté)
-- 🔜 **ProjectQuotaManager** : ext4/xfs (stub prêt)
-- 🔜 **ZFSQuotaManager** : ZFS datasets (stub prêt)
-- Auto-détection filesystem, portable
-
-**Migration complète** :
-- `cmd/anemone-migrate` : Convertit dirs → subvolumes Btrfs
-- Tous partages existants migrés avec quotas
-- Backup `.backup` créés pour sécurité
-
-**Enforcement kernel** :
-- ✅ Quotas Btrfs bloquent écritures (testé avec smith 1GB)
-- Compression Btrfs permet ~20-50% stockage bonus
-- Note ajoutée interface admin
-
-### ✅ Corrections interface utilisateur
-
-**Dashboard utilisateur** :
-- Quota data affiché avec barre progression (au lieu "Pas de limite")
-- Calcul taille optimisé : utilise quotas Btrfs directement
-- Ajout `QuotaDataGB`, `PercentData`, `DataAlertLevel`
-
-**Interface admin quotas** :
-- Changé : "Total + Backup" → "Backup + Data"
-- Total calculé automatiquement (backup + data)
-- JavaScript temps réel pour preview
-- Mise à jour quotas Btrfs automatique lors modification
-
-### ✅ Corbeille fonctionnelle
-
-**Permissions corrigées** :
-- `.trash/` dirs : 755 (au lieu 700)
-- Sudoers mis à jour : `mv`, `rm`, `rmdir`, `mkdir`, `btrfs`
-- Restauration/suppression définitive fonctionnelles
-
-**Fichiers modifiés** :
-- `internal/quota/enforcement.go` (nouveau, 360 lignes)
-- `internal/quota/quota.go`
-- `internal/shares/shares.go`
-- `internal/web/router.go`
-- `web/templates/admin_users_quota.html`
-- `web/templates/dashboard_user.html`
-- `install.sh` (ajout btrfs sudoers)
-
-**Binaires** :
-- `anemone-migrate` : Migration partages → subvolumes
-
-**Statut** : 🟢 PRODUCTION READY
-**Test validé** : Blocage écriture quota dépassé ✅
-
----
-
-## 🔧 Session 4 - Suite 3 (4 Nov 19:00-19:30) - Suppression utilisateur complète
-
-### ❌ Problème découvert : Suppression utilisateur incomplète
-
-**Symptôme** : Après suppression d'un utilisateur via l'interface admin, les fichiers restaient sur le disque.
-
-**Investigation** :
-- ✅ Base de données : Nettoyée correctement
-- ✅ Utilisateurs SMB : Supprimés
-- ✅ Utilisateurs système : Supprimés
-- ❌ Fichiers disque : **RESTAIENT** dans `/srv/anemone/shares/username/`
-
-**Cause racine** :
-```
-Warning: failed to delete user directory /srv/anemone/shares/smith:
-  unlinkat /srv/anemone/shares/smith/data/file.txt: permission denied
-```
-
-Le processus `anemone` (utilisateur `franck`) ne pouvait pas supprimer les fichiers appartenant aux utilisateurs système qui venaient d'être supprimés (uid 1001, 1002, 1003).
-
-### ✅ Solution implémentée
-
-**Modifications dans `internal/users/users.go`** :
-
-1. **Ajout de fonctions helpers** (lignes 306-327) :
-   ```go
-   func isSubvolume(path string) bool
-   func removeShareDirectory(path string) error
-   ```
-
-2. **Suppression avec sudo** (ligne 387) :
-   ```go
-   // Avant (ne fonctionnait pas)
-   os.RemoveAll(userDir)
-
-   // Après (fonctionne)
-   exec.Command("sudo", "rm", "-rf", userDir)
-   ```
-
-3. **Suppression Btrfs subvolumes** (ligne 318) :
-   - Détection automatique si subvolume Btrfs
-   - Utilise `sudo btrfs subvolume delete` si oui
-   - Fallback `os.RemoveAll` pour dirs normaux
-
-4. **Régénération automatique SMB** (lignes 397-424) :
-   - Régénère `smb.conf` sans l'utilisateur supprimé
-   - Copie vers `/etc/samba/smb.conf`
-   - Reload service Samba (multi-distro)
-
-**Modifications dans `internal/web/router.go`** (ligne 903) :
-- Ajout du paramètre `dataDir` à l'appel `DeleteUser()`
-
-### 🧪 Tests validés
-
-**Utilisateurs supprimés** : test, doe, smith (3 utilisateurs)
-
-**Vérifications complètes** :
-```bash
-# Base de données
-sqlite3 anemone.db "SELECT * FROM users WHERE username IN ('test','doe','smith');"
-→ 0 résultats ✅
-
-sqlite3 anemone.db "SELECT * FROM shares WHERE user_id IN (3,4,5);"
-→ 0 résultats ✅
-
-# Filesystem
-ls -la /srv/anemone/shares/
-→ Répertoire vide ✅
-
-# Utilisateurs SMB
-sudo pdbedit -L | grep -E "test|doe|smith"
-→ Aucun résultat ✅
-
-# Utilisateurs système
-id test && id doe && id smith
-→ "utilisateur inexistant" ✅
-
-# Config Samba
-grep -E "test|doe|smith" /etc/samba/smb.conf
-→ Aucun résultat ✅
-```
-
-### 📝 Checklist suppression utilisateur
-
-Quand on supprime un utilisateur via l'interface admin, voici ce qui est nettoyé automatiquement :
-
-1. ✅ **Base de données** : Entrée `users` + `shares` + `activation_tokens` + quotas (CASCADE)
-2. ✅ **Subvolumes Btrfs** : Chaque partage (backup + data) supprimé avec `btrfs subvolume delete`
-3. ✅ **Répertoire parent** : `/srv/anemone/shares/username/` supprimé avec `sudo rm -rf`
-4. ✅ **Utilisateur SMB** : `sudo smbpasswd -x username`
-5. ✅ **Utilisateur système** : `sudo userdel username`
-6. ✅ **Config Samba** : Régénérée automatiquement sans les partages supprimés
-7. ✅ **Service Samba** : Rechargé automatiquement (`systemctl reload smb/smbd`)
-
-**Confirmation double requise** :
-- Saisie du nom d'utilisateur exact
-- Popup de confirmation finale
-
-### 📊 Fichiers modifiés
-
-- `internal/users/users.go` : Ajout fonctions helpers + sudo rm -rf
-- `internal/web/router.go` : Passage paramètre `dataDir`
-
-### 🎉 Résultat
-
-**Suppression utilisateur 100% complète** ✅
-
-Plus **AUCUNE trace** de l'utilisateur après suppression :
-- Base de données propre
-- Fichiers supprimés du disque
-- Comptes SMB et système supprimés
-- Configuration Samba mise à jour
-
-**Statut** : 🟢 PRODUCTION READY
-**Tests** : Validé avec 3 utilisateurs (test, doe, smith) supprimés complètement
-
----
-
-## 🔧 Session 4 - Suite 4 (4 Nov 19:30-19:40) - Corrections finales
-
-### ✅ Fix création utilisateur : Permissions subvolumes Btrfs
-
-**Problème** : Subvolumes créés avec owner `root:root` → permissions denied pour créer `.trash/`
-
-**Solution** : Ajout `chown` après création subvolume (router.go lignes 1096, 1124)
-
-### ✅ Fix interface création utilisateur
-
-**Avant** : "Quota Total" + "Quota Backup"
-**Maintenant** : "Quota Backup" + "Quota Data"
-**Calcul auto** : Total = Backup + Data
-
-**Fichiers modifiés** :
-- `web/templates/admin_users_add.html` : Changé les champs de formulaire
-- `internal/web/router.go` : Ajout `os/exec` import + calcul total auto + chown subvolumes
-
----
-
-## 📋 Prochaines étapes (Roadmap)
-
-1. **Tests utilisateur** : Créer john, valider quotas + accès partages
-2. **Support ext4/ZFS** : Implémenter `ProjectQuotaManager` et `ZFSQuotaManager`
-3. **Tests production** : Valider sur autre serveur
-4. **Restore config** : Sauvegarde/restauration configuration complète
-5. **P2P sync** : Finaliser synchronisation P2P automatique
-
-**Statut global** : 🟢 PRODUCTION READY
-**Session 4 complète** : Quotas Btrfs + Suppression complète + Fixes création user
 
 ---
 
@@ -423,286 +133,68 @@ Plus **AUCUNE trace** de l'utilisateur après suppression :
 
 Utilisateurs créés après session 4 n'avaient **aucun partage SMB visible**.
 
-**Symptômes** :
-- Création user réussie mais partages absents
-- Logs : `Warning: Failed to create backup share: permission denied`
-- Répertoires existaient sur disque mais pas en DB
-
-### 🔍 Cause racine
-
-**Double bug de permissions** :
-
-1. **Mauvais chemin sudo** : Code utilisait `"chown"` au lieu de `"/usr/bin/chown"`
-   - Sudoers autorise `/usr/bin/chown -R *` uniquement
-   - Sans chemin complet, sudo demandait mot de passe → échec silencieux
-
-2. **Ordre d'opérations incorrect** :
-   - `router.go` : `chown kenny:kenny` sur subvolumes **AVANT** création `.trash`
-   - `shares.go` : Tentative `os.MkdirAll(.trash)` en tant que user `franck`
-   - Processus `franck` ne peut pas écrire dans répertoires `kenny:kenny` (755)
+**Cause racine** :
+1. Code utilisait `"chown"` au lieu de `"/usr/bin/chown"` (sudoers bloquait)
+2. Création `.trash` impossible (processus franck ne peut pas écrire dans dirs user:user)
 
 ### ✅ Corrections appliquées
 
 **Fichiers modifiés** :
-1. `internal/web/router.go:1100,1128` - Ajout `/usr/bin/chown -R`
-2. `internal/shares/shares.go:47,52,60,74` - Remplacé `os.MkdirAll` par `sudo /usr/bin/mkdir -p`
-3. `cmd/anemone-migrate/main.go:183` - Ajout `/usr/bin/chown -R`
+1. `internal/web/router.go` - Chemins complets `/usr/bin/chown -R`
+2. `internal/shares/shares.go` - `sudo /usr/bin/mkdir -p` pour `.trash`
+3. `cmd/anemone-migrate/main.go` - Chemins complets
 
-**Solution** :
-- Utilise `sudo /usr/bin/mkdir -p` pour créer `.trash` (fonctionne même si répertoire parent appartient à autre user)
-- Ajout `sudo /usr/bin/chmod -R 755` avant chown
-- Tous les chemins sudo utilisent maintenant chemins complets
+**Tests validés** : ✅ Création utilisateur + partages SMB fonctionnels
 
-### 🧪 Tests validés
-
-✅ Création utilisateur kenny : Partages SMB visibles
-✅ Répertoires avec bonnes permissions
-✅ Partages enregistrés en DB
-✅ Config Samba régénérée automatiquement
-
-### 📝 Commits Session 5
-
+**Commits** :
 ```
 a66c059 - fix: Correct sudo chown paths and .trash creation permissions
 4d189c1 - fix: Prevent users from deleting their own account
 ```
 
-### ✅ Correction bonus : Protection auto-suppression
-
-**Fichier modifié** : `internal/web/router.go:908-911`
-**Ajout** : Vérification `session.UserID != userID` avant suppression
-**Résultat** : HTTP 403 si tentative d'auto-suppression
-
 **Statut** : 🟢 PRODUCTION READY
-**Durée session** : ~2h
 
 ---
 
-## 🔧 Session 6 - 7 Novembre 2025 - Support multi-filesystem (ext4/XFS/ZFS)
+## 🔧 Session 6 - 7 Novembre 2025 - Support multi-filesystem
 
-### ✅ Implémentation complète des quotas multi-filesystem
+### ✅ Implémentation quotas multi-filesystem
 
-**Avant** : Quotas uniquement sur Btrfs
-**Maintenant** : Support complet de 4 filesystems
+**Objectif initial** : Support Btrfs + ext4 + XFS + ZFS
 
-#### Architecture universelle implémentée
+**Réalité découverte** :
+- ❌ ext4 project quotas : Feature non activée par défaut, nécessite formatage
+- ❌ XFS : Nécessite option montage `prjquota`
+- ❌ ZFS : Peu répandu sur Linux
 
-**Interface `QuotaManager`** (`internal/quota/enforcement.go`) :
-- `CreateQuotaDir()` : Création avec enforcement quota
-- `UpdateQuota()` : Mise à jour limites
-- `GetUsage()` : Lecture utilisation + limites
-- `RemoveQuotaDir()` : Suppression + nettoyage
+### ✅ Solution finale : Btrfs + Fallback
 
-**Détection automatique du filesystem** :
-```go
-func detectFilesystem(path string) (string, error)
-```
-- Utilise `syscall.Statfs()` et magic numbers du kernel
-- Détecte : btrfs, ext4, xfs, zfs
-- Retourne erreur si filesystem non supporté
+**Architecture** :
+- `BtrfsQuotaManager` : Quotas complets avec enforcement kernel
+- `FallbackQuotaManager` : Fonctionne sur ext4/XFS/ZFS sans enforcement
 
-#### 1. ✅ BtrfsQuotaManager (Déjà existant)
-
-**Fonctionnalités** :
-- Subvolumes Btrfs avec qgroups
-- Enforcement kernel natif
-- Compression Btrfs = stockage bonus (~20-50%)
-
-**Commandes utilisées** :
-- `btrfs subvolume create`
-- `btrfs qgroup limit`
-- `btrfs qgroup show`
-
-#### 2. ✅ ProjectQuotaManager (ext4/XFS) - NOUVEAU
-
-**Implémentation complète** (~315 lignes) :
-
-**Fonctionnalités** :
-- Project quotas du kernel Linux
-- Gestion automatique des project IDs (range 10000-99999)
-- Mapping persistant dans `/etc/projects` et `/etc/projid`
-- Support XFS et ext4
-
-**Commandes XFS** :
-- `xfs_quota -x -c "project -s -p <path> <id>" <mount>`
-- `xfs_quota -x -c "limit -p bhard=<bytes> <id>" <mount>`
-- `xfs_quota -x -c "quota -p <id>" <mount>`
-
-**Commandes ext4** :
-- `setquota -P <id> 0 <limit_kb> 0 0 <mount>`
-- `quota -P -p <id>`
-
-**Fonctions clés** :
-- `getOrCreateProjectID()` : Attribution ID unique via hash du path
-- `setProjectID()` : Configure project ID sur répertoire
-- `addProjectIDMapping()` : Ajoute à `/etc/projects` et `/etc/projid`
-- `removeProjectID()` : Nettoie les mappings
-- `getXFSQuotaUsage()` / `getExt4QuotaUsage()` : Lecture quotas
-
-#### 3. ✅ ZFSQuotaManager (ZFS) - NOUVEAU
-
-**Implémentation complète** (~195 lignes) :
-
-**Fonctionnalités** :
-- Datasets ZFS natifs avec quotas intégrés
-- Création automatique de child datasets
-- Destruction récursive (snapshots inclus)
-
-**Commandes ZFS** :
-- `zfs create <dataset>`
-- `zfs set quota=<bytes> <dataset>`
-- `zfs get -Hp used,quota <dataset>`
-- `zfs destroy -r <dataset>`
-
-**Fonctions clés** :
-- `getZFSDataset()` : Trouve le dataset ZFS pour un path
-- `pathToDataset()` : Convertit path filesystem → dataset name
-- `datasetExists()` : Vérifie existence dataset
-
-#### Sélection automatique du QuotaManager
-
+**Détection automatique** :
 ```go
 func NewQuotaManager(basePath string) (QuotaManager, error) {
     fsType := detectFilesystem(basePath)
     switch fsType {
         case "btrfs": return &BtrfsQuotaManager{}
-        case "ext4", "xfs": return &ProjectQuotaManager{}
-        case "zfs": return &ZFSQuotaManager{}
+        default: return &FallbackQuotaManager{} // No enforcement
     }
 }
 ```
 
-### 📊 Fichiers modifiés
+**Résultat** :
+- ✅ **Btrfs** : Fonctionnalité complète avec enforcement
+- ✅ **ext4/XFS/ZFS** : Fonctionne sans enforcement (warning au démarrage)
 
-**Code** :
-- `internal/quota/enforcement.go` : +510 lignes (ProjectQuotaManager + ZFSQuotaManager)
-
-**Binaires compilés** :
-- ✅ `anemone` : Serveur principal
-- ✅ `anemone-dfree` : Calcul quotas pour Samba
-- ✅ `anemone-smbgen` : Générateur config SMB
-- ✅ `anemone-migrate` : Migration vers subvolumes
-
-### 🎯 Compatibilité
-
-**Filesystems supportés** :
-- ✅ **Btrfs** : Subvolumes + qgroups (testé en production)
-- ✅ **XFS** : Project quotas (implémenté, prêt pour tests)
-- ✅ **ext4** : Project quotas (implémenté, prêt pour tests)
-- ✅ **ZFS** : Datasets + quotas natifs (implémenté, prêt pour tests)
-
-**Prérequis système** :
-- Btrfs : `btrfs-progs` (déjà installé)
-- XFS : `xfsprogs`, `xfs_quota` (package `xfsprogs`)
-- ext4 : `quota` tools (package `quota`)
-- ZFS : `zfsutils-linux` ou `zfs` (selon distro)
-
-### 🧪 Tests à effectuer
-
-**Prochaines validations** :
-1. ✅ Btrfs : Déjà validé en production (DEV + FR1)
-2. 🔜 XFS : Tester sur serveur avec XFS filesystem
-3. 🔜 ext4 : Tester sur serveur avec ext4 + project quota enabled
-4. 🔜 ZFS : Tester sur serveur avec ZFS pool
-
-**Note** : L'installation sur un nouveau serveur permettra de valider le support ext4/XFS selon le filesystem utilisé.
-
-### 📝 Prérequis installation selon filesystem
-
-**Pour ext4** (ajouter à `install.sh`) :
-```bash
-# Enable project quota on ext4
-# Mount options: /dev/sdX /mount ext4 prjquota 0 0
+**Commits** :
 ```
-
-**Pour XFS** (ajouter à `install.sh`) :
-```bash
-# Enable project quota on XFS
-# Mount options: /dev/sdX /mount xfs prjquota 0 0
+ccae3f8 - docs: Clean up documentation and remove obsolete quota code
+46f9e6b - feat: Simplify quota strategy - Btrfs only for enforcement
 ```
-
-**Pour ZFS** (ajouter à `install.sh`) :
-```bash
-# ZFS quotas are native, no special mount options needed
-```
-
-### 🎉 Résultat
-
-**Support multi-filesystem complet** ✅
-
-Anemone peut maintenant fonctionner sur :
-- Btrfs (validation complète ✅)
-- XFS (code prêt, tests à venir)
-- ext4 (code prêt, tests à venir)
-- ZFS (code prêt, tests à venir)
-
-**Détection automatique** : Le système détecte automatiquement le filesystem et utilise le QuotaManager approprié.
-
-**Statut** : 🟢 PRODUCTION READY (Btrfs) + 🟡 READY FOR TESTING (ext4/XFS/ZFS)
-**Durée session** : ~1h30
-**Lignes ajoutées** : ~510 lignes de code
-
----
-
-## 🔧 Session 6 - Suite (7 Nov 2025 16:00) - Stratégie quotas simplifiée
-
-### ❌ Problème découvert : ext4 project quotas trop complexe
-
-**Test sur Linux Mint (ext4 standard)** :
-- ❌ Feature `project` non activée par défaut dans superblock ext4
-- ❌ Impossible d'activer sur filesystem monté
-- ❌ Nécessite formatage ou boot en rescue mode
-- ❌ Installations standard (Ubuntu/Mint/Debian) n'activent PAS cette feature
-
-**Comparaison Btrfs vs ext4** :
-- ✅ **Btrfs** : Quotas natifs, activables sur FS monté, out-of-the-box
-- ❌ **ext4** : Feature legacy, configuration complexe, non-standard
-- ❌ **XFS** : Nécessite option de montage `prjquota`
-- ❌ **ZFS** : Peu répandu sur Linux standard
-
-### ✅ Décision : Btrfs uniquement pour quotas avec enforcement
-
-**Nouvelle stratégie** :
-- 🎯 **Quotas complets** : Btrfs uniquement (recommandé)
-- ⚠️ **Mode fallback** : ext4/XFS/ZFS fonctionnent SANS enforcement kernel
-
-**Implémentation FallbackQuotaManager** (~60 lignes) :
-- Crée des répertoires normaux (pas de subvolumes/datasets)
-- Calcule l'usage avec `du -sb`
-- Affiche les quotas dans l'interface MAIS ne bloque pas les écritures
-- Warning au démarrage si filesystem non-Btrfs
-
-**Modifications** :
-```go
-func NewQuotaManager(basePath string) (QuotaManager, error) {
-    case "btrfs": return &BtrfsQuotaManager{}
-    default: return &FallbackQuotaManager{} // No enforcement
-}
-```
-
-### 📊 Fichiers modifiés
-
-- `internal/quota/enforcement.go` : +60 lignes (FallbackQuotaManager), modifié NewQuotaManager
-- `README.md` : Clarification Btrfs requis pour quotas
-- `SESSION_STATE.md` : Documentation changement stratégie
-
-### 🎯 Résultat final
-
-**Support filesystem Anemone** :
-- ✅ **Btrfs** : Fonctionnalité complète avec quotas enforced
-- ✅ **ext4/XFS/ZFS** : Fonctionne SANS quotas enforced (fallback mode)
-
-**Message utilisateur** :
-- Si non-Btrfs : Warning au démarrage "Quota enforcement requires Btrfs"
-- Interface fonctionne normalement
-- Quotas affichés mais pas bloqués par kernel
-
-**Recommandation installation** :
-- Pour NAS avec quotas → **Installer avec Btrfs**
-- Pour test/dev simple → ext4 acceptable
 
 **Statut** : 🟢 PRODUCTION READY
-**Tests validés** : Compilation OK, prêt pour test Linux Mint
 
 ---
 
@@ -730,26 +222,13 @@ func NewQuotaManager(basePath string) (QuotaManager, error) {
 **internal/crypto/crypto.go** (+107 lignes) :
 - `EncryptStream(reader, writer, key)` : Chiffre un flux de données
 - `DecryptStream(reader, writer, key)` : Déchiffre un flux de données
-- Utilise AES-256-GCM déjà en place
-- Format standardisé : nonce + ciphertext
 
 **internal/sync/sync.go** (+25 lignes) :
 - `GetUserEncryptionKey(db, userID)` : Récupère clé déchiffrée
-  - Lit master_key depuis system_config
-  - Lit encryption_key_encrypted de l'utilisateur
-  - Déchiffre avec DecryptKey()
-- `SyncShare()` modifié :
-  - Récupère clé utilisateur
-  - Crée tar.gz
-  - **Chiffre avec EncryptStream**
-  - Envoie archive chiffrée (.tar.gz.enc)
-  - Ajoute flag "encrypted":"true" au formulaire
+- `SyncShare()` : Chiffre tar.gz avant envoi
 
 **internal/web/router.go** (+30 lignes) :
-- `handleAPISyncReceive()` modifié :
-  - Vérifie flag "encrypted"
-  - Si encrypted : déchiffre avec DecryptStream avant extraction
-  - Compatible backward : supporte archives non-chiffrées
+- `handleAPISyncReceive()` : Déchiffre si flag "encrypted"
 
 ### 🔒 Sécurité
 
@@ -764,41 +243,341 @@ func NewQuotaManager(basePath string) (QuotaManager, error) {
 - Impossible de déchiffrer les backups d'autres users
 - Même avec accès DB (clés chiffrées avec master key)
 
-**Résistance à la compromission** :
-- Si serveur peer compromis → backups restent chiffrés
-- Si DB compromise → clés protégées par master key
-- Si master key compromise → peut déchiffrer les clés users
-
-### 🧪 Tests à effectuer
-
-1. ✅ Compilation : OK
-2. 🔜 Sync manuel avec chiffrement
-3. 🔜 Vérification archive chiffrée sur peer
-4. 🔜 Déchiffrement et extraction sur peer
-5. 🔜 Test avec mauvaise clé (doit échouer)
-
-### 📊 Fichiers modifiés
-
-- `internal/crypto/crypto.go` : +107 lignes (EncryptStream, DecryptStream)
-- `internal/sync/sync.go` : +25 lignes (GetUserEncryptionKey, chiffrement sync)
-- `internal/web/router.go` : +30 lignes (déchiffrement reception)
-- `README.md` : Documentation sécurité mise à jour
-
-### 📝 Commits Session 7
-
+**Commits** :
 ```
 6751b57 - feat: Implement end-to-end encryption for P2P backup sync
+4dbff9a - docs: Update documentation for end-to-end encryption
 ```
 
-### 🎉 Résultat
-
-**Chiffrement E2E des backups P2P** ✅
-
-Toutes les synchronisations P2P sont maintenant chiffrées end-to-end :
-- AES-256-GCM pour confidentialité + authentification
-- Clés par utilisateur pour isolation
-- Architecture hiérarchique (master key → user keys)
-- Protection même si serveur peer compromis
-
 **Statut** : 🟢 READY FOR TESTING
-**Prochaine étape** : Tester sync chiffré entre deux serveurs
+
+---
+
+## 🔧 Session 8 - 7 Novembre 2025 - Synchronisation incrémentale type "rclone sync"
+
+### 🎯 Objectif : Remplacer tar.gz monolithique par sync miroir incrémentale
+
+**Problème actuel** :
+- ❌ Un seul gros fichier `backup.tar.gz.enc` (peut faire plusieurs GB)
+- ❌ Doit tout re-transférer à chaque sync (même si 1 seul fichier change)
+- ❌ Impossible de naviguer dans les fichiers sans tout télécharger
+- ❌ Restauration = tout ou rien
+
+**Solution** : Synchronisation fichier par fichier (type rclone)
+
+### 🏗️ Architecture cible
+
+#### Stockage sur le peer distant
+
+```
+/srv/anemone/backups/incoming/
+└── smith_backup/
+    ├── .anemone-manifest.json.enc    # Métadonnées chiffrées
+    ├── documents/
+    │   ├── rapport.pdf.enc           # Fichiers chiffrés individuellement
+    │   └── facture.xlsx.enc
+    ├── photos/
+    │   └── vacances.jpg.enc
+    └── videos/
+        └── anniversaire.mp4.enc
+```
+
+**Avantages** :
+- ✅ Structure visible (noms de fichiers visibles pour debug)
+- ✅ Contenu chiffré (AES-256-GCM)
+- ✅ Restauration sélective
+- ✅ Sync incrémental (seulement les changements)
+
+#### Structure du manifest
+
+```json
+{
+  "version": 1,
+  "last_sync": "2025-11-07T15:30:00Z",
+  "user_id": 5,
+  "share_name": "backup",
+  "files": {
+    "documents/rapport.pdf": {
+      "size": 2400000,
+      "mtime": "2025-11-07T10:00:00Z",
+      "checksum": "sha256:abc123...",
+      "encrypted_path": "documents/rapport.pdf.enc"
+    },
+    "photos/vacances.jpg": {
+      "size": 4500000,
+      "mtime": "2025-11-06T18:30:00Z",
+      "checksum": "sha256:def456...",
+      "encrypted_path": "photos/vacances.jpg.enc"
+    }
+  }
+}
+```
+
+### 🔄 Flux de synchronisation
+
+```
+1. Récupérer le manifest distant (ou null si première sync)
+2. Scanner les fichiers locaux + calculer checksums
+3. Comparer manifests → calculer delta :
+   - Fichiers à ajouter (nouveaux)
+   - Fichiers à modifier (mtime/size/checksum différent)
+   - Fichiers à supprimer (présents sur peer mais plus en local)
+4. Appliquer les changements :
+   - Upload fichiers nouveaux/modifiés (chiffrés un par un)
+   - Delete fichiers supprimés sur peer
+5. Mettre à jour le manifest distant (chiffré)
+```
+
+### 📡 APIs nécessaires
+
+#### 1. Récupérer le manifest
+```http
+GET /api/sync/manifest?share_id=123
+Response: manifest.json.enc (ou 404 si première sync)
+```
+
+#### 2. Upload un fichier chiffré
+```http
+POST /api/sync/file
+Body (multipart):
+  - share_id: 123
+  - relative_path: "documents/rapport.pdf"
+  - size: 2400000
+  - mtime: "2025-11-07T10:00:00Z"
+  - checksum: "sha256:abc123..."
+  - file: [binary encrypted data]
+```
+
+#### 3. Supprimer un fichier sur le peer
+```http
+DELETE /api/sync/file?share_id=123&path=documents/old.pdf
+```
+
+#### 4. Mettre à jour le manifest
+```http
+PUT /api/sync/manifest?share_id=123
+Body: manifest.json.enc (chiffré)
+```
+
+### 🌐 Interface web de restauration
+
+#### Page 1 : Déverrouillage
+
+```
+┌─────────────────────────────────────────────────────┐
+│ 🔐 Mes backups sur les pairs                         │
+├─────────────────────────────────────────────────────┤
+│ Peer : FR1 (192.168.83.96)                          │
+│ Dernier backup : 07/11/2025 15:30                   │
+│ Taille : 2.5 GB (1,234 fichiers)                    │
+│                                                      │
+│ Clé de déchiffrement :                              │
+│ [........................................] 👁️       │
+│                                                      │
+│ [🔓 Déverrouiller et explorer]                      │
+└─────────────────────────────────────────────────────┘
+```
+
+#### Page 2 : Explorateur de fichiers
+
+```
+┌─────────────────────────────────────────────────────┐
+│ 📁 Explorateur de backup - FR1                       │
+│ 🔓 Déchiffré avec votre clé                          │
+├─────────────────────────────────────────────────────┤
+│ ☑️ 📁 documents/                            1.2 GB  │
+│    ☑️ 📄 rapport.pdf                       2.3 MB  │
+│    ☐ 📊 facture.xlsx                       156 KB  │
+│ ☐ 📁 photos/                                800 MB  │
+│    ☐ 🖼️ vacances.jpg                       4.5 MB  │
+│    ☐ 🖼️ famille.png                        3.2 MB  │
+│                                                      │
+│ Actions :                                            │
+│ ☐ Sélectionner tout                                 │
+│ [⬇️ Télécharger sélection] (sur votre PC)          │
+│ [🔄 Restaurer et écraser] ⚠️ DANGER                 │
+└─────────────────────────────────────────────────────┘
+```
+
+**Deux modes de restauration** :
+1. **Télécharger** : ZIP des fichiers sélectionnés déchiffrés → téléchargés sur le PC
+2. **Restaurer et écraser** : Confirmation double → restaure dans `/srv/anemone/shares/user/backup/`
+
+### 💻 Implémentation technique
+
+#### 1. Nouveau fichier `internal/sync/manifest.go`
+
+```go
+package sync
+
+type FileMetadata struct {
+    Size          int64     `json:"size"`
+    ModTime       time.Time `json:"mtime"`
+    Checksum      string    `json:"checksum"`
+    EncryptedPath string    `json:"encrypted_path"`
+}
+
+type SyncManifest struct {
+    Version   int                       `json:"version"`
+    LastSync  time.Time                 `json:"last_sync"`
+    UserID    int                       `json:"user_id"`
+    ShareName string                    `json:"share_name"`
+    Files     map[string]FileMetadata   `json:"files"`
+}
+
+type SyncDelta struct {
+    ToAdd    []string  // Fichiers nouveaux
+    ToUpdate []string  // Fichiers modifiés
+    ToDelete []string  // Fichiers à supprimer sur peer
+}
+
+// BuildManifest scans a directory and creates a manifest
+func BuildManifest(sourceDir string, userID int, shareName string) (*SyncManifest, error)
+
+// CompareManifests compares local and remote manifests and returns delta
+func CompareManifests(local, remote *SyncManifest) (*SyncDelta, error)
+
+// CalculateChecksum calculates SHA-256 of a file
+func CalculateChecksum(filePath string) (string, error)
+```
+
+#### 2. Modifier `internal/sync/sync.go`
+
+```go
+// SyncShareIncremental performs incremental file-by-file sync with encryption
+func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
+    // 1. Get user encryption key
+    encryptionKey, err := GetUserEncryptionKey(db, req.UserID)
+
+    // 2. Fetch remote manifest (or create empty if first sync)
+    remoteManifest := fetchRemoteManifest(peerURL, req.ShareID)
+
+    // 3. Build local manifest
+    localManifest := BuildManifest(req.SharePath, req.UserID, req.ShareName)
+
+    // 4. Calculate delta
+    delta := CompareManifests(localManifest, remoteManifest)
+
+    // 5. Upload new/modified files (encrypted)
+    for _, relativePath := range append(delta.ToAdd, delta.ToUpdate...) {
+        uploadEncryptedFile(peerURL, req.ShareID, relativePath, encryptionKey)
+    }
+
+    // 6. Delete removed files on peer
+    for _, relativePath := range delta.ToDelete {
+        deleteRemoteFile(peerURL, req.ShareID, relativePath)
+    }
+
+    // 7. Upload new manifest (encrypted)
+    uploadManifest(peerURL, req.ShareID, localManifest, encryptionKey)
+
+    // 8. Update sync log
+    UpdateSyncLog(db, logID, "success", len(localManifest.Files), totalBytes, "")
+}
+```
+
+#### 3. Nouveaux handlers dans `router.go`
+
+```go
+// GET /api/sync/manifest?share_id=X
+func (s *Server) handleAPISyncManifestGet(w http.ResponseWriter, r *http.Request)
+
+// POST /api/sync/file
+func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request)
+
+// DELETE /api/sync/file?share_id=X&path=Y
+func (s *Server) handleAPISyncFileDelete(w http.ResponseWriter, r *http.Request)
+
+// PUT /api/sync/manifest?share_id=X
+func (s *Server) handleAPISyncManifestUpdate(w http.ResponseWriter, r *http.Request)
+
+// GET /restore - Page UI de restauration
+func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request)
+
+// POST /api/restore/list - Liste fichiers avec déchiffrement
+func (s *Server) handleRestoreList(w http.ResponseWriter, r *http.Request)
+
+// POST /api/restore/download - Télécharge fichiers sélectionnés
+func (s *Server) handleRestoreDownload(w http.ResponseWriter, r *http.Request)
+
+// POST /api/restore/restore - Restaure sur serveur local
+func (s *Server) handleRestoreRestore(w http.ResponseWriter, r *http.Request)
+```
+
+#### 4. Template web `restore.html`
+
+- Formulaire avec sélection peer + input clé de déchiffrement
+- Explorateur de fichiers en arbre avec checkboxes
+- Deux boutons : "Télécharger" / "Restaurer et écraser"
+- Gestion erreurs (clé invalide, peer inaccessible, etc.)
+
+### 📋 Plan d'implémentation
+
+**Phase 1 : Système de manifest** 🔜
+- [ ] Créer `internal/sync/manifest.go`
+- [ ] Implémenter `BuildManifest()` avec scan récursif + checksums
+- [ ] Implémenter `CompareManifests()` pour calculer delta
+- [ ] Tests unitaires
+
+**Phase 2 : Synchronisation incrémentale** 🔜
+- [ ] API handlers : GET/PUT manifest, POST/DELETE file
+- [ ] Modifier `SyncShareIncremental()` pour upload fichier par fichier
+- [ ] Upload fichiers chiffrés un par un
+- [ ] Supprimer fichiers obsolètes sur peer
+- [ ] Tests sync incrémental
+
+**Phase 3 : Interface de restauration** 🔜
+- [ ] Template `restore.html` avec explorateur de fichiers
+- [ ] Handler `handleRestoreList()` : Télécharge manifest + déchiffre + retourne liste JSON
+- [ ] Handler `handleRestoreDownload()` : ZIP fichiers sélectionnés déchiffrés
+- [ ] Handler `handleRestoreRestore()` : Restauration sur serveur avec confirmation
+- [ ] Tests UI complets
+
+**Phase 4 : Migration code existant** 🔜
+- [ ] Remplacer `SyncShare()` par `SyncShareIncremental()`
+- [ ] Maintenir rétrocompatibilité avec anciens backups tar.gz.enc
+- [ ] Tests migration
+
+### 🎯 Résultat attendu
+
+**Sync incrémental ultra-rapide** :
+- ✅ Seulement les fichiers modifiés sont transférés
+- ✅ Bande passante optimisée
+- ✅ Temps de sync réduit (de minutes à secondes)
+
+**Restauration flexible** :
+- ✅ Navigation dans les fichiers sans tout télécharger
+- ✅ Restauration sélective (choix des fichiers)
+- ✅ Téléchargement sur PC ou restauration serveur
+
+**Sécurité maintenue** :
+- ✅ Chiffrement fichier par fichier (AES-256-GCM)
+- ✅ Clé utilisateur jamais stockée
+- ✅ Noms visibles, contenu protégé
+
+**Statut** : 🟡 EN DÉVELOPPEMENT
+**Début implémentation** : 2025-11-07 16:30
+
+---
+
+## 📝 Prochaines étapes (Roadmap)
+
+### Court terme (Session 8)
+1. ⏳ Implémenter système de manifest
+2. 🔜 Synchronisation incrémentale fichier par fichier
+3. 🔜 Interface web de restauration
+
+### Moyen terme
+1. 🔜 Synchronisation P2P automatique (cron/scheduled)
+2. 🔜 Notifications (email/web) pour sync réussies/échouées
+3. 🔜 Logs détaillés de synchronisation
+4. 🔜 Bandwidth throttling (limite bande passante)
+
+### Long terme
+1. 🔜 Tests production sur multiples serveurs
+2. 🔜 Backup/restore configuration complète
+3. 🔜 Multi-peer redundancy (plusieurs pairs pour un user)
+4. 🔜 Statistiques sync (bande passante, fréquence, etc.)
+
+**État global** : 🟡 EN DÉVELOPPEMENT ACTIF
+**Session 8 en cours** : Synchronisation incrémentale type rclone
