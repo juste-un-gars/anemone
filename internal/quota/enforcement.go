@@ -43,12 +43,12 @@ func NewQuotaManager(basePath string) (QuotaManager, error) {
 	switch fsType {
 	case "btrfs":
 		return &BtrfsQuotaManager{}, nil
-	case "ext4", "xfs":
-		return &ProjectQuotaManager{}, nil
-	case "zfs":
-		return &ZFSQuotaManager{}, nil
 	default:
-		return nil, fmt.Errorf("unsupported filesystem: %s (supported: btrfs, ext4, xfs, zfs)", fsType)
+		// For non-Btrfs filesystems, use fallback mode (no kernel quota enforcement)
+		fmt.Printf("⚠️  Warning: Filesystem '%s' detected. Quota enforcement requires Btrfs.\n", fsType)
+		fmt.Printf("   Anemone will work but quotas will NOT be enforced by the kernel.\n")
+		fmt.Printf("   For full quota support, please use Btrfs filesystem.\n")
+		return &FallbackQuotaManager{}, nil
 	}
 }
 
@@ -761,4 +761,60 @@ func (m *ZFSQuotaManager) pathToDataset(parentDataset, path string) string {
 func (m *ZFSQuotaManager) datasetExists(dataset string) bool {
 	cmd := exec.Command("sudo", "zfs", "list", "-H", "-o", "name", dataset)
 	return cmd.Run() == nil
+}
+
+// ============================================================================
+// Fallback Implementation (for non-Btrfs filesystems)
+// ============================================================================
+
+// FallbackQuotaManager provides basic directory operations without kernel quota enforcement
+// Used for ext4, xfs, and other filesystems that don't have easy quota support
+type FallbackQuotaManager struct{}
+
+// CreateQuotaDir creates a regular directory (no quota enforcement)
+func (m *FallbackQuotaManager) CreateQuotaDir(path string, limitGB int) error {
+	// Just create a regular directory
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	fmt.Printf("ℹ️  Created directory %s (quota limit: %dGB, not enforced by kernel)\n", path, limitGB)
+	return nil
+}
+
+// UpdateQuota is a no-op for fallback mode
+func (m *FallbackQuotaManager) UpdateQuota(path string, limitGB int) error {
+	// No kernel enforcement, just log
+	fmt.Printf("ℹ️  Quota updated for %s: %dGB (not enforced by kernel)\n", path, limitGB)
+	return nil
+}
+
+// GetUsage returns current disk usage using du command
+func (m *FallbackQuotaManager) GetUsage(path string) (usedBytes, limitBytes int64, err error) {
+	// Calculate actual usage with du
+	cmd := exec.Command("du", "-sb", path)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// If du fails, directory might not exist yet
+		return 0, 0, nil
+	}
+
+	// Parse du output: "bytes	path"
+	fields := strings.Fields(string(output))
+	if len(fields) < 1 {
+		return 0, 0, fmt.Errorf("unexpected du output: %s", output)
+	}
+
+	used, err := strconv.ParseInt(fields[0], 10, 64)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to parse usage: %w", err)
+	}
+
+	// Return 0 for limit (no enforcement)
+	return used, 0, nil
+}
+
+// RemoveQuotaDir removes a regular directory
+func (m *FallbackQuotaManager) RemoveQuotaDir(path string) error {
+	return os.RemoveAll(path)
 }

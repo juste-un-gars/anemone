@@ -326,11 +326,12 @@ Linux:   smb://nas.local/username-backup
 ## 💾 Quotas
 
 **Filesystem Support**:
-- ✅ **Btrfs**: Subvolumes with qgroups (tested in production)
-- ✅ **XFS**: Project quotas (ready for testing)
-- ✅ **ext4**: Project quotas (ready for testing)
-- ✅ **ZFS**: Native dataset quotas (ready for testing)
-- Automatic filesystem detection and quota manager selection
+- ✅ **Btrfs**: Full quota support with kernel enforcement (recommended)
+- ⚠️ **Other filesystems (ext4, XFS, ZFS)**: Anemone works but quotas are NOT enforced by the kernel
+
+**⚠️ Important**: For quota enforcement to work, you must use **Btrfs filesystem**.
+- On ext4/XFS/ZFS, Anemone will show quota usage but cannot prevent users from exceeding limits
+- Automatic filesystem detection
 
 **Admin Management**:
 - Set individual quotas per user via web interface (`/admin/users/{id}/quota`)
