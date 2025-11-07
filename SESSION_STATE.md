@@ -1,6 +1,6 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-04 (Session 4 - Quotas Btrfs)
+**Dernière session** : 2025-11-07 (Session 5 - Fix permissions chown)
 **Status** : 🟢 PRODUCTION READY
 
 > **Note** : L'historique des sessions 1-3 a été archivé dans `SESSION_STATE_ARCHIVE.md`
@@ -414,3 +414,61 @@ Plus **AUCUNE trace** de l'utilisateur après suppression :
 
 **Statut global** : 🟢 PRODUCTION READY
 **Session 4 complète** : Quotas Btrfs + Suppression complète + Fixes création user
+
+---
+
+## 🔧 Session 5 - 7 Novembre 2025 - Fix permissions sudo chown
+
+### ❌ Problème découvert
+
+Utilisateurs créés après session 4 n'avaient **aucun partage SMB visible**.
+
+**Symptômes** :
+- Création user réussie mais partages absents
+- Logs : `Warning: Failed to create backup share: permission denied`
+- Répertoires existaient sur disque mais pas en DB
+
+### 🔍 Cause racine
+
+**Double bug de permissions** :
+
+1. **Mauvais chemin sudo** : Code utilisait `"chown"` au lieu de `"/usr/bin/chown"`
+   - Sudoers autorise `/usr/bin/chown -R *` uniquement
+   - Sans chemin complet, sudo demandait mot de passe → échec silencieux
+
+2. **Ordre d'opérations incorrect** :
+   - `router.go` : `chown kenny:kenny` sur subvolumes **AVANT** création `.trash`
+   - `shares.go` : Tentative `os.MkdirAll(.trash)` en tant que user `franck`
+   - Processus `franck` ne peut pas écrire dans répertoires `kenny:kenny` (755)
+
+### ✅ Corrections appliquées
+
+**Fichiers modifiés** :
+1. `internal/web/router.go:1100,1128` - Ajout `/usr/bin/chown -R`
+2. `internal/shares/shares.go:47,52,60,74` - Remplacé `os.MkdirAll` par `sudo /usr/bin/mkdir -p`
+3. `cmd/anemone-migrate/main.go:183` - Ajout `/usr/bin/chown -R`
+
+**Solution** :
+- Utilise `sudo /usr/bin/mkdir -p` pour créer `.trash` (fonctionne même si répertoire parent appartient à autre user)
+- Ajout `sudo /usr/bin/chmod -R 755` avant chown
+- Tous les chemins sudo utilisent maintenant chemins complets
+
+### 🧪 Tests validés
+
+✅ Création utilisateur kenny : Partages SMB visibles
+✅ Répertoires avec bonnes permissions
+✅ Partages enregistrés en DB
+✅ Config Samba régénérée automatiquement
+
+### 📊 Bugs identifiés (non corrigés)
+
+⚠️ **Sécurité** : Un utilisateur peut se supprimer lui-même alors qu'il est connecté
+
+### 📝 Commits Session 5
+
+```
+[À ajouter] fix: Correct sudo chown paths and .trash creation permissions
+```
+
+**Statut** : 🟢 PRODUCTION READY
+**Durée session** : ~1h30

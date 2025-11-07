@@ -1097,7 +1097,7 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Created backup subvolume with %dGB quota", user.QuotaBackupGB)
 
 				// Set ownership of subvolume to user (needed for .trash creation)
-				chownCmd := exec.Command("sudo", "chown", fmt.Sprintf("%s:%s", token.Username, token.Username), backupPath)
+				chownCmd := exec.Command("sudo", "/usr/bin/chown", "-R", fmt.Sprintf("%s:%s", token.Username, token.Username), backupPath)
 				if err := chownCmd.Run(); err != nil {
 					log.Printf("Warning: Failed to set backup subvolume ownership: %v", err)
 				}
@@ -1125,7 +1125,7 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Created data subvolume with %dGB quota", dataQuotaGB)
 
 				// Set ownership of subvolume to user (needed for .trash creation)
-				chownCmd := exec.Command("sudo", "chown", fmt.Sprintf("%s:%s", token.Username, token.Username), dataPath)
+				chownCmd := exec.Command("sudo", "/usr/bin/chown", "-R", fmt.Sprintf("%s:%s", token.Username, token.Username), dataPath)
 				if err := chownCmd.Run(); err != nil {
 					log.Printf("Warning: Failed to set data subvolume ownership: %v", err)
 				}

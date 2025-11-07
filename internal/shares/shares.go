@@ -43,14 +43,22 @@ func Create(db *sql.DB, share *Share, username string) error {
 	// The VFS module ignores force_directory_mode for internally-created directories
 	if username != "" {
 		trashDir := filepath.Join(share.Path, ".trash", username)
-		if err := os.MkdirAll(trashDir, 0755); err != nil {
+		// Use sudo mkdir because share.Path may already be owned by username
+		cmd := exec.Command("sudo", "/usr/bin/mkdir", "-p", trashDir)
+		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to create trash directory: %w", err)
 		}
 
-		// Set ownership of .trash to the share user
+		// Set correct permissions (755) on .trash directories
 		trashRoot := filepath.Join(share.Path, ".trash")
-		cmd := exec.Command("sudo", "chown", "-R", fmt.Sprintf("%s:%s", username, username), trashRoot)
-		if err := cmd.Run(); err != nil {
+		chmodCmd := exec.Command("sudo", "/usr/bin/chmod", "-R", "755", trashRoot)
+		if err := chmodCmd.Run(); err != nil {
+			return fmt.Errorf("failed to set trash directory permissions: %w", err)
+		}
+
+		// Set ownership of .trash to the share user
+		chownCmd := exec.Command("sudo", "/usr/bin/chown", "-R", fmt.Sprintf("%s:%s", username, username), trashRoot)
+		if err := chownCmd.Run(); err != nil {
 			return fmt.Errorf("failed to set trash directory ownership: %w", err)
 		}
 	}
@@ -71,7 +79,7 @@ func Create(db *sql.DB, share *Share, username string) error {
 	// Change owner to the share user (requires sudo)
 	// This allows the SMB user to access their own directories
 	if username != "" {
-		cmd := exec.Command("sudo", "chown", "-R", fmt.Sprintf("%s:%s", username, username), share.Path)
+		cmd := exec.Command("sudo", "/usr/bin/chown", "-R", fmt.Sprintf("%s:%s", username, username), share.Path)
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to set directory ownership: %w", err)
 		}

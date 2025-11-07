@@ -180,7 +180,7 @@ func main() {
 			}
 
 			// Step 4: Verify ownership
-			cmd = exec.Command("sudo", "chown", "-R", fmt.Sprintf("%s:%s", user.Username, user.Username), share.Path)
+			cmd = exec.Command("sudo", "/usr/bin/chown", "-R", fmt.Sprintf("%s:%s", user.Username, user.Username), share.Path)
 			if err := cmd.Run(); err != nil {
 				log.Printf("  ⚠️  WARNING: Failed to set ownership: %v", err)
 			}
