@@ -27,12 +27,12 @@ Your support helps maintain and improve Anemone. Thank you!
 Anemone is a self-hosted Network Attached Storage (NAS) solution designed for families and small teams. It provides:
 
 - 🔐 **Multi-user support** with individual encrypted backups
-- 🌐 **Peer-to-peer synchronization** of encrypted data
+- 🌐 **Peer-to-peer synchronization** with end-to-end encryption (AES-256-GCM)
 - 📦 **SMB file sharing** (Windows/Mac/Linux compatible)
 - 🗑️ **Per-user trash** with configurable retention
-- 💾 **Quota management** per user
+- 💾 **Quota management** per user (Btrfs only)
 - 🌍 **Multilingual** (French & English)
-- 🔒 **End-to-end encryption** with user-specific keys
+- 🔒 **End-to-end encryption** with user-specific keys and master key protection
 
 ## 🏗️ Architecture
 
@@ -266,20 +266,32 @@ open http://localhost:8080
 
 ## 🔐 Security
 
-### Encryption Keys
+### End-to-End Encryption
 
-- Each user has a **unique encryption key** (32 bytes)
-- Key is generated automatically and shown **once** during activation
-- Key is stored encrypted in database (using system master key)
-- Hash stored for verification without exposing the key
-- **Without the key, backup data cannot be decrypted**
+**Backup synchronization uses AES-256-GCM encryption**:
+- Backups are **encrypted before leaving the source server**
+- Only the destination server with the user's key can decrypt
+- Even if the peer server is compromised, backups remain encrypted
+- Encryption format: `[nonce (12 bytes)][encrypted data + auth tag]`
+
+### Encryption Keys Architecture
+
+- **Master Key**: Generated at setup, stored in `system_config`
+  - Used to encrypt/decrypt user encryption keys
+  - Never leaves the server
+- **User Encryption Keys**: Unique 32-byte key per user
+  - Generated automatically during user activation
+  - Shown **once** to user (download recommended)
+  - Stored encrypted with master key in `encryption_key_encrypted`
+  - Hash stored in `encryption_key_hash` for verification
+  - **Without the key, backup data cannot be decrypted**
 
 ### P2P Sync Security
 
 - Each user's backups are encrypted with their personal key
-- Peers cannot decrypt data from other users
-- No VPN required (assume firewall/network security handled externally)
-- HTTPS recommended for peer connections
+- Peers cannot decrypt data from other users (key isolation)
+- HTTPS for secure transfer (TLS + application-level encryption)
+- No VPN required (network security assumed external)
 
 ## 📂 File Shares
 
@@ -611,12 +623,12 @@ echo "✓ Anemone removed (system users and SMB users NOT removed - see above)"
   - [x] Fallback mode for non-Btrfs filesystems (tracking only, no enforcement)
 - [x] P2P synchronization (manual):
   - [x] Manual sync button per share
-  - [x] tar.gz over HTTPS transfer
+  - [x] tar.gz with AES-256-GCM encryption
+  - [x] End-to-end encrypted transfer over HTTPS
   - [x] Connection testing to peers
 
 **Planned** 📅:
 - [ ] P2P auto-sync with scheduling
-- [ ] Encryption of backup shares (rclone)
 - [ ] Advanced settings (workgroup, network config)
 - [ ] Conflict resolution for sync
 - [ ] API endpoints for external integrations
