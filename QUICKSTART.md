@@ -4,9 +4,12 @@ Ce guide vous aide à installer et démarrer Anemone v2.
 
 ## Prérequis
 
+- **Btrfs filesystem** (requis pour quotas avec enforcement kernel)
 - Go 1.21+ - [Installation](https://go.dev/doc/install)
 - Samba (pour partages SMB)
 - Accès sudo (pour configuration système)
+
+> ⚠️ **Important** : Pour bénéficier des quotas avec enforcement, installez votre système sur **Btrfs**. Anemone fonctionnera sur ext4/XFS mais les quotas ne seront pas enforced par le kernel.
 
 ## Installation automatique (recommandé)
 
@@ -185,9 +188,7 @@ sudo testparm -s | grep -A 5 backup_
 smbclient -L localhost -U utilisateur
 ```
 
-## Prochaines étapes
-
-Fonctionnalités actuellement implémentées :
+## Fonctionnalités implémentées
 
 1. ✅ Configuration initiale (setup)
 2. ✅ Système d'authentification
@@ -198,14 +199,17 @@ Fonctionnalités actuellement implémentées :
 7. ✅ Configuration Samba dynamique
 8. ✅ Support HTTPS avec TLS auto-signé
 9. ✅ Multilingue (FR/EN)
+10. ✅ **Quotas utilisateur** (Btrfs uniquement, avec enforcement kernel)
+11. ✅ **Corbeille intégrée** (restauration + suppression définitive)
+12. ✅ **Synchronisation P2P manuelle** (tar.gz over HTTPS)
 
-À venir :
+## Prochaines étapes
 
-1. ⏭️ Synchronisation P2P réelle
+1. ⏭️ Synchronisation P2P automatisée avec planification
 2. ⏭️ Chiffrement des partages backup
-3. ⏭️ Quotas utilisateur
-4. ⏭️ Corbeille avec rétention
-5. ⏭️ Monitoring et statistiques
+3. ⏭️ Monitoring et statistiques avancées
+4. ⏭️ Notifications email (alertes quota, etc.)
+5. ⏭️ Support multi-pairs (actuellement 1-to-1)
 
 ## Dépannage
 

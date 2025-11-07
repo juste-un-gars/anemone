@@ -81,9 +81,12 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 
 ### Prerequisites
 
+- **Btrfs filesystem** (required for quota enforcement) - [Why Btrfs?](#-quotas)
 - Go 1.21+ - [Installation guide](https://go.dev/doc/install)
 - Samba (for SMB file sharing)
 - Sudo access (for system configuration)
+
+> ⚠️ **Important**: Anemone works on any filesystem (ext4, XFS, ZFS), but **quota enforcement requires Btrfs**. On other filesystems, quotas will be displayed but not enforced by the kernel.
 
 ### One-Line Installation (Fresh Server)
 
@@ -600,12 +603,20 @@ echo "✓ Anemone removed (system users and SMB users NOT removed - see above)"
 - [x] SELinux configuration (Fedora/RHEL)
 - [x] Automated installation script
 - [x] Privacy (users only see their own shares)
-
-**In Progress** 🔨:
-- [ ] P2P synchronization (rclone with encryption)
-- [ ] User quotas enforcement & monitoring
+- [x] Quota management (Btrfs only):
+  - [x] Per-user quotas (backup + data)
+  - [x] Kernel-level enforcement (Btrfs subvolumes + qgroups)
+  - [x] Real-time usage display with alerts
+  - [x] Admin quota configuration interface
+  - [x] Fallback mode for non-Btrfs filesystems (tracking only, no enforcement)
+- [x] P2P synchronization (manual):
+  - [x] Manual sync button per share
+  - [x] tar.gz over HTTPS transfer
+  - [x] Connection testing to peers
 
 **Planned** 📅:
+- [ ] P2P auto-sync with scheduling
+- [ ] Encryption of backup shares (rclone)
 - [ ] Advanced settings (workgroup, network config)
 - [ ] Conflict resolution for sync
 - [ ] API endpoints for external integrations
