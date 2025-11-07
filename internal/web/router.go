@@ -5,11 +5,13 @@
 package web
 
 import (
+	"bytes"
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -22,6 +24,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/activation"
 	"github.com/juste-un-gars/anemone/internal/auth"
 	"github.com/juste-un-gars/anemone/internal/config"
+	"github.com/juste-un-gars/anemone/internal/crypto"
 	"github.com/juste-un-gars/anemone/internal/i18n"
 	"github.com/juste-un-gars/anemone/internal/peers"
 	"github.com/juste-un-gars/anemone/internal/quota"
@@ -1977,8 +1980,31 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	// Check if archive is encrypted
+	encrypted := r.FormValue("encrypted") == "true"
+
+	var reader io.Reader = file
+	if encrypted {
+		// Get user's encryption key
+		encryptionKey, err := sync.GetUserEncryptionKey(s.db, userID)
+		if err != nil {
+			log.Printf("Error getting encryption key: %v", err)
+			http.Error(w, "Failed to get encryption key", http.StatusInternalServerError)
+			return
+		}
+
+		// Decrypt archive
+		var decryptedBuf bytes.Buffer
+		if err := crypto.DecryptStream(file, &decryptedBuf, encryptionKey); err != nil {
+			log.Printf("Error decrypting archive: %v", err)
+			http.Error(w, fmt.Sprintf("Failed to decrypt archive: %v", err), http.StatusInternalServerError)
+			return
+		}
+		reader = &decryptedBuf
+	}
+
 	// Extract archive to local share path
-	if err := sync.ExtractTarGz(file, targetShare.Path); err != nil {
+	if err := sync.ExtractTarGz(reader, targetShare.Path); err != nil {
 		log.Printf("Error extracting archive: %v", err)
 		http.Error(w, fmt.Sprintf("Failed to extract archive: %v", err), http.StatusInternalServerError)
 		return

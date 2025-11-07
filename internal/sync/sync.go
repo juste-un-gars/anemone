@@ -17,6 +17,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/juste-un-gars/anemone/internal/crypto"
 )
 
 // SyncLog represents a synchronization log entry
@@ -130,9 +132,33 @@ func GetSyncLogs(db *sql.DB, userID int, limit int) ([]*SyncLog, error) {
 	return logs, nil
 }
 
-// SyncShare synchronizes a share to a peer using HTTP/HTTPS API
-// This is a simple implementation for testing: creates tar archive and sends to peer
-// Will be replaced with rclone + encryption for production
+// GetUserEncryptionKey retrieves and decrypts the user's encryption key
+func GetUserEncryptionKey(db *sql.DB, userID int) (string, error) {
+	// Get master key from system config
+	var masterKey string
+	err := db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to get master key: %w", err)
+	}
+
+	// Get user's encrypted encryption key
+	var encryptedKey []byte
+	err = db.QueryRow("SELECT encryption_key_encrypted FROM users WHERE id = ?", userID).Scan(&encryptedKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to get user encryption key: %w", err)
+	}
+
+	// Decrypt the user's encryption key
+	decryptedKey, err := crypto.DecryptKey(string(encryptedKey), masterKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt user encryption key: %w", err)
+	}
+
+	return decryptedKey, nil
+}
+
+// SyncShare synchronizes a share to a peer using HTTPS with encryption
+// Creates tar.gz archive, encrypts it with user's key, and sends to peer
 func SyncShare(db *sql.DB, req *SyncRequest) error {
 	// Create sync log entry
 	logID, err := CreateSyncLog(db, req.UserID, req.PeerID)
@@ -140,16 +166,32 @@ func SyncShare(db *sql.DB, req *SyncRequest) error {
 		return fmt.Errorf("failed to create sync log: %w", err)
 	}
 
+	// Get user's encryption key
+	encryptionKey, err := GetUserEncryptionKey(db, req.UserID)
+	if err != nil {
+		errMsg := fmt.Sprintf("Failed to get encryption key: %v", err)
+		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
 	// Create tar.gz archive of the share directory
-	var buf bytes.Buffer
-	fileCount, totalSize, err := createTarGz(&buf, req.SharePath)
+	var tarBuf bytes.Buffer
+	fileCount, totalSize, err := createTarGz(&tarBuf, req.SharePath)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create archive: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
 		return fmt.Errorf(errMsg)
 	}
 
-	// Send archive to peer via HTTP POST
+	// Encrypt the archive
+	var encryptedBuf bytes.Buffer
+	if err := crypto.EncryptStream(&tarBuf, &encryptedBuf, encryptionKey); err != nil {
+		errMsg := fmt.Sprintf("Failed to encrypt archive: %v", err)
+		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
+	// Send encrypted archive to peer via HTTP POST
 	peerURL := fmt.Sprintf("https://%s:%d/api/sync/receive", req.PeerAddress, req.PeerPort)
 
 	// Create multipart form with share info
@@ -159,18 +201,19 @@ func SyncShare(db *sql.DB, req *SyncRequest) error {
 	// Add metadata fields
 	writer.WriteField("share_id", fmt.Sprintf("%d", req.ShareID))
 	writer.WriteField("user_id", fmt.Sprintf("%d", req.UserID))
+	writer.WriteField("encrypted", "true") // Flag to indicate encryption
 	// Extract share name from path (last directory)
 	shareName := filepath.Base(filepath.Dir(req.SharePath))
 	writer.WriteField("share_name", shareName)
 
-	// Add archive file
-	part, err := writer.CreateFormFile("archive", "share.tar.gz")
+	// Add encrypted archive file
+	part, err := writer.CreateFormFile("archive", "share.tar.gz.enc")
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create form file: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
 		return fmt.Errorf(errMsg)
 	}
-	io.Copy(part, &buf)
+	io.Copy(part, &encryptedBuf)
 	writer.Close()
 
 	// Create HTTP client that accepts self-signed certs

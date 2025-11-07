@@ -105,3 +105,109 @@ func CheckPassword(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
 }
+
+// EncryptStream encrypts data from reader and writes to writer using AES-256-GCM
+// The encryption key must be base64-encoded 32-byte key
+// Format: [nonce (12 bytes)][encrypted data with auth tag]
+func EncryptStream(reader io.Reader, writer io.Writer, encryptionKey string) error {
+	// Decode the base64 key
+	key, err := base64.StdEncoding.DecodeString(encryptionKey)
+	if err != nil {
+		return fmt.Errorf("failed to decode encryption key: %w", err)
+	}
+
+	if len(key) != 32 {
+		return fmt.Errorf("encryption key must be 32 bytes, got %d", len(key))
+	}
+
+	// Create AES cipher
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	// Create GCM mode
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	// Generate random nonce
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return fmt.Errorf("failed to generate nonce: %w", err)
+	}
+
+	// Write nonce first (needed for decryption)
+	if _, err := writer.Write(nonce); err != nil {
+		return fmt.Errorf("failed to write nonce: %w", err)
+	}
+
+	// Read all data (for GCM we need the full plaintext)
+	plaintext, err := io.ReadAll(reader)
+	if err != nil {
+		return fmt.Errorf("failed to read data: %w", err)
+	}
+
+	// Encrypt data
+	ciphertext := gcm.Seal(nil, nonce, plaintext, nil)
+
+	// Write encrypted data
+	if _, err := writer.Write(ciphertext); err != nil {
+		return fmt.Errorf("failed to write encrypted data: %w", err)
+	}
+
+	return nil
+}
+
+// DecryptStream decrypts data from reader and writes to writer using AES-256-GCM
+// The encryption key must be base64-encoded 32-byte key
+// Expected format: [nonce (12 bytes)][encrypted data with auth tag]
+func DecryptStream(reader io.Reader, writer io.Writer, encryptionKey string) error {
+	// Decode the base64 key
+	key, err := base64.StdEncoding.DecodeString(encryptionKey)
+	if err != nil {
+		return fmt.Errorf("failed to decode encryption key: %w", err)
+	}
+
+	if len(key) != 32 {
+		return fmt.Errorf("encryption key must be 32 bytes, got %d", len(key))
+	}
+
+	// Create AES cipher
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	// Create GCM mode
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	// Read nonce
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(reader, nonce); err != nil {
+		return fmt.Errorf("failed to read nonce: %w", err)
+	}
+
+	// Read all encrypted data
+	ciphertext, err := io.ReadAll(reader)
+	if err != nil {
+		return fmt.Errorf("failed to read encrypted data: %w", err)
+	}
+
+	// Decrypt data
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return fmt.Errorf("failed to decrypt: %w (invalid key or corrupted data)", err)
+	}
+
+	// Write decrypted data
+	if _, err := writer.Write(plaintext); err != nil {
+		return fmt.Errorf("failed to write decrypted data: %w", err)
+	}
+
+	return nil
+}
