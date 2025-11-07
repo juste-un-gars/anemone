@@ -460,15 +460,18 @@ Utilisateurs créés après session 4 n'avaient **aucun partage SMB visible**.
 ✅ Partages enregistrés en DB
 ✅ Config Samba régénérée automatiquement
 
-### 📊 Bugs identifiés (non corrigés)
-
-⚠️ **Sécurité** : Un utilisateur peut se supprimer lui-même alors qu'il est connecté
-
 ### 📝 Commits Session 5
 
 ```
-[À ajouter] fix: Correct sudo chown paths and .trash creation permissions
+a66c059 - fix: Correct sudo chown paths and .trash creation permissions
+4d189c1 - fix: Prevent users from deleting their own account
 ```
 
+### ✅ Correction bonus : Protection auto-suppression
+
+**Fichier modifié** : `internal/web/router.go:908-911`
+**Ajout** : Vérification `session.UserID != userID` avant suppression
+**Résultat** : HTTP 403 si tentative d'auto-suppression
+
 **Statut** : 🟢 PRODUCTION READY
-**Durée session** : ~1h30
+**Durée session** : ~2h
