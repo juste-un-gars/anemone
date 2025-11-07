@@ -513,13 +513,14 @@ func (s *Server) handleRestoreRestore(w http.ResponseWriter, r *http.Request)
 
 ### 📋 Plan d'implémentation
 
-**Phase 1 : Système de manifest** 🔜
-- [ ] Créer `internal/sync/manifest.go`
-- [ ] Implémenter `BuildManifest()` avec scan récursif + checksums
-- [ ] Implémenter `CompareManifests()` pour calculer delta
-- [ ] Tests unitaires
+**Phase 1 : Système de manifest** ✅ COMPLÈTE
+- [x] Créer `internal/sync/manifest.go`
+- [x] Implémenter `BuildManifest()` avec scan récursif + checksums
+- [x] Implémenter `CompareManifests()` pour calculer delta
+- [x] Fonctions helper : `CalculateChecksum()`, `MarshalManifest()`, `UnmarshalManifest()`
+- [x] Compilation OK
 
-**Phase 2 : Synchronisation incrémentale** 🔜
+**Phase 2 : Synchronisation incrémentale** 🔜 PROCHAINE
 - [ ] API handlers : GET/PUT manifest, POST/DELETE file
 - [ ] Modifier `SyncShareIncremental()` pour upload fichier par fichier
 - [ ] Upload fichiers chiffrés un par un
@@ -538,6 +539,27 @@ func (s *Server) handleRestoreRestore(w http.ResponseWriter, r *http.Request)
 - [ ] Maintenir rétrocompatibilité avec anciens backups tar.gz.enc
 - [ ] Tests migration
 
+### 📝 Progression Session 8 (7 Nov 2025)
+
+**✅ Implémenté aujourd'hui** :
+- Fichier `internal/sync/manifest.go` créé (223 lignes)
+- Structures de données :
+  - `FileMetadata` : size, mtime, checksum SHA-256, encrypted_path
+  - `SyncManifest` : version, last_sync, user_id, share_name, files map
+  - `SyncDelta` : ToAdd, ToUpdate, ToDelete
+- Fonctions :
+  - `BuildManifest()` : Scan récursif avec exclusion fichiers cachés
+  - `CompareManifests()` : Calcul delta (nouveaux/modifiés/supprimés)
+  - `CalculateChecksum()` : SHA-256 streaming
+  - `MarshalManifest()` / `UnmarshalManifest()` : JSON serialization
+  - `GetManifestStats()` : Compteurs fichiers/taille
+- Tests : Compilation OK ✅
+
+**🔜 À faire demain** :
+1. Implémenter les API handlers (GET/PUT manifest, POST/DELETE file)
+2. Créer `SyncShareIncremental()` pour remplacer `SyncShare()`
+3. Tests de synchronisation incrémentale
+
 ### 🎯 Résultat attendu
 
 **Sync incrémental ultra-rapide** :
@@ -555,8 +577,9 @@ func (s *Server) handleRestoreRestore(w http.ResponseWriter, r *http.Request)
 - ✅ Clé utilisateur jamais stockée
 - ✅ Noms visibles, contenu protégé
 
-**Statut** : 🟡 EN DÉVELOPPEMENT
+**Statut** : 🟡 EN DÉVELOPPEMENT (Phase 1/4 complète)
 **Début implémentation** : 2025-11-07 16:30
+**Dernière mise à jour** : 2025-11-07 17:00 (fin de journée)
 
 ---
 
