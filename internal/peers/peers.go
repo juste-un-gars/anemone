@@ -18,7 +18,7 @@ type Peer struct {
 	Name      string
 	Address   string
 	Port      int
-	PublicKey string
+	PublicKey *string // Can be NULL
 	Enabled   bool
 	Status    string // "online", "offline", "error", "unknown"
 	LastSeen  *time.Time

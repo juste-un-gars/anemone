@@ -15,6 +15,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -149,6 +150,10 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 
 	// API routes - Sync (no auth for peer-to-peer sync)
 	mux.HandleFunc("/api/sync/receive", server.handleAPISyncReceive)
+
+	// API routes - Incremental sync (manifest-based)
+	mux.HandleFunc("/api/sync/manifest", server.handleAPISyncManifest)       // GET/PUT
+	mux.HandleFunc("/api/sync/file", server.handleAPISyncFile)               // POST/DELETE
 
 	return mux
 }
@@ -1496,11 +1501,15 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Create peer
+		var pkPtr *string
+		if publicKey != "" {
+			pkPtr = &publicKey
+		}
 		peer := &peers.Peer{
 			Name:      name,
 			Address:   address,
 			Port:      port,
-			PublicKey: publicKey,
+			PublicKey: pkPtr,
 			Enabled:   enabled,
 			Status:    "unknown",
 		}
@@ -1899,14 +1908,15 @@ func (s *Server) handleSyncShare(w http.ResponseWriter, r *http.Request) {
 			PeerPort:    peer.Port,
 		}
 
-		err := sync.SyncShare(s.db, req)
+		// Use incremental sync (manifest-based)
+		err := sync.SyncShareIncremental(s.db, req)
 		if err != nil {
 			errorCount++
 			lastError = err.Error()
 			log.Printf("Error syncing to peer %s: %v", peer.Name, err)
 		} else {
 			successCount++
-			log.Printf("Successfully synced share %d to peer %s", shareID, peer.Name)
+			log.Printf("Successfully synced share %d to peer %s (incremental)", shareID, peer.Name)
 		}
 	}
 
@@ -2016,6 +2026,255 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"success": true, "message": "Sync received and extracted"}`)
+}
+
+// handleAPISyncManifest handles GET and PUT requests for sync manifests
+func (s *Server) handleAPISyncManifest(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.handleAPISyncManifestGet(w, r)
+	case http.MethodPut:
+		s.handleAPISyncManifestPut(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleAPISyncManifestGet returns the manifest for a given share
+// GET /api/sync/manifest?user_id=5&share_name=backup
+func (s *Server) handleAPISyncManifestGet(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	userIDStr := r.URL.Query().Get("user_id")
+	shareName := r.URL.Query().Get("share_name")
+
+	if userIDStr == "" || shareName == "" {
+		http.Error(w, "Missing user_id or share_name", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	// Build backup directory path directly (no need to check if user exists locally)
+	// Format: /srv/anemone/backups/incoming/{user_id}_{share_name}/
+	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
+	backupDir := filepath.Join("/srv/anemone/backups/incoming", backupDirName)
+	manifestPath := filepath.Join(backupDir, ".anemone-manifest.json.enc")
+
+	// Check if manifest file exists
+	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+		// No manifest yet (first sync) - return 404
+		http.Error(w, "No manifest found (first sync)", http.StatusNotFound)
+		return
+	}
+
+	// Read encrypted manifest
+	encryptedData, err := os.ReadFile(manifestPath)
+	if err != nil {
+		log.Printf("Error reading manifest file: %v", err)
+		http.Error(w, "Failed to read manifest", http.StatusInternalServerError)
+		return
+	}
+
+	// Return encrypted manifest
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", "attachment; filename=\".anemone-manifest.json.enc\"")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encryptedData)
+}
+
+// handleAPISyncManifestPut updates the manifest for a given share
+// PUT /api/sync/manifest?user_id=5&share_name=backup
+// Body: encrypted manifest data
+func (s *Server) handleAPISyncManifestPut(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	userIDStr := r.URL.Query().Get("user_id")
+	shareName := r.URL.Query().Get("share_name")
+
+	if userIDStr == "" || shareName == "" {
+		http.Error(w, "Missing user_id or share_name", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	// Read encrypted manifest from request body
+	encryptedData, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Error reading request body: %v", err)
+		http.Error(w, "Failed to read manifest data", http.StatusBadRequest)
+		return
+	}
+
+	// Build backup directory path directly (no need to check if user exists locally)
+	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
+	backupDir := filepath.Join("/srv/anemone/backups/incoming", backupDirName)
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		log.Printf("Error creating backup directory: %v", err)
+		http.Error(w, "Failed to create backup directory", http.StatusInternalServerError)
+		return
+	}
+
+	// Write encrypted manifest
+	manifestPath := filepath.Join(backupDir, ".anemone-manifest.json.enc")
+	if err := os.WriteFile(manifestPath, encryptedData, 0644); err != nil {
+		log.Printf("Error writing manifest file: %v", err)
+		http.Error(w, "Failed to write manifest", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Successfully updated manifest for user %d, share %s", userID, shareName)
+
+	// Return success
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"success": true, "message": "Manifest updated"}`)
+}
+
+// handleAPISyncFile handles POST and DELETE requests for individual files
+func (s *Server) handleAPISyncFile(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		s.handleAPISyncFileUpload(w, r)
+	case http.MethodDelete:
+		s.handleAPISyncFileDelete(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleAPISyncFileUpload handles uploading a single encrypted file
+// POST /api/sync/file
+// Multipart form with: user_id, share_name, relative_path, file
+func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request) {
+	// Parse multipart form (max 10GB)
+	if err := r.ParseMultipartForm(10 << 30); err != nil {
+		log.Printf("Error parsing multipart form: %v", err)
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	// Get metadata from form
+	userIDStr := r.FormValue("user_id")
+	shareName := r.FormValue("share_name")
+	relativePath := r.FormValue("relative_path")
+
+	if userIDStr == "" || shareName == "" || relativePath == "" {
+		http.Error(w, "Missing user_id, share_name, or relative_path", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	// Security check: prevent path traversal
+	if strings.Contains(relativePath, "..") {
+		http.Error(w, "Invalid relative_path (path traversal detected)", http.StatusBadRequest)
+		return
+	}
+
+	// Get file from multipart form
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		log.Printf("Error getting file: %v", err)
+		http.Error(w, "Missing file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Build backup directory path directly (no need to check if user exists locally)
+	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
+	backupDir := filepath.Join("/srv/anemone/backups/incoming", backupDirName)
+	targetPath := filepath.Join(backupDir, relativePath)
+
+	// Create parent directory if needed
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+		log.Printf("Error creating directory: %v", err)
+		http.Error(w, "Failed to create directory", http.StatusInternalServerError)
+		return
+	}
+
+	// Write file to disk
+	outFile, err := os.Create(targetPath)
+	if err != nil {
+		log.Printf("Error creating file: %v", err)
+		http.Error(w, "Failed to create file", http.StatusInternalServerError)
+		return
+	}
+	defer outFile.Close()
+
+	if _, err := io.Copy(outFile, file); err != nil {
+		log.Printf("Error writing file: %v", err)
+		http.Error(w, "Failed to write file", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Successfully uploaded file: %s (user %d, share %s)", relativePath, userID, shareName)
+
+	// Return success
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"success": true, "message": "File uploaded"}`)
+}
+
+// handleAPISyncFileDelete handles deleting a single file from backup
+// DELETE /api/sync/file?user_id=5&share_name=backup&path=documents/report.pdf.enc
+func (s *Server) handleAPISyncFileDelete(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	userIDStr := r.URL.Query().Get("user_id")
+	shareName := r.URL.Query().Get("share_name")
+	relativePath := r.URL.Query().Get("path")
+
+	if userIDStr == "" || shareName == "" || relativePath == "" {
+		http.Error(w, "Missing user_id, share_name, or path", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	// Security check: prevent path traversal
+	if strings.Contains(relativePath, "..") {
+		http.Error(w, "Invalid path (path traversal detected)", http.StatusBadRequest)
+		return
+	}
+
+	// Build backup directory path directly (no need to check if user exists locally)
+	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
+	backupDir := filepath.Join("/srv/anemone/backups/incoming", backupDirName)
+	targetPath := filepath.Join(backupDir, relativePath)
+
+	// Delete file
+	if err := os.Remove(targetPath); err != nil {
+		if os.IsNotExist(err) {
+			// File already doesn't exist - that's OK
+			log.Printf("File already deleted: %s", relativePath)
+		} else {
+			log.Printf("Error deleting file: %v", err)
+			http.Error(w, "Failed to delete file", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	log.Printf("Successfully deleted file: %s (user %d, share %s)", relativePath, userID, shareName)
+
+	// Return success
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"success": true, "message": "File deleted"}`)
 }
 
 // handleSettings shows the user settings page
