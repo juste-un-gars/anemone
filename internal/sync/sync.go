@@ -493,6 +493,93 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	return nil
 }
 
+// SyncAllUsers synchronizes all users with sync_enabled shares to all enabled peers
+// Returns: successCount, errorCount, lastError
+func SyncAllUsers(db *sql.DB) (int, int, string) {
+	// Get all shares with sync enabled
+	sharesQuery := `SELECT id, user_id, name, path FROM shares WHERE sync_enabled = 1`
+	shareRows, err := db.Query(sharesQuery)
+	if err != nil {
+		return 0, 1, fmt.Sprintf("Failed to query shares: %v", err)
+	}
+	defer shareRows.Close()
+
+	type ShareInfo struct {
+		ID     int
+		UserID int
+		Name   string
+		Path   string
+	}
+
+	var sharesList []ShareInfo
+	for shareRows.Next() {
+		var s ShareInfo
+		if err := shareRows.Scan(&s.ID, &s.UserID, &s.Name, &s.Path); err != nil {
+			return 0, 1, fmt.Sprintf("Failed to scan share: %v", err)
+		}
+		sharesList = append(sharesList, s)
+	}
+
+	if len(sharesList) == 0 {
+		return 0, 0, "No shares with sync enabled"
+	}
+
+	// Get all enabled peers
+	peersQuery := `SELECT id, name, address, port FROM peers WHERE enabled = 1`
+	peerRows, err := db.Query(peersQuery)
+	if err != nil {
+		return 0, 1, fmt.Sprintf("Failed to query peers: %v", err)
+	}
+	defer peerRows.Close()
+
+	type PeerInfo struct {
+		ID      int
+		Name    string
+		Address string
+		Port    int
+	}
+
+	var peersList []PeerInfo
+	for peerRows.Next() {
+		var p PeerInfo
+		if err := peerRows.Scan(&p.ID, &p.Name, &p.Address, &p.Port); err != nil {
+			return 0, 1, fmt.Sprintf("Failed to scan peer: %v", err)
+		}
+		peersList = append(peersList, p)
+	}
+
+	if len(peersList) == 0 {
+		return 0, 0, "No enabled peers"
+	}
+
+	// Sync each share to each peer
+	successCount := 0
+	errorCount := 0
+	var lastError string
+
+	for _, share := range sharesList {
+		for _, peer := range peersList {
+			req := &SyncRequest{
+				ShareID:     share.ID,
+				PeerID:      peer.ID,
+				UserID:      share.UserID,
+				SharePath:   share.Path,
+				PeerAddress: peer.Address,
+				PeerPort:    peer.Port,
+			}
+
+			if err := SyncShareIncremental(db, req); err != nil {
+				errorCount++
+				lastError = fmt.Sprintf("Share %s to %s: %v", share.Name, peer.Name, err)
+			} else {
+				successCount++
+			}
+		}
+	}
+
+	return successCount, errorCount, lastError
+}
+
 // createTarGz creates a tar.gz archive of a directory
 // Returns: fileCount, totalSize (bytes), error
 func createTarGz(buf *bytes.Buffer, sourceDir string) (int, int64, error) {

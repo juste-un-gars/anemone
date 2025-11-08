@@ -115,6 +115,20 @@ func Migrate(db *sql.DB) error {
 			FOREIGN KEY (peer_id) REFERENCES peers(id) ON DELETE CASCADE
 		)`,
 
+		// Sync configuration (automatic sync settings)
+		`CREATE TABLE IF NOT EXISTS sync_config (
+			id INTEGER PRIMARY KEY CHECK (id = 1),
+			enabled BOOLEAN DEFAULT 0,
+			interval TEXT DEFAULT '1h',
+			fixed_hour INTEGER DEFAULT 23,
+			last_sync DATETIME,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+
+		// Insert default sync config
+		`INSERT OR IGNORE INTO sync_config (id, enabled, interval, fixed_hour) VALUES (1, 0, '1h', 23)`,
+
 		// Indexes for performance
 		`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`,
 		`CREATE INDEX IF NOT EXISTS idx_activation_tokens_token ON activation_tokens(token)`,

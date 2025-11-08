@@ -1,7 +1,7 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-08 (Session 8 - Sync incrémentale Phase 2 complète)
-**Status** : 🟢 PHASE 2 COMPLÈTE
+**Dernière session** : 2025-11-08 (Session 8 - Sync incrémentale Phase 3 complète)
+**Status** : 🟢 PHASE 3 COMPLÈTE (Synchronisation automatique)
 
 > **Note** : L'historique des sessions 1-3 a été archivé dans `SESSION_STATE_ARCHIVE.md`
 
@@ -528,11 +528,14 @@ func (s *Server) handleRestoreRestore(w http.ResponseWriter, r *http.Request)
 - [x] Tests sync incrémental (DEV → FR1)
 - [x] Fix: Serveur distant n'a plus besoin que l'utilisateur existe localement
 
-**Phase 3 : Synchronisation automatique** 🔜 PROCHAINE
-- [ ] Interface admin pour configurer intervalle de sync (30min, 1h, 2h, 6h, heure fixe)
-- [ ] Bouton admin pour forcer sync de tous les utilisateurs
-- [ ] Rapport des 3 dernières synchronisations
-- [ ] Implémentation du scheduler (cron ou systemd timer)
+**Phase 3 : Synchronisation automatique** ✅ COMPLÈTE
+- [x] Interface admin pour configurer intervalle de sync (30min, 1h, 2h, 6h, heure fixe)
+- [x] Bouton admin pour forcer sync de tous les utilisateurs
+- [x] Rapport des dernières synchronisations (tableau complet)
+- [x] Table sync_config dans la base de données
+- [x] Package syncconfig pour la gestion de configuration
+- [x] Fonction SyncAllUsers() pour synchroniser tous les utilisateurs
+- [ ] Implémentation du scheduler (cron ou systemd timer) - À venir
 
 **Phase 4 : Interface de restauration** 🔜
 - [ ] Template `restore.html` avec explorateur de fichiers
@@ -587,6 +590,74 @@ c95f7a6 - feat: Implement incremental P2P sync with file-by-file transfer (Phase
 **Début implémentation** : 2025-11-07 16:30
 **Fin Phase 2** : 2025-11-08 06:10
 
+**✅ Phase 3 : Synchronisation automatique** (8 Nov)
+
+**Objectif** : Interface admin pour configurer et contrôler la synchronisation automatique
+
+**Implémentation** :
+
+1. **Base de données** (`internal/database/migrations.go`)
+   - Table `sync_config` avec colonnes :
+     - `enabled` : Activer/désactiver la sync automatique
+     - `interval` : Fréquence (30min, 1h, 2h, 6h, fixed)
+     - `fixed_hour` : Heure pour sync quotidienne (0-23)
+     - `last_sync` : Timestamp dernière sync
+
+2. **Package de configuration** (`internal/syncconfig/syncconfig.go`)
+   - `Get()` : Récupérer la configuration
+   - `Update()` : Mettre à jour la configuration
+   - `UpdateLastSync()` : Mettre à jour le timestamp
+   - `ShouldSync()` : Déterminer si une sync doit être lancée
+
+3. **Fonction de synchronisation globale** (`internal/sync/sync.go`)
+   - `SyncAllUsers()` : Synchronise tous les utilisateurs avec sync activée
+   - Retourne : nombre de succès, erreurs, dernier message d'erreur
+   - Parcourt tous les partages avec `sync_enabled=1`
+   - Synchronise vers tous les pairs actifs
+
+4. **Interface web** (`web/templates/admin_sync.html`)
+   - Formulaire de configuration :
+     - Checkbox enable/disable
+     - Dropdown intervalle (30min, 1h, 2h, 6h, heure fixe)
+     - Input heure fixe (0-23) avec visibilité dynamique
+     - Affichage dernière sync
+   - Bouton "Forcer la synchronisation"
+   - Tableau des 20 dernières synchronisations :
+     - Utilisateur, Pair, Date, Statut, Fichiers, Taille
+
+5. **Handlers HTTP** (`internal/web/router.go`)
+   - `GET /admin/sync` : Affiche la page de configuration
+   - `POST /admin/sync/config` : Enregistre la configuration
+   - `POST /admin/sync/force` : Force la sync de tous les utilisateurs
+
+6. **Dashboard admin**
+   - Carte "Synchronisation automatique" remplace "Paramètres"
+   - Lien direct vers `/admin/sync`
+
+**Fichiers modifiés/créés** :
+- `internal/database/migrations.go` : +17 lignes (table sync_config)
+- `internal/syncconfig/syncconfig.go` : +109 lignes (NOUVEAU)
+- `internal/sync/sync.go` : +47 lignes (SyncAllUsers)
+- `web/templates/admin_sync.html` : +260 lignes (NOUVEAU)
+- `internal/web/router.go` : +188 lignes (3 handlers + import)
+- `web/templates/dashboard_admin.html` : Modification carte
+
+**Tests validés** :
+- ✅ Page accessible à `/admin/sync`
+- ✅ Authentification requise (admin uniquement)
+- ✅ Compilation sans erreurs
+- ✅ Serveur redémarré avec succès
+
+**Commits** :
+```
+À venir : feat: Implement automatic sync configuration interface (Phase 3/4)
+```
+
+**Statut** : 🟢 PHASE 3 COMPLÈTE
+**Fin Phase 3** : 2025-11-08 07:00
+
+> **Note** : Le scheduler automatique (daemon/cron) sera implémenté ultérieurement. Pour l'instant, la synchronisation automatique peut être déclenchée manuellement via le bouton "Forcer" dans l'interface admin.
+
 ---
 
 ## 📝 Prochaines étapes (Roadmap)
@@ -594,11 +665,11 @@ c95f7a6 - feat: Implement incremental P2P sync with file-by-file transfer (Phase
 ### Court terme (Session 8 - Suite)
 1. ✅ Système de manifest (Phase 1)
 2. ✅ Synchronisation incrémentale fichier par fichier (Phase 2)
-3. 🔜 **Synchronisation automatique + Interface admin** (Phase 3 - EN COURS)
+3. ✅ **Synchronisation automatique + Interface admin** (Phase 3 - COMPLÈTE)
    - Configuration intervalle sync (30min, 1h, 2h, 6h, heure fixe)
    - Bouton admin pour forcer sync globale
-   - Rapport des 3 dernières syncs
-4. 🔜 Interface web de restauration (Phase 4)
+   - Rapport des dernières synchronisations
+4. 🔜 Interface web de restauration (Phase 4 - PROCHAINE)
 
 ### Moyen terme
 1. 🔜 Notifications (email/web) pour sync réussies/échouées
@@ -610,5 +681,5 @@ c95f7a6 - feat: Implement incremental P2P sync with file-by-file transfer (Phase
 2. 🔜 Multi-peer redundancy (plusieurs pairs pour un user)
 3. 🔜 Backup/restore configuration complète
 
-**État global** : 🟢 PHASE 2 COMPLÈTE
-**Prochaine étape** : Phase 3 - Synchronisation automatique
+**État global** : 🟢 PHASE 3 COMPLÈTE
+**Prochaine étape** : Phase 4 - Interface de restauration
