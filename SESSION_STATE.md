@@ -1,7 +1,7 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-07 (Session 8 - Sync incrémentale type rclone)
-**Status** : 🟡 EN DÉVELOPPEMENT
+**Dernière session** : 2025-11-08 (Session 8 - Sync incrémentale Phase 2 complète)
+**Status** : 🟢 PHASE 2 COMPLÈTE
 
 > **Note** : L'historique des sessions 1-3 a été archivé dans `SESSION_STATE_ARCHIVE.md`
 
@@ -520,87 +520,95 @@ func (s *Server) handleRestoreRestore(w http.ResponseWriter, r *http.Request)
 - [x] Fonctions helper : `CalculateChecksum()`, `MarshalManifest()`, `UnmarshalManifest()`
 - [x] Compilation OK
 
-**Phase 2 : Synchronisation incrémentale** 🔜 PROCHAINE
-- [ ] API handlers : GET/PUT manifest, POST/DELETE file
-- [ ] Modifier `SyncShareIncremental()` pour upload fichier par fichier
-- [ ] Upload fichiers chiffrés un par un
-- [ ] Supprimer fichiers obsolètes sur peer
-- [ ] Tests sync incrémental
+**Phase 2 : Synchronisation incrémentale** ✅ COMPLÈTE
+- [x] API handlers : GET/PUT manifest, POST/DELETE file
+- [x] Créer `SyncShareIncremental()` pour upload fichier par fichier
+- [x] Upload fichiers chiffrés un par un
+- [x] Supprimer fichiers obsolètes sur peer
+- [x] Tests sync incrémental (DEV → FR1)
+- [x] Fix: Serveur distant n'a plus besoin que l'utilisateur existe localement
 
-**Phase 3 : Interface de restauration** 🔜
+**Phase 3 : Synchronisation automatique** 🔜 PROCHAINE
+- [ ] Interface admin pour configurer intervalle de sync (30min, 1h, 2h, 6h, heure fixe)
+- [ ] Bouton admin pour forcer sync de tous les utilisateurs
+- [ ] Rapport des 3 dernières synchronisations
+- [ ] Implémentation du scheduler (cron ou systemd timer)
+
+**Phase 4 : Interface de restauration** 🔜
 - [ ] Template `restore.html` avec explorateur de fichiers
 - [ ] Handler `handleRestoreList()` : Télécharge manifest + déchiffre + retourne liste JSON
 - [ ] Handler `handleRestoreDownload()` : ZIP fichiers sélectionnés déchiffrés
 - [ ] Handler `handleRestoreRestore()` : Restauration sur serveur avec confirmation
 - [ ] Tests UI complets
 
-**Phase 4 : Migration code existant** 🔜
-- [ ] Remplacer `SyncShare()` par `SyncShareIncremental()`
-- [ ] Maintenir rétrocompatibilité avec anciens backups tar.gz.enc
-- [ ] Tests migration
+### 📝 Progression Session 8 (8 Nov 2025)
 
-### 📝 Progression Session 8 (7 Nov 2025)
+**✅ Phase 1 : Système de manifest** (7 Nov)
+- Fichier `internal/sync/manifest.go` créé (210 lignes)
+- Tests unitaires : 7/7 PASS
+- Programme de démo : `cmd/test-manifest/`
 
-**✅ Implémenté aujourd'hui** :
-- Fichier `internal/sync/manifest.go` créé (223 lignes)
-- Structures de données :
-  - `FileMetadata` : size, mtime, checksum SHA-256, encrypted_path
-  - `SyncManifest` : version, last_sync, user_id, share_name, files map
-  - `SyncDelta` : ToAdd, ToUpdate, ToDelete
-- Fonctions :
-  - `BuildManifest()` : Scan récursif avec exclusion fichiers cachés
-  - `CompareManifests()` : Calcul delta (nouveaux/modifiés/supprimés)
-  - `CalculateChecksum()` : SHA-256 streaming
-  - `MarshalManifest()` / `UnmarshalManifest()` : JSON serialization
-  - `GetManifestStats()` : Compteurs fichiers/taille
-- Tests : Compilation OK ✅
+**✅ Phase 2 : Synchronisation incrémentale** (8 Nov)
+- 4 nouveaux API endpoints (router.go +566 lignes)
+- `SyncShareIncremental()` implémentée (sync.go +234 lignes)
+- Stockage : `/srv/anemone/backups/incoming/{user_id}_{share_name}/`
+- Fix bugs : `peers.PublicKey` → `*string` (gestion NULL)
 
-**🔜 À faire demain** :
-1. Implémenter les API handlers (GET/PUT manifest, POST/DELETE file)
-2. Créer `SyncShareIncremental()` pour remplacer `SyncShare()`
-3. Tests de synchronisation incrémentale
+**Tests validés** :
+- ✅ Première sync : 4 fichiers uploadés chiffrés (DEV → FR1)
+- ✅ Sync incrémentale : 1 ajout, 1 modification, 1 suppression
+- ✅ Fichiers inchangés PAS retransmis (validation timestamps)
+- ✅ Serveur distant fonctionne sans que l'utilisateur existe
 
-### 🎯 Résultat attendu
+**Commits** :
+```
+c95f7a6 - feat: Implement incremental P2P sync with file-by-file transfer (Phase 2/4)
+1322625 - feat: Implement manifest system for incremental P2P sync (Phase 1/4)
+```
 
-**Sync incrémental ultra-rapide** :
+### 🎯 Résultats obtenus
+
+**Sync incrémental fonctionnel** :
 - ✅ Seulement les fichiers modifiés sont transférés
-- ✅ Bande passante optimisée
-- ✅ Temps de sync réduit (de minutes à secondes)
+- ✅ Bande passante optimisée (~50% économie dans tests)
+- ✅ Chaque fichier chiffré individuellement (AES-256-GCM)
 
-**Restauration flexible** :
-- ✅ Navigation dans les fichiers sans tout télécharger
-- ✅ Restauration sélective (choix des fichiers)
-- ✅ Téléchargement sur PC ou restauration serveur
+**Architecture simplifiée** :
+- ✅ Serveur distant = simple stockage (pas besoin DB utilisateur)
+- ✅ Structure claire : `{user_id}_{share_name}/`
+- ✅ Manifest chiffré pour tracking
 
-**Sécurité maintenue** :
-- ✅ Chiffrement fichier par fichier (AES-256-GCM)
-- ✅ Clé utilisateur jamais stockée
-- ✅ Noms visibles, contenu protégé
+**Sécurité** :
+- ✅ Chiffrement end-to-end maintenu
+- ✅ Clé utilisateur unique
+- ✅ Protection path traversal
 
-**Statut** : 🟡 EN DÉVELOPPEMENT (Phase 1/4 complète)
+**Statut** : 🟢 PHASE 2 COMPLÈTE ET TESTÉE
 **Début implémentation** : 2025-11-07 16:30
-**Dernière mise à jour** : 2025-11-07 17:00 (fin de journée)
+**Fin Phase 2** : 2025-11-08 06:10
 
 ---
 
 ## 📝 Prochaines étapes (Roadmap)
 
-### Court terme (Session 8)
-1. ⏳ Implémenter système de manifest
-2. 🔜 Synchronisation incrémentale fichier par fichier
-3. 🔜 Interface web de restauration
+### Court terme (Session 8 - Suite)
+1. ✅ Système de manifest (Phase 1)
+2. ✅ Synchronisation incrémentale fichier par fichier (Phase 2)
+3. 🔜 **Synchronisation automatique + Interface admin** (Phase 3 - EN COURS)
+   - Configuration intervalle sync (30min, 1h, 2h, 6h, heure fixe)
+   - Bouton admin pour forcer sync globale
+   - Rapport des 3 dernières syncs
+4. 🔜 Interface web de restauration (Phase 4)
 
 ### Moyen terme
-1. 🔜 Synchronisation P2P automatique (cron/scheduled)
-2. 🔜 Notifications (email/web) pour sync réussies/échouées
-3. 🔜 Logs détaillés de synchronisation
-4. 🔜 Bandwidth throttling (limite bande passante)
+1. 🔜 Notifications (email/web) pour sync réussies/échouées
+2. 🔜 Bandwidth throttling (limite bande passante)
+3. 🔜 Statistiques détaillées de synchronisation
 
 ### Long terme
 1. 🔜 Tests production sur multiples serveurs
-2. 🔜 Backup/restore configuration complète
-3. 🔜 Multi-peer redundancy (plusieurs pairs pour un user)
-4. 🔜 Statistiques sync (bande passante, fréquence, etc.)
+2. 🔜 Multi-peer redundancy (plusieurs pairs pour un user)
+3. 🔜 Backup/restore configuration complète
 
-**État global** : 🟡 EN DÉVELOPPEMENT ACTIF
-**Session 8 en cours** : Synchronisation incrémentale type rclone
+**État global** : 🟢 PHASE 2 COMPLÈTE
+**Prochaine étape** : Phase 3 - Synchronisation automatique
