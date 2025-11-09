@@ -12,6 +12,7 @@ import (
 
 	"github.com/juste-un-gars/anemone/internal/config"
 	"github.com/juste-un-gars/anemone/internal/database"
+	"github.com/juste-un-gars/anemone/internal/scheduler"
 	"github.com/juste-un-gars/anemone/internal/tls"
 	"github.com/juste-un-gars/anemone/internal/web"
 )
@@ -36,6 +37,9 @@ func main() {
 	if err := database.Migrate(db); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
+
+	// Start automatic synchronization scheduler
+	scheduler.Start(db)
 
 	// Initialize web server
 	router := web.NewRouter(db, cfg)

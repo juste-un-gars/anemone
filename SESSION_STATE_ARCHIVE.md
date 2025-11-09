@@ -2688,3 +2688,152 @@ La fonctionnalité de réinitialisation de mot de passe par admin est **100% com
 
 ---
 
+
+### ✅ Implémentation complète
+
+**Fonctionnalités** :
+- Quotas Btrfs avec enforcement kernel
+- Interface admin pour définir quotas backup + data
+- Dashboard utilisateur avec barres de progression
+- Migration automatique (dirs → subvolumes)
+- Architecture extensible multi-filesystem
+
+**Corrections majeures** :
+- Fix enforcement quotas (SELinux bloquait dfree command)
+- Suppression utilisateur complète (DB + disque + SMB + système)
+- Permissions subvolumes Btrfs (chown après création)
+
+**Commits** :
+```
+60d89cf - feat: Add quota management system
+46f9e6b - feat: Simplify quota strategy - Btrfs only
+a66c059 - fix: Correct sudo chown paths
+```
+
+**Statut** : 🟢 PRODUCTION READY
+
+---
+
+## 🔧 Session 5 - 7 Novembre 2025 - Fix permissions sudo chown
+
+### ❌ Problème découvert
+
+Utilisateurs créés après session 4 n'avaient **aucun partage SMB visible**.
+
+**Cause racine** :
+1. Code utilisait `"chown"` au lieu de `"/usr/bin/chown"` (sudoers bloquait)
+2. Création `.trash` impossible (processus franck ne peut pas écrire dans dirs user:user)
+
+### ✅ Corrections appliquées
+
+**Fichiers modifiés** :
+1. `internal/web/router.go` - Chemins complets `/usr/bin/chown -R`
+2. `internal/shares/shares.go` - `sudo /usr/bin/mkdir -p` pour `.trash`
+3. `cmd/anemone-migrate/main.go` - Chemins complets
+
+**Tests validés** : ✅ Création utilisateur + partages SMB fonctionnels
+
+**Commits** :
+```
+a66c059 - fix: Correct sudo chown paths and .trash creation permissions
+4d189c1 - fix: Prevent users from deleting their own account
+```
+
+**Statut** : 🟢 PRODUCTION READY
+
+---
+
+## 🔧 Session 6 - 7 Novembre 2025 - Support multi-filesystem
+
+### ✅ Implémentation quotas multi-filesystem
+
+**Objectif initial** : Support Btrfs + ext4 + XFS + ZFS
+
+**Réalité découverte** :
+- ❌ ext4 project quotas : Feature non activée par défaut, nécessite formatage
+- ❌ XFS : Nécessite option montage `prjquota`
+- ❌ ZFS : Peu répandu sur Linux
+
+### ✅ Solution finale : Btrfs + Fallback
+
+**Architecture** :
+- `BtrfsQuotaManager` : Quotas complets avec enforcement kernel
+- `FallbackQuotaManager` : Fonctionne sur ext4/XFS/ZFS sans enforcement
+
+**Détection automatique** :
+```go
+func NewQuotaManager(basePath string) (QuotaManager, error) {
+    fsType := detectFilesystem(basePath)
+    switch fsType {
+        case "btrfs": return &BtrfsQuotaManager{}
+        default: return &FallbackQuotaManager{} // No enforcement
+    }
+}
+```
+
+**Résultat** :
+- ✅ **Btrfs** : Fonctionnalité complète avec enforcement
+- ✅ **ext4/XFS/ZFS** : Fonctionne sans enforcement (warning au démarrage)
+
+**Commits** :
+```
+ccae3f8 - docs: Clean up documentation and remove obsolete quota code
+46f9e6b - feat: Simplify quota strategy - Btrfs only for enforcement
+```
+
+**Statut** : 🟢 PRODUCTION READY
+
+---
+
+## 🔧 Session 7 - 7 Novembre 2025 - Chiffrement End-to-End des Backups
+
+### ✅ Implémentation complète du chiffrement P2P
+
+**Objectif** : Chiffrer automatiquement tous les backups avant synchronisation P2P
+
+### 🔐 Architecture du chiffrement
+
+**Hiérarchie des clés** :
+1. **Master Key** : Générée au setup, stockée dans `system_config.master_key`
+2. **User Encryption Keys** : Clé unique 32 bytes par utilisateur
+   - Chiffrée avec la master key
+   - Stockée dans `users.encryption_key_encrypted`
+   - Hash dans `users.encryption_key_hash` pour vérification
+
+**Algorithme** : AES-256-GCM (Authenticated Encryption with Associated Data)
+- Confidentialité + authentification
+- Format : `[nonce 12 bytes][encrypted data + auth tag 16 bytes]`
+
+### 📝 Modifications code
+
+**internal/crypto/crypto.go** (+107 lignes) :
+- `EncryptStream(reader, writer, key)` : Chiffre un flux de données
+- `DecryptStream(reader, writer, key)` : Déchiffre un flux de données
+
+**internal/sync/sync.go** (+25 lignes) :
+- `GetUserEncryptionKey(db, userID)` : Récupère clé déchiffrée
+- `SyncShare()` : Chiffre tar.gz avant envoi
+
+**internal/web/router.go** (+30 lignes) :
+- `handleAPISyncReceive()` : Déchiffre si flag "encrypted"
+
+### 🔒 Sécurité
+
+**Protection end-to-end** :
+- ✅ Backup chiffré à la source (avant transfert)
+- ✅ Transit chiffré (HTTPS)
+- ✅ Stockage chiffré sur le peer
+- ✅ Seul le possesseur de la clé peut déchiffrer
+
+**Isolation utilisateurs** :
+- Chaque utilisateur a sa propre clé
+- Impossible de déchiffrer les backups d'autres users
+- Même avec accès DB (clés chiffrées avec master key)
+
+**Commits** :
+```
+6751b57 - feat: Implement end-to-end encryption for P2P backup sync
+4dbff9a - docs: Update documentation for end-to-end encryption
+```
+
+**Statut** : 🟢 READY FOR TESTING

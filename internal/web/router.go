@@ -395,14 +395,18 @@ func (s *Server) getDashboardStats(session *auth.Session) *DashboardStats {
 	// Get last backup time from sync_log
 	var lastSync sql.NullTime
 	err = s.db.QueryRow(`
-		SELECT MAX(timestamp)
+		SELECT completed_at
 		FROM sync_log
 		WHERE user_id = ? AND status = 'success'
+		ORDER BY completed_at DESC
+		LIMIT 1
 	`, session.UserID).Scan(&lastSync)
 
 	if err == nil && lastSync.Valid {
 		duration := time.Since(lastSync.Time)
-		if duration < 24*time.Hour {
+		if duration < time.Hour {
+			stats.LastBackup = fmt.Sprintf("Il y a %d minutes", int(duration.Minutes()))
+		} else if duration < 24*time.Hour {
 			stats.LastBackup = fmt.Sprintf("Il y a %d heures", int(duration.Hours()))
 		} else {
 			stats.LastBackup = fmt.Sprintf("Il y a %d jours", int(duration.Hours()/24))
