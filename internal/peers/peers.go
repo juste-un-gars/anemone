@@ -19,6 +19,7 @@ type Peer struct {
 	Address   string
 	Port      int
 	PublicKey *string // Can be NULL
+	Password  *string // Can be NULL - password for peer authentication
 	Enabled   bool
 	Status    string // "online", "offline", "error", "unknown"
 	LastSeen  *time.Time
@@ -29,10 +30,10 @@ type Peer struct {
 
 // Create creates a new peer
 func Create(db *sql.DB, peer *Peer) error {
-	query := `INSERT INTO peers (name, address, port, public_key, enabled, status, created_at, updated_at)
-	          VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+	query := `INSERT INTO peers (name, address, port, public_key, password, enabled, status, created_at, updated_at)
+	          VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
 
-	result, err := db.Exec(query, peer.Name, peer.Address, peer.Port, peer.PublicKey, peer.Enabled, peer.Status)
+	result, err := db.Exec(query, peer.Name, peer.Address, peer.Port, peer.PublicKey, peer.Password, peer.Enabled, peer.Status)
 	if err != nil {
 		return fmt.Errorf("failed to create peer: %w", err)
 	}
@@ -49,11 +50,11 @@ func Create(db *sql.DB, peer *Peer) error {
 // GetByID retrieves a peer by ID
 func GetByID(db *sql.DB, id int) (*Peer, error) {
 	peer := &Peer{}
-	query := `SELECT id, name, address, port, public_key, enabled, status, last_seen, last_sync, created_at, updated_at
+	query := `SELECT id, name, address, port, public_key, password, enabled, status, last_seen, last_sync, created_at, updated_at
 	          FROM peers WHERE id = ?`
 
 	err := db.QueryRow(query, id).Scan(
-		&peer.ID, &peer.Name, &peer.Address, &peer.Port, &peer.PublicKey,
+		&peer.ID, &peer.Name, &peer.Address, &peer.Port, &peer.PublicKey, &peer.Password,
 		&peer.Enabled, &peer.Status, &peer.LastSeen, &peer.LastSync,
 		&peer.CreatedAt, &peer.UpdatedAt,
 	)
@@ -69,7 +70,7 @@ func GetByID(db *sql.DB, id int) (*Peer, error) {
 
 // GetAll retrieves all peers
 func GetAll(db *sql.DB) ([]*Peer, error) {
-	query := `SELECT id, name, address, port, public_key, enabled, status, last_seen, last_sync, created_at, updated_at
+	query := `SELECT id, name, address, port, public_key, password, enabled, status, last_seen, last_sync, created_at, updated_at
 	          FROM peers ORDER BY created_at DESC`
 
 	rows, err := db.Query(query)
@@ -82,7 +83,7 @@ func GetAll(db *sql.DB) ([]*Peer, error) {
 	for rows.Next() {
 		peer := &Peer{}
 		err := rows.Scan(
-			&peer.ID, &peer.Name, &peer.Address, &peer.Port, &peer.PublicKey,
+			&peer.ID, &peer.Name, &peer.Address, &peer.Port, &peer.PublicKey, &peer.Password,
 			&peer.Enabled, &peer.Status, &peer.LastSeen, &peer.LastSync,
 			&peer.CreatedAt, &peer.UpdatedAt,
 		)
@@ -97,10 +98,10 @@ func GetAll(db *sql.DB) ([]*Peer, error) {
 
 // Update updates a peer
 func Update(db *sql.DB, peer *Peer) error {
-	query := `UPDATE peers SET name = ?, address = ?, port = ?, public_key = ?,
+	query := `UPDATE peers SET name = ?, address = ?, port = ?, public_key = ?, password = ?,
 	          enabled = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
 
-	_, err := db.Exec(query, peer.Name, peer.Address, peer.Port, peer.PublicKey,
+	_, err := db.Exec(query, peer.Name, peer.Address, peer.Port, peer.PublicKey, peer.Password,
 		peer.Enabled, peer.Status, peer.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update peer: %w", err)

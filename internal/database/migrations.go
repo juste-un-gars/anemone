@@ -188,6 +188,7 @@ func migratePeersTable(db *sql.DB) error {
 		"address":    "ALTER TABLE peers ADD COLUMN address TEXT DEFAULT ''",
 		"port":       "ALTER TABLE peers ADD COLUMN port INTEGER DEFAULT 8443",
 		"public_key": "ALTER TABLE peers ADD COLUMN public_key TEXT",
+		"password":   "ALTER TABLE peers ADD COLUMN password TEXT",
 		"enabled":    "ALTER TABLE peers ADD COLUMN enabled BOOLEAN DEFAULT 1",
 		"status":     "ALTER TABLE peers ADD COLUMN status TEXT DEFAULT 'unknown'",
 		"last_seen":  "ALTER TABLE peers ADD COLUMN last_seen DATETIME",

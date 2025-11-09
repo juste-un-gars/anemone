@@ -33,6 +33,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/shares"
 	"github.com/juste-un-gars/anemone/internal/smb"
 	"github.com/juste-un-gars/anemone/internal/sync"
+	"github.com/juste-un-gars/anemone/internal/syncauth"
 	"github.com/juste-un-gars/anemone/internal/syncconfig"
 	"github.com/juste-un-gars/anemone/internal/trash"
 	"github.com/juste-un-gars/anemone/internal/users"
@@ -135,6 +136,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 
 	// Admin routes - Settings
 	mux.HandleFunc("/admin/settings", auth.RequireAdmin(server.handleAdminSettings))
+	mux.HandleFunc("/admin/settings/sync-password", auth.RequireAdmin(server.handleAdminSettingsSyncPassword))
 
 	// Admin routes - Sync
 	mux.HandleFunc("/admin/sync", auth.RequireAdmin(server.handleAdminSync))
@@ -154,12 +156,12 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// Sync routes
 	mux.HandleFunc("/sync/share/", auth.RequireAuth(server.handleSyncShare))
 
-	// API routes - Sync (no auth for peer-to-peer sync)
-	mux.HandleFunc("/api/sync/receive", server.handleAPISyncReceive)
+	// API routes - Sync (protected by password authentication)
+	mux.HandleFunc("/api/sync/receive", server.syncAuthMiddleware(server.handleAPISyncReceive))
 
-	// API routes - Incremental sync (manifest-based)
-	mux.HandleFunc("/api/sync/manifest", server.handleAPISyncManifest)       // GET/PUT
-	mux.HandleFunc("/api/sync/file", server.handleAPISyncFile)               // POST/DELETE
+	// API routes - Incremental sync (manifest-based, protected by password authentication)
+	mux.HandleFunc("/api/sync/manifest", server.syncAuthMiddleware(server.handleAPISyncManifest))       // GET/PUT
+	mux.HandleFunc("/api/sync/file", server.syncAuthMiddleware(server.handleAPISyncFile))               // POST/DELETE
 
 	return mux
 }
@@ -169,6 +171,51 @@ func (s *Server) isSetupCompleted() bool {
 	var count int
 	err := s.db.QueryRow("SELECT COUNT(*) FROM system_config WHERE key = 'setup_completed'").Scan(&count)
 	return err == nil && count > 0
+}
+
+// syncAuthMiddleware checks for sync authentication password in X-Sync-Password header
+// This middleware protects /api/sync/* endpoints from unauthorized access
+func (s *Server) syncAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Check if sync auth password is configured
+		isConfigured, err := syncauth.IsConfigured(s.db)
+		if err != nil {
+			log.Printf("Error checking sync auth config: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		// If no password is configured, allow access (backward compatibility)
+		if !isConfigured {
+			next(w, r)
+			return
+		}
+
+		// Get password from header
+		password := r.Header.Get("X-Sync-Password")
+		if password == "" {
+			log.Printf("Sync auth failed: No X-Sync-Password header from %s", r.RemoteAddr)
+			http.Error(w, "Unauthorized: X-Sync-Password header required", http.StatusUnauthorized)
+			return
+		}
+
+		// Check if password is correct
+		valid, err := syncauth.CheckSyncAuthPassword(s.db, password)
+		if err != nil {
+			log.Printf("Error checking sync auth password: %v", err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if !valid {
+			log.Printf("Sync auth failed: Invalid password from %s", r.RemoteAddr)
+			http.Error(w, "Forbidden: Invalid password", http.StatusForbidden)
+			return
+		}
+
+		// Password is valid, continue to handler
+		next(w, r)
+	}
 }
 
 // getLang gets language from user preference (DB), query param, or config
@@ -1463,6 +1510,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 		address := r.FormValue("address")
 		portStr := r.FormValue("port")
 		publicKey := r.FormValue("public_key")
+		password := r.FormValue("password")
 		enabled := r.FormValue("enabled") == "on"
 
 		// Validate
@@ -1515,11 +1563,16 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 		if publicKey != "" {
 			pkPtr = &publicKey
 		}
+		var pwPtr *string
+		if password != "" {
+			pwPtr = &password
+		}
 		peer := &peers.Peer{
 			Name:      name,
 			Address:   address,
 			Port:      port,
 			PublicKey: pkPtr,
+			Password:  pwPtr,
 			Enabled:   enabled,
 			Status:    "unknown",
 		}
@@ -1634,7 +1687,144 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Admin Settings Page (Coming soon)")
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	// Check if sync auth password is configured
+	isConfigured, err := syncauth.IsConfigured(s.db)
+	if err != nil {
+		log.Printf("Error checking sync auth config: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	data := struct {
+		Lang          string
+		Session       *auth.Session
+		IsConfigured  bool
+		Success       string
+		Error         string
+	}{
+		Lang:          lang,
+		Session:       session,
+		IsConfigured:  isConfigured,
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
+		log.Printf("Error rendering admin settings template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleAdminSettingsSyncPassword(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	// Parse form
+	password := r.FormValue("password")
+	passwordConfirm := r.FormValue("password_confirm")
+
+	// Validate
+	if password == "" || len(password) < 8 {
+		isConfigured, _ := syncauth.IsConfigured(s.db)
+		data := struct {
+			Lang          string
+			Session       *auth.Session
+			IsConfigured  bool
+			Success       string
+			Error         string
+		}{
+			Lang:          lang,
+			Session:       session,
+			IsConfigured:  isConfigured,
+			Error:         "Le mot de passe doit contenir au moins 8 caractères",
+		}
+		if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
+			log.Printf("Error rendering admin settings template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	if password != passwordConfirm {
+		isConfigured, _ := syncauth.IsConfigured(s.db)
+		data := struct {
+			Lang          string
+			Session       *auth.Session
+			IsConfigured  bool
+			Success       string
+			Error         string
+		}{
+			Lang:          lang,
+			Session:       session,
+			IsConfigured:  isConfigured,
+			Error:         "Les mots de passe ne correspondent pas",
+		}
+		if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
+			log.Printf("Error rendering admin settings template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Set password
+	if err := syncauth.SetSyncAuthPassword(s.db, password); err != nil {
+		log.Printf("Error setting sync auth password: %v", err)
+		isConfigured, _ := syncauth.IsConfigured(s.db)
+		data := struct {
+			Lang          string
+			Session       *auth.Session
+			IsConfigured  bool
+			Success       string
+			Error         string
+		}{
+			Lang:          lang,
+			Session:       session,
+			IsConfigured:  isConfigured,
+			Error:         "Erreur lors de la configuration du mot de passe",
+		}
+		if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
+			log.Printf("Error rendering admin settings template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Success
+	log.Printf("Admin %s configured sync auth password", session.Username)
+	isConfigured, _ := syncauth.IsConfigured(s.db)
+	data := struct {
+		Lang          string
+		Session       *auth.Session
+		IsConfigured  bool
+		Success       string
+		Error         string
+	}{
+		Lang:          lang,
+		Session:       session,
+		IsConfigured:  isConfigured,
+		Success:       "Mot de passe de synchronisation configuré avec succès",
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
+		log.Printf("Error rendering admin settings template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {

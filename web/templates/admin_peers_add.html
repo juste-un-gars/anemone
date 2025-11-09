@@ -115,6 +115,19 @@
                     <p class="mt-1 text-sm text-gray-500">{{T .Lang "peers.public_key.help"}}</p>
                 </div>
 
+                <!-- Password (optional) -->
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">
+                        🔐 Mot de passe de synchronisation
+                    </label>
+                    <input type="password" id="password" name="password"
+                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                           placeholder="Laisser vide si le pair n'a pas de mot de passe">
+                    <p class="mt-1 text-sm text-gray-500">
+                        Mot de passe configuré sur le serveur distant pour protéger les endpoints de synchronisation.
+                    </p>
+                </div>
+
                 <!-- Enable Sync -->
                 <div class="flex items-start">
                     <div class="flex items-center h-5">

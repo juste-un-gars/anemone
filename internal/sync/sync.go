@@ -36,12 +36,13 @@ type SyncLog struct {
 
 // SyncRequest represents a synchronization request
 type SyncRequest struct {
-	ShareID  int
-	PeerID   int
-	UserID   int
-	SharePath string
-	PeerAddress string
-	PeerPort    int
+	ShareID      int
+	PeerID       int
+	UserID       int
+	SharePath    string
+	PeerAddress  string
+	PeerPort     int
+	PeerPassword string // Optional password for peer authentication
 }
 
 // CreateSyncLog creates a new sync log entry and returns its ID
@@ -300,7 +301,19 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 
 	// Try to fetch remote manifest
 	var remoteManifest *SyncManifest
-	resp, err := client.Get(peerURL)
+	manifestReq, err := http.NewRequest(http.MethodGet, peerURL, nil)
+	if err != nil {
+		errMsg := fmt.Sprintf("Failed to create manifest request: %v", err)
+		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
+	// Add authentication header if password is provided
+	if req.PeerPassword != "" {
+		manifestReq.Header.Set("X-Sync-Password", req.PeerPassword)
+	}
+
+	resp, err := client.Do(manifestReq)
 	if err == nil && resp.StatusCode == http.StatusOK {
 		// Manifest exists - decrypt it
 		defer resp.Body.Close()
@@ -391,7 +404,20 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		writer.Close()
 
 		// Send POST request
-		resp, err := client.Post(uploadURL, writer.FormDataContentType(), &requestBody)
+		uploadReq, err := http.NewRequest(http.MethodPost, uploadURL, &requestBody)
+		if err != nil {
+			errMsg := fmt.Sprintf("Failed to create upload request for %s: %v", relativePath, err)
+			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+			return fmt.Errorf(errMsg)
+		}
+		uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
+
+		// Add authentication header if password is provided
+		if req.PeerPassword != "" {
+			uploadReq.Header.Set("X-Sync-Password", req.PeerPassword)
+		}
+
+		resp, err := client.Do(uploadReq)
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to upload file %s: %v", relativePath, err)
 			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
@@ -414,14 +440,19 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		deleteURL := fmt.Sprintf("https://%s:%d/api/sync/file?user_id=%d&share_name=%s&path=%s",
 			req.PeerAddress, req.PeerPort, req.UserID, shareName, remoteMeta.EncryptedPath)
 
-		req, err := http.NewRequest(http.MethodDelete, deleteURL, nil)
+		deleteReq, err := http.NewRequest(http.MethodDelete, deleteURL, nil)
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to create delete request for %s: %v", relativePath, err)
 			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
 			return fmt.Errorf(errMsg)
 		}
 
-		resp, err := client.Do(req)
+		// Add authentication header if password is provided
+		if req.PeerPassword != "" {
+			deleteReq.Header.Set("X-Sync-Password", req.PeerPassword)
+		}
+
+		resp, err := client.Do(deleteReq)
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to delete file %s: %v", relativePath, err)
 			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
@@ -455,15 +486,20 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	manifestURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?user_id=%d&share_name=%s",
 		req.PeerAddress, req.PeerPort, req.UserID, shareName)
 
-	manifestReq, err := http.NewRequest(http.MethodPut, manifestURL, &encryptedManifest)
+	manifestPutReq, err := http.NewRequest(http.MethodPut, manifestURL, &encryptedManifest)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create manifest upload request: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
 		return fmt.Errorf(errMsg)
 	}
-	manifestReq.Header.Set("Content-Type", "application/octet-stream")
+	manifestPutReq.Header.Set("Content-Type", "application/octet-stream")
 
-	resp, err = client.Do(manifestReq)
+	// Add authentication header if password is provided
+	if req.PeerPassword != "" {
+		manifestPutReq.Header.Set("X-Sync-Password", req.PeerPassword)
+	}
+
+	resp, err = client.Do(manifestPutReq)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to upload manifest: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
@@ -525,7 +561,7 @@ func SyncAllUsers(db *sql.DB) (int, int, string) {
 	}
 
 	// Get all enabled peers
-	peersQuery := `SELECT id, name, address, port FROM peers WHERE enabled = 1`
+	peersQuery := `SELECT id, name, address, port, password FROM peers WHERE enabled = 1`
 	peerRows, err := db.Query(peersQuery)
 	if err != nil {
 		return 0, 1, fmt.Sprintf("Failed to query peers: %v", err)
@@ -533,16 +569,17 @@ func SyncAllUsers(db *sql.DB) (int, int, string) {
 	defer peerRows.Close()
 
 	type PeerInfo struct {
-		ID      int
-		Name    string
-		Address string
-		Port    int
+		ID       int
+		Name     string
+		Address  string
+		Port     int
+		Password *string
 	}
 
 	var peersList []PeerInfo
 	for peerRows.Next() {
 		var p PeerInfo
-		if err := peerRows.Scan(&p.ID, &p.Name, &p.Address, &p.Port); err != nil {
+		if err := peerRows.Scan(&p.ID, &p.Name, &p.Address, &p.Port, &p.Password); err != nil {
 			return 0, 1, fmt.Sprintf("Failed to scan peer: %v", err)
 		}
 		peersList = append(peersList, p)
@@ -559,13 +596,20 @@ func SyncAllUsers(db *sql.DB) (int, int, string) {
 
 	for _, share := range sharesList {
 		for _, peer := range peersList {
+			// Get peer password (empty string if NULL)
+			peerPassword := ""
+			if peer.Password != nil {
+				peerPassword = *peer.Password
+			}
+
 			req := &SyncRequest{
-				ShareID:     share.ID,
-				PeerID:      peer.ID,
-				UserID:      share.UserID,
-				SharePath:   share.Path,
-				PeerAddress: peer.Address,
-				PeerPort:    peer.Port,
+				ShareID:      share.ID,
+				PeerID:       peer.ID,
+				UserID:       share.UserID,
+				SharePath:    share.Path,
+				PeerAddress:  peer.Address,
+				PeerPort:     peer.Port,
+				PeerPassword: peerPassword,
 			}
 
 			if err := SyncShareIncremental(db, req); err != nil {
