@@ -28,9 +28,13 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 
 - 🔐 **Multi-user support** with individual encrypted backups
 - 🌐 **Peer-to-peer synchronization** with end-to-end encryption (AES-256-GCM)
+- ⚡ **Incremental sync** - Only modified files are transferred (manifest-based)
+- ⏰ **Automatic scheduler** - Configurable sync intervals (30min/1h/2h/6h/fixed time)
+- 🔒 **P2P authentication** - Password protection for sync endpoints
 - 📦 **SMB file sharing** (Windows/Mac/Linux compatible)
 - 🗑️ **Per-user trash** with configurable retention
 - 💾 **Quota management** per user (Btrfs only)
+- 👥 **Incoming backups management** - View and manage remote peers storing backups on your server
 - 🌍 **Multilingual** (French & English)
 - 🔒 **End-to-end encryption** with user-specific keys and master key protection
 
@@ -40,9 +44,10 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 
 - **Backend**: Go (fast, single binary, easy deployment)
 - **Database**: SQLite (simple, reliable, no external dependencies)
-- **Frontend**: HTML templates + HTMX + Tailwind CSS
+- **Frontend**: HTML templates + Tailwind CSS
 - **File sharing**: Samba (SMB protocol)
-- **Backup sync**: rclone with encryption
+- **Backup sync**: Custom incremental sync with AES-256-GCM encryption
+- **Scheduler**: Background goroutine for automatic sync
 
 ### Project Structure
 
@@ -56,7 +61,11 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 │   ├── shares/                  # SMB share management
 │   ├── peers/                   # P2P peers management
 │   ├── smb/                     # Samba configuration
-│   ├── sync/                    # P2P synchronization
+│   ├── sync/                    # P2P synchronization (incremental + manifest)
+│   ├── syncauth/                # Sync authentication (password protection)
+│   ├── syncconfig/              # Sync scheduler configuration
+│   ├── scheduler/               # Automatic sync scheduler
+│   ├── incoming/                # Incoming backups management
 │   ├── crypto/                  # Encryption utilities
 │   ├── quota/                   # Quota enforcement
 │   ├── trash/                   # Trash management
@@ -319,17 +328,57 @@ Linux:   smb://nas.local/username-backup
 
 ### How it works
 
-1. Admin adds **peer** (another Anemone instance)
-2. Enter peer IP address
-3. Each user's `backup/` folder syncs automatically
-4. Data is encrypted **before** leaving source NAS
-5. Peer stores encrypted blobs (cannot read content)
+1. **Admin adds peer** (another Anemone instance)
+   - Enter peer IP address and port
+   - Optionally configure authentication password
+   - Test connection to verify accessibility
+2. **Incremental synchronization** (manifest-based)
+   - Only modified files are transferred (saves bandwidth)
+   - Manifest tracks file checksums (SHA-256)
+   - Automatic detection of added/modified/deleted files
+3. **Encryption before transfer**
+   - Data encrypted with user's personal key (AES-256-GCM)
+   - Files stored encrypted on peer (`.enc` extension)
+   - Peer cannot read content without user's key
+4. **Automatic scheduler** (configurable)
+   - Intervals: 30min, 1h, 2h, 6h, or fixed daily time
+   - Background goroutine checks every minute
+   - Configurable via `/admin/sync` interface
+
+### Sync Security
+
+**Password Authentication** (optional but recommended):
+- **Server password**: Protect your server's sync endpoints (`/admin/settings`)
+  - Remote peers must provide this password to store backups on your server
+  - Stored hashed with bcrypt
+- **Peer password**: Authenticate with remote servers when syncing
+  - Configured when adding/editing a peer
+  - Sent in `X-Sync-Password` header
+- **Connection testing**: Automatically validates authentication when testing peers
+  - Detects invalid passwords before sync attempts
+  - Returns specific error codes (401/403)
 
 ### Sync Monitoring
 
-- Dashboard shows last sync time per user
-- Sync logs stored in database
-- Manual sync button available
+- **Dashboard statistics**:
+  - Last backup time per user
+  - Number of connected peers
+  - Sync success/failure indicators
+- **Admin interfaces**:
+  - `/admin/sync` - Configure automatic synchronization
+  - `/admin/peers` - Manage peers (add/edit/delete/test)
+  - `/admin/incoming` - View peers storing backups on this server
+- **Sync logs** stored in database with detailed history
+- **Manual sync** button available per share
+- **Force sync** button for admins to trigger immediate full sync
+
+### Incoming Backups Management
+
+View and manage remote peers storing backups on your server:
+- **Statistics**: Number of peers, files count, total space used
+- **Per-backup details**: Username, share name, file count, size, last modified
+- **Delete backups**: Remove incoming backups if needed
+- Access via `/admin/incoming` or dashboard card
 
 ## 🗑️ Trash System
 
@@ -389,14 +438,15 @@ Supported languages:
 See `internal/database/migrations.go` for complete schema.
 
 Main tables:
-- `system_config` - System settings
-- `users` - User accounts (with language preference)
+- `system_config` - System settings (including sync auth password hash)
+- `users` - User accounts (with language preference and encryption keys)
 - `activation_tokens` - Temporary activation links (24h validity)
 - `password_reset_tokens` - Password reset links (24h validity, single-use)
-- `shares` - File shares
+- `shares` - File shares (with sync_enabled flag)
 - `trash_items` - Deleted files
-- `peers` - Connected Anemone instances
-- `sync_log` - Synchronization history
+- `peers` - Connected Anemone instances (with optional password for auth)
+- `sync_log` - Synchronization history (detailed logs with file counts and bytes)
+- `sync_config` - Automatic sync scheduler configuration (interval, last_sync, enabled)
 
 ## 🔧 Configuration
 
@@ -577,7 +627,7 @@ echo "✓ Anemone removed (system users and SMB users NOT removed - see above)"
 
 ## 📝 Development Status
 
-**Current Status**: 🟡 BETA (Core features complete)
+**Current Status**: 🟢 PRODUCTION READY (All core features complete)
 
 **Implemented** ✅:
 - [x] Setup page & initial configuration
@@ -608,9 +658,9 @@ echo "✓ Anemone removed (system users and SMB users NOT removed - see above)"
   - [x] Trash count
   - [x] Last sync timestamp
   - [x] User information
+  - [x] Quick access cards for all admin features
 - [x] Automatic SMB share creation (backup + data per user)
 - [x] Samba dynamic configuration & auto-reload
-- [x] P2P peers management (CRUD, connection testing)
 - [x] HTTPS with self-signed certificates
 - [x] SELinux configuration (Fedora/RHEL)
 - [x] Automated installation script
@@ -621,19 +671,38 @@ echo "✓ Anemone removed (system users and SMB users NOT removed - see above)"
   - [x] Real-time usage display with alerts
   - [x] Admin quota configuration interface
   - [x] Fallback mode for non-Btrfs filesystems (tracking only, no enforcement)
-- [x] P2P synchronization (manual):
+- [x] **P2P Synchronization** (Sessions 8-11):
+  - [x] **Incremental sync** (manifest-based, only changed files)
+  - [x] **Automatic scheduler** (30min/1h/2h/6h/fixed time)
+  - [x] **Password authentication** (server + peer passwords)
   - [x] Manual sync button per share
-  - [x] tar.gz with AES-256-GCM encryption
+  - [x] Force sync for admins
+  - [x] AES-256-GCM encryption per file
   - [x] End-to-end encrypted transfer over HTTPS
-  - [x] Connection testing to peers
+  - [x] SHA-256 checksums for integrity
+- [x] **Peers Management**:
+  - [x] CRUD operations (create/read/update/delete)
+  - [x] Connection testing with auth validation
+  - [x] Edit interface for modifying peer config
+  - [x] Password management (add/modify/remove)
+  - [x] Enable/disable peers
+- [x] **Incoming Backups Management**:
+  - [x] View peers storing backups on this server
+  - [x] Statistics (peers count, files, space used)
+  - [x] Delete incoming backups
+  - [x] Dashboard integration
 
-**Planned** 📅:
-- [ ] P2P auto-sync with scheduling
-- [ ] Advanced settings (workgroup, network config)
-- [ ] Conflict resolution for sync
-- [ ] API endpoints for external integrations
-- [ ] Docker official image
-- [ ] Email notifications (password reset, quota alerts)
+**Next Features** 📅:
+- [ ] Web restore interface (browse and download encrypted backups)
+- [ ] Per-peer sync frequency (daily/weekly/monthly snapshots)
+- [ ] Server config export/import (disaster recovery)
+- [ ] Audit trail and logging system
+- [ ] Backup integrity verification tool
+- [ ] systemd service integration
+- [ ] Rate limiting (anti-bruteforce)
+- [ ] Advanced statistics and monitoring
+- [ ] Notification system (webhooks, Home Assistant, email)
+- [ ] Complete user guide with screenshots
 
 ## 🤝 Contributing
 
