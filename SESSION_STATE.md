@@ -612,7 +612,17 @@ Permettre aux admins de visualiser quels serveurs distants stockent des backups 
 - Restauration complète d'un partage
 - Interface intuitive avec prévisualisation
 
-**Session 13 : Export/Import configuration serveur** 💾
+**Session 13 : Fréquence de synchronisation par pair** ⏰
+- Configuration de la fréquence de sync indépendante pour chaque pair
+  - Quotidien (daily) - ex: FR1 pour récupération rapide
+  - Hebdomadaire (weekly) - ex: FR2 pour snapshot hebdo
+  - Mensuel (monthly) - ex: FR3 pour archive long terme
+  - Heure fixe personnalisée
+- Modification du scheduler pour gérer les fréquences multiples
+- Interface admin pour configurer la fréquence par pair
+- Permet d'avoir des snapshots à différentes fréquences sans duplication
+
+**Session 14 : Export/Import configuration serveur** 💾
 - Export complet de la configuration serveur (JSON chiffré)
   - Base de données (users, peers, shares, quotas, config)
   - Clés de chiffrement
@@ -627,32 +637,61 @@ Permettre aux admins de visualiser quels serveurs distants stockent des backups 
 
 ### ⚙️ Priorité 2 - Améliorations
 
-1. **Service systemd** 🔄
+1. **Logs et audit trail** 📋
+   - Table `audit_log` en base de données
+   - Enregistrement des actions importantes :
+     - Création/suppression/modification utilisateurs
+     - Ajout/édition/suppression de pairs
+     - Modifications de quotas
+     - Tentatives de connexion (succès/échec)
+     - Actions administratives sensibles
+   - Champs : timestamp, user_id, action, details, ip_address
+   - Rétention configurable (30/60/90 jours)
+   - Job de nettoyage automatique des anciens logs
+   - Interface admin pour consulter les logs
+
+2. **Vérification d'intégrité des backups** ✅
+   - Commande `anemone-verify` pour vérification manuelle
+   - Vérification des checksums depuis les manifests
+   - Option de vérification périodique en background
+   - Alerte si corruption détectée
+   - Rapport détaillé des fichiers vérifiés/corrompus
+
+3. **Service systemd** 🔄
    - Démarrage automatique au boot
    - Gestion propre du service (start/stop/restart/status)
    - Logs systemd intégrés
-   - Script d'installation
+   - Script d'installation automatique
 
-2. **Rate limiting anti-bruteforce** 🛡️
+4. **Rate limiting anti-bruteforce** 🛡️
    - Protection sur `/login` et `/api/sync/*`
    - Bannissement temporaire après X tentatives échouées
    - Whitelist IP de confiance
-   - Logs des tentatives
+   - Logs des tentatives avec audit trail
 
-3. **Statistiques détaillées de synchronisation** 📊
+5. **Statistiques détaillées de synchronisation** 📊
    - Graphiques d'utilisation (espace, fichiers, bande passante)
    - Historique des syncs sur 30 jours
    - Performance réseau par pair
    - Tableau de bord monitoring
 
-4. **Tests production multi-serveurs** 🧪
+6. **Tests production multi-serveurs** 🧪
    - Topologie complexe (3+ serveurs)
    - Scénarios de failover
    - Validation de charge
 
 ### 🚀 Priorité 3 - Évolutions futures
 
-1. **Système de notifications** 📧
+1. **Guide utilisateur complet** 📚
+   - Guide d'installation pas-à-pas avec captures d'écran
+   - Guide d'utilisation pour chaque fonctionnalité
+   - Exemples de configurations (topologies réseau)
+   - FAQ détaillée
+   - Section troubleshooting
+   - Best practices sécurité et performance
+   - Disponible en FR et EN
+
+2. **Système de notifications** 📧
    - **Module Home Assistant** via webhooks
    - **Webhooks génériques** (Discord, Slack, custom)
    - **Email SMTP** (optionnel)
@@ -664,22 +703,32 @@ Permettre aux admins de visualiser quels serveurs distants stockent des backups 
      - Rapport hebdomadaire/mensuel
    - Configuration flexible par utilisateur/admin
 
-2. **Multi-peer redundancy**
+3. **Multi-peer redundancy**
    - Stockage sur plusieurs pairs simultanément (2-of-3, 3-of-5)
    - Choix du niveau de redondance par partage
    - Reconstruction automatique en cas de perte d'un pair
 
-3. **Interface de monitoring avancée**
+4. **Interface de monitoring avancée**
    - Dashboard temps réel avec WebSocket
    - Alertes configurables
    - Intégration Prometheus/Grafana
 
-4. **Chiffrement asymétrique**
+5. **Chiffrement asymétrique**
    - Clés publiques/privées RSA ou Ed25519
    - Échange de clés sécurisé entre pairs
    - Signature des manifests
 
-**Note** : Le bandwidth throttling n'est pas prioritaire car la synchronisation à heure fixe permet déjà de planifier les syncs hors heures de pointe.
+### 📝 Fonctionnalités à évaluer (impact ressources)
+
+- **Versioning des fichiers** : Conservation de N versions d'un fichier lors des syncs, permettant de revenir en arrière en cas de corruption/suppression accidentelle. Nécessite des tests de charge pour évaluer l'impact disque/performance.
+
+- **Authentification 2FA/MFA** : Authentification à deux facteurs avec TOTP (Google Authenticator, etc.). Jugée trop lourde pour un contexte homelab avec certificats auto-signés.
+
+### 📌 Notes
+
+- **Bandwidth throttling** : Non prioritaire car la synchronisation à heure fixe et les fréquences différenciées par pair permettent déjà de planifier les syncs hors heures de pointe.
+
+- **Politique de rétention automatique** : Remplacée par le système de fréquence de synchronisation par pair (quotidien/hebdo/mensuel), permettant des snapshots à différentes fréquences sans complexité supplémentaire.
 
 **État global** : 🟢 GESTION COMPLÈTE DES PAIRS ET BACKUPS ENTRANTS
 **Prochaine étape** : Interface web de restauration (Session 12)
