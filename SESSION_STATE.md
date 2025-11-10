@@ -601,26 +601,85 @@ Permettre aux admins de visualiser quels serveurs distants stockent des backups 
 
 ## 📝 Prochaines étapes (Roadmap)
 
-### Court terme (Session 12 - Prochaine)
+### 🎯 Priorité 1 - Court terme
 
-1. 🔜 **Interface web de restauration** (Phase 4 - Session 8)
-   - Explorateur de fichiers pour naviguer dans les backups
-   - Téléchargement sélectif de fichiers
-   - Restauration avec confirmation
+**Session 12 : Interface web de restauration** 📂
+- Explorateur de fichiers pour naviguer dans les backups chiffrés
+- Liste des backups disponibles par utilisateur/partage
+- Navigation dans l'arborescence des fichiers backupés
+- Déchiffrement à la volée avec la clé utilisateur
+- Téléchargement sélectif de fichiers
+- Restauration complète d'un partage
+- Interface intuitive avec prévisualisation
 
-### Moyen terme
-1. 🔜 Notifications (email/web) pour sync réussies/échouées
-2. 🔜 Bandwidth throttling (limite bande passante)
-3. 🔜 Statistiques détaillées de synchronisation
-4. 🔜 Service systemd pour démarrage automatique
-5. 🔜 Rate limiting sur l'authentification (anti-bruteforce)
+**Session 13 : Export/Import configuration serveur** 💾
+- Export complet de la configuration serveur (JSON chiffré)
+  - Base de données (users, peers, shares, quotas, config)
+  - Clés de chiffrement
+  - Configuration Samba
+  - Métadonnées système
+- Script `restore_server.sh` pour restauration complète
+  - Usage : `bash restore_server.sh config_backup.json.enc master_key`
+  - Restauration automatique de tous les paramètres
+  - Recréation des utilisateurs système et SMB
+  - Régénération des certificats TLS
+- Chiffrement AES-256-GCM avec clé admin
 
-### Long terme
-1. 🔜 Tests production sur multiples serveurs
-2. 🔜 Multi-peer redundancy (plusieurs pairs pour un user)
-3. 🔜 Backup/restore configuration complète
-4. 🔜 Interface de monitoring avancée
-5. 🔜 Chiffrement asymétrique avec clés publiques (RSA/Ed25519)
+### ⚙️ Priorité 2 - Améliorations
+
+1. **Service systemd** 🔄
+   - Démarrage automatique au boot
+   - Gestion propre du service (start/stop/restart/status)
+   - Logs systemd intégrés
+   - Script d'installation
+
+2. **Rate limiting anti-bruteforce** 🛡️
+   - Protection sur `/login` et `/api/sync/*`
+   - Bannissement temporaire après X tentatives échouées
+   - Whitelist IP de confiance
+   - Logs des tentatives
+
+3. **Statistiques détaillées de synchronisation** 📊
+   - Graphiques d'utilisation (espace, fichiers, bande passante)
+   - Historique des syncs sur 30 jours
+   - Performance réseau par pair
+   - Tableau de bord monitoring
+
+4. **Tests production multi-serveurs** 🧪
+   - Topologie complexe (3+ serveurs)
+   - Scénarios de failover
+   - Validation de charge
+
+### 🚀 Priorité 3 - Évolutions futures
+
+1. **Système de notifications** 📧
+   - **Module Home Assistant** via webhooks
+   - **Webhooks génériques** (Discord, Slack, custom)
+   - **Email SMTP** (optionnel)
+   - Événements notifiables :
+     - Sync réussie/échouée
+     - Quota à 80%/90%/100%
+     - Nouveau pair connecté
+     - Authentification échouée (sécurité)
+     - Rapport hebdomadaire/mensuel
+   - Configuration flexible par utilisateur/admin
+
+2. **Multi-peer redundancy**
+   - Stockage sur plusieurs pairs simultanément (2-of-3, 3-of-5)
+   - Choix du niveau de redondance par partage
+   - Reconstruction automatique en cas de perte d'un pair
+
+3. **Interface de monitoring avancée**
+   - Dashboard temps réel avec WebSocket
+   - Alertes configurables
+   - Intégration Prometheus/Grafana
+
+4. **Chiffrement asymétrique**
+   - Clés publiques/privées RSA ou Ed25519
+   - Échange de clés sécurisé entre pairs
+   - Signature des manifests
+
+**Note** : Le bandwidth throttling n'est pas prioritaire car la synchronisation à heure fixe permet déjà de planifier les syncs hors heures de pointe.
 
 **État global** : 🟢 GESTION COMPLÈTE DES PAIRS ET BACKUPS ENTRANTS
-**Prochaine étape** : Interface web de restauration (explorateur de backups)
+**Prochaine étape** : Interface web de restauration (Session 12)
