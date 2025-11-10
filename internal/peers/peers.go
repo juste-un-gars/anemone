@@ -132,7 +132,7 @@ func UpdateStatus(db *sql.DB, id int, status string) error {
 	return nil
 }
 
-// TestConnection tests if a peer is reachable
+// TestConnection tests if a peer is reachable and validates authentication if password is set
 func TestConnection(peer *Peer) (bool, error) {
 	// Create HTTPS client that accepts self-signed certificates
 	tr := &http.Transport{
@@ -143,19 +143,52 @@ func TestConnection(peer *Peer) (bool, error) {
 		Timeout:   5 * time.Second,
 	}
 
-	// Try to reach the health endpoint
-	url := fmt.Sprintf("https://%s:%d/health", peer.Address, peer.Port)
-	resp, err := client.Get(url)
+	// First, check basic connectivity with health endpoint
+	healthURL := fmt.Sprintf("https://%s:%d/health", peer.Address, peer.Port)
+	resp, err := client.Get(healthURL)
 	if err != nil {
 		return false, fmt.Errorf("connection failed: %w", err)
 	}
-	defer resp.Body.Close()
+	resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK {
-		return true, nil
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("health check failed: status %d", resp.StatusCode)
 	}
 
-	return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	// If password is configured, test authentication on a protected endpoint
+	if peer.Password != nil && *peer.Password != "" {
+		// Test /api/sync/manifest endpoint with authentication
+		// We expect either 404 (auth OK, no manifest) or 200 (auth OK, manifest exists)
+		// We reject 401 (no auth header) or 403 (wrong password)
+		testURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?user_id=1&share_name=test", peer.Address, peer.Port)
+		req, err := http.NewRequest(http.MethodGet, testURL, nil)
+		if err != nil {
+			return false, fmt.Errorf("failed to create auth test request: %w", err)
+		}
+
+		// Add authentication header
+		req.Header.Set("X-Sync-Password", *peer.Password)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return false, fmt.Errorf("auth test request failed: %w", err)
+		}
+		resp.Body.Close()
+
+		// Check response status
+		if resp.StatusCode == http.StatusUnauthorized {
+			return false, fmt.Errorf("authentication required: server expects a password")
+		}
+		if resp.StatusCode == http.StatusForbidden {
+			return false, fmt.Errorf("authentication failed: invalid password")
+		}
+		// 200 (manifest exists) or 404 (no manifest) are both OK - authentication succeeded
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+			return false, fmt.Errorf("unexpected auth test response: status %d", resp.StatusCode)
+		}
+	}
+
+	return true, nil
 }
 
 // URL returns the full HTTPS URL of the peer
