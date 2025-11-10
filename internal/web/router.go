@@ -27,6 +27,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/config"
 	"github.com/juste-un-gars/anemone/internal/crypto"
 	"github.com/juste-un-gars/anemone/internal/i18n"
+	"github.com/juste-un-gars/anemone/internal/incoming"
 	"github.com/juste-un-gars/anemone/internal/peers"
 	"github.com/juste-un-gars/anemone/internal/quota"
 	"github.com/juste-un-gars/anemone/internal/reset"
@@ -142,6 +143,10 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/admin/sync", auth.RequireAdmin(server.handleAdminSync))
 	mux.HandleFunc("/admin/sync/config", auth.RequireAdmin(server.handleAdminSyncConfig))
 	mux.HandleFunc("/admin/sync/force", auth.RequireAdmin(server.handleAdminSyncForce))
+
+	// Admin routes - Incoming backups
+	mux.HandleFunc("/admin/incoming", auth.RequireAdmin(server.handleAdminIncoming))
+	mux.HandleFunc("/admin/incoming/delete", auth.RequireAdmin(server.handleAdminIncomingDelete))
 
 	// User routes
 	mux.HandleFunc("/trash", auth.RequireAuth(server.handleTrash))
@@ -1625,6 +1630,104 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 	action := parts[1]
 
 	switch action {
+	case "edit":
+		// Display edit form (GET)
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		session, ok := auth.GetSessionFromContext(r)
+		if !ok {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+
+		peer, err := peers.GetByID(s.db, peerID)
+		if err != nil {
+			log.Printf("Error getting peer: %v", err)
+			http.Error(w, "Peer not found", http.StatusNotFound)
+			return
+		}
+
+		data := struct {
+			Lang    string
+			Session *auth.Session
+			Peer    *peers.Peer
+			Error   string
+		}{
+			Lang:    s.cfg.Language,
+			Session: session,
+			Peer:    peer,
+			Error:   r.URL.Query().Get("error"),
+		}
+
+		if err := s.templates.ExecuteTemplate(w, "admin_peers_edit.html", data); err != nil {
+			log.Printf("Template error: %v", err)
+			http.Error(w, "Template error", http.StatusInternalServerError)
+		}
+		return
+
+	case "update":
+		// Process edit form (POST)
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		session, ok := auth.GetSessionFromContext(r)
+		if !ok {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+
+		if err := r.ParseForm(); err != nil {
+			http.Redirect(w, r, fmt.Sprintf("/admin/peers/%d/edit?error=Invalid+form+data", peerID), http.StatusSeeOther)
+			return
+		}
+
+		// Get existing peer
+		peer, err := peers.GetByID(s.db, peerID)
+		if err != nil {
+			log.Printf("Error getting peer: %v", err)
+			http.Redirect(w, r, "/admin/peers?error=Peer+not+found", http.StatusSeeOther)
+			return
+		}
+
+		// Update fields
+		peer.Name = r.FormValue("name")
+		peer.Address = r.FormValue("address")
+
+		port, err := strconv.Atoi(r.FormValue("port"))
+		if err != nil || port < 1 || port > 65535 {
+			http.Redirect(w, r, fmt.Sprintf("/admin/peers/%d/edit?error=Invalid+port", peerID), http.StatusSeeOther)
+			return
+		}
+		peer.Port = port
+
+		// Update password if provided
+		password := r.FormValue("password")
+		if password != "" {
+			peer.Password = &password
+		} else if r.FormValue("clear_password") == "1" {
+			peer.Password = nil
+		}
+		// If password is empty and clear_password is not checked, keep existing password
+
+		// Update enabled status
+		peer.Enabled = r.FormValue("enabled") == "1"
+
+		// Save to database
+		if err := peers.Update(s.db, peer); err != nil {
+			log.Printf("Error updating peer: %v", err)
+			http.Redirect(w, r, fmt.Sprintf("/admin/peers/%d/edit?error=Failed+to+update+peer", peerID), http.StatusSeeOther)
+			return
+		}
+
+		log.Printf("Admin %s updated peer ID %d: %s", session.Username, peerID, peer.Name)
+		http.Redirect(w, r, "/admin/peers", http.StatusSeeOther)
+		return
+
 	case "delete":
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -2894,4 +2997,102 @@ func (s *Server) handleAdminSyncForce(w http.ResponseWriter, r *http.Request) {
 		successMsg := fmt.Sprintf("Synchronisation réussie : %d synchronisations effectuées", successCount)
 		http.Redirect(w, r, "/admin/sync?success="+successMsg, http.StatusSeeOther)
 	}
+}
+
+// handleAdminIncoming displays incoming backups from remote peers
+func (s *Server) handleAdminIncoming(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Scan incoming backups directory
+	backupsDir := filepath.Join(s.cfg.DataDir, "backups", "incoming")
+	backups, err := incoming.ScanIncomingBackups(s.db, backupsDir)
+	if err != nil {
+		log.Printf("Error scanning incoming backups: %v", err)
+		http.Error(w, "Failed to scan incoming backups", http.StatusInternalServerError)
+		return
+	}
+
+	// Calculate total statistics
+	var totalFiles int
+	var totalSize int64
+	for _, backup := range backups {
+		totalFiles += backup.FileCount
+		totalSize += backup.TotalSize
+	}
+
+	data := struct {
+		Lang        string
+		Session     *auth.Session
+		Backups     []*incoming.IncomingBackup
+		TotalFiles  int
+		TotalSize   string
+		Error       string
+		Success     string
+		FormatBytes func(int64) string
+		FormatTime  func(time.Time, string) string
+	}{
+		Lang:        s.cfg.Language,
+		Session:     session,
+		Backups:     backups,
+		TotalFiles:  totalFiles,
+		TotalSize:   incoming.FormatBytes(totalSize),
+		Error:       r.URL.Query().Get("error"),
+		Success:     r.URL.Query().Get("success"),
+		FormatBytes: incoming.FormatBytes,
+		FormatTime:  incoming.FormatTimeAgo,
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "admin_incoming.html", data); err != nil {
+		log.Printf("Template error: %v", err)
+		http.Error(w, "Template error", http.StatusInternalServerError)
+	}
+}
+
+// handleAdminIncomingDelete deletes an incoming backup
+func (s *Server) handleAdminIncomingDelete(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse form
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/admin/incoming?error=Invalid+form+data", http.StatusSeeOther)
+		return
+	}
+
+	// Get backup path from form
+	backupPath := r.FormValue("path")
+	if backupPath == "" {
+		http.Redirect(w, r, "/admin/incoming?error=Missing+backup+path", http.StatusSeeOther)
+		return
+	}
+
+	// Security check: ensure path is within data directory
+	dataDir := s.cfg.DataDir
+	if !strings.HasPrefix(backupPath, dataDir) {
+		log.Printf("Security: Attempted to delete path outside data directory: %s", backupPath)
+		http.Redirect(w, r, "/admin/incoming?error=Invalid+backup+path", http.StatusSeeOther)
+		return
+	}
+
+	// Delete the backup
+	if err := incoming.DeleteIncomingBackup(backupPath); err != nil {
+		log.Printf("Error deleting backup %s: %v", backupPath, err)
+		http.Redirect(w, r, "/admin/incoming?error=Failed+to+delete+backup", http.StatusSeeOther)
+		return
+	}
+
+	log.Printf("Admin %s deleted incoming backup: %s", session.Username, backupPath)
+	http.Redirect(w, r, "/admin/incoming?success=Backup+deleted+successfully", http.StatusSeeOther)
 }

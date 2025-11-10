@@ -127,6 +127,9 @@
                             {{end}}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <a href="/admin/peers/{{.ID}}/edit" class="text-indigo-600 hover:text-indigo-900 mr-3">
+                                {{if eq $.Lang "fr"}}Éditer{{else}}Edit{{end}}
+                            </a>
                             <button onclick="testPeer({{.ID}}, '{{.Name}}')" class="text-blue-600 hover:text-blue-900 mr-3">
                                 {{T $.Lang "peers.action.test"}}
                             </button>
