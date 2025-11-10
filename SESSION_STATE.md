@@ -1,9 +1,10 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-10 (Session 11 - Vue "Pairs connectés à moi" + Édition de pair)
-**Status** : 🟢 GESTION COMPLÈTE DES PAIRS ET BACKUPS ENTRANTS
+**Dernière session** : 2025-11-10 (Session 13 - Fréquence de synchronisation par pair avec option Interval)
+**Status** : 🟢 SYNCHRONISATION PAR PAIR AVEC FRÉQUENCES PERSONNALISABLES (Interval/Daily/Weekly/Monthly)
 
 > **Note** : L'historique des sessions 1-7 a été archivé dans `SESSION_STATE_ARCHIVE.md`
+> **Note** : Les détails techniques des sessions 8-11 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
 
 ---
 
@@ -47,12 +48,13 @@
    - Vidage corbeille complet
 
 6. **Gestion pairs P2P**
-   - CRUD complet
-   - Test connexion HTTPS
+   - CRUD complet avec édition
+   - Test connexion HTTPS avec authentification
    - Statuts (online/offline/error)
    - **Synchronisation manuelle** : Bouton sync par partage
-   - **Synchronisation automatique** : Scheduler intégré ✨ Session 9
+   - **Synchronisation automatique** : Scheduler intégré avec fréquences personnalisables
    - **Chiffrement E2E** : AES-256-GCM par utilisateur
+   - **Authentification P2P** : Protection endpoints par mot de passe
 
 7. **Système de Quotas**
    - **Quotas Btrfs kernel** : Enforcement automatique au niveau filesystem
@@ -79,8 +81,7 @@
 
 10. **Scheduler automatique** ✨ Session 9
     - Goroutine background vérifiant toutes les 1 minute
-    - Intervalles configurables : 30min, 1h, 2h, 6h, heure fixe
-    - Interface admin `/admin/sync` pour configuration
+    - Configuration par pair (interval/daily/weekly/monthly)
     - Bouton "Forcer la synchronisation" pour trigger manuel
     - Logs détaillés dans la console serveur
     - Dashboard utilisateur affiche "Dernière sauvegarde"
@@ -93,25 +94,24 @@
     - Champ mot de passe lors de l'ajout/édition de pairs
     - Hachage bcrypt côté serveur (stockage sécurisé)
     - Rétrocompatibilité : Sans mot de passe configuré = accès libre
-    - Logs d'authentification dans la console serveur
 
-12. **Installation automatisée**
-    - Script `install.sh` zéro-touch
-    - Configuration complète système
-    - Support multi-distro (Fedora/RHEL/Debian)
-
-13. **Gestion des backups entrants** 👥 Session 11
+12. **Gestion des backups entrants** 👥 Session 11
     - Vue `/admin/incoming` pour visualiser les pairs qui stockent des backups
     - Statistiques : nombre de pairs, fichiers, espace utilisé
     - Suppression de backups entrants
     - Carte dashboard pour accès rapide
 
-14. **Édition de pairs** ✏️ Session 11
+13. **Édition de pairs** ✏️ Session 11
     - Interface `/admin/peers/{id}/edit` pour modifier la configuration
-    - Modification nom, adresse, port, mot de passe, statut
+    - Modification nom, adresse, port, mot de passe, statut, fréquence sync
     - Gestion intelligente du mot de passe (conserver/modifier/supprimer)
     - Test d'authentification intégré au bouton "Test"
     - Détection automatique des erreurs d'authentification (401/403)
+
+14. **Installation automatisée**
+    - Script `install.sh` zéro-touch
+    - Configuration complète système
+    - Support multi-distro (Fedora/RHEL/Debian)
 
 ### 🚀 Déploiement
 
@@ -132,8 +132,8 @@
 - ✅ **Authentification P2P** : OK (Session 10 - 401/403/200 selon mot de passe)
 - ✅ **Vue backups entrants** : OK (Session 11 - affichage stats et backups)
 - ✅ **Édition de pair** : OK (Session 11 - modification config complète)
-- ✅ **Test authentification pair** : OK (Session 11 - détection mot de passe invalide)
 - ✅ **Synchronisation avec authentification** : OK (Session 11 - DEV→FR1)
+- ✅ **Fréquences par pair** : OK (Session 13 - interval/daily/weekly/monthly)
 
 **Structure de production** :
 - Code : `~/anemone/` (repo git, binaires)
@@ -149,453 +149,214 @@
 
 ---
 
-## 🔧 Session 8 - 7-8 Novembre 2025 - Synchronisation incrémentale
+## 📋 Résumé des sessions récentes
 
-### 🎯 Objectif
+### Session 8 (7-8 Nov) - Synchronisation incrémentale
+- ✅ Système de manifest pour tracking fichiers
+- ✅ API endpoints pour sync fichier par fichier
+- ✅ ~50% économie bande passante (seulement fichiers modifiés)
+- ✅ Interface `/admin/sync` pour configuration
+- **Détails** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
 
-Remplacer la synchronisation monolithique (tar.gz complet) par une synchronisation incrémentale fichier par fichier (type rclone).
+### Session 9 (9 Nov) - Scheduler automatique + Bug fixes
+- ✅ Goroutine background pour sync automatique
+- ✅ Vérification toutes les 1 minute
+- ✅ Fix dashboard "Dernière sauvegarde" (requête SQLite)
+- ✅ Logs détaillés dans console
+- **Détails** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
 
-### ✅ Phases complétées
+### Session 10 (9 Nov) - Authentification P2P
+- ✅ Mot de passe serveur (bcrypt) pour protéger `/api/sync/*`
+- ✅ Mot de passe pair pour authentification sortante
+- ✅ Middleware avec header `X-Sync-Password`
+- ✅ Interface `/admin/settings` pour configuration
+- ✅ Rétrocompatibilité (sans mot de passe = accès libre)
+- **Détails** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
 
-**Phase 1 : Système de manifest**
-- Fichier `internal/sync/manifest.go` (210 lignes)
-- Fonctions : `BuildManifest()`, `CompareManifests()`, `CalculateChecksum()`
-- Tests unitaires : 7/7 PASS
-
-**Phase 2 : Synchronisation incrémentale**
-- 4 nouveaux API endpoints : GET/PUT manifest, POST/DELETE file
-- Fonction `SyncShareIncremental()` pour upload fichier par fichier
-- Stockage : `/srv/anemone/backups/incoming/{user_id}_{share_name}/`
-- Serveur distant n'a plus besoin que l'utilisateur existe localement
-
-**Phase 3 : Interface admin**
-- Page `/admin/sync` pour configuration
-- Table `sync_config` en base de données
-- Package `internal/syncconfig/` pour gestion configuration
-- Fonction `SyncAllUsers()` pour synchronisation globale
-- Bouton "Forcer la synchronisation"
-- Tableau des 20 dernières synchronisations
-
-### 📊 Résultats
-
-- ✅ Seulement les fichiers modifiés sont transférés (~50% économie bande passante)
-- ✅ Chaque fichier chiffré individuellement (AES-256-GCM)
-- ✅ Architecture simplifiée (serveur distant = simple stockage)
-- ✅ Sécurité end-to-end maintenue
-
-**Commits** :
-```
-368faa1 - feat: Implement automatic sync configuration interface (Phase 3/4)
-c95f7a6 - feat: Implement incremental P2P sync with file-by-file transfer (Phase 2/4)
-1322625 - feat: Implement manifest system for incremental P2P sync (Phase 1/4)
-```
-
-**Statut** : 🟢 COMPLÈTE
+### Session 11 (10 Nov) - Vue backups entrants + Édition pairs
+- ✅ Vue `/admin/incoming` avec statistiques backups
+- ✅ Interface `/admin/peers/{id}/edit` pour modification
+- ✅ Gestion intelligente mot de passe (conserver/modifier/supprimer)
+- ✅ Test d'authentification intégré
+- ✅ Cartes dashboard (Paramètres serveur, Pairs connectés)
+- **Détails** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
 
 ---
 
-## 🔧 Session 9 - 9 Novembre 2025 - Scheduler automatique + Bug fixes
+## 🔧 Session 13 - 10 Novembre 2025 - Fréquence de synchronisation par pair (avec Interval)
 
 ### 🎯 Objectif
 
-Implémenter le scheduler automatique pour déclencher les synchronisations selon l'intervalle configuré.
-
-### ✅ Implémentation
-
-**1. Package scheduler** (`internal/scheduler/scheduler.go`)
-- Goroutine background lancée au démarrage du serveur
-- Vérifie toutes les 1 minute s'il faut synchroniser
-- Lit la configuration depuis `sync_config` en base
-- Appelle `sync.SyncAllUsers()` si nécessaire
-- Met à jour `sync_config.last_sync` après chaque sync
-- Logs détaillés dans la console
-
-**2. Intégration dans main.go**
-- Import du package `scheduler`
-- Appel de `scheduler.Start(db)` avant le serveur HTTP
-- Le scheduler tourne en parallèle du serveur web
-
-**3. Logique de déclenchement** (`syncconfig.ShouldSync()`)
-- Si `last_sync` est NULL → première sync (trigger immédiat)
-- Si intervalle = "fixed" → vérifie l'heure quotidienne
-- Sinon → vérifie si `now - last_sync >= interval`
-
-**Intervalles supportés** :
-- `30min` : Toutes les 30 minutes
-- `1h` : Toutes les heures
-- `2h` : Toutes les 2 heures
-- `6h` : Toutes les 6 heures
-- `fixed` : Heure fixe quotidienne (0-23)
-
-### 🐛 Bug fixes
-
-**Bug 1 : Dashboard "Dernière sauvegarde" affichait toujours "Jamais"**
-
-**Cause** : Requête SQL incorrecte
-```sql
--- AVANT (ne fonctionnait pas avec SQLite)
-SELECT MAX(completed_at) FROM sync_log ...
-```
-SQLite retourne `MAX(completed_at)` comme une **string**, pas un **time.Time**.
-
-**Solution** :
-```sql
--- APRÈS (fonctionne parfaitement)
-SELECT completed_at FROM sync_log
-WHERE user_id = ? AND status = 'success'
-ORDER BY completed_at DESC
-LIMIT 1
-```
-
-**Fichier modifié** : `internal/web/router.go:395-413`
-
-**Amélioration bonus** : Affichage en minutes si < 1h
-```go
-if duration < time.Hour {
-    stats.LastBackup = fmt.Sprintf("Il y a %d minutes", int(duration.Minutes()))
-} else if duration < 24*time.Hour {
-    stats.LastBackup = fmt.Sprintf("Il y a %d heures", int(duration.Hours()))
-} else {
-    stats.LastBackup = fmt.Sprintf("Il y a %d jours", int(duration.Hours()/24))
-}
-```
-
-### 🧪 Tests validés
-
-**Test 1 : Synchronisation automatique**
-- ✅ Configuration activée avec intervalle 30min
-- ✅ Scheduler démarre au lancement du serveur
-- ✅ Première sync déclenchée automatiquement (last_sync=NULL)
-- ✅ Synchronisations suivantes toutes les 30 minutes
-- ✅ Logs visibles dans la console :
-  ```
-  2025/11/09 09:43:25 🔄 Scheduler: Triggering automatic synchronization...
-  2025/11/09 09:43:26 ✅ Scheduler: Sync completed successfully - 2 shares synchronized
-  ```
-
-**Test 2 : Dashboard utilisateur**
-- ✅ "Dernière sauvegarde" affiche "Il y a X minutes"
-- ✅ Mise à jour en temps réel après chaque sync
-- ✅ Plus d'erreur "Jamais" pour utilisateurs avec syncs
-
-**Test 3 : Synchronisation incrémentale**
-- ✅ Fichiers ajoutés à 8h57 → synchronisés à 9h13
-- ✅ Ajout/modification détectés correctement
-- ✅ Suppression répliquée sur le pair distant
-- ✅ Fichiers stockés chiffrés sur FR1
-
-### 📝 Fichiers créés/modifiés
-
-**Créés** :
-- `internal/scheduler/scheduler.go` (+56 lignes)
-
-**Modifiés** :
-- `cmd/anemone/main.go` (+3 lignes - import + appel scheduler)
-- `internal/web/router.go` (+10 lignes - fix requête SQL)
-
-### 📊 Logs de production
-
-```
-2025/11/09 10:02:31 🪸 Starting Anemone NAS...
-2025/11/09 10:02:31 🔄 Starting automatic synchronization scheduler...
-2025/11/09 10:02:31 ✅ Automatic synchronization scheduler started (checks every 1 minute)
-2025/11/09 10:02:31 🔒 HTTPS server listening on https://localhost:8443
-```
-
-**Commits** :
-```
-À venir : feat: Implement automatic sync scheduler (Session 9)
-          fix: Dashboard last backup display with SQLite-compatible query
-```
-
-**Statut** : 🟢 COMPLÈTE ET TESTÉE
-
----
-
-## 🔧 Session 10 - 9 Novembre 2025 - Authentification P2P par mot de passe
-
-### 🎯 Objectif
-
-Sécuriser les endpoints de synchronisation P2P pour empêcher les connexions non autorisées. Problème identifié : n'importe quel serveur pouvait stocker des backups sans authentification.
+Permettre de configurer une fréquence de synchronisation indépendante pour chaque pair, incluant une option "Interval" pour synchroniser toutes les X minutes ou heures.
 
 ### ✅ Architecture implémentée
 
-**Système à deux niveaux** :
+**Avant** : Configuration globale dans `sync_config` → tous les pairs synchronisés en même temps
+**Après** : Configuration individuelle par pair → chaque pair a sa propre fréquence et son propre timestamp de dernière sync
 
-1. **Mot de passe SERVEUR** (dans `system_config.sync_auth_password`)
-   - Protège les endpoints `/api/sync/*` de CE serveur
-   - Stocké hashé avec bcrypt (sécurité maximale)
-   - Configurable via `/admin/settings`
-   - Les pairs doivent fournir ce mot de passe pour se connecter
+**Fréquences supportées** :
+- **Interval** : Synchronisation à intervalle régulier (ex: toutes les 30 minutes, toutes les 2 heures)
+- **Daily** : Synchronisation quotidienne à une heure fixe (ex: 23:00)
+- **Weekly** : Synchronisation hebdomadaire un jour spécifique (ex: Samedi 23:00)
+- **Monthly** : Synchronisation mensuelle un jour spécifique (ex: 1er du mois à 23:00)
 
-2. **Mot de passe PAIR** (dans `peers.password`)
-   - Utilisé pour s'authentifier auprès des AUTRES serveurs
-   - Stocké en clair (transmis via HTTPS chiffré)
-   - Configurable lors de l'ajout/édition d'un pair
-
-**Rétrocompatibilité** : Si aucun mot de passe serveur n'est configuré, les endpoints restent accessibles sans authentification.
+**Cas d'usage** :
+- Pair FR0 (interval 30min) : Backup très fréquent pour données critiques
+- Pair FR1 (daily 23:00) : Backup quotidien pour récupération rapide
+- Pair FR2 (weekly Samedi 23:00) : Snapshot hebdomadaire pour version intermédiaire
+- Pair FR3 (monthly 1er 23:00) : Archive mensuelle pour rétention long terme
 
 ### 🔨 Composants créés/modifiés
 
 **1. Database Migration** (`internal/database/migrations.go`)
-- Ajout colonne `password TEXT` à la table `peers`
-- Migration automatique au démarrage
 
-**2. Package syncauth** (`internal/syncauth/syncauth.go` - NOUVEAU)
-- `GetSyncAuthPassword(db)` : Récupère le hash du mot de passe serveur
-- `SetSyncAuthPassword(db, password)` : Configure/modifie le mot de passe (avec bcrypt)
-- `CheckSyncAuthPassword(db, password)` : Vérifie si le mot de passe fourni est correct
-- `IsConfigured(db)` : Vérifie si un mot de passe est configuré
-
-**3. Middleware d'authentification** (`internal/web/router.go`)
-```go
-func (s *Server) syncAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
-    // 1. Vérifie si un mot de passe est configuré
-    // 2. Si non → accès libre (backward compatibility)
-    // 3. Si oui → exige header X-Sync-Password
-    // 4. Valide le mot de passe avec bcrypt
-    // 5. Retourne 401 (pas de header) ou 403 (mauvais mot de passe)
-}
+Nouvelles colonnes ajoutées à la table `peers` :
+```sql
+sync_enabled BOOLEAN DEFAULT 1           -- Activer/désactiver sync pour ce pair
+sync_frequency TEXT DEFAULT 'daily'      -- "interval", "daily", "weekly", "monthly"
+sync_time TEXT DEFAULT '23:00'           -- Heure de sync (format HH:MM)
+sync_day_of_week INTEGER                 -- 0-6 (0=dimanche), NULL si pas weekly
+sync_day_of_month INTEGER                -- 1-31, NULL si pas monthly
+sync_interval_minutes INTEGER DEFAULT 60 -- Intervalle en minutes pour "interval"
 ```
 
-Appliqué sur :
-- `/api/sync/manifest` (GET/PUT)
-- `/api/sync/file` (POST/DELETE)
-- `/api/sync/receive` (ancien endpoint)
+**2. Package peers** (`internal/peers/peers.go`)
 
-**4. Client de synchronisation** (`internal/sync/sync.go`)
-- Modification de `SyncAllUsers()` pour récupérer le mot de passe du pair
-- Ajout du header `X-Sync-Password` sur toutes les requêtes HTTP :
-  - GET manifest (vérifier état distant)
-  - POST file (upload fichier chiffré)
-  - DELETE file (supprimer fichier obsolète)
-  - PUT manifest (mettre à jour manifest distant)
-
-**5. Structure Peer** (`internal/peers/peers.go`)
+Ajout de champs à la struct `Peer` :
 ```go
 type Peer struct {
-    ID        int
-    Name      string
-    Address   string
-    Port      int
-    PublicKey *string
-    Password  *string  // NOUVEAU - Can be NULL
-    Enabled   bool
-    // ...
+    // ... existing fields
+    SyncEnabled         bool
+    SyncFrequency       string   // "interval", "daily", "weekly", "monthly"
+    SyncTime            string   // "HH:MM"
+    SyncDayOfWeek       *int     // 0-6, NULL si pas weekly
+    SyncDayOfMonth      *int     // 1-31, NULL si pas monthly
+    SyncIntervalMinutes int      // Intervalle en minutes pour "interval"
 }
 ```
-Toutes les fonctions CRUD mises à jour (Create, GetByID, GetAll, Update).
 
-**6. Interface admin - Settings** (`web/templates/admin_settings.html` - NOUVEAU)
-- Page `/admin/settings` pour configurer le mot de passe serveur
-- Indicateur de statut (configuré / non configuré)
-- Formulaire avec confirmation du mot de passe
-- Validation : minimum 8 caractères
-- Messages de succès/erreur
-- Info-box expliquant le fonctionnement
+Nouvelles fonctions :
+- `UpdateLastSync(db, peerID)` : Met à jour le timestamp de dernière sync
+- `ShouldSyncPeer(peer)` : Détermine si un pair doit être synchronisé maintenant
+  - Interval : Vérifie si `now - lastSync >= interval` (en minutes)
+  - Daily : Vérifie si on a passé l'heure de sync aujourd'hui et qu'on n'a pas encore sync aujourd'hui
+  - Weekly : Vérifie le jour de la semaine + l'heure + qu'on n'a pas sync aujourd'hui
+  - Monthly : Vérifie le jour du mois + l'heure + qu'on n'a pas sync aujourd'hui
 
-**7. Interface admin - Add Peer** (`web/templates/admin_peers_add.html`)
-- Ajout du champ "Mot de passe de synchronisation" (optionnel)
-- Type `password` pour masquer la saisie
-- Texte d'aide explicatif
+**3. Package sync** (`internal/sync/sync.go`)
 
-**8. Handlers** (`internal/web/router.go`)
-- `handleAdminSettings()` : Affiche la page de configuration
-- `handleAdminSettingsSyncPassword()` : Traite le formulaire de configuration
+Nouvelle fonction `SyncPeer()` pour synchroniser tous les shares vers UN seul pair spécifique.
+
+**4. Scheduler** (`internal/scheduler/scheduler.go`)
+
+Parcourt tous les pairs individuellement et synchronise ceux qui doivent l'être selon leur fréquence configurée.
+
+**5. Interfaces admin**
+
+**Add Peer** (`web/templates/admin_peers_add.html`) :
+- Checkbox "Activer la synchronisation automatique"
+- Dropdown "Fréquence" (interval/daily/weekly/monthly)
+- **Pour "Interval"** : Input numérique + dropdown unité (minutes/heures)
+  - Valeur convertie en minutes avant stockage en base
+  - Exemple : 2 heures → stocké comme 120 minutes
+  - Masque le champ "Heure de synchronisation"
+- Input time "Heure de synchronisation" (pour daily/weekly/monthly)
+- Dropdown "Jour de la semaine" (affiché conditionnellement pour weekly)
+- Input "Jour du mois" (affiché conditionnellement pour monthly)
+- JavaScript pour affichage conditionnel des champs
+
+**Edit Peer** (`web/templates/admin_peers_edit.html`) :
+- Mêmes champs que Add Peer
+- Valeurs pré-remplies depuis la base de données
+- **Pour "Interval"** : Affiche la valeur en minutes depuis la base (utilisateur peut changer l'unité)
+- JavaScript identique pour affichage conditionnel
+
+**6. Handlers** (`internal/web/router.go`)
+
+**handleAdminPeersAdd** :
+- Récupère et parse les champs de sync depuis le formulaire
+- Pour "interval" : Parse `sync_interval_value` et `sync_interval_unit`
+- Convertit en minutes (heures × 60) avant création du pair
+
+**handleAdminPeersActions (case "update")** :
+- Récupère et parse les champs de sync pour mise à jour
+- Logique de conversion identique pour "interval"
+
+### 📝 Fichiers créés/modifiés
+
+**Modifiés** :
+- `internal/database/migrations.go` (~20 lignes) - Migration colonnes sync
+- `internal/peers/peers.go` (~110 lignes) - Struct + ShouldSyncPeer + UpdateLastSync + interval logic
+- `internal/sync/sync.go` (~70 lignes) - Fonction SyncPeer
+- `internal/scheduler/scheduler.go` (~30 lignes) - Boucle sur peers au lieu de config globale
+- `internal/web/router.go` (~70 lignes) - Parse champs sync + conversion minutes/heures
+- `web/templates/admin_peers_add.html` (~120 lignes) - Section config sync + interval
+- `web/templates/admin_peers_edit.html` (~120 lignes) - Section config sync + interval
+
+**Total** : ~540 lignes ajoutées/modifiées
 
 ### 🧪 Tests validés
 
-**Test 1 : Sans mot de passe (attendu: 401)**
-```bash
-curl https://localhost:8443/api/sync/manifest?user_id=1&share_name=backup
-→ HTTP 401: "Unauthorized: X-Sync-Password header required" ✅
+**Migration DB** :
+- ✅ Compilation réussie
+- ✅ Serveur démarre sans erreur
+- ✅ Pair existant FR1 migré avec config par défaut (daily, 23:00, interval=60)
+- ✅ Nouvelles colonnes présentes en base
+
+**Interface admin** :
+- ✅ Option "Interval" visible dans dropdown fréquence
+- ✅ Champs interval (valeur + unité) s'affichent conditionnellement
+- ✅ Conversion minutes/heures fonctionne correctement
+- ✅ Édition d'un pair affiche les valeurs correctement
+
+**Scheduler** :
+- ✅ Scheduler démarre avec message "checks every 1 minute"
+- ✅ Parcourt les pairs individuellement
+- ✅ Logique interval fonctionne (vérifie temps écoulé depuis last_sync)
+
+**Rétrocompatibilité** :
+- ✅ Pairs existants migrés automatiquement
+- ✅ Valeurs par défaut : sync_enabled=1, frequency=daily, time=23:00, interval=60
+- ✅ Aucune régression sur les fonctionnalités existantes
+
+### 📊 Exemple de configuration
+
+**Topologie recommandée** :
+```
+Serveur DEV (192.168.83.99)
+├── Pair FR0 (future) : Interval 30min → Backup très fréquent
+├── Pair FR1 (192.168.83.96) : Daily 23:00 → Backup quotidien
+├── Pair FR2 (future) : Weekly Samedi 23:00 → Snapshot hebdo
+└── Pair FR3 (future) : Monthly 1er 23:00 → Archive mensuelle
 ```
 
-**Test 2 : Mauvais mot de passe (attendu: 403)**
-```bash
-curl -H "X-Sync-Password: wrongpassword" ...
-→ HTTP 403: "Forbidden: Invalid password" ✅
-```
+**Avantages** :
+- ✅ Pas de duplication des fichiers (chaque pair reçoit les mêmes données)
+- ✅ Plusieurs points de restauration à différentes fréquences
+- ✅ Optimisation réseau : syncs espacées dans le temps
+- ✅ Flexibilité : Chaque pair peut avoir sa propre stratégie
+- ✅ Option interval pour données critiques nécessitant backups très fréquents
 
-**Test 3 : Bon mot de passe (attendu: succès)**
-```bash
-curl -H "X-Sync-Password: testpass123" ...
-→ HTTP 404: "No manifest found" (authentification OK, pas de manifest) ✅
-```
+### 🔄 Remplacement de fonctionnalités
 
-**Logs serveur** :
-```
-2025/11/09 11:59:45 Sync auth failed: No X-Sync-Password header from [::1]:46814
-2025/11/09 11:59:50 Sync auth failed: Invalid password from [::1]:46828
-```
-(Le 3ème test réussit sans log d'erreur)
+**Ancienne approche (Session 9)** :
+- Table `sync_config` avec configuration globale
+- Tous les pairs synchronisés en même temps
+- Intervalle global (30min, 1h, 2h, 6h, fixed)
 
-### 📝 Fichiers créés/modifiés
+**Nouvelle approche (Session 13)** :
+- Configuration par pair dans la table `peers`
+- Chaque pair synchronisé indépendamment
+- Fréquences plus claires et flexibles (interval/daily/weekly/monthly)
 
-**Créés** :
-- `internal/syncauth/syncauth.go` (+76 lignes) - Package d'authentification
-- `web/templates/admin_settings.html` (+191 lignes) - Interface de configuration
-
-**Modifiés** :
-- `internal/database/migrations.go` - Migration `password` column
-- `internal/peers/peers.go` - Peer struct + CRUD avec password
-- `internal/web/router.go` - Middleware + routes `/admin/settings`
-- `internal/sync/sync.go` - Envoi header `X-Sync-Password`
-- `web/templates/admin_peers_add.html` - Champ password
-
-**Total** : ~350 lignes ajoutées/modifiées
-
-### 📊 Détails techniques
-
-**Flux d'authentification** :
-1. Admin configure mot de passe via `/admin/settings` → stocké hashé en DB
-2. Admin ajoute pair FR1 avec le mot de passe de FR1 → stocké en clair
-3. Lors de la sync, le serveur DEV envoie `X-Sync-Password: password_de_fr1`
-4. FR1 reçoit la requête → middleware vérifie le mot de passe
-5. Si valide → accepte le backup, sinon → rejette avec 401/403
-
-**Sécurité** :
-- ✅ Mot de passe serveur hashé avec bcrypt (cost 10)
-- ✅ Transmission HTTPS chiffrée (header en clair dans HTTPS)
-- ✅ Logs d'authentification pour monitoring
-- ✅ Pas de rate limiting (TODO pour production)
+**Note** : La table `sync_config` est conservée mais n'est plus utilisée par le scheduler. Elle peut être supprimée dans une future version.
 
 **Commits** :
 ```
-À venir : feat: Implement P2P password authentication (Session 10)
+À venir : feat: Add interval frequency option to peer sync configuration (Session 13)
 ```
 
 **Statut** : 🟢 COMPLÈTE ET TESTÉE
-
----
-
-## 🔧 Session 11 - 10 Novembre 2025 - Vue "Pairs connectés" + Édition de pair
-
-### 🎯 Objectif
-
-Permettre aux admins de visualiser quels serveurs distants stockent des backups sur leur serveur, et de modifier la configuration des pairs existants.
-
-### ✅ Fonctionnalités implémentées
-
-**1. Vue "Pairs connectés à moi"** (`/admin/incoming`)
-- **Package** `internal/incoming/incoming.go` (192 lignes)
-  - `ScanIncomingBackups()` : Scanne `/srv/anemone/backups/incoming/`
-  - `DeleteIncomingBackup()` : Supprime un backup
-  - `FormatBytes()`, `FormatTimeAgo()` : Utilitaires de formatage
-- **Interface admin** avec statistiques :
-  - Nombre de pairs connectés
-  - Nombre total de fichiers stockés
-  - Espace disque utilisé
-- **Tableau détaillé** par backup :
-  - Username + User ID
-  - Nom du partage (backup/data)
-  - Nombre de fichiers
-  - Taille totale
-  - Date de dernière modification
-  - Indicateur de présence du manifest
-  - Bouton "Supprimer" avec confirmation
-- État vide si aucun backup reçu
-
-**2. Interface d'édition de pair** (`/admin/peers/{id}/edit`)
-- **Handlers** dans `router.go` :
-  - Case `"edit"` : Affiche le formulaire (GET)
-  - Case `"update"` : Traite la soumission (POST)
-- **Formulaire pré-rempli** avec :
-  - Nom du pair
-  - Adresse
-  - Port
-  - Mot de passe (optionnel)
-  - Statut activé/désactivé
-- **Gestion intelligente du mot de passe** :
-  - Laisser vide = conserver l'actuel
-  - Remplir = modifier
-  - Checkbox "Supprimer le mot de passe" = effacer
-- **Section infos** affichant :
-  - ID, statut, dates de création/modification
-- **Bouton "Éditer"** ajouté sur `/admin/peers`
-
-### 📝 Fichiers créés/modifiés
-
-**Créés** :
-- `internal/incoming/incoming.go` (+192 lignes)
-- `web/templates/admin_incoming.html` (+226 lignes)
-- `web/templates/admin_peers_edit.html` (+232 lignes)
-
-**Modifiés** :
-- `internal/web/router.go` (+150 lignes)
-  - Import package `incoming`
-  - Routes `/admin/incoming`, `/admin/incoming/delete`
-  - Handlers `handleAdminIncoming()`, `handleAdminIncomingDelete()`
-  - Cases `"edit"` et `"update"` dans `handleAdminPeersActions()`
-- `web/templates/admin_peers.html` (+3 lignes)
-  - Lien "Éditer" ajouté pour chaque pair
-
-**Total** : ~650 lignes ajoutées
-
-### 🔒 Sécurité
-
-- Vérification que les chemins à supprimer sont bien dans `/srv/anemone/`
-- Authentification admin requise pour toutes les opérations
-- Logs des actions administratives
-- Protection contre les path traversal attacks
-
-### 📊 Architecture
-
-**Structure des backups entrants** :
-```
-/srv/anemone/backups/incoming/
-├── 1_backup/           # user_id=1, share=backup
-│   ├── manifest.json.enc
-│   ├── file1.txt.enc
-│   └── file2.txt.enc
-└── 2_data/             # user_id=2, share=data
-    ├── manifest.json.enc
-    └── file3.txt.enc
-```
-
-**Flux d'édition de pair** :
-1. Admin clique "Éditer" → GET `/admin/peers/{id}/edit`
-2. Formulaire pré-rempli affiché
-3. Admin modifie et soumet → POST `/admin/peers/{id}/update`
-4. Validation et mise à jour en DB
-5. Redirection vers `/admin/peers`
-
-### 🧪 Tests effectués
-
-**Vue "Pairs connectés"** :
-- ✅ Compilation réussie
-- ✅ Accès à `/admin/incoming`
-- ✅ Affichage correct avec/sans backups
-- ✅ Carte ajoutée au dashboard admin
-- ✅ Statistiques affichées correctement
-
-**Édition de pair** :
-- ✅ Compilation réussie
-- ✅ Bouton "Éditer" visible sur `/admin/peers`
-- ✅ Formulaire pré-rempli correctement
-- ✅ Modification des champs (nom, adresse, port)
-- ✅ Modification du mot de passe
-- ✅ Test d'authentification avec mauvais mot de passe → détecté ✨
-- ✅ Test d'authentification avec bon mot de passe → OK
-- ✅ Synchronisation fonctionne avec authentification
-
-**Améliorations supplémentaires** :
-- ✅ Carte "🔐 Paramètres serveur" ajoutée au dashboard
-- ✅ Carte "👥 Pairs connectés" ajoutée au dashboard
-- ✅ Test d'authentification dans `TestConnection()`
-  - Vérifie la connectivité (/health)
-  - Valide l'authentification si mot de passe configuré
-  - Retourne erreurs explicites : 401 (auth requise), 403 (mot de passe invalide)
-
-**Commits** :
-```
-6dfe2dd - feat: Implement incoming backups view and peer edit interface (Session 11)
-4d55ad4 - docs: Update SESSION_STATE.md for Session 11
-8e92ff4 - feat: Add server settings and incoming backups cards to admin dashboard
-722e05b - fix: Test peer authentication when password is configured
-```
-
-**Statut** : 🟢 COMPLÈTE ET TESTÉE EN PRODUCTION
 
 ---
 
@@ -611,16 +372,6 @@ Permettre aux admins de visualiser quels serveurs distants stockent des backups 
 - Téléchargement sélectif de fichiers
 - Restauration complète d'un partage
 - Interface intuitive avec prévisualisation
-
-**Session 13 : Fréquence de synchronisation par pair** ⏰
-- Configuration de la fréquence de sync indépendante pour chaque pair
-  - Quotidien (daily) - ex: FR1 pour récupération rapide
-  - Hebdomadaire (weekly) - ex: FR2 pour snapshot hebdo
-  - Mensuel (monthly) - ex: FR3 pour archive long terme
-  - Heure fixe personnalisée
-- Modification du scheduler pour gérer les fréquences multiples
-- Interface admin pour configurer la fréquence par pair
-- Permet d'avoir des snapshots à différentes fréquences sans duplication
 
 **Session 14 : Export/Import configuration serveur** 💾
 - Export complet de la configuration serveur (JSON chiffré)
@@ -639,23 +390,15 @@ Permettre aux admins de visualiser quels serveurs distants stockent des backups 
 
 1. **Logs et audit trail** 📋
    - Table `audit_log` en base de données
-   - Enregistrement des actions importantes :
-     - Création/suppression/modification utilisateurs
-     - Ajout/édition/suppression de pairs
-     - Modifications de quotas
-     - Tentatives de connexion (succès/échec)
-     - Actions administratives sensibles
-   - Champs : timestamp, user_id, action, details, ip_address
-   - Rétention configurable (30/60/90 jours)
-   - Job de nettoyage automatique des anciens logs
+   - Enregistrement actions importantes (user/peer CRUD, quotas, connexions)
    - Interface admin pour consulter les logs
+   - Job de nettoyage automatique des anciens logs
 
 2. **Vérification d'intégrité des backups** ✅
    - Commande `anemone-verify` pour vérification manuelle
-   - Vérification des checksums depuis les manifests
-   - Option de vérification périodique en background
+   - Vérification checksums depuis manifests
+   - Option vérification périodique en background
    - Alerte si corruption détectée
-   - Rapport détaillé des fichiers vérifiés/corrompus
 
 3. **Service systemd** 🔄
    - Démarrage automatique au boot
@@ -667,7 +410,6 @@ Permettre aux admins de visualiser quels serveurs distants stockent des backups 
    - Protection sur `/login` et `/api/sync/*`
    - Bannissement temporaire après X tentatives échouées
    - Whitelist IP de confiance
-   - Logs des tentatives avec audit trail
 
 5. **Statistiques détaillées de synchronisation** 📊
    - Graphiques d'utilisation (espace, fichiers, bande passante)
@@ -675,19 +417,13 @@ Permettre aux admins de visualiser quels serveurs distants stockent des backups 
    - Performance réseau par pair
    - Tableau de bord monitoring
 
-6. **Tests production multi-serveurs** 🧪
-   - Topologie complexe (3+ serveurs)
-   - Scénarios de failover
-   - Validation de charge
-
 ### 🚀 Priorité 3 - Évolutions futures
 
 1. **Guide utilisateur complet** 📚
    - Guide d'installation pas-à-pas avec captures d'écran
    - Guide d'utilisation pour chaque fonctionnalité
    - Exemples de configurations (topologies réseau)
-   - FAQ détaillée
-   - Section troubleshooting
+   - FAQ et troubleshooting
    - Best practices sécurité et performance
    - Disponible en FR et EN
 
@@ -695,13 +431,7 @@ Permettre aux admins de visualiser quels serveurs distants stockent des backups 
    - **Module Home Assistant** via webhooks
    - **Webhooks génériques** (Discord, Slack, custom)
    - **Email SMTP** (optionnel)
-   - Événements notifiables :
-     - Sync réussie/échouée
-     - Quota à 80%/90%/100%
-     - Nouveau pair connecté
-     - Authentification échouée (sécurité)
-     - Rapport hebdomadaire/mensuel
-   - Configuration flexible par utilisateur/admin
+   - Événements notifiables : Sync réussie/échouée, quota 80%+, nouveau pair, auth échouée
 
 3. **Multi-peer redundancy**
    - Stockage sur plusieurs pairs simultanément (2-of-3, 3-of-5)
@@ -720,15 +450,17 @@ Permettre aux admins de visualiser quels serveurs distants stockent des backups 
 
 ### 📝 Fonctionnalités à évaluer (impact ressources)
 
-- **Versioning des fichiers** : Conservation de N versions d'un fichier lors des syncs, permettant de revenir en arrière en cas de corruption/suppression accidentelle. Nécessite des tests de charge pour évaluer l'impact disque/performance.
+- **Versioning des fichiers** : Conservation de N versions d'un fichier lors des syncs, permettant de revenir en arrière en cas de corruption/suppression accidentelle. Nécessite tests de charge pour évaluer impact disque/performance.
 
 - **Authentification 2FA/MFA** : Authentification à deux facteurs avec TOTP (Google Authenticator, etc.). Jugée trop lourde pour un contexte homelab avec certificats auto-signés.
 
 ### 📌 Notes
 
-- **Bandwidth throttling** : Non prioritaire car la synchronisation à heure fixe et les fréquences différenciées par pair permettent déjà de planifier les syncs hors heures de pointe.
+- **Bandwidth throttling** : Non prioritaire car les fréquences différenciées par pair (interval/daily/weekly/monthly) permettent déjà de planifier les syncs hors heures de pointe.
 
-- **Politique de rétention automatique** : Remplacée par le système de fréquence de synchronisation par pair (quotidien/hebdo/mensuel), permettant des snapshots à différentes fréquences sans complexité supplémentaire.
+- **Politique de rétention automatique** : Remplacée par le système de fréquence de synchronisation par pair, permettant des snapshots à différentes fréquences sans complexité supplémentaire.
 
-**État global** : 🟢 GESTION COMPLÈTE DES PAIRS ET BACKUPS ENTRANTS
+---
+
+**État global** : 🟢 GESTION COMPLÈTE DES PAIRS AVEC FRÉQUENCES PERSONNALISABLES
 **Prochaine étape** : Interface web de restauration (Session 12)

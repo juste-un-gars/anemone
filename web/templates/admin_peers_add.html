@@ -128,7 +128,96 @@
                     </p>
                 </div>
 
-                <!-- Enable Sync -->
+                <!-- Automatic Sync Configuration -->
+                <div class="border-t border-gray-200 pt-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">⏰ Configuration de synchronisation automatique</h3>
+
+                    <!-- Enable Auto Sync -->
+                    <div class="mb-4 flex items-start">
+                        <div class="flex items-center h-5">
+                            <input id="sync_enabled" name="sync_enabled" type="checkbox" checked
+                                   class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label for="sync_enabled" class="font-medium text-gray-700">
+                                Activer la synchronisation automatique
+                            </label>
+                            <p class="text-gray-500">Synchroniser automatiquement les partages vers ce pair</p>
+                        </div>
+                    </div>
+
+                    <!-- Sync Frequency -->
+                    <div class="mb-4">
+                        <label for="sync_frequency" class="block text-sm font-medium text-gray-700">
+                            Fréquence de synchronisation
+                        </label>
+                        <select id="sync_frequency" name="sync_frequency"
+                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <option value="interval">Intervalle (Interval)</option>
+                            <option value="daily" selected>Quotidien (Daily)</option>
+                            <option value="weekly">Hebdomadaire (Weekly)</option>
+                            <option value="monthly">Mensuel (Monthly)</option>
+                        </select>
+                        <p class="mt-1 text-sm text-gray-500">Fréquence des sauvegardes automatiques</p>
+                    </div>
+
+                    <!-- Interval (for interval frequency) -->
+                    <div id="interval_section" class="mb-4 hidden">
+                        <label for="sync_interval_value" class="block text-sm font-medium text-gray-700">
+                            Intervalle de synchronisation
+                        </label>
+                        <div class="mt-1 flex space-x-2">
+                            <input type="number" id="sync_interval_value" name="sync_interval_value" value="1" min="1"
+                                   class="block w-32 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <select id="sync_interval_unit" name="sync_interval_unit"
+                                    class="block w-40 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <option value="minutes">minutes</option>
+                                <option value="hours" selected>heures</option>
+                            </select>
+                        </div>
+                        <p class="mt-1 text-sm text-gray-500">Synchroniser toutes les X minutes/heures</p>
+                    </div>
+
+                    <!-- Sync Time (hidden for interval) -->
+                    <div id="sync_time_section" class="mb-4">
+                        <label for="sync_time" class="block text-sm font-medium text-gray-700">
+                            Heure de synchronisation
+                        </label>
+                        <input type="time" id="sync_time" name="sync_time" value="23:00"
+                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <p class="mt-1 text-sm text-gray-500">Heure quotidienne de la synchronisation (format 24h)</p>
+                    </div>
+
+                    <!-- Day of Week (for weekly) -->
+                    <div id="day_of_week_section" class="mb-4 hidden">
+                        <label for="sync_day_of_week" class="block text-sm font-medium text-gray-700">
+                            Jour de la semaine
+                        </label>
+                        <select id="sync_day_of_week" name="sync_day_of_week"
+                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <option value="0">Dimanche</option>
+                            <option value="1">Lundi</option>
+                            <option value="2">Mardi</option>
+                            <option value="3">Mercredi</option>
+                            <option value="4">Jeudi</option>
+                            <option value="5">Vendredi</option>
+                            <option value="6" selected>Samedi</option>
+                        </select>
+                        <p class="mt-1 text-sm text-gray-500">Jour de la semaine pour la synchronisation hebdomadaire</p>
+                    </div>
+
+                    <!-- Day of Month (for monthly) -->
+                    <div id="day_of_month_section" class="mb-4 hidden">
+                        <label for="sync_day_of_month" class="block text-sm font-medium text-gray-700">
+                            Jour du mois
+                        </label>
+                        <input type="number" id="sync_day_of_month" name="sync_day_of_month" value="1" min="1" max="31"
+                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <p class="mt-1 text-sm text-gray-500">Jour du mois pour la synchronisation mensuelle (1-31)</p>
+                    </div>
+                </div>
+
+                <!-- Enable Peer -->
                 <div class="flex items-start">
                     <div class="flex items-center h-5">
                         <input id="enabled" name="enabled" type="checkbox" checked
@@ -170,6 +259,36 @@
         </div>
     </div>
 </div>
+
+<script>
+// Handle sync frequency change to show/hide conditional fields
+document.getElementById('sync_frequency').addEventListener('change', function() {
+    const frequency = this.value;
+    const intervalSection = document.getElementById('interval_section');
+    const syncTimeSection = document.getElementById('sync_time_section');
+    const dayOfWeekSection = document.getElementById('day_of_week_section');
+    const dayOfMonthSection = document.getElementById('day_of_month_section');
+
+    // Hide all conditional sections first
+    intervalSection.classList.add('hidden');
+    dayOfWeekSection.classList.add('hidden');
+    dayOfMonthSection.classList.add('hidden');
+
+    // Show/hide sync time section (not needed for interval)
+    if (frequency === 'interval') {
+        syncTimeSection.classList.add('hidden');
+        intervalSection.classList.remove('hidden');
+    } else {
+        syncTimeSection.classList.remove('hidden');
+
+        if (frequency === 'weekly') {
+            dayOfWeekSection.classList.remove('hidden');
+        } else if (frequency === 'monthly') {
+            dayOfMonthSection.classList.remove('hidden');
+        }
+    }
+});
+</script>
 
 </body>
 </html>

@@ -134,7 +134,97 @@
                     {{end}}
                 </div>
 
-                <!-- Enable Sync -->
+                <!-- Automatic Sync Configuration -->
+                <div class="border-t border-gray-200 pt-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">⏰ {{if eq .Lang "fr"}}Configuration de synchronisation automatique{{else}}Automatic Sync Configuration{{end}}</h3>
+
+                    <!-- Enable Auto Sync -->
+                    <div class="mb-4 flex items-start">
+                        <div class="flex items-center h-5">
+                            <input id="sync_enabled" name="sync_enabled" type="checkbox" {{if .Peer.SyncEnabled}}checked{{end}}
+                                   class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                        </div>
+                        <div class="ml-3 text-sm">
+                            <label for="sync_enabled" class="font-medium text-gray-700">
+                                {{if eq .Lang "fr"}}Activer la synchronisation automatique{{else}}Enable automatic sync{{end}}
+                            </label>
+                            <p class="text-gray-500">{{if eq .Lang "fr"}}Synchroniser automatiquement les partages vers ce pair{{else}}Automatically sync shares to this peer{{end}}</p>
+                        </div>
+                    </div>
+
+                    <!-- Sync Frequency -->
+                    <div class="mb-4">
+                        <label for="sync_frequency" class="block text-sm font-medium text-gray-700">
+                            {{if eq .Lang "fr"}}Fréquence de synchronisation{{else}}Sync Frequency{{end}}
+                        </label>
+                        <select id="sync_frequency" name="sync_frequency"
+                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <option value="interval" {{if eq .Peer.SyncFrequency "interval"}}selected{{end}}>{{if eq .Lang "fr"}}Intervalle (Interval){{else}}Interval{{end}}</option>
+                            <option value="daily" {{if eq .Peer.SyncFrequency "daily"}}selected{{end}}>{{if eq .Lang "fr"}}Quotidien (Daily){{else}}Daily{{end}}</option>
+                            <option value="weekly" {{if eq .Peer.SyncFrequency "weekly"}}selected{{end}}>{{if eq .Lang "fr"}}Hebdomadaire (Weekly){{else}}Weekly{{end}}</option>
+                            <option value="monthly" {{if eq .Peer.SyncFrequency "monthly"}}selected{{end}}>{{if eq .Lang "fr"}}Mensuel (Monthly){{else}}Monthly{{end}}</option>
+                        </select>
+                        <p class="mt-1 text-sm text-gray-500">{{if eq .Lang "fr"}}Fréquence des sauvegardes automatiques{{else}}Automatic backup frequency{{end}}</p>
+                    </div>
+
+                    <!-- Interval (for interval frequency) -->
+                    <div id="interval_section" class="mb-4 {{if ne .Peer.SyncFrequency "interval"}}hidden{{end}}">
+                        <label for="sync_interval_value" class="block text-sm font-medium text-gray-700">
+                            {{if eq .Lang "fr"}}Intervalle de synchronisation{{else}}Sync Interval{{end}}
+                        </label>
+                        <div class="mt-1 flex space-x-2">
+                            <input type="number" id="sync_interval_value" name="sync_interval_value" value="{{if .Peer.SyncIntervalMinutes}}{{.Peer.SyncIntervalMinutes}}{{else}}60{{end}}" min="1"
+                                   class="block w-32 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <select id="sync_interval_unit" name="sync_interval_unit"
+                                    class="block w-40 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                                <option value="minutes">{{if eq .Lang "fr"}}minutes{{else}}minutes{{end}}</option>
+                                <option value="hours">{{if eq .Lang "fr"}}heures{{else}}hours{{end}}</option>
+                            </select>
+                        </div>
+                        <p class="mt-1 text-sm text-gray-500">{{if eq .Lang "fr"}}Synchroniser toutes les X minutes/heures{{else}}Sync every X minutes/hours{{end}}</p>
+                    </div>
+
+                    <!-- Sync Time (hidden for interval) -->
+                    <div id="sync_time_section" class="mb-4 {{if eq .Peer.SyncFrequency "interval"}}hidden{{end}}">
+                        <label for="sync_time" class="block text-sm font-medium text-gray-700">
+                            {{if eq .Lang "fr"}}Heure de synchronisation{{else}}Sync Time{{end}}
+                        </label>
+                        <input type="time" id="sync_time" name="sync_time" value="{{.Peer.SyncTime}}"
+                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <p class="mt-1 text-sm text-gray-500">{{if eq .Lang "fr"}}Heure quotidienne de la synchronisation (format 24h){{else}}Daily sync time (24h format){{end}}</p>
+                    </div>
+
+                    <!-- Day of Week (for weekly) -->
+                    <div id="day_of_week_section" class="mb-4 {{if ne .Peer.SyncFrequency "weekly"}}hidden{{end}}">
+                        <label for="sync_day_of_week" class="block text-sm font-medium text-gray-700">
+                            {{if eq .Lang "fr"}}Jour de la semaine{{else}}Day of Week{{end}}
+                        </label>
+                        <select id="sync_day_of_week" name="sync_day_of_week"
+                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            {{$dayOfWeek := 0}}{{if .Peer.SyncDayOfWeek}}{{$dayOfWeek = .Peer.SyncDayOfWeek}}{{end}}
+                            <option value="0" {{if eq $dayOfWeek 0}}selected{{end}}>{{if eq .Lang "fr"}}Dimanche{{else}}Sunday{{end}}</option>
+                            <option value="1" {{if eq $dayOfWeek 1}}selected{{end}}>{{if eq .Lang "fr"}}Lundi{{else}}Monday{{end}}</option>
+                            <option value="2" {{if eq $dayOfWeek 2}}selected{{end}}>{{if eq .Lang "fr"}}Mardi{{else}}Tuesday{{end}}</option>
+                            <option value="3" {{if eq $dayOfWeek 3}}selected{{end}}>{{if eq .Lang "fr"}}Mercredi{{else}}Wednesday{{end}}</option>
+                            <option value="4" {{if eq $dayOfWeek 4}}selected{{end}}>{{if eq .Lang "fr"}}Jeudi{{else}}Thursday{{end}}</option>
+                            <option value="5" {{if eq $dayOfWeek 5}}selected{{end}}>{{if eq .Lang "fr"}}Vendredi{{else}}Friday{{end}}</option>
+                            <option value="6" {{if eq $dayOfWeek 6}}selected{{end}}>{{if eq .Lang "fr"}}Samedi{{else}}Saturday{{end}}</option>
+                        </select>
+                        <p class="mt-1 text-sm text-gray-500">{{if eq .Lang "fr"}}Jour de la semaine pour la synchronisation hebdomadaire{{else}}Weekly sync day{{end}}</p>
+                    </div>
+
+                    <!-- Day of Month (for monthly) -->
+                    <div id="day_of_month_section" class="mb-4 {{if ne .Peer.SyncFrequency "monthly"}}hidden{{end}}">
+                        <label for="sync_day_of_month" class="block text-sm font-medium text-gray-700">
+                            {{if eq .Lang "fr"}}Jour du mois{{else}}Day of Month{{end}}
+                        </label>
+                        <input type="number" id="sync_day_of_month" name="sync_day_of_month" value="{{if .Peer.SyncDayOfMonth}}{{.Peer.SyncDayOfMonth}}{{else}}1{{end}}" min="1" max="31"
+                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <p class="mt-1 text-sm text-gray-500">{{if eq .Lang "fr"}}Jour du mois pour la synchronisation mensuelle (1-31){{else}}Monthly sync day (1-31){{end}}</p>
+                    </div>
+                </div>
+
+                <!-- Enable Peer -->
                 <div class="flex items-start">
                     <div class="flex items-center h-5">
                         <input id="enabled" name="enabled" type="checkbox" value="1" {{if .Peer.Enabled}}checked{{end}}
@@ -219,6 +309,36 @@
         </div>
     </div>
 </div>
+
+<script>
+// Handle sync frequency change to show/hide conditional fields
+document.getElementById('sync_frequency').addEventListener('change', function() {
+    const frequency = this.value;
+    const intervalSection = document.getElementById('interval_section');
+    const syncTimeSection = document.getElementById('sync_time_section');
+    const dayOfWeekSection = document.getElementById('day_of_week_section');
+    const dayOfMonthSection = document.getElementById('day_of_month_section');
+
+    // Hide all conditional sections first
+    intervalSection.classList.add('hidden');
+    dayOfWeekSection.classList.add('hidden');
+    dayOfMonthSection.classList.add('hidden');
+
+    // Show/hide sync time section (not needed for interval)
+    if (frequency === 'interval') {
+        syncTimeSection.classList.add('hidden');
+        intervalSection.classList.remove('hidden');
+    } else {
+        syncTimeSection.classList.remove('hidden');
+
+        if (frequency === 'weekly') {
+            dayOfWeekSection.classList.remove('hidden');
+        } else if (frequency === 'monthly') {
+            dayOfMonthSection.classList.remove('hidden');
+        }
+    }
+});
+</script>
 
 </body>
 </html>

@@ -185,15 +185,21 @@ func migratePeersTable(db *sql.DB) error {
 
 	// Add missing columns
 	columnsToAdd := map[string]string{
-		"address":    "ALTER TABLE peers ADD COLUMN address TEXT DEFAULT ''",
-		"port":       "ALTER TABLE peers ADD COLUMN port INTEGER DEFAULT 8443",
-		"public_key": "ALTER TABLE peers ADD COLUMN public_key TEXT",
-		"password":   "ALTER TABLE peers ADD COLUMN password TEXT",
-		"enabled":    "ALTER TABLE peers ADD COLUMN enabled BOOLEAN DEFAULT 1",
-		"status":     "ALTER TABLE peers ADD COLUMN status TEXT DEFAULT 'unknown'",
-		"last_seen":  "ALTER TABLE peers ADD COLUMN last_seen DATETIME",
-		"last_sync":  "ALTER TABLE peers ADD COLUMN last_sync DATETIME",
-		"updated_at": "ALTER TABLE peers ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP",
+		"address":              "ALTER TABLE peers ADD COLUMN address TEXT DEFAULT ''",
+		"port":                 "ALTER TABLE peers ADD COLUMN port INTEGER DEFAULT 8443",
+		"public_key":           "ALTER TABLE peers ADD COLUMN public_key TEXT",
+		"password":             "ALTER TABLE peers ADD COLUMN password TEXT",
+		"enabled":              "ALTER TABLE peers ADD COLUMN enabled BOOLEAN DEFAULT 1",
+		"status":               "ALTER TABLE peers ADD COLUMN status TEXT DEFAULT 'unknown'",
+		"last_seen":            "ALTER TABLE peers ADD COLUMN last_seen DATETIME",
+		"last_sync":            "ALTER TABLE peers ADD COLUMN last_sync DATETIME",
+		"updated_at":           "ALTER TABLE peers ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP",
+		"sync_enabled":         "ALTER TABLE peers ADD COLUMN sync_enabled BOOLEAN DEFAULT 1",
+		"sync_frequency":       "ALTER TABLE peers ADD COLUMN sync_frequency TEXT DEFAULT 'daily'",
+		"sync_time":            "ALTER TABLE peers ADD COLUMN sync_time TEXT DEFAULT '23:00'",
+		"sync_day_of_week":     "ALTER TABLE peers ADD COLUMN sync_day_of_week INTEGER",
+		"sync_day_of_month":    "ALTER TABLE peers ADD COLUMN sync_day_of_month INTEGER",
+		"sync_interval_minutes": "ALTER TABLE peers ADD COLUMN sync_interval_minutes INTEGER DEFAULT 60",
 	}
 
 	for column, query := range columnsToAdd {
@@ -215,10 +221,17 @@ func migratePeersTable(db *sql.DB) error {
 				address TEXT NOT NULL,
 				port INTEGER DEFAULT 8443,
 				public_key TEXT,
+				password TEXT,
 				enabled BOOLEAN DEFAULT 1,
 				status TEXT DEFAULT 'unknown',
 				last_seen DATETIME,
 				last_sync DATETIME,
+				sync_enabled BOOLEAN DEFAULT 1,
+				sync_frequency TEXT DEFAULT 'daily',
+				sync_time TEXT DEFAULT '23:00',
+				sync_day_of_week INTEGER,
+				sync_day_of_month INTEGER,
+				sync_interval_minutes INTEGER DEFAULT 60,
 				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 			)
@@ -229,11 +242,15 @@ func migratePeersTable(db *sql.DB) error {
 
 		// Copy data from old table, using address and port from url if needed
 		_, err = db.Exec(`
-			INSERT INTO peers_new (id, name, address, port, public_key, enabled, status, last_seen, last_sync, created_at, updated_at)
+			INSERT INTO peers_new (id, name, address, port, public_key, password, enabled, status, last_seen, last_sync,
+				sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month, sync_interval_minutes,
+				created_at, updated_at)
 			SELECT id, name,
 				CASE WHEN address = '' OR address IS NULL THEN '' ELSE address END,
 				CASE WHEN port IS NULL THEN 8443 ELSE port END,
-				public_key, enabled, status, last_seen, last_sync, created_at, updated_at
+				public_key, password, enabled, status, last_seen, last_sync,
+				1, 'daily', '23:00', NULL, NULL, 60,
+				created_at, updated_at
 			FROM peers
 		`)
 		if err != nil {

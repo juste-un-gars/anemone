@@ -9,12 +9,12 @@ import (
 	"log"
 	"time"
 
+	"github.com/juste-un-gars/anemone/internal/peers"
 	"github.com/juste-un-gars/anemone/internal/sync"
-	"github.com/juste-un-gars/anemone/internal/syncconfig"
 )
 
 // Start launches the automatic synchronization scheduler in a goroutine
-// It checks every minute if a sync should be triggered based on the configuration
+// It checks every minute if a sync should be triggered for each peer based on their individual configuration
 func Start(db *sql.DB) {
 	log.Println("🔄 Starting automatic synchronization scheduler...")
 
@@ -26,35 +26,38 @@ func Start(db *sql.DB) {
 		for {
 			<-ticker.C // Wait for next tick
 
-			// Get sync configuration
-			config, err := syncconfig.Get(db)
+			// Get all peers
+			allPeers, err := peers.GetAll(db)
 			if err != nil {
-				log.Printf("⚠️  Scheduler: Failed to get sync config: %v", err)
+				log.Printf("⚠️  Scheduler: Failed to get peers: %v", err)
 				continue
 			}
 
-			// Check if we should sync
-			if !syncconfig.ShouldSync(config) {
-				continue
-			}
+			// Check each peer individually
+			for _, peer := range allPeers {
+				// Check if this peer should be synced now
+				if !peers.ShouldSyncPeer(peer) {
+					continue
+				}
 
-			log.Println("🔄 Scheduler: Triggering automatic synchronization...")
+				log.Printf("🔄 Scheduler: Triggering sync to peer '%s' (frequency: %s)...", peer.Name, peer.SyncFrequency)
 
-			// Perform sync for all users
-			successCount, errorCount, lastError := sync.SyncAllUsers(db)
+				// Perform sync for this peer
+				successCount, errorCount, lastError := sync.SyncPeer(db, peer.ID, peer.Name, peer.Address, peer.Port, peer.Password)
 
-			// Update last sync timestamp
-			if err := syncconfig.UpdateLastSync(db); err != nil {
-				log.Printf("⚠️  Scheduler: Failed to update last_sync: %v", err)
-			}
+				// Update last sync timestamp for this peer
+				if err := peers.UpdateLastSync(db, peer.ID); err != nil {
+					log.Printf("⚠️  Scheduler: Failed to update last_sync for peer %s: %v", peer.Name, err)
+				}
 
-			// Log results
-			if errorCount > 0 {
-				log.Printf("⚠️  Scheduler: Sync completed with errors - Success: %d, Errors: %d, Last error: %s",
-					successCount, errorCount, lastError)
-			} else {
-				log.Printf("✅ Scheduler: Sync completed successfully - %d shares synchronized",
-					successCount)
+				// Log results
+				if errorCount > 0 {
+					log.Printf("⚠️  Scheduler: Sync to %s completed with errors - Success: %d, Errors: %d, Last error: %s",
+						peer.Name, successCount, errorCount, lastError)
+				} else {
+					log.Printf("✅ Scheduler: Sync to %s completed successfully - %d shares synchronized",
+						peer.Name, successCount)
+				}
 			}
 		}
 	}()

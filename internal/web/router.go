@@ -1518,6 +1518,13 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 		password := r.FormValue("password")
 		enabled := r.FormValue("enabled") == "on"
 
+		// Parse sync configuration
+		syncEnabled := r.FormValue("sync_enabled") == "on"
+		syncFrequency := r.FormValue("sync_frequency")
+		syncTime := r.FormValue("sync_time")
+		syncDayOfWeekStr := r.FormValue("sync_day_of_week")
+		syncDayOfMonthStr := r.FormValue("sync_day_of_month")
+
 		// Validate
 		if name == "" || address == "" {
 			data := struct {
@@ -1563,6 +1570,40 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Parse sync day of week/month
+		var syncDayOfWeekPtr *int
+		if syncDayOfWeekStr != "" && syncFrequency == "weekly" {
+			dayOfWeek, err := strconv.Atoi(syncDayOfWeekStr)
+			if err == nil && dayOfWeek >= 0 && dayOfWeek <= 6 {
+				syncDayOfWeekPtr = &dayOfWeek
+			}
+		}
+		var syncDayOfMonthPtr *int
+		if syncDayOfMonthStr != "" && syncFrequency == "monthly" {
+			dayOfMonth, err := strconv.Atoi(syncDayOfMonthStr)
+			if err == nil && dayOfMonth >= 1 && dayOfMonth <= 31 {
+				syncDayOfMonthPtr = &dayOfMonth
+			}
+		}
+
+		// Parse sync interval (convert to minutes)
+		syncIntervalMinutes := 60 // Default: 1 hour
+		if syncFrequency == "interval" {
+			intervalValueStr := r.FormValue("sync_interval_value")
+			intervalUnit := r.FormValue("sync_interval_unit")
+
+			if intervalValueStr != "" {
+				intervalValue, err := strconv.Atoi(intervalValueStr)
+				if err == nil && intervalValue > 0 {
+					if intervalUnit == "hours" {
+						syncIntervalMinutes = intervalValue * 60
+					} else {
+						syncIntervalMinutes = intervalValue
+					}
+				}
+			}
+		}
+
 		// Create peer
 		var pkPtr *string
 		if publicKey != "" {
@@ -1573,13 +1614,19 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 			pwPtr = &password
 		}
 		peer := &peers.Peer{
-			Name:      name,
-			Address:   address,
-			Port:      port,
-			PublicKey: pkPtr,
-			Password:  pwPtr,
-			Enabled:   enabled,
-			Status:    "unknown",
+			Name:               name,
+			Address:            address,
+			Port:               port,
+			PublicKey:          pkPtr,
+			Password:           pwPtr,
+			Enabled:            enabled,
+			Status:             "unknown",
+			SyncEnabled:        syncEnabled,
+			SyncFrequency:      syncFrequency,
+			SyncTime:           syncTime,
+			SyncDayOfWeek:      syncDayOfWeekPtr,
+			SyncDayOfMonth:     syncDayOfMonthPtr,
+			SyncIntervalMinutes: syncIntervalMinutes,
 		}
 
 		if err := peers.Create(s.db, peer); err != nil {
@@ -1716,6 +1763,54 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 
 		// Update enabled status
 		peer.Enabled = r.FormValue("enabled") == "1"
+
+		// Update sync configuration
+		peer.SyncEnabled = r.FormValue("sync_enabled") == "on"
+		peer.SyncFrequency = r.FormValue("sync_frequency")
+		peer.SyncTime = r.FormValue("sync_time")
+
+		// Parse sync day of week/month
+		syncDayOfWeekStr := r.FormValue("sync_day_of_week")
+		syncDayOfMonthStr := r.FormValue("sync_day_of_month")
+
+		var syncDayOfWeekPtr *int
+		if syncDayOfWeekStr != "" && peer.SyncFrequency == "weekly" {
+			dayOfWeek, err := strconv.Atoi(syncDayOfWeekStr)
+			if err == nil && dayOfWeek >= 0 && dayOfWeek <= 6 {
+				syncDayOfWeekPtr = &dayOfWeek
+			}
+		}
+		peer.SyncDayOfWeek = syncDayOfWeekPtr
+
+		var syncDayOfMonthPtr *int
+		if syncDayOfMonthStr != "" && peer.SyncFrequency == "monthly" {
+			dayOfMonth, err := strconv.Atoi(syncDayOfMonthStr)
+			if err == nil && dayOfMonth >= 1 && dayOfMonth <= 31 {
+				syncDayOfMonthPtr = &dayOfMonth
+			}
+		}
+		peer.SyncDayOfMonth = syncDayOfMonthPtr
+
+		// Parse sync interval (convert to minutes)
+		if peer.SyncFrequency == "interval" {
+			intervalValueStr := r.FormValue("sync_interval_value")
+			intervalUnit := r.FormValue("sync_interval_unit")
+
+			if intervalValueStr != "" {
+				intervalValue, err := strconv.Atoi(intervalValueStr)
+				if err == nil && intervalValue > 0 {
+					if intervalUnit == "hours" {
+						peer.SyncIntervalMinutes = intervalValue * 60
+					} else {
+						peer.SyncIntervalMinutes = intervalValue
+					}
+				} else {
+					peer.SyncIntervalMinutes = 60 // Default: 1 hour
+				}
+			} else {
+				peer.SyncIntervalMinutes = 60 // Default: 1 hour
+			}
+		}
 
 		// Save to database
 		if err := peers.Update(s.db, peer); err != nil {

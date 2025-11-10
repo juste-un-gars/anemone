@@ -14,26 +14,36 @@ import (
 
 // Peer represents a remote Anemone instance for P2P synchronization
 type Peer struct {
-	ID        int
-	Name      string
-	Address   string
-	Port      int
-	PublicKey *string // Can be NULL
-	Password  *string // Can be NULL - password for peer authentication
-	Enabled   bool
-	Status    string // "online", "offline", "error", "unknown"
-	LastSeen  *time.Time
-	LastSync  *time.Time
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID                 int
+	Name               string
+	Address            string
+	Port               int
+	PublicKey          *string // Can be NULL
+	Password           *string // Can be NULL - password for peer authentication
+	Enabled            bool
+	Status             string // "online", "offline", "error", "unknown"
+	LastSeen           *time.Time
+	LastSync           *time.Time
+	SyncEnabled        bool
+	SyncFrequency      string // "daily", "weekly", "monthly", "interval"
+	SyncTime           string // "HH:MM" format
+	SyncDayOfWeek      *int   // 0-6 (0=Sunday), NULL if not weekly
+	SyncDayOfMonth     *int   // 1-31, NULL if not monthly
+	SyncIntervalMinutes int    // Interval in minutes for "interval" frequency
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
 }
 
 // Create creates a new peer
 func Create(db *sql.DB, peer *Peer) error {
-	query := `INSERT INTO peers (name, address, port, public_key, password, enabled, status, created_at, updated_at)
-	          VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+	query := `INSERT INTO peers (name, address, port, public_key, password, enabled, status,
+	          sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month,
+	          sync_interval_minutes, created_at, updated_at)
+	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
 
-	result, err := db.Exec(query, peer.Name, peer.Address, peer.Port, peer.PublicKey, peer.Password, peer.Enabled, peer.Status)
+	result, err := db.Exec(query, peer.Name, peer.Address, peer.Port, peer.PublicKey, peer.Password,
+		peer.Enabled, peer.Status, peer.SyncEnabled, peer.SyncFrequency, peer.SyncTime,
+		peer.SyncDayOfWeek, peer.SyncDayOfMonth, peer.SyncIntervalMinutes)
 	if err != nil {
 		return fmt.Errorf("failed to create peer: %w", err)
 	}
@@ -50,13 +60,16 @@ func Create(db *sql.DB, peer *Peer) error {
 // GetByID retrieves a peer by ID
 func GetByID(db *sql.DB, id int) (*Peer, error) {
 	peer := &Peer{}
-	query := `SELECT id, name, address, port, public_key, password, enabled, status, last_seen, last_sync, created_at, updated_at
+	query := `SELECT id, name, address, port, public_key, password, enabled, status, last_seen, last_sync,
+	          sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month,
+	          sync_interval_minutes, created_at, updated_at
 	          FROM peers WHERE id = ?`
 
 	err := db.QueryRow(query, id).Scan(
 		&peer.ID, &peer.Name, &peer.Address, &peer.Port, &peer.PublicKey, &peer.Password,
 		&peer.Enabled, &peer.Status, &peer.LastSeen, &peer.LastSync,
-		&peer.CreatedAt, &peer.UpdatedAt,
+		&peer.SyncEnabled, &peer.SyncFrequency, &peer.SyncTime, &peer.SyncDayOfWeek, &peer.SyncDayOfMonth,
+		&peer.SyncIntervalMinutes, &peer.CreatedAt, &peer.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -70,7 +83,9 @@ func GetByID(db *sql.DB, id int) (*Peer, error) {
 
 // GetAll retrieves all peers
 func GetAll(db *sql.DB) ([]*Peer, error) {
-	query := `SELECT id, name, address, port, public_key, password, enabled, status, last_seen, last_sync, created_at, updated_at
+	query := `SELECT id, name, address, port, public_key, password, enabled, status, last_seen, last_sync,
+	          sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month,
+	          sync_interval_minutes, created_at, updated_at
 	          FROM peers ORDER BY created_at DESC`
 
 	rows, err := db.Query(query)
@@ -85,7 +100,8 @@ func GetAll(db *sql.DB) ([]*Peer, error) {
 		err := rows.Scan(
 			&peer.ID, &peer.Name, &peer.Address, &peer.Port, &peer.PublicKey, &peer.Password,
 			&peer.Enabled, &peer.Status, &peer.LastSeen, &peer.LastSync,
-			&peer.CreatedAt, &peer.UpdatedAt,
+			&peer.SyncEnabled, &peer.SyncFrequency, &peer.SyncTime, &peer.SyncDayOfWeek, &peer.SyncDayOfMonth,
+			&peer.SyncIntervalMinutes, &peer.CreatedAt, &peer.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan peer: %w", err)
@@ -99,10 +115,14 @@ func GetAll(db *sql.DB) ([]*Peer, error) {
 // Update updates a peer
 func Update(db *sql.DB, peer *Peer) error {
 	query := `UPDATE peers SET name = ?, address = ?, port = ?, public_key = ?, password = ?,
-	          enabled = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+	          enabled = ?, status = ?, sync_enabled = ?, sync_frequency = ?, sync_time = ?,
+	          sync_day_of_week = ?, sync_day_of_month = ?, sync_interval_minutes = ?,
+	          updated_at = CURRENT_TIMESTAMP
+	          WHERE id = ?`
 
 	_, err := db.Exec(query, peer.Name, peer.Address, peer.Port, peer.PublicKey, peer.Password,
-		peer.Enabled, peer.Status, peer.ID)
+		peer.Enabled, peer.Status, peer.SyncEnabled, peer.SyncFrequency, peer.SyncTime,
+		peer.SyncDayOfWeek, peer.SyncDayOfMonth, peer.SyncIntervalMinutes, peer.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update peer: %w", err)
 	}
@@ -194,4 +214,100 @@ func TestConnection(peer *Peer) (bool, error) {
 // URL returns the full HTTPS URL of the peer
 func (p *Peer) URL() string {
 	return fmt.Sprintf("https://%s:%d", p.Address, p.Port)
+}
+
+// UpdateLastSync updates the last_sync timestamp of a peer
+func UpdateLastSync(db *sql.DB, peerID int) error {
+	query := `UPDATE peers SET last_sync = CURRENT_TIMESTAMP WHERE id = ?`
+	_, err := db.Exec(query, peerID)
+	if err != nil {
+		return fmt.Errorf("failed to update peer last_sync: %w", err)
+	}
+	return nil
+}
+
+// ShouldSyncPeer determines if a peer should be synchronized based on its configuration
+func ShouldSyncPeer(peer *Peer) bool {
+	// Check if sync is enabled for this peer
+	if !peer.SyncEnabled || !peer.Enabled {
+		return false
+	}
+
+	// First sync ever
+	if peer.LastSync == nil {
+		return true
+	}
+
+	now := time.Now()
+	lastSync := *peer.LastSync
+
+	// Parse sync time (format: "HH:MM")
+	var syncHour, syncMinute int
+	fmt.Sscanf(peer.SyncTime, "%d:%d", &syncHour, &syncMinute)
+
+	switch peer.SyncFrequency {
+	case "interval":
+		// Interval-based sync: check if enough time has passed since last sync
+		if peer.SyncIntervalMinutes <= 0 {
+			return false
+		}
+
+		interval := time.Duration(peer.SyncIntervalMinutes) * time.Minute
+		return now.Sub(lastSync) >= interval
+
+	case "daily":
+		// Daily sync: check if we've passed the sync time today and haven't synced today
+		lastSyncDate := lastSync.Format("2006-01-02")
+		todayDate := now.Format("2006-01-02")
+
+		// If last sync was on a different day and we've passed the sync time
+		if lastSyncDate != todayDate && (now.Hour() > syncHour || (now.Hour() == syncHour && now.Minute() >= syncMinute)) {
+			return true
+		}
+		return false
+
+	case "weekly":
+		// Weekly sync: check if we're on the right day of week and past sync time
+		if peer.SyncDayOfWeek == nil {
+			return false
+		}
+
+		currentDayOfWeek := int(now.Weekday()) // 0=Sunday, 1=Monday, ..., 6=Saturday
+		if currentDayOfWeek != *peer.SyncDayOfWeek {
+			return false
+		}
+
+		// Check if we've passed the sync time today
+		if now.Hour() < syncHour || (now.Hour() == syncHour && now.Minute() < syncMinute) {
+			return false
+		}
+
+		// Check if last sync was before today
+		lastSyncDate := lastSync.Format("2006-01-02")
+		todayDate := now.Format("2006-01-02")
+		return lastSyncDate != todayDate
+
+	case "monthly":
+		// Monthly sync: check if we're on the right day of month and past sync time
+		if peer.SyncDayOfMonth == nil {
+			return false
+		}
+
+		if now.Day() != *peer.SyncDayOfMonth {
+			return false
+		}
+
+		// Check if we've passed the sync time today
+		if now.Hour() < syncHour || (now.Hour() == syncHour && now.Minute() < syncMinute) {
+			return false
+		}
+
+		// Check if last sync was before today
+		lastSyncDate := lastSync.Format("2006-01-02")
+		todayDate := now.Format("2006-01-02")
+		return lastSyncDate != todayDate
+
+	default:
+		return false
+	}
 }

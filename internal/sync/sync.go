@@ -760,3 +760,67 @@ func ExtractTarGz(reader io.Reader, destDir string) error {
 
 	return nil
 }
+
+// SyncPeer synchronizes all enabled shares to a specific peer
+// Returns: successCount, errorCount, lastError
+func SyncPeer(db *sql.DB, peerID int, peerName, peerAddress string, peerPort int, peerPassword *string) (int, int, string) {
+	// Get all shares with sync enabled
+	sharesQuery := `SELECT id, user_id, name, path FROM shares WHERE sync_enabled = 1`
+	shareRows, err := db.Query(sharesQuery)
+	if err != nil {
+		return 0, 1, fmt.Sprintf("Failed to query shares: %v", err)
+	}
+	defer shareRows.Close()
+
+	type ShareInfo struct {
+		ID     int
+		UserID int
+		Name   string
+		Path   string
+	}
+
+	var sharesList []ShareInfo
+	for shareRows.Next() {
+		var s ShareInfo
+		if err := shareRows.Scan(&s.ID, &s.UserID, &s.Name, &s.Path); err != nil {
+			return 0, 1, fmt.Sprintf("Failed to scan share: %v", err)
+		}
+		sharesList = append(sharesList, s)
+	}
+
+	if len(sharesList) == 0 {
+		return 0, 0, "No shares with sync enabled"
+	}
+
+	// Sync each share to this peer
+	successCount := 0
+	errorCount := 0
+	var lastError string
+
+	// Get peer password (empty string if NULL)
+	password := ""
+	if peerPassword != nil {
+		password = *peerPassword
+	}
+
+	for _, share := range sharesList {
+		req := &SyncRequest{
+			ShareID:      share.ID,
+			PeerID:       peerID,
+			UserID:       share.UserID,
+			SharePath:    share.Path,
+			PeerAddress:  peerAddress,
+			PeerPort:     peerPort,
+			PeerPassword: password,
+		}
+
+		if err := SyncShareIncremental(db, req); err != nil {
+			errorCount++
+			lastError = fmt.Sprintf("Share %s to %s: %v", share.Name, peerName, err)
+		} else {
+			successCount++
+		}
+	}
+
+	return successCount, errorCount, lastError
+}
