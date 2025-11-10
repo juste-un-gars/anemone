@@ -1,7 +1,7 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-09 (Session 10 - Authentification P2P par mot de passe)
-**Status** : 🟢 AUTHENTIFICATION P2P SÉCURISÉE OPÉRATIONNELLE
+**Dernière session** : 2025-11-10 (Session 11 - Vue "Pairs connectés à moi" + Édition de pair)
+**Status** : 🟢 GESTION COMPLÈTE DES PAIRS ET BACKUPS ENTRANTS
 
 > **Note** : L'historique des sessions 1-7 a été archivé dans `SESSION_STATE_ARCHIVE.md`
 
@@ -452,22 +452,129 @@ curl -H "X-Sync-Password: testpass123" ...
 
 ---
 
+## 🔧 Session 11 - 10 Novembre 2025 - Vue "Pairs connectés" + Édition de pair
+
+### 🎯 Objectif
+
+Permettre aux admins de visualiser quels serveurs distants stockent des backups sur leur serveur, et de modifier la configuration des pairs existants.
+
+### ✅ Fonctionnalités implémentées
+
+**1. Vue "Pairs connectés à moi"** (`/admin/incoming`)
+- **Package** `internal/incoming/incoming.go` (192 lignes)
+  - `ScanIncomingBackups()` : Scanne `/srv/anemone/backups/incoming/`
+  - `DeleteIncomingBackup()` : Supprime un backup
+  - `FormatBytes()`, `FormatTimeAgo()` : Utilitaires de formatage
+- **Interface admin** avec statistiques :
+  - Nombre de pairs connectés
+  - Nombre total de fichiers stockés
+  - Espace disque utilisé
+- **Tableau détaillé** par backup :
+  - Username + User ID
+  - Nom du partage (backup/data)
+  - Nombre de fichiers
+  - Taille totale
+  - Date de dernière modification
+  - Indicateur de présence du manifest
+  - Bouton "Supprimer" avec confirmation
+- État vide si aucun backup reçu
+
+**2. Interface d'édition de pair** (`/admin/peers/{id}/edit`)
+- **Handlers** dans `router.go` :
+  - Case `"edit"` : Affiche le formulaire (GET)
+  - Case `"update"` : Traite la soumission (POST)
+- **Formulaire pré-rempli** avec :
+  - Nom du pair
+  - Adresse
+  - Port
+  - Mot de passe (optionnel)
+  - Statut activé/désactivé
+- **Gestion intelligente du mot de passe** :
+  - Laisser vide = conserver l'actuel
+  - Remplir = modifier
+  - Checkbox "Supprimer le mot de passe" = effacer
+- **Section infos** affichant :
+  - ID, statut, dates de création/modification
+- **Bouton "Éditer"** ajouté sur `/admin/peers`
+
+### 📝 Fichiers créés/modifiés
+
+**Créés** :
+- `internal/incoming/incoming.go` (+192 lignes)
+- `web/templates/admin_incoming.html` (+226 lignes)
+- `web/templates/admin_peers_edit.html` (+232 lignes)
+
+**Modifiés** :
+- `internal/web/router.go` (+150 lignes)
+  - Import package `incoming`
+  - Routes `/admin/incoming`, `/admin/incoming/delete`
+  - Handlers `handleAdminIncoming()`, `handleAdminIncomingDelete()`
+  - Cases `"edit"` et `"update"` dans `handleAdminPeersActions()`
+- `web/templates/admin_peers.html` (+3 lignes)
+  - Lien "Éditer" ajouté pour chaque pair
+
+**Total** : ~650 lignes ajoutées
+
+### 🔒 Sécurité
+
+- Vérification que les chemins à supprimer sont bien dans `/srv/anemone/`
+- Authentification admin requise pour toutes les opérations
+- Logs des actions administratives
+- Protection contre les path traversal attacks
+
+### 📊 Architecture
+
+**Structure des backups entrants** :
+```
+/srv/anemone/backups/incoming/
+├── 1_backup/           # user_id=1, share=backup
+│   ├── manifest.json.enc
+│   ├── file1.txt.enc
+│   └── file2.txt.enc
+└── 2_data/             # user_id=2, share=data
+    ├── manifest.json.enc
+    └── file3.txt.enc
+```
+
+**Flux d'édition de pair** :
+1. Admin clique "Éditer" → GET `/admin/peers/{id}/edit`
+2. Formulaire pré-rempli affiché
+3. Admin modifie et soumet → POST `/admin/peers/{id}/update`
+4. Validation et mise à jour en DB
+5. Redirection vers `/admin/peers`
+
+### 🧪 Tests à effectuer
+
+**Vue "Pairs connectés"** :
+- ✅ Compilation réussie
+- ⏳ Accès à `/admin/incoming`
+- ⏳ Affichage correct avec/sans backups
+- ⏳ Suppression d'un backup
+- ⏳ Vérification des statistiques
+
+**Édition de pair** :
+- ✅ Compilation réussie
+- ⏳ Bouton "Éditer" visible sur `/admin/peers`
+- ⏳ Formulaire pré-rempli correctement
+- ⏳ Modification des champs (nom, adresse, port)
+- ⏳ Modification du mot de passe
+- ⏳ Suppression du mot de passe
+- ⏳ Changement du statut activé/désactivé
+
+**Commits** :
+```
+6dfe2dd - feat: Implement incoming backups view and peer edit interface (Session 11)
+```
+
+**Statut** : 🟢 IMPLÉMENTÉE - TESTS EN ATTENTE
+
+---
+
 ## 📝 Prochaines étapes (Roadmap)
 
-### Court terme (Session 11 - Prochaine)
+### Court terme (Session 12 - Prochaine)
 
-1. 🔜 **Vue "Pairs connectés à moi"** 👥
-   - Scanner `/srv/anemone/backups/incoming/`
-   - Afficher liste des serveurs qui stockent des backups sur CE serveur
-   - Statistiques : espace utilisé, dernier sync, nombre de fichiers
-   - Interface admin pour gérer/supprimer ces backups
-
-2. 🔜 **Interface d'édition de pair**
-   - Modifier nom, adresse, port, mot de passe d'un pair existant
-   - Bouton "Éditer" sur la page `/admin/peers`
-   - Formulaire pré-rempli avec les valeurs actuelles
-
-3. 🔜 **Interface web de restauration** (Phase 4 - Session 8)
+1. 🔜 **Interface web de restauration** (Phase 4 - Session 8)
    - Explorateur de fichiers pour naviguer dans les backups
    - Téléchargement sélectif de fichiers
    - Restauration avec confirmation
@@ -486,5 +593,5 @@ curl -H "X-Sync-Password: testpass123" ...
 4. 🔜 Interface de monitoring avancée
 5. 🔜 Chiffrement asymétrique avec clés publiques (RSA/Ed25519)
 
-**État global** : 🟢 AUTHENTIFICATION P2P SÉCURISÉE OPÉRATIONNELLE
-**Prochaine étape** : Vue "Pairs connectés à moi" + Interface d'édition de pair
+**État global** : 🟢 GESTION COMPLÈTE DES PAIRS ET BACKUPS ENTRANTS
+**Prochaine étape** : Interface web de restauration (explorateur de backups)
