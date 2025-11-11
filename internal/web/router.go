@@ -218,6 +218,11 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/api/sync/manifest", server.syncAuthMiddleware(server.handleAPISyncManifest))       // GET/PUT
 	mux.HandleFunc("/api/sync/file", server.syncAuthMiddleware(server.handleAPISyncFile))               // POST/DELETE
 
+	// API routes - Remote restore (protected by password authentication)
+	mux.HandleFunc("/api/sync/list-user-backups", server.syncAuthMiddleware(server.handleAPISyncListUserBackups))
+	mux.HandleFunc("/api/sync/download-encrypted-manifest", server.syncAuthMiddleware(server.handleAPISyncDownloadEncryptedManifest))
+	mux.HandleFunc("/api/sync/download-encrypted-file", server.syncAuthMiddleware(server.handleAPISyncDownloadEncryptedFile))
+
 	return mux
 }
 
@@ -3436,4 +3441,206 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 	}
 
 	log.Printf("User %s downloaded file %s from backup %s", session.Username, filePath, shareName)
+}
+
+// handleAPISyncListUserBackups lists available backups for a given user on this peer
+// GET /api/sync/list-user-backups?user_id=X
+// This endpoint is called by the origin server to discover backups stored on this peer
+func (s *Server) handleAPISyncListUserBackups(w http.ResponseWriter, r *http.Request) {
+	userIDStr := r.URL.Query().Get("user_id")
+	if userIDStr == "" {
+		http.Error(w, "Missing user_id parameter", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	// Scan incoming backups directory for this user
+	backupsDir := filepath.Join(s.cfg.DataDir, "backups", "incoming")
+	entries, err := os.ReadDir(backupsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// No backups directory yet
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte("[]"))
+			return
+		}
+		log.Printf("Error reading backups directory: %v", err)
+		http.Error(w, "Failed to read backups directory", http.StatusInternalServerError)
+		return
+	}
+
+	type BackupInfo struct {
+		ShareName    string    `json:"share_name"`
+		FileCount    int       `json:"file_count"`
+		TotalSize    int64     `json:"total_size"`
+		LastModified time.Time `json:"last_modified"`
+	}
+
+	var backups []BackupInfo
+	prefix := fmt.Sprintf("%d_", userID)
+
+	for _, entry := range entries {
+		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), prefix) {
+			continue
+		}
+
+		shareName := strings.TrimPrefix(entry.Name(), prefix)
+		backupPath := filepath.Join(backupsDir, entry.Name())
+
+		// Get modification time
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+
+		// Count files and size
+		var fileCount int
+		var totalSize int64
+		filepath.Walk(backupPath, func(path string, info os.FileInfo, err error) error {
+			if err != nil || info.IsDir() {
+				return nil
+			}
+			fileCount++
+			totalSize += info.Size()
+			return nil
+		})
+
+		backups = append(backups, BackupInfo{
+			ShareName:    shareName,
+			FileCount:    fileCount,
+			TotalSize:    totalSize,
+			LastModified: info.ModTime(),
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(backups)
+}
+
+// handleAPISyncDownloadEncryptedManifest downloads the encrypted manifest without decrypting it
+// GET /api/sync/download-encrypted-manifest?user_id=X&share_name=Y
+// Returns the .anemone-manifest.json.enc file as-is (encrypted)
+func (s *Server) handleAPISyncDownloadEncryptedManifest(w http.ResponseWriter, r *http.Request) {
+	userIDStr := r.URL.Query().Get("user_id")
+	shareName := r.URL.Query().Get("share_name")
+
+	if userIDStr == "" || shareName == "" {
+		http.Error(w, "Missing user_id or share_name", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	// Build backup path
+	backupDir := fmt.Sprintf("%d_%s", userID, shareName)
+	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", backupDir)
+	manifestPath := filepath.Join(backupPath, ".anemone-manifest.json.enc")
+
+	// Check if manifest exists
+	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+		http.Error(w, "Manifest not found", http.StatusNotFound)
+		return
+	}
+
+	// Read encrypted manifest
+	encryptedData, err := os.ReadFile(manifestPath)
+	if err != nil {
+		log.Printf("Error reading encrypted manifest: %v", err)
+		http.Error(w, "Failed to read manifest", http.StatusInternalServerError)
+		return
+	}
+
+	// Return encrypted manifest as-is
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", "attachment; filename=\".anemone-manifest.json.enc\"")
+	w.WriteHeader(http.StatusOK)
+	w.Write(encryptedData)
+
+	log.Printf("Sent encrypted manifest for user %d share %s", userID, shareName)
+}
+
+// handleAPISyncDownloadEncryptedFile downloads an encrypted file without decrypting it
+// GET /api/sync/download-encrypted-file?user_id=X&share_name=Y&path=Z
+// Returns the encrypted file as-is (with .enc extension)
+func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *http.Request) {
+	userIDStr := r.URL.Query().Get("user_id")
+	shareName := r.URL.Query().Get("share_name")
+	filePath := r.URL.Query().Get("path")
+
+	if userIDStr == "" || shareName == "" || filePath == "" {
+		http.Error(w, "Missing user_id, share_name, or path", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	// Build backup path
+	backupDir := fmt.Sprintf("%d_%s", userID, shareName)
+	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", backupDir)
+
+	// Build encrypted file path
+	encryptedFilePath := filepath.Join(backupPath, filePath+".enc")
+
+	// Security check: ensure path is within backup directory
+	absBackupPath, err := filepath.Abs(backupPath)
+	if err != nil {
+		http.Error(w, "Invalid backup path", http.StatusBadRequest)
+		return
+	}
+	absFilePath, err := filepath.Abs(encryptedFilePath)
+	if err != nil {
+		http.Error(w, "Invalid file path", http.StatusBadRequest)
+		return
+	}
+	if !strings.HasPrefix(absFilePath, absBackupPath) {
+		log.Printf("Security: Attempted path traversal: %s", filePath)
+		http.Error(w, "Invalid file path", http.StatusForbidden)
+		return
+	}
+
+	// Check if file exists
+	fileInfo, err := os.Stat(encryptedFilePath)
+	if os.IsNotExist(err) {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		log.Printf("Error accessing file: %v", err)
+		http.Error(w, "Failed to access file", http.StatusInternalServerError)
+		return
+	}
+
+	// Open encrypted file
+	encryptedFile, err := os.Open(encryptedFilePath)
+	if err != nil {
+		log.Printf("Error opening encrypted file: %v", err)
+		http.Error(w, "Failed to open file", http.StatusInternalServerError)
+		return
+	}
+	defer encryptedFile.Close()
+
+	// Return encrypted file as-is
+	fileName := filepath.Base(filePath) + ".enc"
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileInfo.Size()))
+	w.WriteHeader(http.StatusOK)
+
+	// Stream the encrypted file
+	io.Copy(w, encryptedFile)
+
+	log.Printf("Sent encrypted file %s for user %d share %s", filePath, userID, shareName)
 }
