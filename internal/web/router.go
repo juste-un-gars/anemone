@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
@@ -31,6 +32,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/peers"
 	"github.com/juste-un-gars/anemone/internal/quota"
 	"github.com/juste-un-gars/anemone/internal/reset"
+	"github.com/juste-un-gars/anemone/internal/restore"
 	"github.com/juste-un-gars/anemone/internal/shares"
 	"github.com/juste-un-gars/anemone/internal/smb"
 	"github.com/juste-un-gars/anemone/internal/sync"
@@ -196,6 +198,12 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/settings", auth.RequireAuth(server.handleSettings))
 	mux.HandleFunc("/settings/language", auth.RequireAuth(server.handleSettingsLanguage))
 	mux.HandleFunc("/settings/password", auth.RequireAuth(server.handleSettingsPassword))
+
+	// Restore routes (user can restore their own backups)
+	mux.HandleFunc("/restore", auth.RequireAuth(server.handleRestore))
+	mux.HandleFunc("/api/restore/backups", auth.RequireAuth(server.handleAPIRestoreBackups))
+	mux.HandleFunc("/api/restore/files", auth.RequireAuth(server.handleAPIRestoreFiles))
+	mux.HandleFunc("/api/restore/download", auth.RequireAuth(server.handleAPIRestoreDownload))
 
 	// Admin routes - Shares
 	mux.HandleFunc("/admin/shares", auth.RequireAdmin(server.handleAdminShares))
@@ -3228,4 +3236,204 @@ func (s *Server) handleAdminIncomingDelete(w http.ResponseWriter, r *http.Reques
 
 	log.Printf("Admin %s deleted incoming backup: %s", session.Username, backupPath)
 	http.Redirect(w, r, "/admin/incoming?success=Backup+deleted+successfully", http.StatusSeeOther)
+}
+
+// handleRestore displays the restore page
+func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	data := struct {
+		Lang    string
+		Session *auth.Session
+	}{
+		Lang:    s.cfg.Language,
+		Session: session,
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "restore.html", data); err != nil {
+		log.Printf("Error rendering restore template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
+// handleAPIRestoreBackups returns list of available backups for the current user
+// GET /api/restore/backups
+func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	backupsDir := filepath.Join(s.cfg.DataDir, "backups", "incoming")
+	backups, err := restore.ListUserBackups(s.db, session.UserID, backupsDir)
+	if err != nil {
+		log.Printf("Error listing backups for user %d: %v", session.UserID, err)
+		http.Error(w, "Failed to list backups", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(backups); err != nil {
+		log.Printf("Error encoding backups JSON: %v", err)
+	}
+}
+
+// handleAPIRestoreFiles returns the file tree for a backup
+// GET /api/restore/files?backup={share_name}&path={directory_path}
+func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	shareName := r.URL.Query().Get("backup")
+	if shareName == "" {
+		http.Error(w, "Missing backup parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Get user encryption key
+	var encryptedKey []byte
+	err := s.db.QueryRow("SELECT encryption_key_encrypted FROM users WHERE id = ?", session.UserID).Scan(&encryptedKey)
+	if err != nil {
+		log.Printf("Error getting user encryption key: %v", err)
+		http.Error(w, "Failed to get encryption key", http.StatusInternalServerError)
+		return
+	}
+
+	// Get master key
+	masterKeyPath := filepath.Join(s.cfg.DataDir, "keys", "master.key")
+	masterKeyData, err := os.ReadFile(masterKeyPath)
+	if err != nil {
+		log.Printf("Error reading master key: %v", err)
+		http.Error(w, "Failed to read master key", http.StatusInternalServerError)
+		return
+	}
+	masterKey := string(masterKeyData)
+
+	// Decrypt user key
+	userKey, err := crypto.DecryptKey(string(encryptedKey), masterKey)
+	if err != nil {
+		log.Printf("Error decrypting user key: %v", err)
+		http.Error(w, "Failed to decrypt user key", http.StatusInternalServerError)
+		return
+	}
+
+	// Build backup path
+	backupDir := fmt.Sprintf("%d_%s", session.UserID, shareName)
+	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", backupDir)
+
+	// Check if backup exists
+	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+		http.Error(w, "Backup not found", http.StatusNotFound)
+		return
+	}
+
+	// Get manifest
+	manifest, err := restore.GetBackupManifest(backupPath, userKey)
+	if err != nil {
+		log.Printf("Error getting backup manifest: %v", err)
+		http.Error(w, "Failed to read backup manifest", http.StatusInternalServerError)
+		return
+	}
+
+	// Build file tree
+	fileTree := restore.BuildFileTree(manifest)
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(fileTree); err != nil {
+		log.Printf("Error encoding file tree JSON: %v", err)
+	}
+}
+
+// handleAPIRestoreDownload downloads and decrypts a file from backup
+// GET /api/restore/download?backup={share_name}&file={file_path}
+func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	shareName := r.URL.Query().Get("backup")
+	filePath := r.URL.Query().Get("file")
+
+	if shareName == "" || filePath == "" {
+		http.Error(w, "Missing backup or file parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Get user encryption key
+	var encryptedKey []byte
+	err := s.db.QueryRow("SELECT encryption_key_encrypted FROM users WHERE id = ?", session.UserID).Scan(&encryptedKey)
+	if err != nil {
+		log.Printf("Error getting user encryption key: %v", err)
+		http.Error(w, "Failed to get encryption key", http.StatusInternalServerError)
+		return
+	}
+
+	// Get master key
+	masterKeyPath := filepath.Join(s.cfg.DataDir, "keys", "master.key")
+	masterKeyData, err := os.ReadFile(masterKeyPath)
+	if err != nil {
+		log.Printf("Error reading master key: %v", err)
+		http.Error(w, "Failed to read master key", http.StatusInternalServerError)
+		return
+	}
+	masterKey := string(masterKeyData)
+
+	// Decrypt user key
+	userKey, err := crypto.DecryptKey(string(encryptedKey), masterKey)
+	if err != nil {
+		log.Printf("Error decrypting user key: %v", err)
+		http.Error(w, "Failed to decrypt user key", http.StatusInternalServerError)
+		return
+	}
+
+	// Build backup path
+	backupDir := fmt.Sprintf("%d_%s", session.UserID, shareName)
+	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", backupDir)
+
+	// Check if backup exists
+	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+		http.Error(w, "Backup not found", http.StatusNotFound)
+		return
+	}
+
+	// Get file metadata from manifest
+	manifest, err := restore.GetBackupManifest(backupPath, userKey)
+	if err != nil {
+		log.Printf("Error getting backup manifest: %v", err)
+		http.Error(w, "Failed to read backup manifest", http.StatusInternalServerError)
+		return
+	}
+
+	fileMetadata, err := restore.GetFileFromManifest(manifest, filePath)
+	if err != nil {
+		log.Printf("Error getting file from manifest: %v", err)
+		http.Error(w, "File not found in backup", http.StatusNotFound)
+		return
+	}
+
+	// Set headers for file download
+	fileName := filepath.Base(filePath)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileMetadata.Size))
+
+	// Decrypt and stream file
+	err = restore.RestoreFile(backupPath, filePath, userKey, w)
+	if err != nil {
+		log.Printf("Error restoring file %s: %v", filePath, err)
+		// Can't send error response here as we've already started writing
+		return
+	}
+
+	log.Printf("User %s downloaded file %s from backup %s", session.Username, filePath, shareName)
 }
