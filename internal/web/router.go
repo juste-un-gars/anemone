@@ -3373,8 +3373,8 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-// handleAPIRestoreFiles returns the file tree for a backup
-// GET /api/restore/files?backup={share_name}&path={directory_path}
+// handleAPIRestoreFiles returns the file tree for a backup from a remote peer
+// GET /api/restore/files?peer_id={id}&backup={share_name}
 func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.GetSessionFromContext(r)
 	if !ok {
@@ -3382,15 +3382,30 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	peerIDStr := r.URL.Query().Get("peer_id")
 	shareName := r.URL.Query().Get("backup")
-	if shareName == "" {
-		http.Error(w, "Missing backup parameter", http.StatusBadRequest)
+	if peerIDStr == "" || shareName == "" {
+		http.Error(w, "Missing peer_id or backup parameter", http.StatusBadRequest)
+		return
+	}
+
+	peerID, err := strconv.Atoi(peerIDStr)
+	if err != nil {
+		http.Error(w, "Invalid peer_id", http.StatusBadRequest)
+		return
+	}
+
+	// Get peer info
+	peer, err := peers.GetByID(s.db, peerID)
+	if err != nil {
+		log.Printf("Error getting peer %d: %v", peerID, err)
+		http.Error(w, "Peer not found", http.StatusNotFound)
 		return
 	}
 
 	// Get user encryption key
 	var encryptedKey []byte
-	err := s.db.QueryRow("SELECT encryption_key_encrypted FROM users WHERE id = ?", session.UserID).Scan(&encryptedKey)
+	err = s.db.QueryRow("SELECT encryption_key_encrypted FROM users WHERE id = ?", session.UserID).Scan(&encryptedKey)
 	if err != nil {
 		log.Printf("Error getting user encryption key: %v", err)
 		http.Error(w, "Failed to get encryption key", http.StatusInternalServerError)
@@ -3415,26 +3430,71 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build backup path
-	backupDir := fmt.Sprintf("%d_%s", session.UserID, shareName)
-	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", backupDir)
+	// Download encrypted manifest from peer
+	url := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-manifest?user_id=%d&share_name=%s",
+		peer.Address, peer.Port, session.UserID, shareName)
 
-	// Check if backup exists
-	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
-		http.Error(w, "Backup not found", http.StatusNotFound)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   30 * time.Second,
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.Printf("Error creating request: %v", err)
+		http.Error(w, "Failed to create request", http.StatusInternalServerError)
 		return
 	}
 
-	// Get manifest
-	manifest, err := restore.GetBackupManifest(backupPath, userKey)
+	// Add P2P authentication
+	if peer.Password != nil && *peer.Password != "" {
+		req.Header.Set("X-Sync-Password", *peer.Password)
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("Error getting backup manifest: %v", err)
-		http.Error(w, "Failed to read backup manifest", http.StatusInternalServerError)
+		log.Printf("Error downloading manifest from peer %s: %v", peer.Name, err)
+		http.Error(w, "Failed to contact peer", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Peer %s returned status %d", peer.Name, resp.StatusCode)
+		http.Error(w, "Failed to get manifest from peer", http.StatusInternalServerError)
+		return
+	}
+
+	// Read encrypted manifest
+	encryptedManifest, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Error reading manifest response: %v", err)
+		http.Error(w, "Failed to read manifest", http.StatusInternalServerError)
+		return
+	}
+
+	// Decrypt manifest
+	var decryptedBuf bytes.Buffer
+	err = crypto.DecryptStream(bytes.NewReader(encryptedManifest), &decryptedBuf, userKey)
+	if err != nil {
+		log.Printf("Error decrypting manifest: %v", err)
+		http.Error(w, "Failed to decrypt manifest", http.StatusInternalServerError)
+		return
+	}
+
+	// Parse manifest
+	var manifest sync.SyncManifest
+	if err := json.Unmarshal(decryptedBuf.Bytes(), &manifest); err != nil {
+		log.Printf("Error parsing manifest: %v", err)
+		http.Error(w, "Failed to parse manifest", http.StatusInternalServerError)
 		return
 	}
 
 	// Build file tree
-	fileTree := restore.BuildFileTree(manifest)
+	fileTree := restore.BuildFileTree(&manifest)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(fileTree); err != nil {
@@ -3442,8 +3502,8 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleAPIRestoreDownload downloads and decrypts a file from backup
-// GET /api/restore/download?backup={share_name}&file={file_path}
+// handleAPIRestoreDownload downloads and decrypts a file from a remote peer
+// GET /api/restore/download?peer_id={id}&backup={share_name}&file={file_path}
 func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.GetSessionFromContext(r)
 	if !ok {
@@ -3451,17 +3511,32 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	peerIDStr := r.URL.Query().Get("peer_id")
 	shareName := r.URL.Query().Get("backup")
 	filePath := r.URL.Query().Get("file")
 
-	if shareName == "" || filePath == "" {
-		http.Error(w, "Missing backup or file parameter", http.StatusBadRequest)
+	if peerIDStr == "" || shareName == "" || filePath == "" {
+		http.Error(w, "Missing peer_id, backup, or file parameter", http.StatusBadRequest)
+		return
+	}
+
+	peerID, err := strconv.Atoi(peerIDStr)
+	if err != nil {
+		http.Error(w, "Invalid peer_id", http.StatusBadRequest)
+		return
+	}
+
+	// Get peer info
+	peer, err := peers.GetByID(s.db, peerID)
+	if err != nil {
+		log.Printf("Error getting peer %d: %v", peerID, err)
+		http.Error(w, "Peer not found", http.StatusNotFound)
 		return
 	}
 
 	// Get user encryption key
 	var encryptedKey []byte
-	err := s.db.QueryRow("SELECT encryption_key_encrypted FROM users WHERE id = ?", session.UserID).Scan(&encryptedKey)
+	err = s.db.QueryRow("SELECT encryption_key_encrypted FROM users WHERE id = ?", session.UserID).Scan(&encryptedKey)
 	if err != nil {
 		log.Printf("Error getting user encryption key: %v", err)
 		http.Error(w, "Failed to get encryption key", http.StatusInternalServerError)
@@ -3486,46 +3561,58 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Build backup path
-	backupDir := fmt.Sprintf("%d_%s", session.UserID, shareName)
-	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", backupDir)
+	// Download encrypted file from peer
+	url := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-file?user_id=%d&share_name=%s&path=%s",
+		peer.Address, peer.Port, session.UserID, shareName, filePath)
 
-	// Check if backup exists
-	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
-		http.Error(w, "Backup not found", http.StatusNotFound)
-		return
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   120 * time.Second, // Longer timeout for large files
 	}
 
-	// Get file metadata from manifest
-	manifest, err := restore.GetBackupManifest(backupPath, userKey)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Printf("Error getting backup manifest: %v", err)
-		http.Error(w, "Failed to read backup manifest", http.StatusInternalServerError)
+		log.Printf("Error creating request: %v", err)
+		http.Error(w, "Failed to create request", http.StatusInternalServerError)
 		return
 	}
 
-	fileMetadata, err := restore.GetFileFromManifest(manifest, filePath)
+	// Add P2P authentication
+	if peer.Password != nil && *peer.Password != "" {
+		req.Header.Set("X-Sync-Password", *peer.Password)
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("Error getting file from manifest: %v", err)
-		http.Error(w, "File not found in backup", http.StatusNotFound)
+		log.Printf("Error downloading file from peer %s: %v", peer.Name, err)
+		http.Error(w, "Failed to contact peer", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Peer %s returned status %d", peer.Name, resp.StatusCode)
+		http.Error(w, "Failed to get file from peer", http.StatusInternalServerError)
 		return
 	}
 
-	// Set headers for file download
+	// Set headers for file download (use original filename without .enc)
 	fileName := filepath.Base(filePath)
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", fileName))
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", fileMetadata.Size))
 
-	// Decrypt and stream file
-	err = restore.RestoreFile(backupPath, filePath, userKey, w)
+	// Decrypt and stream file directly to response
+	err = crypto.DecryptStream(resp.Body, w, userKey)
 	if err != nil {
-		log.Printf("Error restoring file %s: %v", filePath, err)
+		log.Printf("Error decrypting file %s: %v", filePath, err)
 		// Can't send error response here as we've already started writing
 		return
 	}
 
-	log.Printf("User %s downloaded file %s from backup %s", session.Username, filePath, shareName)
+	log.Printf("User %s downloaded file %s from peer %s backup %s", session.Username, filePath, peer.Name, shareName)
 }
 
 // handleAPISyncListUserBackups lists available backups for a given user on this peer
