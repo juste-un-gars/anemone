@@ -140,14 +140,18 @@
 
         // Backup selection handler
         document.getElementById('backup-select').addEventListener('change', async (e) => {
-            const shareName = e.target.value;
-            if (!shareName) {
+            const value = e.target.value;
+            if (!value) {
                 document.getElementById('backup-info').classList.add('hidden');
                 document.getElementById('file-browser').classList.add('hidden');
                 return;
             }
 
-            currentBackup = backups.find(b => b.share_name === shareName);
+            // Parse "peer_id:share_name"
+            const [peerIdStr, shareName] = value.split(':');
+            const peerId = parseInt(peerIdStr);
+
+            currentBackup = backups.find(b => b.peer_id === peerId && b.share_name === shareName);
             if (!currentBackup) return;
 
             // Show backup info
@@ -157,7 +161,7 @@
             document.getElementById('backup-info').classList.remove('hidden');
 
             // Load files
-            await loadFiles(shareName);
+            await loadFiles(peerId, shareName);
         });
 
         async function loadBackups() {
@@ -175,8 +179,8 @@
 
                 backups.forEach(backup => {
                     const option = document.createElement('option');
-                    option.value = backup.share_name;
-                    option.textContent = backup.share_name;
+                    option.value = `${backup.peer_id}:${backup.share_name}`;
+                    option.textContent = `${backup.peer_name} - ${backup.share_name}`;
                     select.appendChild(option);
                 });
             } catch (error) {
@@ -185,12 +189,12 @@
             }
         }
 
-        async function loadFiles(shareName) {
+        async function loadFiles(peerId, shareName) {
             document.getElementById('loading').classList.remove('hidden');
             document.getElementById('file-browser').classList.add('hidden');
 
             try {
-                const response = await fetch(`/api/restore/files?backup=${encodeURIComponent(shareName)}`);
+                const response = await fetch(`/api/restore/files?peer_id=${peerId}&backup=${encodeURIComponent(shareName)}`);
                 if (!response.ok) throw new Error('Failed to load files');
 
                 fileTree = await response.json();
@@ -333,7 +337,7 @@
 
         function downloadFile(filePath) {
             if (!currentBackup) return;
-            const url = `/api/restore/download?backup=${encodeURIComponent(currentBackup.share_name)}&file=${encodeURIComponent(filePath)}`;
+            const url = `/api/restore/download?peer_id=${currentBackup.peer_id}&backup=${encodeURIComponent(currentBackup.share_name)}&file=${encodeURIComponent(filePath)}`;
             window.location.href = url;
         }
 

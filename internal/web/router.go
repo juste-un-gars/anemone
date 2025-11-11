@@ -7,6 +7,7 @@ package web
 import (
 	"bytes"
 	"crypto/rand"
+	"crypto/tls"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
@@ -3265,7 +3266,7 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleAPIRestoreBackups returns list of available backups for the current user
+// handleAPIRestoreBackups returns list of available backups from all configured peers
 // GET /api/restore/backups
 func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.GetSessionFromContext(r)
@@ -3274,16 +3275,100 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	backupsDir := filepath.Join(s.cfg.DataDir, "backups", "incoming")
-	backups, err := restore.ListUserBackups(s.db, session.UserID, backupsDir)
+	// Get all configured peers
+	allPeers, err := peers.GetAll(s.db)
 	if err != nil {
-		log.Printf("Error listing backups for user %d: %v", session.UserID, err)
-		http.Error(w, "Failed to list backups", http.StatusInternalServerError)
+		log.Printf("Error getting peers: %v", err)
+		http.Error(w, "Failed to get peers", http.StatusInternalServerError)
 		return
 	}
 
+	type PeerBackup struct {
+		PeerID       int       `json:"peer_id"`
+		PeerName     string    `json:"peer_name"`
+		PeerAddress  string    `json:"peer_address"`
+		ShareName    string    `json:"share_name"`
+		FileCount    int       `json:"file_count"`
+		TotalSize    int64     `json:"total_size"`
+		LastModified time.Time `json:"last_modified"`
+	}
+
+	var allBackups []PeerBackup
+
+	// Query each peer for backups
+	for _, peer := range allPeers {
+		// Skip disabled peers
+		if !peer.SyncEnabled {
+			continue
+		}
+
+		// Build URL
+		url := fmt.Sprintf("https://%s:%d/api/sync/list-user-backups?user_id=%d",
+			peer.Address, peer.Port, session.UserID)
+
+		// Create HTTP client with TLS skip verify (self-signed certs)
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client := &http.Client{
+			Transport: tr,
+			Timeout:   10 * time.Second,
+		}
+
+		// Create request
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			log.Printf("Error creating request for peer %s: %v", peer.Name, err)
+			continue
+		}
+
+		// Add P2P authentication header if peer has password
+		if peer.Password != nil && *peer.Password != "" {
+			req.Header.Set("X-Sync-Password", *peer.Password)
+		}
+
+		// Execute request
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("Error contacting peer %s: %v", peer.Name, err)
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("Peer %s returned status %d", peer.Name, resp.StatusCode)
+			continue
+		}
+
+		// Parse response
+		type BackupInfo struct {
+			ShareName    string    `json:"share_name"`
+			FileCount    int       `json:"file_count"`
+			TotalSize    int64     `json:"total_size"`
+			LastModified time.Time `json:"last_modified"`
+		}
+		var peerBackups []BackupInfo
+		if err := json.NewDecoder(resp.Body).Decode(&peerBackups); err != nil {
+			log.Printf("Error decoding response from peer %s: %v", peer.Name, err)
+			continue
+		}
+
+		// Add peer info to each backup
+		for _, backup := range peerBackups {
+			allBackups = append(allBackups, PeerBackup{
+				PeerID:       peer.ID,
+				PeerName:     peer.Name,
+				PeerAddress:  peer.Address,
+				ShareName:    backup.ShareName,
+				FileCount:    backup.FileCount,
+				TotalSize:    backup.TotalSize,
+				LastModified: backup.LastModified,
+			})
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(backups); err != nil {
+	if err := json.NewEncoder(w).Encode(allBackups); err != nil {
 		log.Printf("Error encoding backups JSON: %v", err)
 	}
 }
