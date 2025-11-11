@@ -85,6 +85,48 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		"divf": func(a, b int64) float64 {
 			return float64(a) / float64(b)
 		},
+		"FormatBytes": func(bytes int64) string {
+			const unit = 1024
+			if bytes < unit {
+				return fmt.Sprintf("%d B", bytes)
+			}
+			div, exp := int64(unit), 0
+			for n := bytes / unit; n >= unit; n /= unit {
+				div *= unit
+				exp++
+			}
+			return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+		},
+		"FormatTime": func(t time.Time, lang string) string {
+			now := time.Now()
+			diff := now.Sub(t)
+
+			if diff < time.Minute {
+				if lang == "fr" {
+					return "À l'instant"
+				}
+				return "Just now"
+			}
+			if diff < time.Hour {
+				mins := int(diff.Minutes())
+				if lang == "fr" {
+					return fmt.Sprintf("Il y a %d min", mins)
+				}
+				return fmt.Sprintf("%d min ago", mins)
+			}
+			if diff < 24*time.Hour {
+				hours := int(diff.Hours())
+				if lang == "fr" {
+					return fmt.Sprintf("Il y a %d h", hours)
+				}
+				return fmt.Sprintf("%d h ago", hours)
+			}
+			days := int(diff.Hours() / 24)
+			if lang == "fr" {
+				return fmt.Sprintf("Il y a %d j", days)
+			}
+			return fmt.Sprintf("%d d ago", days)
+		},
 	}
 
 	templates := template.Must(template.New("").Funcs(funcMap).ParseGlob(filepath.Join("web", "templates", "*.html")))
@@ -3120,25 +3162,21 @@ func (s *Server) handleAdminIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Lang        string
-		Session     *auth.Session
-		Backups     []*incoming.IncomingBackup
-		TotalFiles  int
-		TotalSize   string
-		Error       string
-		Success     string
-		FormatBytes func(int64) string
-		FormatTime  func(time.Time, string) string
+		Lang       string
+		Session    *auth.Session
+		Backups    []*incoming.IncomingBackup
+		TotalFiles int
+		TotalSize  string
+		Error      string
+		Success    string
 	}{
-		Lang:        s.cfg.Language,
-		Session:     session,
-		Backups:     backups,
-		TotalFiles:  totalFiles,
-		TotalSize:   incoming.FormatBytes(totalSize),
-		Error:       r.URL.Query().Get("error"),
-		Success:     r.URL.Query().Get("success"),
-		FormatBytes: incoming.FormatBytes,
-		FormatTime:  incoming.FormatTimeAgo,
+		Lang:       s.cfg.Language,
+		Session:    session,
+		Backups:    backups,
+		TotalFiles: totalFiles,
+		TotalSize:  incoming.FormatBytes(totalSize),
+		Error:      r.URL.Query().Get("error"),
+		Success:    r.URL.Query().Get("success"),
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_incoming.html", data); err != nil {
