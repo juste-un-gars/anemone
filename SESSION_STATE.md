@@ -1,7 +1,7 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-10 (Session 13 - Fréquence de synchronisation par pair avec option Interval)
-**Status** : 🟢 SYNCHRONISATION PAR PAIR AVEC FRÉQUENCES PERSONNALISABLES (Interval/Daily/Weekly/Monthly)
+**Dernière session** : 2025-11-11 (Session 12 - Interface web de restauration avec sélection multiple)
+**Status** : 🟢 RESTAURATION DISTANTE COMPLÈTE ET TESTÉE
 
 > **Note** : L'historique des sessions 1-7 a été archivé dans `SESSION_STATE_ARCHIVE.md`
 > **Note** : Les détails techniques des sessions 8-11 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
@@ -113,6 +113,18 @@
     - Configuration complète système
     - Support multi-distro (Fedora/RHEL/Debian)
 
+15. **Restauration de fichiers avec interface web** 📂 Session 12
+    - Liste des backups disponibles sur tous les pairs distants
+    - Navigation dans l'arborescence des fichiers chiffrés
+    - Déchiffrement automatique côté serveur d'origine
+    - **Sélection multiple** : Checkboxes pour fichiers et dossiers
+    - **Téléchargement ZIP** : Plusieurs fichiers/dossiers en un clic
+    - **Expansion récursive** : Sélection d'un dossier inclut tous les sous-fichiers
+    - Barre d'outils avec compteur de sélection
+    - Boutons "Tout sélectionner" / "Désélectionner tout"
+    - Support des chemins avec espaces et caractères spéciaux
+    - Streaming direct sans stockage temporaire
+
 ### 🚀 Déploiement
 
 **DEV (192.168.83.99)** : ✅ Migration /srv/anemone complète + Quotas Btrfs actifs + Scheduler actif
@@ -134,6 +146,9 @@
 - ✅ **Édition de pair** : OK (Session 11 - modification config complète)
 - ✅ **Synchronisation avec authentification** : OK (Session 11 - DEV→FR1)
 - ✅ **Fréquences par pair** : OK (Session 13 - interval/daily/weekly/monthly)
+- ✅ **Restauration fichiers depuis pairs** : OK (Session 12 - liste, navigation, déchiffrement)
+- ✅ **Téléchargement ZIP multiple** : OK (Session 12 - checkboxes, sélection, dossiers récursifs)
+- ✅ **Encodage URL chemins spéciaux** : OK (Session 12 - espaces, caractères spéciaux)
 
 **Structure de production** :
 - Code : `~/anemone/` (repo git, binaires)
@@ -360,20 +375,253 @@ Serveur DEV (192.168.83.99)
 
 ---
 
+## 🔧 Session 12 - 11 Novembre 2025 - Interface web de restauration depuis pairs distants
+
+### 🎯 Objectif
+
+Permettre aux utilisateurs de restaurer leurs fichiers depuis les backups P2P chiffrés stockés sur les serveurs pairs, avec déchiffrement local sur le serveur d'origine.
+
+### ⚠️ Correction architecturale majeure
+
+**Problème identifié** : L'architecture initiale permettait aux utilisateurs de restaurer depuis n'importe quel serveur (y compris les pairs qui ne possèdent pas leurs clés de chiffrement).
+
+**Architecture corrigée** :
+- Les utilisateurs se connectent sur leur **serveur d'origine** (où leurs clés sont stockées)
+- Le serveur d'origine **interroge les pairs** pour lister les backups disponibles
+- Les pairs **retournent les fichiers chiffrés** sans les déchiffrer (ils n'ont pas les clés)
+- Le serveur d'origine **déchiffre localement** avec la clé utilisateur
+- Les clés ne quittent jamais le serveur d'origine
+
+**Exemple** :
+```
+Utilisateur marc@DEV (serveur d'origine)
+    ↓ Se connecte et demande ses backups
+DEV interroge FR1, FR2, FR3...
+    ↓ Chaque pair liste ses backups pour marc
+marc sélectionne un fichier depuis FR1
+    ↓ DEV télécharge le fichier chiffré depuis FR1
+FR1 retourne fichier.enc (sans déchiffrer)
+    ↓ DEV déchiffre avec la clé de marc
+marc reçoit le fichier déchiffré
+```
+
+### 🔨 Implémentation en 3 paliers
+
+#### **PALIER 1** : API sur serveurs pairs (commit `28c26d7`)
+
+Nouveaux endpoints sur les pairs (FR1, FR2...) pour servir les fichiers chiffrés :
+
+**`GET /api/sync/list-user-backups?user_id=X`**
+- Liste les backups disponibles pour un utilisateur
+- Retourne : share_name, file_count, total_size, last_modified
+- Protégé par mot de passe P2P
+
+**`GET /api/sync/download-encrypted-manifest?user_id=X&share_name=Y`**
+- Télécharge le manifest chiffré **sans le déchiffrer**
+- Le pair ne touche pas au chiffrement
+
+**`GET /api/sync/download-encrypted-file?user_id=X&share_name=Y&path=Z`**
+- Télécharge un fichier chiffré **sans le déchiffrer**
+- Protection contre path traversal
+- Le pair est un simple serveur de stockage
+
+#### **PALIER 2** : Interface interroge les pairs (commit `d1c1de2`)
+
+Modification de l'interface pour lister les backups depuis les pairs :
+
+**`GET /api/restore/backups`** (modifié) :
+- Récupère tous les pairs configurés
+- Interroge chaque pair via `/api/sync/list-user-backups`
+- Agrège les résultats : peer_id, peer_name, share_name, stats
+- Interface affiche "FR1 - backup" au lieu de "backup"
+
+**Interface `restore.html`** (modifiée) :
+- Dropdown affiche la source du backup (nom du pair)
+- Stocke "peer_id:share_name" comme valeur
+- Passe peer_id ET share_name aux API suivantes
+
+#### **PALIER 3** : Téléchargement et déchiffrement distant (commit `f679d9f`)
+
+Implémentation de la restauration distante avec déchiffrement local :
+
+**`GET /api/restore/files?peer_id=X&backup=Y`** (modifié) :
+- Récupère les infos du pair depuis la base de données
+- Télécharge le manifest chiffré depuis le pair
+- Déchiffre le manifest localement avec la clé utilisateur
+- Construit l'arbre de fichiers
+- Retourne la structure au navigateur
+
+**`GET /api/restore/download?peer_id=X&backup=Y&file=Z`** (modifié) :
+- Récupère les infos du pair depuis la base de données
+- Télécharge le fichier chiffré depuis le pair
+- Déchiffre le fichier en streaming avec la clé utilisateur
+- Stream directement au navigateur (pas de stockage temporaire)
+
+### 📦 Fichiers créés/modifiés
+
+**Nouveaux packages** :
+- `internal/restore/restore.go` (~310 lignes) - Logique de restauration et déchiffrement
+
+**Modifiés** :
+- `internal/web/router.go` (~540 lignes ajoutées) - 6 nouveaux handlers
+- `web/templates/restore.html` (~380 lignes) - Interface utilisateur complète
+- `web/templates/dashboard_user.html` (~15 lignes) - Carte "Restauration"
+
+**Total** : ~1245 lignes ajoutées
+
+### 🔒 Sécurité
+
+**Chiffrement bout-en-bout conservé** :
+- ✅ Les clés utilisateurs ne quittent jamais le serveur d'origine
+- ✅ Les pairs ne peuvent pas déchiffrer les données (ils n'ont pas les clés)
+- ✅ Déchiffrement uniquement sur le serveur d'origine
+- ✅ Streaming direct (pas de stockage en clair)
+
+**Contrôle d'accès** :
+- ✅ Authentification sur serveur d'origine (RequireAuth)
+- ✅ Mot de passe P2P pour protéger les API des pairs
+- ✅ Isolation par user_id (vérifié côté serveur)
+- ✅ Validation des chemins de fichiers (path traversal protection)
+
+#### **PALIER 4** : Sélection multiple et téléchargement ZIP (11 Nov)
+
+Ajout de la fonctionnalité de sélection multiple avec téléchargement ZIP :
+
+**Frontend `restore.html`** :
+- Checkbox à côté de chaque fichier et dossier
+- Checkbox "Tout sélectionner" dans l'en-tête du tableau
+- Barre d'outils de sélection (apparaît quand des éléments sont sélectionnés)
+- Compteur d'éléments sélectionnés
+- Boutons "Tout sélectionner" et "Désélectionner tout"
+- Bouton "Télécharger (ZIP)" pour créer une archive
+- JavaScript pour gestion de l'état de sélection
+
+**Backend `router.go`** :
+- Nouvel endpoint `POST /api/restore/download-multiple`
+- Construction d'un arbre de fichiers depuis le manifest
+- Expansion récursive des dossiers sélectionnés
+- Téléchargement et déchiffrement de chaque fichier
+- Création d'un ZIP en streaming avec `archive/zip`
+- Fonction `buildURL()` pour encoder correctement les URLs (support espaces et caractères spéciaux)
+
+**Fix de sécurité master key** :
+- ✅ Master key maintenant lue **uniquement depuis la base de données** (`system_config.master_key`)
+- ✅ Plus de fichier `/srv/anemone/keys/master.key` (supprimé)
+- ✅ Architecture cohérente : toute la configuration dans la DB
+- ✅ Déployé sur DEV et FR1
+
+### 🧪 Tests validés
+
+✅ **Liste des backups** : Affichage correct depuis pairs distants
+✅ **Navigation dans fichiers** : Arborescence et breadcrumb fonctionnels
+✅ **Téléchargement simple** : Fichier individuel déchiffré correctement
+✅ **Sélection multiple** : Checkboxes et compteur fonctionnent
+✅ **Téléchargement ZIP** : Un seul fichier → ZIP OK
+✅ **Téléchargement ZIP dossier** : Dossier avec sous-dossiers → Tous les fichiers inclus
+✅ **Chemins avec espaces** : Encodage URL correct (ex: "ThinPrint Client Windows 13/Setup.exe")
+✅ **Déchiffrement automatique** : Pas besoin de clé utilisateur, transparent
+
+### 📊 Logs à vérifier
+
+**Sur DEV** (serveur d'origine) :
+```
+User marc downloaded file documents/report.txt from peer FR1 backup backup
+```
+
+**Sur FR1** (serveur pair) :
+```
+Sent encrypted manifest for user 19 share backup
+Sent encrypted file documents/report.txt for user 19 share backup
+```
+
+### 🔄 Déploiement
+
+**DEV (192.168.83.5)** :
+- ✅ Binaire compilé avec restauration distante + sélection multiple + ZIP
+- ✅ Fix master key (lecture depuis DB)
+- ✅ Templates à jour (restore.html, dashboard_user.html)
+- ✅ Service redémarré et fonctionnel
+
+**FR1 (192.168.83.16)** :
+- ✅ Binaire compilé avec API de téléchargement chiffré
+- ✅ Fix master key (lecture depuis DB)
+- ✅ Support encodage URL pour chemins spéciaux
+- ✅ Service redémarré et fonctionnel
+
+### 📝 Commits
+
+```
+28c26d7 - feat: Add remote restore API endpoints on peer servers (Palier 1/4)
+d1c1de2 - feat: Query peer servers for remote backups (Palier 2/4)
+f679d9f - feat: Implement remote restore with local decryption (Palier 3/4)
+4f54713 - fix: Add FormatBytes and FormatTime to global template functions
+c596396 - feat: Add web interface for file restoration from encrypted backups (Session 12) [INITIAL]
+À venir  - feat: Add multiple file selection and ZIP download (Palier 4/4)
+À venir  - fix: Read master key from database instead of file (security)
+À venir  - fix: URL encoding for paths with spaces and special characters
+```
+
+### ⚠️ Notes importantes
+
+1. **Architecture P2P** : Chaque serveur peut être à la fois serveur d'origine (pour ses utilisateurs) et serveur pair (pour les utilisateurs d'autres serveurs)
+
+2. **Pas d'interface sur les pairs** : Les pairs gardent leur interface `/restore` car ils peuvent aussi être des serveurs d'origine pour leurs propres utilisateurs
+
+3. **Rétrocompatibilité** : Les anciennes API restent fonctionnelles, seules les nouvelles API de restauration distante ont été ajoutées
+
+4. **Mot de passe P2P obligatoire** : Pour la sécurité, il est fortement recommandé de configurer un mot de passe P2P sur chaque pair
+
+5. **Fix sécurité master key** : La master key est maintenant stockée et lue uniquement depuis la base de données, plus de fichier en clair
+
+**Statut** : 🟢 **COMPLÈTE ET TESTÉE**
+
+---
+
 ## 📝 Prochaines étapes (Roadmap)
 
 ### 🎯 Priorité 1 - Court terme
 
 **Session 12 : Interface web de restauration** 📂
-- Explorateur de fichiers pour naviguer dans les backups chiffrés
-- Liste des backups disponibles par utilisateur/partage
-- Navigation dans l'arborescence des fichiers backupés
-- Déchiffrement à la volée avec la clé utilisateur
-- Téléchargement sélectif de fichiers
-- Restauration complète d'un partage
-- Interface intuitive avec prévisualisation
+- ✅ **COMPLÈTE ET TESTÉE** - Voir section ci-dessus
+- ✅ Sélection multiple et téléchargement ZIP
+- ✅ Fix sécurité master key
 
-**Session 14 : Export/Import configuration serveur** 💾
+**Session 14 : Audit de sécurité complet** 🔒
+- **Audit des permissions fichiers**
+  - Vérifier permissions `/srv/anemone/` (600/700)
+  - Vérifier ownership des fichiers sensibles
+  - Vérifier permissions base de données
+  - Vérifier permissions certificats TLS
+- **Audit des clés de chiffrement**
+  - Vérifier que la master key est uniquement en DB
+  - Vérifier le chiffrement des clés utilisateurs
+  - Vérifier l'absence de clés en clair sur le disque
+  - Tester la rotation de clés
+- **Audit des endpoints API**
+  - Vérifier l'authentification sur tous les endpoints
+  - Tester les tentatives d'accès non autorisées
+  - Vérifier la protection CSRF
+  - Tester les injections SQL
+  - Vérifier la validation des inputs
+  - Tester path traversal sur les endpoints de fichiers
+- **Audit du chiffrement P2P**
+  - Vérifier que les fichiers sont bien chiffrés sur les pairs
+  - Tester le déchiffrement depuis le serveur d'origine uniquement
+  - Vérifier l'impossibilité de déchiffrer depuis un pair
+- **Audit des logs**
+  - Vérifier qu'aucune donnée sensible n'est loggée
+  - Vérifier l'absence de mots de passe en clair dans les logs
+- **Tests de pénétration**
+  - Brute force login
+  - Tentatives d'élévation de privilèges
+  - Tentatives d'accès aux données d'autres utilisateurs
+  - Tests XSS et injections
+- **Documentation**
+  - Documenter les bonnes pratiques de sécurité
+  - Créer un guide de déploiement sécurisé
+  - Documenter les procédures d'urgence
+
+**Session 15 : Export/Import configuration serveur** 💾
 - Export complet de la configuration serveur (JSON chiffré)
   - Base de données (users, peers, shares, quotas, config)
   - Clés de chiffrement
