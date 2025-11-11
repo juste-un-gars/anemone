@@ -5,6 +5,7 @@
 package web
 
 import (
+	"archive/zip"
 	"bytes"
 	"crypto/rand"
 	"crypto/tls"
@@ -17,6 +18,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -205,6 +207,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/api/restore/backups", auth.RequireAuth(server.handleAPIRestoreBackups))
 	mux.HandleFunc("/api/restore/files", auth.RequireAuth(server.handleAPIRestoreFiles))
 	mux.HandleFunc("/api/restore/download", auth.RequireAuth(server.handleAPIRestoreDownload))
+	mux.HandleFunc("/api/restore/download-multiple", auth.RequireAuth(server.handleAPIRestoreDownloadMultiple))
 
 	// Admin routes - Shares
 	mux.HandleFunc("/admin/shares", auth.RequireAdmin(server.handleAdminShares))
@@ -3412,15 +3415,14 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get master key
-	masterKeyPath := filepath.Join(s.cfg.DataDir, "keys", "master.key")
-	masterKeyData, err := os.ReadFile(masterKeyPath)
+	// Get master key from database
+	var masterKey string
+	err = s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
 	if err != nil {
 		log.Printf("Error reading master key: %v", err)
 		http.Error(w, "Failed to read master key", http.StatusInternalServerError)
 		return
 	}
-	masterKey := string(masterKeyData)
 
 	// Decrypt user key
 	userKey, err := crypto.DecryptKey(string(encryptedKey), masterKey)
@@ -3543,15 +3545,14 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Get master key
-	masterKeyPath := filepath.Join(s.cfg.DataDir, "keys", "master.key")
-	masterKeyData, err := os.ReadFile(masterKeyPath)
+	// Get master key from database
+	var masterKey string
+	err = s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
 	if err != nil {
 		log.Printf("Error reading master key: %v", err)
 		http.Error(w, "Failed to read master key", http.StatusInternalServerError)
 		return
 	}
-	masterKey := string(masterKeyData)
 
 	// Decrypt user key
 	userKey, err := crypto.DecryptKey(string(encryptedKey), masterKey)
@@ -3613,6 +3614,337 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 	}
 
 	log.Printf("User %s downloaded file %s from peer %s backup %s", session.Username, filePath, peer.Name, shareName)
+}
+
+// handleAPIRestoreDownloadMultiple downloads and decrypts multiple files/folders from a remote peer as ZIP
+// POST /api/restore/download-multiple?peer_id={id}&backup={share_name}
+// Form data: paths[] (multiple)
+func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := r.ParseForm()
+	if err != nil {
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		return
+	}
+
+	peerIDStr := r.URL.Query().Get("peer_id")
+	shareName := r.URL.Query().Get("backup")
+	paths := r.Form["paths"]
+
+	if peerIDStr == "" || shareName == "" || len(paths) == 0 {
+		http.Error(w, "Missing peer_id, backup, or paths", http.StatusBadRequest)
+		return
+	}
+
+	peerID, err := strconv.Atoi(peerIDStr)
+	if err != nil {
+		http.Error(w, "Invalid peer_id", http.StatusBadRequest)
+		return
+	}
+
+	// Get peer info
+	peer, err := peers.GetByID(s.db, peerID)
+	if err != nil {
+		log.Printf("Error getting peer %d: %v", peerID, err)
+		http.Error(w, "Peer not found", http.StatusNotFound)
+		return
+	}
+
+	// Get user encryption key
+	var encryptedKey []byte
+	err = s.db.QueryRow("SELECT encryption_key_encrypted FROM users WHERE id = ?", session.UserID).Scan(&encryptedKey)
+	if err != nil {
+		log.Printf("Error getting user encryption key: %v", err)
+		http.Error(w, "Failed to get encryption key", http.StatusInternalServerError)
+		return
+	}
+
+	// Get master key from database
+	var masterKey string
+	err = s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
+	if err != nil {
+		log.Printf("Error reading master key: %v", err)
+		http.Error(w, "Failed to read master key", http.StatusInternalServerError)
+		return
+	}
+
+	// Decrypt user key
+	userKey, err := crypto.DecryptKey(string(encryptedKey), masterKey)
+	if err != nil {
+		log.Printf("Error decrypting user key: %v", err)
+		http.Error(w, "Failed to decrypt user key", http.StatusInternalServerError)
+		return
+	}
+
+	// Download manifest to determine which paths are files vs directories
+	baseManifestURL := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-manifest", peer.Address, peer.Port)
+	manifestURL, err := buildURL(baseManifestURL, map[string]string{
+		"user_id":    strconv.Itoa(session.UserID),
+		"share_name": shareName,
+	})
+	if err != nil {
+		http.Error(w, "Failed to build manifest URL", http.StatusInternalServerError)
+		return
+	}
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   300 * time.Second, // 5 min timeout for large operations
+	}
+
+	manifestReq, err := http.NewRequest("GET", manifestURL, nil)
+	if err != nil {
+		http.Error(w, "Failed to create manifest request", http.StatusInternalServerError)
+		return
+	}
+
+	if peer.Password != nil && *peer.Password != "" {
+		manifestReq.Header.Set("X-Sync-Password", *peer.Password)
+	}
+
+	manifestResp, err := client.Do(manifestReq)
+	if err != nil {
+		log.Printf("Error downloading manifest from peer %s: %v", peer.Name, err)
+		http.Error(w, "Failed to contact peer", http.StatusInternalServerError)
+		return
+	}
+	defer manifestResp.Body.Close()
+
+	if manifestResp.StatusCode != http.StatusOK {
+		log.Printf("Peer %s returned status %d for manifest", peer.Name, manifestResp.StatusCode)
+		http.Error(w, "Failed to get manifest from peer", http.StatusInternalServerError)
+		return
+	}
+
+	// Decrypt manifest
+	var manifestBuf bytes.Buffer
+	err = crypto.DecryptStream(manifestResp.Body, &manifestBuf, userKey)
+	if err != nil {
+		log.Printf("Error decrypting manifest: %v", err)
+		http.Error(w, "Failed to decrypt manifest", http.StatusInternalServerError)
+		return
+	}
+
+	// Parse manifest
+	var manifest sync.SyncManifest
+	err = json.Unmarshal(manifestBuf.Bytes(), &manifest)
+	if err != nil {
+		log.Printf("Error parsing manifest: %v", err)
+		http.Error(w, "Failed to parse manifest", http.StatusInternalServerError)
+		return
+	}
+
+	// Build file tree from manifest
+	fileTree := buildFileTreeFromManifest(&manifest)
+
+	// Expand paths: for each path, determine if it's a file or directory
+	// and collect all file paths to download
+	filesToDownload := make([]string, 0)
+	for _, path := range paths {
+		node := getNodeAtPath(fileTree, path)
+		if node == nil {
+			continue // Skip invalid paths
+		}
+
+		if node.IsDir {
+			// Collect all files in directory recursively
+			collectFilesRecursive(node, &filesToDownload)
+		} else {
+			// It's a file, add directly
+			filesToDownload = append(filesToDownload, path)
+		}
+	}
+
+	if len(filesToDownload) == 0 {
+		http.Error(w, "No files to download", http.StatusBadRequest)
+		return
+	}
+
+	// Set headers for ZIP download
+	zipFileName := fmt.Sprintf("restore_%s_%d.zip", shareName, time.Now().Unix())
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", zipFileName))
+
+	// Create ZIP writer
+	zipWriter := zip.NewWriter(w)
+	defer zipWriter.Close()
+
+	// Download and add each file to ZIP
+	for _, filePath := range filesToDownload {
+		// Download encrypted file from peer
+		baseURL := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-file", peer.Address, peer.Port)
+		fileURL, err := buildURL(baseURL, map[string]string{
+			"user_id":    strconv.Itoa(session.UserID),
+			"share_name": shareName,
+			"path":       filePath,
+		})
+		if err != nil {
+			log.Printf("Error building URL for file %s: %v", filePath, err)
+			continue
+		}
+
+		fileReq, err := http.NewRequest("GET", fileURL, nil)
+		if err != nil {
+			log.Printf("Error creating request for file %s: %v", filePath, err)
+			continue
+		}
+
+		if peer.Password != nil && *peer.Password != "" {
+			fileReq.Header.Set("X-Sync-Password", *peer.Password)
+		}
+
+		fileResp, err := client.Do(fileReq)
+		if err != nil {
+			log.Printf("Error downloading file %s from peer %s: %v", filePath, peer.Name, err)
+			continue
+		}
+
+		if fileResp.StatusCode != http.StatusOK {
+			log.Printf("Peer %s returned status %d for file %s", peer.Name, fileResp.StatusCode, filePath)
+			fileResp.Body.Close()
+			continue
+		}
+
+		// Decrypt file to a buffer
+		var decryptedBuf bytes.Buffer
+		err = crypto.DecryptStream(fileResp.Body, &decryptedBuf, userKey)
+		fileResp.Body.Close()
+
+		if err != nil {
+			log.Printf("Error decrypting file %s: %v", filePath, err)
+			continue
+		}
+
+		// Add file to ZIP
+		// Remove leading slash for ZIP entries
+		zipPath := strings.TrimPrefix(filePath, "/")
+		zipEntry, err := zipWriter.Create(zipPath)
+		if err != nil {
+			log.Printf("Error creating ZIP entry for %s: %v", filePath, err)
+			continue
+		}
+
+		_, err = zipEntry.Write(decryptedBuf.Bytes())
+		if err != nil {
+			log.Printf("Error writing ZIP entry for %s: %v", filePath, err)
+			continue
+		}
+	}
+
+	log.Printf("User %s downloaded %d files from peer %s backup %s as ZIP", session.Username, len(filesToDownload), peer.Name, shareName)
+}
+
+// Helper functions for file tree navigation
+
+type FileTreeNode struct {
+	Name     string
+	Path     string
+	IsDir    bool
+	Size     int64
+	ModTime  time.Time
+	Children map[string]*FileTreeNode
+}
+
+func buildFileTreeFromManifest(manifest *sync.SyncManifest) *FileTreeNode {
+	root := &FileTreeNode{
+		Name:     "/",
+		Path:     "/",
+		IsDir:    true,
+		Children: make(map[string]*FileTreeNode),
+	}
+
+	for filePath, file := range manifest.Files {
+		parts := strings.Split(strings.Trim(filePath, "/"), "/")
+		currentNode := root
+
+		// Create directory nodes
+		for i, part := range parts[:len(parts)-1] {
+			if _, exists := currentNode.Children[part]; !exists {
+				dirPath := "/" + strings.Join(parts[:i+1], "/")
+				currentNode.Children[part] = &FileTreeNode{
+					Name:     part,
+					Path:     dirPath,
+					IsDir:    true,
+					Children: make(map[string]*FileTreeNode),
+				}
+			}
+			currentNode = currentNode.Children[part]
+		}
+
+		// Add file node
+		fileName := parts[len(parts)-1]
+		currentNode.Children[fileName] = &FileTreeNode{
+			Name:    fileName,
+			Path:    filePath,
+			IsDir:   false,
+			Size:    file.Size,
+			ModTime: file.ModTime,
+		}
+	}
+
+	return root
+}
+
+func getNodeAtPath(root *FileTreeNode, path string) *FileTreeNode {
+	if path == "/" {
+		return root
+	}
+
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	currentNode := root
+
+	for _, part := range parts {
+		if currentNode.Children == nil {
+			return nil
+		}
+		node, exists := currentNode.Children[part]
+		if !exists {
+			return nil
+		}
+		currentNode = node
+	}
+
+	return currentNode
+}
+
+func collectFilesRecursive(node *FileTreeNode, files *[]string) {
+	if !node.IsDir {
+		*files = append(*files, node.Path)
+		return
+	}
+
+	for _, child := range node.Children {
+		collectFilesRecursive(child, files)
+	}
+}
+
+// buildURL constructs a URL with properly encoded query parameters
+func buildURL(baseURL string, params map[string]string) (string, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return "", err
+	}
+
+	q := u.Query()
+	for key, value := range params {
+		q.Set(key, value)
+	}
+	u.RawQuery = q.Encode()
+
+	return u.String(), nil
 }
 
 // handleAPISyncListUserBackups lists available backups for a given user on this peer
