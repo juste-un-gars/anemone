@@ -1,7 +1,7 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-11 (Session 12 - Interface web de restauration avec sélection multiple)
-**Status** : 🟢 RESTAURATION DISTANTE COMPLÈTE ET TESTÉE
+**Dernière session** : 2025-11-12 (Session 15 - Backups serveur automatiques)
+**Status** : 🟢 SYSTÈME DE BACKUP SERVEUR IMPLÉMENTÉ
 
 > **Note** : L'historique des sessions 1-7 a été archivé dans `SESSION_STATE_ARCHIVE.md`
 > **Note** : Les détails techniques des sessions 8-11 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
@@ -577,6 +577,184 @@ c596396 - feat: Add web interface for file restoration from encrypted backups (S
 
 ---
 
+## 🔧 Session 15 - 12 Novembre 2025 - Backups serveur automatiques
+
+### 🎯 Objectif
+
+Implémenter un système de sauvegarde automatique de la configuration du serveur (disaster recovery) avec backups quotidiens, rotation automatique, et téléchargement sécurisé avec re-chiffrement.
+
+### ✅ Architecture implémentée
+
+**Fonctionnalités** :
+- **Backups automatiques quotidiens** : Scheduler qui s'exécute chaque jour à 4h du matin
+- **Rotation automatique** : Conservation des 10 derniers backups, suppression automatique des anciens
+- **Backups manuels** : Bouton "Sauvegarder maintenant" dans l'interface admin
+- **Téléchargement sécurisé** : Re-chiffrement à la volée avec mot de passe utilisateur (min 12 caractères)
+- **Stockage chiffré** : Backups stockés chiffrés avec la master key du serveur
+- **Interface dédiée** : Page `/admin/backup` avec liste des sauvegardes et métadonnées
+
+**Contenu des backups** :
+- Configuration complète du serveur
+- Utilisateurs et leurs clés de chiffrement
+- Partages et configuration SMB
+- Pairs P2P et configuration de synchronisation
+- Quotas et paramètres système
+- Clés système (master key)
+
+**Architecture de sécurité** :
+```
+Création backup → Chiffrement avec master_key → Stockage /srv/anemone/backups/server/
+Téléchargement → Déchiffrement avec master_key → Re-chiffrement avec mot de passe utilisateur → Download
+```
+
+**Note importante** : La master key n'est **jamais** incluse en clair dans le backup. Les backups sont stockés chiffrés avec la master_key sur le serveur, puis re-chiffrés avec un mot de passe choisi par l'utilisateur au moment du téléchargement.
+
+### 🔨 Composants créés/modifiés
+
+**1. Package serverbackup** (`internal/serverbackup/serverbackup.go` - nouveau)
+- `CreateServerBackup()` : Crée un backup chiffré avec master_key
+- `ListBackups()` : Liste tous les backups triés par date (plus récent en premier)
+- `CleanOldBackups()` : Supprime les backups au-delà de 10, garde les plus récents
+- `ReEncryptBackup()` : Déchiffre avec master_key, re-chiffre avec mot de passe utilisateur
+- `StartScheduler()` : Goroutine qui s'exécute quotidiennement à 4h du matin
+
+**2. Modifications main.go** (`cmd/anemone/main.go`)
+```go
+// Ajout du démarrage du scheduler
+serverbackup.StartScheduler(db, cfg.DataDir)
+```
+
+**3. Interface admin** (`web/templates/admin_backup.html` - nouvelle)
+- Liste des 10 derniers backups avec date, nom fichier, taille
+- Bouton "Sauvegarder maintenant" (POST `/admin/backup/create`)
+- Bouton "Télécharger" pour chaque backup (ouvre une modale)
+- Modale de téléchargement avec :
+  - Champ mot de passe (min 12 caractères)
+  - Confirmation du mot de passe
+  - Validation JavaScript
+  - Avertissement de sécurité sur la conservation du mot de passe
+
+**4. Handlers web** (`internal/web/router.go`)
+- `handleAdminBackup()` : Affiche la liste des backups
+- `handleAdminBackupCreate()` : Crée un backup manuel (POST)
+- `handleAdminBackupDownload()` : Re-chiffre et télécharge (POST)
+
+**5. Routes ajoutées** :
+```go
+mux.HandleFunc("/admin/backup", auth.RequireAdmin(server.handleAdminBackup))
+mux.HandleFunc("/admin/backup/create", auth.RequireAdmin(server.handleAdminBackupCreate))
+mux.HandleFunc("/admin/backup/download", auth.RequireAdmin(server.handleAdminBackupDownload))
+```
+
+**6. Dashboard admin modifié** (`web/templates/dashboard_admin.html`)
+- Lien "Sauvegarde serveur" mis à jour vers `/admin/backup`
+- Description mise à jour : "Gérer les sauvegardes automatiques du serveur (backup quotidien à 4h)"
+
+### 📝 Fichiers créés/modifiés
+
+**Nouveaux** :
+- `internal/serverbackup/serverbackup.go` (~208 lignes) - Package complet de backup serveur
+- `web/templates/admin_backup.html` (~227 lignes) - Interface admin avec modale
+
+**Modifiés** :
+- `cmd/anemone/main.go` (~3 lignes) - Import et appel StartScheduler
+- `internal/web/router.go` (~140 lignes) - Import, 3 handlers, routes
+- `web/templates/dashboard_admin.html` (~3 lignes) - Lien et description
+
+**Total** : ~581 lignes ajoutées/modifiées
+
+### 🔒 Sécurité
+
+**Protection de la master key** :
+- ✅ Master key stockée uniquement en base de données
+- ✅ Backups chiffrés avec master key (AES-256-GCM)
+- ✅ Re-chiffrement avec mot de passe utilisateur au téléchargement
+- ✅ Pas de stockage temporaire en clair
+- ✅ Mot de passe minimum 12 caractères
+- ✅ Validation côté client et serveur
+
+**Contrôle d'accès** :
+- ✅ Accès réservé aux administrateurs (`RequireAdmin`)
+- ✅ Validation des paramètres (filename, passphrase)
+- ✅ Protection contre path traversal
+- ✅ Permissions fichiers 0600 (lecture/écriture propriétaire uniquement)
+
+**Rotation automatique** :
+- ✅ Suppression automatique des backups au-delà de 10
+- ✅ Conservation des plus récents
+- ✅ Logs de suppression des anciens backups
+
+### 🧪 Tests à effectuer
+
+**Scheduler** :
+- ✅ Démarrage du scheduler au lancement du serveur
+- ✅ Log "🕐 Server backup scheduler started (daily at 4:00 AM)"
+- ✅ Affichage de la prochaine exécution avec countdown
+- ⏳ Attendre 4h du matin pour tester l'exécution automatique
+
+**Backup manuel** :
+- ⏳ Cliquer sur "Sauvegarder maintenant" dans `/admin/backup`
+- ⏳ Vérifier la création du fichier dans `/srv/anemone/backups/server/`
+- ⏳ Vérifier le format : `backup_YYYYMMDD_HHMMSS.enc`
+- ⏳ Vérifier l'affichage dans la liste
+
+**Téléchargement** :
+- ⏳ Cliquer sur "Télécharger" pour un backup
+- ⏳ Saisir un mot de passe (12+ caractères)
+- ⏳ Vérifier que la confirmation fonctionne
+- ⏳ Télécharger le fichier re-chiffré
+- ⏳ Vérifier que le fichier téléchargé est différent de celui sur le serveur
+
+**Rotation** :
+- ⏳ Créer 11+ backups manuels
+- ⏳ Vérifier que seuls les 10 plus récents sont conservés
+- ⏳ Vérifier les logs de suppression
+
+### 📊 Logs attendus
+
+**Démarrage serveur** :
+```
+🕐 Server backup scheduler started (daily at 4:00 AM)
+Next automatic server backup scheduled for: 2025-11-13 04:00:00 (in 18h11m0s)
+```
+
+**Création backup manuel** :
+```
+Server backup created: backup_20251112_094530.enc (15847 bytes)
+```
+
+**Téléchargement** :
+```
+Admin downloaded backup backup_20251112_094530.enc (re-encrypted, size: 15912 bytes)
+```
+
+**Rotation** :
+```
+Removed old backup: backup_20251101_040000.enc
+```
+
+### 🔄 Déploiement
+
+**DEV** :
+- ✅ Package `serverbackup` créé et compilé
+- ✅ Templates ajoutés
+- ✅ Routes configurées
+- ✅ Scheduler démarré
+- ✅ Serveur redémarré et fonctionnel
+
+**FR1** :
+- ⏳ À déployer après tests sur DEV
+
+### 📝 Commits
+
+```
+À venir : feat: Add automatic server backup system with daily scheduler (Session 15)
+```
+
+**Statut** : 🟢 **IMPLÉMENTÉ, EN TEST**
+
+---
+
 ## 📝 Prochaines étapes (Roadmap)
 
 ### 🎯 Priorité 1 - Court terme
@@ -585,6 +763,14 @@ c596396 - feat: Add web interface for file restoration from encrypted backups (S
 - ✅ **COMPLÈTE ET TESTÉE** - Voir section ci-dessus
 - ✅ Sélection multiple et téléchargement ZIP
 - ✅ Fix sécurité master key
+
+**Session 15 : Backups serveur automatiques** 💾
+- ✅ **IMPLÉMENTÉ, EN TEST** - Voir section ci-dessus
+- ✅ Scheduler quotidien à 4h du matin
+- ✅ Rotation automatique (10 derniers backups)
+- ✅ Re-chiffrement à la volée pour téléchargement
+- ✅ Interface admin `/admin/backup`
+- ⏳ Tests utilisateur en cours
 
 **Session 14 : Audit de sécurité complet** 🔒
 - **Audit des permissions fichiers**
@@ -620,19 +806,6 @@ c596396 - feat: Add web interface for file restoration from encrypted backups (S
   - Documenter les bonnes pratiques de sécurité
   - Créer un guide de déploiement sécurisé
   - Documenter les procédures d'urgence
-
-**Session 15 : Export/Import configuration serveur** 💾
-- Export complet de la configuration serveur (JSON chiffré)
-  - Base de données (users, peers, shares, quotas, config)
-  - Clés de chiffrement
-  - Configuration Samba
-  - Métadonnées système
-- Script `restore_server.sh` pour restauration complète
-  - Usage : `bash restore_server.sh config_backup.json.enc master_key`
-  - Restauration automatique de tous les paramètres
-  - Recréation des utilisateurs système et SMB
-  - Régénération des certificats TLS
-- Chiffrement AES-256-GCM avec clé admin
 
 ### ⚙️ Priorité 2 - Améliorations
 

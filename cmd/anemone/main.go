@@ -13,6 +13,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/config"
 	"github.com/juste-un-gars/anemone/internal/database"
 	"github.com/juste-un-gars/anemone/internal/scheduler"
+	"github.com/juste-un-gars/anemone/internal/serverbackup"
 	"github.com/juste-un-gars/anemone/internal/tls"
 	"github.com/juste-un-gars/anemone/internal/web"
 )
@@ -40,6 +41,9 @@ func main() {
 
 	// Start automatic synchronization scheduler
 	scheduler.Start(db)
+
+	// Start automatic server backup scheduler (daily at 4 AM)
+	serverbackup.StartScheduler(db, cfg.DataDir)
 
 	// Initialize web server
 	router := web.NewRouter(db, cfg)

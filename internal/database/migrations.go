@@ -300,5 +300,19 @@ func migrateUsersTable(db *sql.DB) error {
 		}
 	}
 
+	// Add restore_acknowledged column if it doesn't exist
+	if !existingColumns["restore_acknowledged"] {
+		if _, err := db.Exec("ALTER TABLE users ADD COLUMN restore_acknowledged BOOLEAN DEFAULT 0"); err != nil {
+			return fmt.Errorf("failed to add restore_acknowledged column: %w", err)
+		}
+	}
+
+	// Add restore_completed column if it doesn't exist
+	if !existingColumns["restore_completed"] {
+		if _, err := db.Exec("ALTER TABLE users ADD COLUMN restore_completed BOOLEAN DEFAULT 0"); err != nil {
+			return fmt.Errorf("failed to add restore_completed column: %w", err)
+		}
+	}
+
 	return nil
 }

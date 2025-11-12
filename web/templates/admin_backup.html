@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sauvegardes serveur - Anemone</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/dashboard" class="text-2xl font-bold text-gray-900">
+                        🪸 Anemone
+                    </a>
+                    <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                        Admin
+                    </span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700">{{.Session.Username}}</span>
+                    <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
+                        Déconnexion
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="mb-6">
+            <a href="/admin" class="text-purple-600 hover:text-purple-800">← Retour au dashboard</a>
+        </div>
+
+        <!-- Header -->
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold text-gray-900">💾 Sauvegardes serveur</h2>
+            <p class="mt-2 text-gray-600">
+                Backups automatiques quotidiens à 4h du matin • Conservation des 10 derniers
+            </p>
+        </div>
+
+        <!-- Manual Backup -->
+        <div class="bg-white shadow rounded-lg p-6 mb-8">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Sauvegarde manuelle</h3>
+            <p class="text-sm text-gray-600 mb-4">
+                Créer une sauvegarde immédiate de la configuration du serveur
+            </p>
+            <form method="POST" action="/admin/backup/create">
+                <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
+                    📥 Sauvegarder maintenant
+                </button>
+            </form>
+        </div>
+
+        <!-- Backups List -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900">Dernières sauvegardes</h3>
+            </div>
+
+            {{if .Backups}}
+            <ul class="divide-y divide-gray-200">
+                {{range .Backups}}
+                <li class="px-6 py-4 hover:bg-gray-50">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="flex-shrink-0">
+                                <svg class="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-gray-900">
+                                    {{.FormattedDate}}
+                                </p>
+                                <p class="text-sm text-gray-500">
+                                    {{.Filename}} • {{.FormattedSize}}
+                                </p>
+                            </div>
+                        </div>
+                        <div>
+                            <button onclick="downloadBackup('{{.Filename}}')" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                📥 Télécharger
+                            </button>
+                        </div>
+                    </div>
+                </li>
+                {{end}}
+            </ul>
+            {{else}}
+            <div class="px-6 py-12 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">Aucune sauvegarde</h3>
+                <p class="mt-1 text-sm text-gray-500">
+                    Créez une sauvegarde manuelle ou attendez la prochaine sauvegarde automatique
+                </p>
+            </div>
+            {{end}}
+        </div>
+
+        <!-- Info Box -->
+        <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h4 class="text-sm font-semibold text-blue-900 mb-2">ℹ️ Informations importantes</h4>
+            <ul class="text-sm text-blue-800 space-y-1">
+                <li>• Les sauvegardes sont chiffrées et stockées sur le serveur</li>
+                <li>• Lors du téléchargement, vous devrez choisir un mot de passe pour sécuriser le fichier</li>
+                <li>• Conservez précieusement ce mot de passe, vous en aurez besoin pour la restauration</li>
+                <li>• Les sauvegardes incluent : utilisateurs, partages, pairs, configuration système</li>
+                <li>• Les fichiers utilisateurs ne sont PAS inclus dans les sauvegardes serveur</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Download Modal -->
+<div id="downloadModal" class="hidden fixed z-10 inset-0 overflow-y-auto">
+    <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
+
+        <div class="bg-white rounded-lg overflow-hidden shadow-xl transform transition-all sm:max-w-lg sm:w-full">
+            <div class="bg-white px-6 pt-5 pb-4">
+                <div class="sm:flex sm:items-start">
+                    <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
+                            Télécharger la sauvegarde
+                        </h3>
+
+                        <form id="downloadForm" method="POST" action="/admin/backup/download">
+                            <input type="hidden" name="filename" id="downloadFilename">
+
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Mot de passe de chiffrement
+                                </label>
+                                <input type="password" name="passphrase" id="passphrase" required minlength="12"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    placeholder="Minimum 12 caractères">
+                                <p class="mt-1 text-xs text-gray-500">
+                                    Ce mot de passe chiffrera le fichier téléchargé
+                                </p>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Confirmer le mot de passe
+                                </label>
+                                <input type="password" name="passphrase_confirm" id="passphrase_confirm" required minlength="12"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    placeholder="Saisir à nouveau">
+                            </div>
+
+                            <div class="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+                                <p class="text-xs text-yellow-800">
+                                    ⚠️ <strong>Notez ce mot de passe !</strong> Vous en aurez besoin pour restaurer le serveur.
+                                </p>
+                            </div>
+
+                            <div class="flex justify-end space-x-3">
+                                <button type="button" onclick="closeModal()"
+                                    class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                    Annuler
+                                </button>
+                                <button type="submit"
+                                    class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white anemone-gradient hover:opacity-90">
+                                    Télécharger
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function downloadBackup(filename) {
+        document.getElementById('downloadFilename').value = filename;
+        document.getElementById('downloadModal').classList.remove('hidden');
+        document.getElementById('passphrase').value = '';
+        document.getElementById('passphrase_confirm').value = '';
+    }
+
+    function closeModal() {
+        document.getElementById('downloadModal').classList.add('hidden');
+    }
+
+    document.getElementById('downloadForm').addEventListener('submit', function(e) {
+        const passphrase = document.getElementById('passphrase').value;
+        const confirm = document.getElementById('passphrase_confirm').value;
+
+        if (passphrase !== confirm) {
+            e.preventDefault();
+            alert('Les mots de passe ne correspondent pas !');
+            return;
+        }
+
+        if (passphrase.length < 12) {
+            e.preventDefault();
+            alert('Le mot de passe doit contenir au moins 12 caractères');
+            return;
+        }
+    });
+
+    // Close modal on escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeModal();
+        }
+    });
+</script>
+
+</body>
+</html>

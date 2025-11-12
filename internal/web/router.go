@@ -28,6 +28,8 @@ import (
 
 	"github.com/juste-un-gars/anemone/internal/activation"
 	"github.com/juste-un-gars/anemone/internal/auth"
+	backupPkg "github.com/juste-un-gars/anemone/internal/backup"
+	"github.com/juste-un-gars/anemone/internal/bulkrestore"
 	"github.com/juste-un-gars/anemone/internal/config"
 	"github.com/juste-un-gars/anemone/internal/crypto"
 	"github.com/juste-un-gars/anemone/internal/i18n"
@@ -36,6 +38,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/quota"
 	"github.com/juste-un-gars/anemone/internal/reset"
 	"github.com/juste-un-gars/anemone/internal/restore"
+	"github.com/juste-un-gars/anemone/internal/serverbackup"
 	"github.com/juste-un-gars/anemone/internal/shares"
 	"github.com/juste-un-gars/anemone/internal/smb"
 	"github.com/juste-un-gars/anemone/internal/sync"
@@ -169,8 +172,13 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/reset-password", server.handleResetPasswordForm)
 	mux.HandleFunc("/reset-password/confirm", server.handleResetPasswordSubmit)
 
-	// Protected routes
-	mux.HandleFunc("/dashboard", auth.RequireAuth(server.handleDashboard))
+	// Restore warning routes (protected but bypass restore check)
+	mux.HandleFunc("/restore-warning", auth.RequireAuth(server.handleRestoreWarning))
+	mux.HandleFunc("/restore-warning/acknowledge", auth.RequireAuth(server.handleRestoreWarningAcknowledge))
+	mux.HandleFunc("/restore-warning/bulk", auth.RequireAuth(server.handleRestoreWarningBulk))
+
+	// Protected routes (with restore check)
+	mux.HandleFunc("/dashboard", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleDashboard)))
 
 	// Admin routes - Users
 	mux.HandleFunc("/admin/users", auth.RequireAdmin(server.handleAdminUsers))
@@ -195,19 +203,24 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/admin/incoming", auth.RequireAdmin(server.handleAdminIncoming))
 	mux.HandleFunc("/admin/incoming/delete", auth.RequireAdmin(server.handleAdminIncomingDelete))
 
-	// User routes
-	mux.HandleFunc("/trash", auth.RequireAuth(server.handleTrash))
-	mux.HandleFunc("/trash/", auth.RequireAuth(server.handleTrashActions))
-	mux.HandleFunc("/settings", auth.RequireAuth(server.handleSettings))
-	mux.HandleFunc("/settings/language", auth.RequireAuth(server.handleSettingsLanguage))
-	mux.HandleFunc("/settings/password", auth.RequireAuth(server.handleSettingsPassword))
+	// Admin routes - Server backup
+	mux.HandleFunc("/admin/backup", auth.RequireAdmin(server.handleAdminBackup))
+	mux.HandleFunc("/admin/backup/create", auth.RequireAdmin(server.handleAdminBackupCreate))
+	mux.HandleFunc("/admin/backup/download", auth.RequireAdmin(server.handleAdminBackupDownload))
 
-	// Restore routes (user can restore their own backups)
-	mux.HandleFunc("/restore", auth.RequireAuth(server.handleRestore))
-	mux.HandleFunc("/api/restore/backups", auth.RequireAuth(server.handleAPIRestoreBackups))
-	mux.HandleFunc("/api/restore/files", auth.RequireAuth(server.handleAPIRestoreFiles))
-	mux.HandleFunc("/api/restore/download", auth.RequireAuth(server.handleAPIRestoreDownload))
-	mux.HandleFunc("/api/restore/download-multiple", auth.RequireAuth(server.handleAPIRestoreDownloadMultiple))
+	// User routes (with restore check)
+	mux.HandleFunc("/trash", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleTrash)))
+	mux.HandleFunc("/trash/", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleTrashActions)))
+	mux.HandleFunc("/settings", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleSettings)))
+	mux.HandleFunc("/settings/language", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleSettingsLanguage)))
+	mux.HandleFunc("/settings/password", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleSettingsPassword)))
+
+	// Restore routes (user can restore their own backups) (with restore check)
+	mux.HandleFunc("/restore", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleRestore)))
+	mux.HandleFunc("/api/restore/backups", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleAPIRestoreBackups)))
+	mux.HandleFunc("/api/restore/files", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleAPIRestoreFiles)))
+	mux.HandleFunc("/api/restore/download", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleAPIRestoreDownload)))
+	mux.HandleFunc("/api/restore/download-multiple", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleAPIRestoreDownloadMultiple)))
 
 	// Admin routes - Shares
 	mux.HandleFunc("/admin/shares", auth.RequireAdmin(server.handleAdminShares))
@@ -4147,4 +4160,410 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 	io.Copy(w, encryptedFile)
 
 	log.Printf("Sent encrypted file %s for user %d share %s", filePath, userID, shareName)
+}
+
+// handleAdminBackupExport handles server configuration export
+func (s *Server) handleAdminBackupExport(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	if r.Method == "GET" {
+		// Display export form
+		data := struct {
+			Lang    string
+			Title   string
+			Session *auth.Session
+		}{
+			Lang:    lang,
+			Title:   i18n.T(lang, "backup.export.title"),
+			Session: session,
+		}
+		if err := s.templates.ExecuteTemplate(w, "admin_backup_export.html", data); err != nil {
+			log.Printf("Error rendering backup export template: %v", err)
+		}
+		return
+	}
+
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get passphrase from form
+	passphrase := r.FormValue("passphrase")
+	if passphrase == "" {
+		http.Error(w, "Passphrase is required", http.StatusBadRequest)
+		return
+	}
+
+	// Confirm passphrase
+	passphraseConfirm := r.FormValue("passphrase_confirm")
+	if passphrase != passphraseConfirm {
+		http.Error(w, "Passphrases do not match", http.StatusBadRequest)
+		return
+	}
+
+	// Get server name (optional)
+	serverName := r.FormValue("server_name")
+	if serverName == "" {
+		serverName = "Anemone Server"
+	}
+
+	// Export configuration
+	backup, err := backupPkg.ExportConfiguration(s.db, serverName)
+	if err != nil {
+		log.Printf("Error exporting configuration: %v", err)
+		http.Error(w, "Failed to export configuration", http.StatusInternalServerError)
+		return
+	}
+
+	// Encrypt backup
+	encryptedData, err := backupPkg.EncryptBackup(backup, passphrase)
+	if err != nil {
+		log.Printf("Error encrypting backup: %v", err)
+		http.Error(w, "Failed to encrypt backup", http.StatusInternalServerError)
+		return
+	}
+
+	// Generate filename with timestamp
+	timestamp := time.Now().Format("20060102_150405")
+	filename := fmt.Sprintf("anemone_backup_%s.enc", timestamp)
+
+	// Send encrypted file as download
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(encryptedData)))
+	w.WriteHeader(http.StatusOK)
+	w.Write(encryptedData)
+
+	log.Printf("Admin exported server configuration (backup size: %d bytes)", len(encryptedData))
+}
+
+// handleAdminBackup displays the list of server backups
+func (s *Server) handleAdminBackup(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	// Get backup directory path
+	backupDir := filepath.Join(s.cfg.DataDir, "backups", "server")
+
+	// List all backups
+	backupFiles, err := serverbackup.ListBackups(backupDir)
+	if err != nil {
+		log.Printf("Error listing backups: %v", err)
+		http.Error(w, "Failed to list backups", http.StatusInternalServerError)
+		return
+	}
+
+	// Format backups for template
+	type BackupInfo struct {
+		Filename      string
+		FormattedDate string
+		FormattedSize string
+	}
+
+	backups := make([]BackupInfo, 0, len(backupFiles))
+	for _, bf := range backupFiles {
+		// Format size in KB or MB
+		var sizeStr string
+		if bf.Size < 1024*1024 {
+			sizeStr = fmt.Sprintf("%.1f KB", float64(bf.Size)/1024)
+		} else {
+			sizeStr = fmt.Sprintf("%.2f MB", float64(bf.Size)/(1024*1024))
+		}
+
+		backups = append(backups, BackupInfo{
+			Filename:      bf.Filename,
+			FormattedDate: bf.CreatedAt.Format("02/01/2006 15:04:05"),
+			FormattedSize: sizeStr,
+		})
+	}
+
+	data := struct {
+		Lang    string
+		Session *auth.Session
+		Backups []BackupInfo
+	}{
+		Lang:    lang,
+		Session: session,
+		Backups: backups,
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "admin_backup.html", data); err != nil {
+		log.Printf("Error rendering backup template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}
+
+// handleAdminBackupCreate creates a manual server backup
+func (s *Server) handleAdminBackupCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get backup directory path
+	backupDir := filepath.Join(s.cfg.DataDir, "backups", "server")
+
+	// Create backup
+	backupPath, err := serverbackup.CreateServerBackup(s.db, backupDir)
+	if err != nil {
+		log.Printf("Error creating manual backup: %v", err)
+		http.Error(w, "Failed to create backup", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Manual server backup created: %s", backupPath)
+
+	// Redirect back to backup list
+	http.Redirect(w, r, "/admin/backup", http.StatusSeeOther)
+}
+
+// handleAdminBackupDownload downloads a backup re-encrypted with user passphrase
+func (s *Server) handleAdminBackupDownload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get parameters from form
+	filename := r.FormValue("filename")
+	passphrase := r.FormValue("passphrase")
+
+	if filename == "" || passphrase == "" {
+		http.Error(w, "Missing filename or passphrase", http.StatusBadRequest)
+		return
+	}
+
+	// Validate passphrase length
+	if len(passphrase) < 12 {
+		http.Error(w, "Passphrase must be at least 12 characters", http.StatusBadRequest)
+		return
+	}
+
+	// Get backup directory path
+	backupDir := filepath.Join(s.cfg.DataDir, "backups", "server")
+	backupPath := filepath.Join(backupDir, filename)
+
+	// Check if file exists
+	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+		http.Error(w, "Backup file not found", http.StatusNotFound)
+		return
+	}
+
+	// Re-encrypt backup with user passphrase
+	reEncryptedData, err := serverbackup.ReEncryptBackup(s.db, backupPath, passphrase)
+	if err != nil {
+		log.Printf("Error re-encrypting backup: %v", err)
+		http.Error(w, "Failed to prepare backup for download", http.StatusInternalServerError)
+		return
+	}
+
+	// Send as download
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(reEncryptedData)))
+	w.WriteHeader(http.StatusOK)
+	w.Write(reEncryptedData)
+
+	log.Printf("Admin downloaded backup %s (re-encrypted, size: %d bytes)", filename, len(reEncryptedData))
+}
+
+// handleRestoreWarning displays the restore warning page
+func (s *Server) handleRestoreWarning(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	// Get restore date from system_config
+	var restoreDate string
+	err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'server_restored_at'").Scan(&restoreDate)
+	if err != nil {
+		restoreDate = "Unknown"
+	}
+
+	// Get available backups from all peers for this user
+	type BackupInfo struct {
+		PeerID       int
+		PeerName     string
+		ShareName    string
+		FileCount    int
+		TotalSize    string
+		LastModified string
+	}
+
+	var availableBackups []BackupInfo
+
+	// Get all peers
+	peersList, err := peers.GetAll(s.db)
+	if err == nil {
+		client := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+			Timeout: 10 * time.Second,
+		}
+
+		for _, peer := range peersList {
+			// Query peer for user's backups
+			url := fmt.Sprintf("https://%s:%d/api/sync/list-user-backups?user_id=%d", peer.Address, peer.Port, session.UserID)
+
+			req, err := http.NewRequest("GET", url, nil)
+			if err != nil {
+				continue
+			}
+
+			if peer.Password != nil && *peer.Password != "" {
+				req.Header.Set("X-Sync-Password", *peer.Password)
+			}
+
+			resp, err := client.Do(req)
+			if err != nil {
+				continue
+			}
+
+			if resp.StatusCode == http.StatusOK {
+				var backups []struct {
+					ShareName    string `json:"share_name"`
+					FileCount    int    `json:"file_count"`
+					TotalSize    int64  `json:"total_size"`
+					LastModified string `json:"last_modified"`
+				}
+
+				if err := json.NewDecoder(resp.Body).Decode(&backups); err == nil {
+					for _, b := range backups {
+						availableBackups = append(availableBackups, BackupInfo{
+							PeerID:       peer.ID,
+							PeerName:     peer.Name,
+							ShareName:    b.ShareName,
+							FileCount:    b.FileCount,
+							TotalSize:    formatBytes(b.TotalSize),
+							LastModified: b.LastModified,
+						})
+					}
+				}
+			}
+			resp.Body.Close()
+		}
+	}
+
+	data := struct {
+		Lang              string
+		Title             string
+		Session           *auth.Session
+		RestoreDate       string
+		AvailableBackups  []BackupInfo
+	}{
+		Lang:             lang,
+		Title:            "Server Restored",
+		Session:          session,
+		RestoreDate:      restoreDate,
+		AvailableBackups: availableBackups,
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "restore_warning.html", data); err != nil {
+		log.Printf("Error rendering restore warning template: %v", err)
+	}
+}
+
+// handleRestoreWarningAcknowledge marks the restore as acknowledged for the user
+func (s *Server) handleRestoreWarningAcknowledge(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Update user's restore_acknowledged flag
+	_, err := s.db.Exec("UPDATE users SET restore_acknowledged = 1 WHERE id = ?", session.UserID)
+	if err != nil {
+		log.Printf("Error updating restore_acknowledged: %v", err)
+		http.Error(w, "Failed to acknowledge restore", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("User %s acknowledged server restore (manual restore)", session.Username)
+
+	// Redirect to dashboard
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+}
+
+// handleRestoreWarningBulk handles automatic bulk restore from a peer
+func (s *Server) handleRestoreWarningBulk(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Get peer ID and share name from form
+	peerIDStr := r.FormValue("peer_id")
+	shareName := r.FormValue("share_name")
+
+	if peerIDStr == "" || shareName == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Missing peer_id or share_name",
+		})
+		return
+	}
+
+	peerID, err := strconv.Atoi(peerIDStr)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid peer_id",
+		})
+		return
+	}
+
+	log.Printf("User %s starting bulk restore from peer %d share %s", session.Username, peerID, shareName)
+
+	// Start bulk restore in background
+	go func() {
+		// Note: We can't use progressChan in a simple HTTP request/response
+		// For now, we'll just do the restore and mark as complete
+		err := bulkrestore.BulkRestoreFromPeer(s.db, session.UserID, peerID, shareName, s.cfg.DataDir, nil)
+		if err != nil {
+			log.Printf("Bulk restore failed for user %s: %v", session.Username, err)
+		} else {
+			// Mark restore as completed
+			s.db.Exec("UPDATE users SET restore_acknowledged = 1, restore_completed = 1 WHERE id = ?", session.UserID)
+			log.Printf("Bulk restore completed successfully for user %s", session.Username)
+		}
+	}()
+
+	// Return immediate response (restore runs in background)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Bulk restore started in background",
+	})
 }

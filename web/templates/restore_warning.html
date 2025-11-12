@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚠️ Server Restored - Anemone</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-3xl w-full space-y-8">
+        <!-- Header -->
+        <div class="text-center">
+            <h1 class="text-4xl font-bold text-gray-900">🪸 Anemone</h1>
+            <div class="mt-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded-md">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <h2 class="text-lg font-medium text-yellow-800">
+                            Ce serveur a été restauré depuis une sauvegarde
+                        </h2>
+                        <p class="mt-2 text-sm text-yellow-700">
+                            Restauré le : <strong>{{.RestoreDate}}</strong>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Box -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-blue-900 mb-3">ℹ️ Que s'est-il passé ?</h3>
+            <ul class="list-disc list-inside text-blue-800 space-y-2">
+                <li>Votre configuration utilisateur a été restaurée (compte, mots de passe, quotas)</li>
+                <li>Vos partages SMB sont de nouveau configurés</li>
+                <li><strong>Vos fichiers ne sont pas encore sur ce serveur</strong></li>
+                <li>Vos fichiers existent toujours chiffrés sur les serveurs pairs distants</li>
+            </ul>
+        </div>
+
+        <!-- Available Backups -->
+        {{if .AvailableBackups}}
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">📦 Vos sauvegardes disponibles</h3>
+            <div class="space-y-3">
+                {{range .AvailableBackups}}
+                <div class="border border-gray-200 rounded-md p-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="font-medium text-gray-900">{{.PeerName}} - {{.ShareName}}</p>
+                            <p class="text-sm text-gray-600">{{.FileCount}} fichiers • {{.TotalSize}}</p>
+                            <p class="text-sm text-gray-500">Dernière modification : {{.LastModified}}</p>
+                        </div>
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+
+        <!-- Options -->
+        <div class="space-y-6">
+            <!-- Option 1: Manual Restore -->
+            <div class="bg-white shadow rounded-lg p-6 border-2 border-gray-200 hover:border-purple-400 transition">
+                <h3 class="text-xl font-semibold text-gray-900 mb-3">
+                    Option 1 : Restauration manuelle
+                </h3>
+                <p class="text-gray-700 mb-4">
+                    Je vais transférer mes fichiers depuis mon PC via SMB.<br>
+                    <span class="text-sm text-gray-600">(Recommandé si vous avez une copie locale de vos fichiers)</span>
+                </p>
+                <form method="POST" action="/restore-warning/acknowledge">
+                    <button type="submit" class="w-full px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+                        ✓ J'ai compris - Accéder au dashboard
+                    </button>
+                </form>
+            </div>
+
+            <!-- Option 2: Automatic Restore -->
+            {{if .AvailableBackups}}
+            <div class="bg-white shadow rounded-lg p-6 border-2 border-purple-200 hover:border-purple-400 transition">
+                <h3 class="text-xl font-semibold text-gray-900 mb-3">
+                    Option 2 : Restauration automatique
+                </h3>
+                <p class="text-gray-700 mb-4">
+                    Restaurer tous mes fichiers depuis un serveur pair distant.<br>
+                    <span class="text-sm text-gray-600">(Peut prendre du temps selon la taille des données)</span>
+                </p>
+
+                <form id="bulkRestoreForm" method="POST" action="/restore-warning/bulk">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Choisir le serveur source :
+                        </label>
+                        <select name="peer_id" id="peerSelect" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md border" required>
+                            <option value="">-- Sélectionner un serveur --</option>
+                            {{range .AvailableBackups}}
+                            <option value="{{.PeerID}}" data-share="{{.ShareName}}">{{.PeerName}} - {{.ShareName}} ({{.FileCount}} fichiers, {{.TotalSize}})</option>
+                            {{end}}
+                        </select>
+                        <input type="hidden" name="share_name" id="shareName" value="">
+                    </div>
+
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
+                        <p class="text-sm text-yellow-800">
+                            ⚠️ <strong>Attention :</strong> Cette opération peut prendre plusieurs minutes ou heures selon la taille de vos données. Ne fermez pas cette page pendant la restauration.
+                        </p>
+                    </div>
+
+                    <button type="submit" class="w-full px-6 py-3 border border-transparent text-base font-medium rounded-md text-white anemone-gradient hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                        🚀 Lancer la restauration automatique
+                    </button>
+                </form>
+
+                <!-- Progress (hidden by default) -->
+                <div id="progressContainer" class="hidden mt-6">
+                    <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+                        <p class="font-semibold text-blue-900 mb-2">⏳ Restauration en cours...</p>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+                            <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                        <p id="progressText" class="text-sm text-blue-800">Initialisation...</p>
+                    </div>
+                </div>
+            </div>
+            {{else}}
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <h3 class="text-xl font-semibold text-gray-600 mb-3">
+                    Option 2 : Restauration automatique
+                </h3>
+                <p class="text-gray-600">
+                    Aucune sauvegarde disponible sur les serveurs pairs distants.
+                </p>
+            </div>
+            {{end}}
+
+            <!-- Help -->
+            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center">
+                <h3 class="text-lg font-semibold text-gray-700 mb-2">Besoin d'aide ?</h3>
+                <p class="text-gray-600">
+                    Contactez votre administrateur pour plus d'informations sur la restauration du serveur.
+                </p>
+                <a href="/logout" class="mt-4 inline-block text-sm text-gray-500 hover:text-gray-700">
+                    Se déconnecter
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Update hidden share_name field when peer is selected
+    document.getElementById('peerSelect').addEventListener('change', function() {
+        var selectedOption = this.options[this.selectedIndex];
+        var shareName = selectedOption.getAttribute('data-share');
+        document.getElementById('shareName').value = shareName;
+    });
+
+    // Handle bulk restore form submission
+    document.getElementById('bulkRestoreForm')?.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        if (!confirm('Êtes-vous sûr de vouloir lancer la restauration automatique ? Cette opération peut prendre du temps.')) {
+            return;
+        }
+
+        // Show progress container
+        document.getElementById('progressContainer').classList.remove('hidden');
+
+        // Disable form
+        this.querySelector('button[type="submit"]').disabled = true;
+        this.querySelector('select').disabled = true;
+
+        // Submit form via AJAX to track progress
+        var formData = new FormData(this);
+
+        fetch('/restore-warning/bulk', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('progressText').textContent = '✓ Restauration terminée avec succès !';
+                document.getElementById('progressBar').style.width = '100%';
+                document.getElementById('progressBar').classList.remove('bg-blue-600');
+                document.getElementById('progressBar').classList.add('bg-green-600');
+
+                // Redirect to dashboard after 2 seconds
+                setTimeout(() => {
+                    window.location.href = '/dashboard';
+                }, 2000);
+            } else {
+                document.getElementById('progressText').textContent = '❌ Erreur : ' + (data.error || 'Erreur inconnue');
+                document.getElementById('progressBar').classList.remove('bg-blue-600');
+                document.getElementById('progressBar').classList.add('bg-red-600');
+            }
+        })
+        .catch(error => {
+            document.getElementById('progressText').textContent = '❌ Erreur réseau : ' + error.message;
+            document.getElementById('progressBar').classList.remove('bg-blue-600');
+            document.getElementById('progressBar').classList.add('bg-red-600');
+        });
+    });
+</script>
+</body>
+</html>

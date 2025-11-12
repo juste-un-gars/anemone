@@ -6,6 +6,7 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 )
 
@@ -69,6 +70,51 @@ func RedirectIfAuthenticated(next http.HandlerFunc) http.HandlerFunc {
 			http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 			return
 		}
+		next.ServeHTTP(w, r)
+	}
+}
+
+// RequireRestoreCheck checks if user needs to acknowledge server restore
+func RequireRestoreCheck(db *sql.DB, next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Skip check for restore-warning page itself and logout
+		if r.URL.Path == "/restore-warning" || r.URL.Path == "/restore-warning/acknowledge" ||
+		   r.URL.Path == "/restore-warning/bulk" || r.URL.Path == "/logout" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		session, ok := GetSessionFromContext(r)
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Check if server has been restored
+		var serverRestored string
+		err := db.QueryRow("SELECT value FROM system_config WHERE key = 'server_restored'").Scan(&serverRestored)
+		if err != nil || serverRestored != "1" {
+			// No restoration or error, continue normally
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Check if user has acknowledged the restore
+		var restoreAcknowledged bool
+		err = db.QueryRow("SELECT restore_acknowledged FROM users WHERE id = ?", session.UserID).Scan(&restoreAcknowledged)
+		if err != nil {
+			// Error reading, continue normally
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		if !restoreAcknowledged {
+			// User needs to acknowledge restore, redirect to warning page
+			http.Redirect(w, r, "/restore-warning", http.StatusSeeOther)
+			return
+		}
+
+		// User has acknowledged, continue normally
 		next.ServeHTTP(w, r)
 	}
 }

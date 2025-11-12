@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{T .Lang "backup.export.title"}} - Anemone</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🪸 Anemone</h1>
+            <nav>
+                <a href="/admin">{{T .Lang "backup.export.admin_dashboard"}}</a>
+                <a href="/logout">{{T .Lang "backup.export.logout"}}</a>
+            </nav>
+        </header>
+
+        <main>
+            <div class="card">
+                <h2>💾 {{T .Lang "backup.export.title"}}</h2>
+
+                <div class="info-box info">
+                    <p><strong>{{T .Lang "backup.export.what_exported"}}</strong></p>
+                    <ul>
+                        <li>{{T .Lang "backup.export.users_keys"}}</li>
+                        <li>{{T .Lang "backup.export.shares_config"}}</li>
+                        <li>{{T .Lang "backup.export.peers_config"}}</li>
+                        <li>{{T .Lang "backup.export.system_config"}}</li>
+                        <li>{{T .Lang "backup.export.sync_config"}}</li>
+                    </ul>
+                    <p><strong>⚠️ {{T .Lang "backup.export.important"}}</strong></p>
+                    <ul>
+                        <li>{{T .Lang "backup.export.encrypted"}}</li>
+                        <li>{{T .Lang "backup.export.keep_safe"}}</li>
+                        <li>{{T .Lang "backup.export.no_files"}}</li>
+                        <li>{{T .Lang "backup.export.store_secure"}}</li>
+                    </ul>
+                </div>
+
+                <form method="POST" action="/admin/backup/export" onsubmit="return validateForm()">
+                    <div class="form-group">
+                        <label for="server_name">{{T .Lang "backup.export.server_name"}} ({{T .Lang "backup.export.optional"}})</label>
+                        <input type="text" id="server_name" name="server_name"
+                               placeholder="{{T .Lang "backup.export.server_name_placeholder"}}"
+                               value="Anemone Server">
+                        <small>{{T .Lang "backup.export.server_name_help"}}</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="passphrase">{{T .Lang "backup.export.passphrase"}} *</label>
+                        <input type="password" id="passphrase" name="passphrase" required
+                               minlength="12"
+                               placeholder="{{T .Lang "backup.export.passphrase_placeholder"}}">
+                        <small>{{T .Lang "backup.export.passphrase_help"}}</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="passphrase_confirm">{{T .Lang "backup.export.passphrase_confirm"}} *</label>
+                        <input type="password" id="passphrase_confirm" name="passphrase_confirm" required
+                               minlength="12"
+                               placeholder="{{T .Lang "backup.export.passphrase_confirm_placeholder"}}">
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="confirm_backup" required>
+                            {{T .Lang "backup.export.confirm_checkbox"}}
+                        </label>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="btn btn-primary">
+                            📥 {{T .Lang "backup.export.download_button"}}
+                        </button>
+                        <a href="/admin" class="btn btn-secondary">{{T .Lang "common.cancel"}}</a>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>📋 {{T .Lang "backup.export.restore_instructions"}}</h3>
+                <p>{{T .Lang "backup.export.restore_text"}}</p>
+                <pre class="code-block">sudo bash restore_server.sh anemone_backup_XXXXXX.enc "your-passphrase"</pre>
+                <p><small>{{T .Lang "backup.export.restore_script_note"}}</small></p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const lang = '{{.Lang}}';
+        const translations = {
+            fr: {
+                mismatch: '{{T "fr" "backup.export.alert_mismatch"}}',
+                tooShort: '{{T "fr" "backup.export.alert_too_short"}}',
+                confirm: '{{T "fr" "backup.export.alert_confirm"}}',
+                ready: '{{T "fr" "backup.export.alert_ready"}}'
+            },
+            en: {
+                mismatch: '{{T "en" "backup.export.alert_mismatch"}}',
+                tooShort: '{{T "en" "backup.export.alert_too_short"}}',
+                confirm: '{{T "en" "backup.export.alert_confirm"}}',
+                ready: '{{T "en" "backup.export.alert_ready"}}'
+            }
+        };
+
+        function validateForm() {
+            const t = translations[lang] || translations.fr;
+            const passphrase = document.getElementById('passphrase').value;
+            const passphraseConfirm = document.getElementById('passphrase_confirm').value;
+            const confirmCheckbox = document.getElementById('confirm_backup').checked;
+
+            if (passphrase !== passphraseConfirm) {
+                alert(t.mismatch);
+                return false;
+            }
+
+            if (passphrase.length < 12) {
+                alert(t.tooShort);
+                return false;
+            }
+
+            if (!confirmCheckbox) {
+                alert(t.confirm);
+                return false;
+            }
+
+            return confirm(t.ready);
+        }
+    </script>
+</body>
+</html>
