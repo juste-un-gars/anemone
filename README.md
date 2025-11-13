@@ -12,6 +12,58 @@ Anemone is under active development and may contain bugs, security vulnerabiliti
 
 ---
 
+## ⚠️ DISCLAIMER - LIMITATION DE RESPONSABILITÉ
+
+**IMPORTANT - LIRE ATTENTIVEMENT**
+
+Ce logiciel est fourni "TEL QUEL", sans garantie d'aucune sorte, expresse ou implicite.
+
+L'auteur et les contributeurs ne pourront en aucun cas être tenus responsables de :
+- ❌ Perte de données, corruption ou suppression de fichiers
+- ❌ Dommages directs ou indirects résultant de l'utilisation du logiciel
+- ❌ Interruptions de service ou dysfonctionnements
+- ❌ Problèmes de sécurité ou violations de données
+- ❌ Tout autre dommage, même si l'auteur a été informé de leur possibilité
+
+**Vous utilisez ce logiciel à vos propres risques.**
+
+Il est FORTEMENT recommandé de :
+- ✅ Tester en environnement de développement avant toute utilisation en production
+- ✅ Maintenir des sauvegardes externes de vos données critiques
+- ✅ Ne pas utiliser comme seule solution de backup
+- ✅ Vérifier régulièrement l'intégrité de vos backups
+
+**Ce logiciel ne doit PAS être utilisé pour des données critiques sans backups externes.**
+
+Pour plus de détails, consultez la licence AGPL v3.0 (sections 15 et 16).
+
+## ⚠️ DISCLAIMER - LIABILITY LIMITATION
+
+**IMPORTANT - READ CAREFULLY**
+
+This software is provided "AS IS", without warranty of any kind, express or implied.
+
+The author and contributors shall not be held liable under any circumstances for:
+- ❌ Data loss, corruption or deletion of files
+- ❌ Direct or indirect damages resulting from the use of the software
+- ❌ Service interruptions or malfunctions
+- ❌ Security issues or data breaches
+- ❌ Any other damages, even if the author has been advised of their possibility
+
+**You use this software at your own risk.**
+
+It is STRONGLY recommended to:
+- ✅ Test in development environment before any production use
+- ✅ Maintain external backups of your critical data
+- ✅ Not use as the sole backup solution
+- ✅ Regularly verify the integrity of your backups
+
+**This software should NOT be used for critical data without external backups.**
+
+For more details, see the AGPL v3.0 license (sections 15 and 16).
+
+---
+
 ## 💖 Support the Project
 
 If you find this project useful and would like to support its development:
