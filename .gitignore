@@ -37,5 +37,8 @@ tmp/
 temp/
 *.tmp
 *.bak
-backup/
 _old/
+
+# Data backups (but not source code in internal/backup/)
+/backup/
+/srv/anemone/backups/
