@@ -40,7 +40,55 @@ echo -e "${BLUE}🪸 Anemone Server Configuration Restore${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
+# Detect distribution
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    DISTRO=$ID
+else
+    echo -e "${RED}Error: Cannot detect Linux distribution${NC}"
+    exit 1
+fi
+
+# Check and install dependencies
+echo -e "${BLUE}Checking system dependencies...${NC}"
+MISSING_DEPS=()
+
+for cmd in jq sqlite3 openssl go smbpasswd useradd; do
+    if ! command -v $cmd &> /dev/null; then
+        case $cmd in
+            go) MISSING_DEPS+=("golang-go") ;;
+            smbpasswd) MISSING_DEPS+=("samba") ;;
+            *) MISSING_DEPS+=("$cmd") ;;
+        esac
+    fi
+done
+
+if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
+    echo -e "${YELLOW}Missing dependencies: ${MISSING_DEPS[*]}${NC}"
+    echo -e "${BLUE}Installing dependencies...${NC}"
+
+    case $DISTRO in
+        ubuntu|debian|linuxmint)
+            apt-get update -qq
+            apt-get install -y -qq jq sqlite3 openssl golang-go samba passwd
+            ;;
+        fedora|rhel|centos)
+            dnf install -y -q jq sqlite openssl golang samba passwd
+            ;;
+        *)
+            echo -e "${RED}Error: Unsupported distribution: $DISTRO${NC}"
+            echo -e "${YELLOW}Please install manually: jq sqlite3 openssl golang samba${NC}"
+            exit 1
+            ;;
+    esac
+
+    echo -e "${GREEN}✓ Dependencies installed${NC}"
+else
+    echo -e "${GREEN}✓ All dependencies already installed${NC}"
+fi
+
 # Confirmation
+echo ""
 echo -e "${YELLOW}⚠️  WARNING: This will restore the server configuration.${NC}"
 echo -e "${YELLOW}    Existing configuration will be backed up to /srv/anemone.backup.$(date +%s)${NC}"
 echo ""
@@ -314,6 +362,19 @@ echo -e "${GREEN}✓ TLS certificate generated${NC}"
 
 echo ""
 echo -e "${BLUE}[10/10] Generating Samba configuration...${NC}"
+
+# Compile anemone-smbgen if not already available
+if ! command -v anemone-smbgen &> /dev/null; then
+    echo -e "${YELLOW}  Compiling anemone-smbgen...${NC}"
+    cd "$(dirname "$0")"
+    go build -o /usr/local/bin/anemone-smbgen ./cmd/anemone-smbgen
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Error: Failed to compile anemone-smbgen${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}  ✓ anemone-smbgen compiled${NC}"
+fi
+
 # Generate Samba config
 anemone-smbgen "$ANEMONE_DATA_DIR/db/anemone.db" > "$ANEMONE_DATA_DIR/smb/smb.conf.anemone"
 echo -e "${GREEN}✓ Samba configuration generated${NC}"
