@@ -133,7 +133,9 @@ CREATE TABLE IF NOT EXISTS users (
     language VARCHAR(2) DEFAULT 'fr',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     activated_at DATETIME,
-    last_login DATETIME
+    last_login DATETIME,
+    restore_acknowledged BOOLEAN DEFAULT 0,
+    restore_completed BOOLEAN DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS shares (
@@ -243,11 +245,11 @@ echo "$DECRYPTED_JSON" | jq -r '.peers[] | @json' | while read -r peer; do
     sqlite3 "$DB_FILE" "INSERT INTO peers (id, name, address, port, public_key, password, enabled, status, sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month, sync_interval_minutes, created_at) VALUES ($ID, '$NAME', '$ADDRESS', $PORT, $(if [ -z "$PUBLIC_KEY" ]; then echo "NULL"; else echo "'$PUBLIC_KEY'"; fi), $(if [ -z "$PASSWORD" ]; then echo "NULL"; else echo "'$PASSWORD'"; fi), $ENABLED, '$STATUS', $SYNC_ENABLED, '$SYNC_FREQUENCY', '$SYNC_TIME', $(if [ "$SYNC_DAY_OF_WEEK" = "NULL" ]; then echo "NULL"; else echo "$SYNC_DAY_OF_WEEK"; fi), $(if [ "$SYNC_DAY_OF_MONTH" = "NULL" ]; then echo "NULL"; else echo "$SYNC_DAY_OF_MONTH"; fi), $SYNC_INTERVAL_MINUTES, '$CREATED_AT');"
 done
 
-# Insert sync_config
-if echo "$DECRYPTED_JSON" | jq -e '.sync_config' > /dev/null; then
-    SYNC_ENABLED=$(echo "$DECRYPTED_JSON" | jq -r '.sync_config.enabled')
-    SYNC_INTERVAL=$(echo "$DECRYPTED_JSON" | jq -r '.sync_config.interval')
-    FIXED_HOUR=$(echo "$DECRYPTED_JSON" | jq -r '.sync_config.fixed_hour')
+# Insert sync_config (if it exists in backup)
+if echo "$DECRYPTED_JSON" | jq -e '.sync_config' > /dev/null 2>&1; then
+    SYNC_ENABLED=$(echo "$DECRYPTED_JSON" | jq -r '.sync_config.enabled // 0')
+    SYNC_INTERVAL=$(echo "$DECRYPTED_JSON" | jq -r '.sync_config.interval // "1h"')
+    FIXED_HOUR=$(echo "$DECRYPTED_JSON" | jq -r '.sync_config.fixed_hour // 23')
     sqlite3 "$DB_FILE" "INSERT INTO sync_config (id, enabled, interval, fixed_hour) VALUES (1, $SYNC_ENABLED, '$SYNC_INTERVAL', $FIXED_HOUR);"
 fi
 
