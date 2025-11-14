@@ -158,7 +158,9 @@ fi
 echo ""
 echo -e "${BLUE}[6/11] Creating data directories...${NC}"
 mkdir -p "$ANEMONE_DATA_DIR"/{db,certs,shares,smb,backups/incoming}
-chmod 700 "$ANEMONE_DATA_DIR"
+chmod 755 "$ANEMONE_DATA_DIR"
+chmod 755 "$ANEMONE_DATA_DIR/shares"
+chmod 700 "$ANEMONE_DATA_DIR"/{db,certs,smb,backups}
 echo -e "${GREEN}✓ Directories created${NC}"
 
 echo ""
@@ -552,17 +554,27 @@ echo ""
 echo -e "${GREEN}Server status:${NC}"
 systemctl status anemone --no-pager -l | head -10
 echo ""
-echo -e "${YELLOW}⚠️  IMPORTANT - SMB Password Reset Required:${NC}"
-echo -e "  All SMB users have been created with temporary password: ${RED}anemone123${NC}"
-echo -e "  Administrators should reset SMB passwords via web interface:"
-echo -e "  ${BLUE}Admin Dashboard → Users → Reset Password${NC}"
+if [ "$DECRYPT_TOOL_AVAILABLE" = true ]; then
+    echo -e "${GREEN}✓ SMB passwords restored from backup${NC}"
+    echo -e "  Users can access SMB shares with their original passwords"
+else
+    echo -e "${YELLOW}⚠️  IMPORTANT - SMB Password Reset Required:${NC}"
+    echo -e "  SMB passwords could not be restored from backup"
+    echo -e "  All SMB users have been created with temporary password: ${RED}anemone123${NC}"
+    echo -e "  ${RED}Administrators must reset SMB passwords via web interface${NC}"
+fi
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo -e "  1. Access web interface: ${BLUE}https://$(hostname -I | awk '{print $1}'):8443${NC}"
 echo -e "  2. Login with restored admin credentials"
-echo -e "  3. ${RED}Reset SMB passwords for all users${NC}"
-echo -e "  4. Test SMB access with new passwords"
-echo -e "  5. Check logs: ${BLUE}sudo journalctl -u anemone -f${NC}"
+if [ "$DECRYPT_TOOL_AVAILABLE" != true ]; then
+    echo -e "  3. ${RED}Reset SMB passwords for all users${NC}"
+    echo -e "  4. Test SMB access with new passwords"
+    echo -e "  5. Check logs: ${BLUE}sudo journalctl -u anemone -f${NC}"
+else
+    echo -e "  3. Test SMB access with restored passwords"
+    echo -e "  4. Check logs: ${BLUE}sudo journalctl -u anemone -f${NC}"
+fi
 echo ""
 if [ -d "$BACKUP_DIR" ]; then
     echo -e "${YELLOW}Backup of previous configuration saved to:${NC}"
