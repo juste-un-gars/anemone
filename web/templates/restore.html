@@ -401,18 +401,37 @@
             }
         }
 
-        function downloadFile(filePath) {
+        async function downloadFile(filePath) {
             if (!currentBackup) return;
             const fileName = filePath.split('/').pop(); // Extract filename
             const url = `/api/restore/download?peer_id=${currentBackup.peer_id}&backup=${encodeURIComponent(currentBackup.share_name)}&file=${encodeURIComponent(filePath)}`;
 
-            // Create temporary link with download attribute to force download
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName; // Force download with original filename
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            try {
+                // Use fetch to get the file as a blob (this forces download even for PDFs)
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const blob = await response.blob();
+
+                // Create a temporary URL for the blob
+                const blobUrl = window.URL.createObjectURL(blob);
+
+                // Create temporary link and trigger download
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+
+                // Cleanup
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(blobUrl);
+            } catch (error) {
+                console.error('Download error:', error);
+                alert(lang === 'fr' ? 'Erreur lors du téléchargement' : 'Download error');
+            }
         }
 
         function formatBytes(bytes) {
