@@ -105,7 +105,7 @@
                         <select name="peer_id" id="peerSelect" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md border" required>
                             <option value="">-- Sélectionner un serveur --</option>
                             {{range .AvailableBackups}}
-                            <option value="{{.PeerID}}" data-share="{{.ShareName}}">{{.PeerName}} - {{.ShareName}} ({{.FileCount}} fichiers, {{.TotalSize}})</option>
+                            <option value="{{.PeerID}}" data-share-name="{{.ShareName}}">{{.PeerName}} - {{.ShareName}} ({{.FileCount}} fichiers, {{.TotalSize}})</option>
                             {{end}}
                         </select>
                         <input type="hidden" name="share_name" id="shareName" value="">
@@ -162,8 +162,9 @@
     // Update hidden share_name field when peer is selected
     document.getElementById('peerSelect').addEventListener('change', function() {
         var selectedOption = this.options[this.selectedIndex];
-        var shareName = selectedOption.getAttribute('data-share');
-        document.getElementById('shareName').value = shareName;
+        var shareName = selectedOption.getAttribute('data-share-name');
+        document.getElementById('shareName').value = shareName || '';
+        console.log('Selected peer_id:', this.value, 'share_name:', shareName);
     });
 
     // Handle bulk restore form submission
