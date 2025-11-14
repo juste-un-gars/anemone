@@ -219,12 +219,12 @@
         // Show progress container
         document.getElementById('progressContainer').classList.remove('hidden');
 
-        // Disable form
+        // Create FormData BEFORE disabling fields (disabled fields are not included in FormData)
+        var formData = new FormData(this);
+
+        // Now disable form
         this.querySelector('button[type="submit"]').disabled = true;
         this.querySelector('select').disabled = true;
-
-        // Submit form via AJAX to track progress
-        var formData = new FormData(this);
 
         fetch('/restore-warning/bulk', {
             method: 'POST',

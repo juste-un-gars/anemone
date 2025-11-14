@@ -1,7 +1,8 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-14 (Session 16 - Restauration des mots de passe SMB)
-**Status** : 🟢 RESTAURATION COMPLÈTE DES MOTS DE PASSE SMB IMPLÉMENTÉE
+**Dernière session** : 2025-11-14 (Session 16 - Restauration des mots de passe SMB - COMPLÉTÉE)
+**Prochaine session** : Session 17 - Re-chiffrement des clés utilisateur lors de la restauration
+**Status** : 🔴 PROBLÈME CRITIQUE DÉCOUVERT - Restauration des fichiers impossible après restauration serveur
 
 > **Note** : L'historique des sessions 1-7 a été archivé dans `SESSION_STATE_ARCHIVE.md`
 > **Note** : Les détails techniques des sessions 8-11 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
@@ -1186,3 +1187,265 @@ func main() {
 
 **État global** : 🟢 GESTION COMPLÈTE DES PAIRS AVEC FRÉQUENCES PERSONNALISABLES
 **Prochaine étape** : Interface web de restauration (Session 12)
+
+---
+
+## 🔴 Session 17 - Re-chiffrement des clés utilisateur lors de la restauration (À FAIRE)
+
+**Date prévue** : 2025-11-15
+**Objectif** : Corriger le problème critique de restauration des fichiers après restauration serveur
+**Priorité** : 🔴 CRITIQUE
+
+### 🐛 Problème découvert
+
+Lors des tests de restauration FR1 → FR3 avec backup sur FR2 :
+
+1. ✅ La configuration serveur est restaurée correctement
+2. ✅ Les comptes utilisateurs sont restaurés correctement
+3. ✅ Les mots de passe SMB sont restaurés et re-chiffrés (Session 16)
+4. ❌ **La restauration automatique des fichiers ÉCHOUE** avec l'erreur :
+   ```
+   Bulk restore failed: failed to decrypt user key:
+   failed to decrypt: cipher: message authentication failed
+   ```
+
+### 🔍 Analyse du problème
+
+**Architecture du chiffrement** :
+```
+Master Key (unique par serveur)
+    ↓ chiffre
+User Encryption Key (unique par utilisateur)
+    ↓ chiffre
+Fichiers utilisateur (backup sur pairs distants)
+```
+
+**Problème** :
+- FR1 génère une master key unique : `MK_FR1`
+- `encryption_key_encrypted` est chiffré avec `MK_FR1`
+- FR3 génère une NOUVELLE master key : `MK_FR3`
+- Le script `restore_server.sh` restaure `encryption_key_encrypted` tel quel (chiffré avec `MK_FR1`)
+- Quand FR3 essaie de restaurer les fichiers :
+  ```go
+  // bulkrestore.go ligne 68
+  userKey, err := crypto.DecryptKey(encryptedKey, masterKey)
+  // masterKey = MK_FR3, mais encryptedKey est chiffré avec MK_FR1
+  // → ÉCHEC !
+  ```
+
+**Ce qui fonctionne déjà** (Session 16) :
+- ✅ `password_encrypted` est re-chiffré avec la nouvelle master key
+- ✅ Les mots de passe SMB sont restaurés correctement
+
+**Ce qui manque** :
+- ❌ `encryption_key_encrypted` n'est PAS re-chiffré
+- ❌ Impossible de restaurer les fichiers depuis les peers
+
+### 💡 Solution à implémenter
+
+**Principe** : Re-chiffrer `encryption_key_encrypted` avec la nouvelle master key lors de la restauration, exactement comme pour `password_encrypted`.
+
+**Étapes** :
+
+1. **Créer l'outil de re-chiffrement** `cmd/anemone-reencrypt-key/main.go` :
+   ```bash
+   Usage: anemone-reencrypt-key <encrypted_key_b64> <old_master_key> <new_master_key>
+
+   1. Décode base64 de encrypted_key_b64
+   2. Déchiffre avec old_master_key → user_key (clair)
+   3. Re-chiffre user_key avec new_master_key → new_encrypted
+   4. Encode en base64 et affiche sur stdout
+   ```
+
+2. **Modifier `restore_server.sh`** :
+
+   **Ordre actuel (PROBLÉMATIQUE)** :
+   ```bash
+   1. Déchiffrer backup
+   2. Créer tables
+   3. Générer nouvelle master key
+   4. Insérer users avec ancien encryption_key_encrypted  ← PROBLÈME
+   5. Re-chiffrer password_encrypted pour SMB
+   ```
+
+   **Nouvel ordre (CORRECT)** :
+   ```bash
+   1. Déchiffrer backup JSON
+   2. Créer tables vides
+   3. Récupérer ancienne master key du backup JSON
+      OLD_MASTER_KEY=$(echo "$JSON" | jq -r '.system_config[] | select(.key == "master_key") | .value')
+
+   4. Générer nouvelle master key pour le nouveau serveur
+      NEW_MASTER_KEY=$(generate_random_key)
+
+   5. Compiler les outils de re-chiffrement
+      go build -o /tmp/anemone-decrypt-password ./cmd/anemone-decrypt-password
+      go build -o /tmp/anemone-reencrypt-key ./cmd/anemone-reencrypt-key
+
+   6. Pour chaque utilisateur du backup :
+      # Re-chiffrer le mot de passe (déjà fait - Session 16)
+      PASSWORD_ENC=$(echo "$user" | jq -r '.password_encrypted')
+      DECRYPTED_PASS=$(/tmp/anemone-decrypt-password "$PASSWORD_ENC" "$OLD_MASTER_KEY")
+      NEW_PASSWORD_ENC=$(encrypt_with_new_key "$DECRYPTED_PASS" "$NEW_MASTER_KEY")
+
+      # Re-chiffrer la clé de chiffrement utilisateur (NOUVEAU)
+      ENCRYPTION_KEY_ENC=$(echo "$user" | jq -r '.encryption_key_encrypted')
+      NEW_ENCRYPTION_KEY_ENC=$(/tmp/anemone-reencrypt-key "$ENCRYPTION_KEY_ENC" "$OLD_MASTER_KEY" "$NEW_MASTER_KEY")
+
+      # Insérer avec les valeurs re-chiffrées
+      INSERT INTO users (..., password_encrypted, encryption_key_encrypted, ...)
+      VALUES (..., X'$NEW_PASSWORD_ENC', X'$NEW_ENCRYPTION_KEY_ENC', ...)
+
+   7. Insérer la NOUVELLE master key dans system_config
+      INSERT INTO system_config (key, value) VALUES ('master_key', '$NEW_MASTER_KEY')
+
+   8. Créer utilisateurs système et SMB (avec mots de passe déchiffrés)
+
+   9. Cleanup
+      rm -f /tmp/anemone-decrypt-password /tmp/anemone-reencrypt-key
+   ```
+
+### 📝 Fichiers à créer
+
+**Nouveau** :
+- `cmd/anemone-reencrypt-key/main.go` (~60 lignes)
+  ```go
+  package main
+
+  import (
+      "encoding/base64"
+      "fmt"
+      "os"
+      "github.com/juste-un-gars/anemone/internal/crypto"
+  )
+
+  func main() {
+      if len(os.Args) != 4 {
+          fmt.Fprintf(os.Stderr, "Usage: %s <encrypted_key_b64> <old_master> <new_master>\n", os.Args[0])
+          os.Exit(1)
+      }
+
+      encryptedB64 := os.Args[1]
+      oldMaster := os.Args[2]
+      newMaster := os.Args[3]
+
+      // Decode base64
+      encrypted, err := base64.StdEncoding.DecodeString(encryptedB64)
+      if err != nil {
+          fmt.Fprintf(os.Stderr, "Error decoding base64: %v\n", err)
+          os.Exit(1)
+      }
+
+      // Decrypt with old master key
+      userKey, err := crypto.DecryptKey(string(encrypted), oldMaster)
+      if err != nil {
+          fmt.Fprintf(os.Stderr, "Error decrypting with old master: %v\n", err)
+          os.Exit(1)
+      }
+
+      // Re-encrypt with new master key
+      newEncrypted, err := crypto.EncryptKey(userKey, newMaster)
+      if err != nil {
+          fmt.Fprintf(os.Stderr, "Error encrypting with new master: %v\n", err)
+          os.Exit(1)
+      }
+
+      // Output base64
+      fmt.Print(base64.StdEncoding.EncodeToString([]byte(newEncrypted)))
+  }
+  ```
+
+### 📝 Fichiers à modifier
+
+**Modifiés** :
+- `restore_server.sh` (~100 lignes modifiées)
+  - Récupération ancienne master key du backup
+  - Génération nouvelle master key AVANT insertion users
+  - Compilation outil `anemone-reencrypt-key`
+  - Boucle sur users pour re-chiffrer `encryption_key_encrypted`
+  - Insertion avec valeurs re-chiffrées
+
+### ✅ Vérifications après implémentation
+
+**Tests à effectuer** :
+
+1. **Installation serveur FR1**
+   ```bash
+   # Créer admin, créer user "test", uploader fichiers
+   ```
+
+2. **Configuration backup FR1 → FR2**
+   ```bash
+   # Ajouter peer FR2, activer sync
+   ```
+
+3. **Export backup FR1**
+   ```bash
+   # Via interface admin : Backup > Export
+   # Récupérer fichier backup.anemone.enc
+   ```
+
+4. **Installation propre FR3**
+   ```bash
+   # Nouveau serveur vierge
+   ```
+
+5. **Restauration sur FR3**
+   ```bash
+   ./restore_server.sh backup.anemone.enc
+   # Vérifier logs : "✓ Re-encrypted encryption keys for N users"
+   ```
+
+6. **Test connexion user**
+   ```bash
+   # Login avec user "test"
+   # Vérifier page "Ce serveur a été restauré"
+   # Vérifier "Vos sauvegardes disponibles" montre FR2
+   ```
+
+7. **Test restauration automatique**
+   ```bash
+   # Cliquer "Lancer la restauration automatique"
+   # DOIT afficher : "✓ Restauration terminée avec succès !"
+   # DOIT restaurer tous les fichiers dans /srv/anemone/shares/test/backup/
+   ```
+
+8. **Vérification fichiers**
+   ```bash
+   # Via SMB : se connecter au partage backup_test
+   # Vérifier tous les fichiers sont présents et lisibles
+   ```
+
+### 🔒 Sécurité
+
+**Garanties** :
+- ✅ La clé de chiffrement utilisateur EN CLAIR ne change jamais
+- ✅ Si l'utilisateur a sauvegardé sa clé, elle reste valide
+- ✅ Seul le chiffrement de stockage en DB change
+- ✅ Les fichiers restent déchiffrables avec la même clé utilisateur
+- ✅ Outils temporaires supprimés après restauration
+- ✅ Ancienne master key jamais persistée sur FR3
+
+**Rétrocompatibilité** :
+- ✅ Si `encryption_key_encrypted` est NULL/vide → Warning, mais continue
+- ✅ Fallback sur restauration manuelle si re-chiffrement échoue
+- ✅ Messages clairs pour l'admin
+
+### 📊 Estimation
+
+**Complexité** : Moyenne
+**Temps estimé** : 2-3 heures
+**Risque** : Faible (même pattern que Session 16 pour `password_encrypted`)
+
+### 🎯 Objectif de sortie
+
+Après cette session :
+- ✅ Restauration complète FR1 → FR3 fonctionnelle
+- ✅ Utilisateurs peuvent restaurer leurs fichiers automatiquement
+- ✅ Clés de chiffrement correctement re-chiffrées
+- ✅ Tests E2E validés (installation → backup → restauration → restore fichiers)
+
+---
+
+**État session 17** : 🔴 NON DÉMARRÉE
+**Blocage actuel** : Restauration des fichiers impossible après restauration serveur
