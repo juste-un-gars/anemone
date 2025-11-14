@@ -342,18 +342,22 @@ echo -e "${GREEN}✓ System users created ($USER_COUNT users)${NC}"
 
 echo ""
 echo -e "${BLUE}[9/11] Creating Samba users...${NC}"
+
+# Temporary SMB password (will need to be reset by admin)
+TEMP_SMB_PASSWORD="anemone123"
+
+echo -e "${YELLOW}  Using temporary SMB password for all users: ${TEMP_SMB_PASSWORD}${NC}"
+echo -e "${YELLOW}  ⚠️  Admin should reset SMB passwords after restoration!${NC}"
+
 echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
     USERNAME=$(echo "$user" | jq -r '.username')
 
-    # Generate random password for SMB
-    SMB_PASSWORD=$(openssl rand -base64 16)
-
-    # Create SMB user
-    (echo "$SMB_PASSWORD"; echo "$SMB_PASSWORD") | smbpasswd -a "$USERNAME" -s 2>/dev/null || true
+    # Create SMB user with temporary password
+    (echo "$TEMP_SMB_PASSWORD"; echo "$TEMP_SMB_PASSWORD") | smbpasswd -a "$USERNAME" -s 2>/dev/null || true
     smbpasswd -e "$USERNAME" 2>/dev/null || true
-    echo -e "  ${GREEN}✓${NC} Created SMB user: $USERNAME"
+    echo -e "  ${GREEN}✓${NC} Created SMB user: $USERNAME (password: $TEMP_SMB_PASSWORD)"
 done
-echo -e "${GREEN}✓ Samba users created${NC}"
+echo -e "${GREEN}✓ Samba users created with temporary passwords${NC}"
 
 echo ""
 echo -e "${BLUE}[10/11] Generating TLS certificate...${NC}"
@@ -488,10 +492,17 @@ echo ""
 echo -e "${GREEN}Server status:${NC}"
 systemctl status anemone --no-pager -l | head -10
 echo ""
+echo -e "${YELLOW}⚠️  IMPORTANT - SMB Password Reset Required:${NC}"
+echo -e "  All SMB users have been created with temporary password: ${RED}anemone123${NC}"
+echo -e "  Administrators should reset SMB passwords via web interface:"
+echo -e "  ${BLUE}Admin Dashboard → Users → Reset Password${NC}"
+echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo -e "  1. Access web interface: ${BLUE}https://$(hostname -I | awk '{print $1}'):8443${NC}"
-echo -e "  2. Login with restored credentials"
-echo -e "  3. Check logs: ${BLUE}sudo journalctl -u anemone -f${NC}"
+echo -e "  2. Login with restored admin credentials"
+echo -e "  3. ${RED}Reset SMB passwords for all users${NC}"
+echo -e "  4. Test SMB access with new passwords"
+echo -e "  5. Check logs: ${BLUE}sudo journalctl -u anemone -f${NC}"
 echo ""
 if [ -d "$BACKUP_DIR" ]; then
     echo -e "${YELLOW}Backup of previous configuration saved to:${NC}"
