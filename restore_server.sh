@@ -103,8 +103,14 @@ ANEMONE_DATA_DIR="${ANEMONE_DATA_DIR:-/srv/anemone}"
 BACKUP_DIR="${ANEMONE_DATA_DIR}.backup.$(date +%s)"
 
 echo ""
-echo -e "${BLUE}[1/10] Compiling decrypt tool...${NC}"
+echo -e "${BLUE}[1/11] Downloading Go dependencies...${NC}"
 cd "$(dirname "$0")"
+# Download all dependencies first to avoid timeouts during compilation
+go mod download 2>/dev/null || echo -e "${YELLOW}  Some dependencies may need to be downloaded during compilation${NC}"
+echo -e "${GREEN}✓ Dependencies ready${NC}"
+
+echo ""
+echo -e "${BLUE}[2/11] Compiling decrypt tool...${NC}"
 go build -o /tmp/anemone-restore-decrypt ./cmd/anemone-restore-decrypt
 if [ $? -ne 0 ]; then
     echo -e "${RED}Error: Failed to compile decrypt tool${NC}"
@@ -113,7 +119,7 @@ fi
 echo -e "${GREEN}✓ Decrypt tool compiled${NC}"
 
 echo ""
-echo -e "${BLUE}[2/10] Decrypting backup file...${NC}"
+echo -e "${BLUE}[3/11] Decrypting backup file...${NC}"
 DECRYPTED_JSON=$(/tmp/anemone-restore-decrypt "$BACKUP_FILE" "$PASSPHRASE" 2>&1)
 if [ $? -ne 0 ]; then
     echo -e "${RED}Error: Failed to decrypt backup file${NC}"
@@ -136,12 +142,12 @@ echo -e "${GREEN}  Server: $SERVER_NAME${NC}"
 echo -e "${GREEN}  Exported: $EXPORT_DATE${NC}"
 
 echo ""
-echo -e "${BLUE}[3/10] Stopping Anemone service...${NC}"
+echo -e "${BLUE}[4/11] Stopping Anemone service...${NC}"
 systemctl stop anemone 2>/dev/null || true
 echo -e "${GREEN}✓ Service stopped${NC}"
 
 echo ""
-echo -e "${BLUE}[4/10] Backing up existing data...${NC}"
+echo -e "${BLUE}[5/11] Backing up existing data...${NC}"
 if [ -d "$ANEMONE_DATA_DIR" ]; then
     mv "$ANEMONE_DATA_DIR" "$BACKUP_DIR"
     echo -e "${GREEN}✓ Existing data backed up to: $BACKUP_DIR${NC}"
@@ -150,13 +156,13 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}[5/10] Creating data directories...${NC}"
+echo -e "${BLUE}[6/11] Creating data directories...${NC}"
 mkdir -p "$ANEMONE_DATA_DIR"/{db,certs,shares,smb,backups/incoming}
 chmod 700 "$ANEMONE_DATA_DIR"
 echo -e "${GREEN}✓ Directories created${NC}"
 
 echo ""
-echo -e "${BLUE}[6/10] Restoring database...${NC}"
+echo -e "${BLUE}[7/11] Restoring database...${NC}"
 # Create database and restore data
 DB_FILE="$ANEMONE_DATA_DIR/db/anemone.db"
 
@@ -312,7 +318,7 @@ sqlite3 "$DB_FILE" "UPDATE users SET restore_acknowledged = 0, restore_completed
 echo -e "${GREEN}✓ Database restored${NC}"
 
 echo ""
-echo -e "${BLUE}[7/10] Creating system users and directories...${NC}"
+echo -e "${BLUE}[8/11] Creating system users and directories...${NC}"
 # Recreate users from database
 USER_COUNT=$(echo "$DECRYPTED_JSON" | jq '.users | length')
 echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
@@ -335,7 +341,7 @@ done
 echo -e "${GREEN}✓ System users created ($USER_COUNT users)${NC}"
 
 echo ""
-echo -e "${BLUE}[8/10] Creating Samba users...${NC}"
+echo -e "${BLUE}[9/11] Creating Samba users...${NC}"
 echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
     USERNAME=$(echo "$user" | jq -r '.username')
 
@@ -350,7 +356,7 @@ done
 echo -e "${GREEN}✓ Samba users created${NC}"
 
 echo ""
-echo -e "${BLUE}[9/10] Generating TLS certificate...${NC}"
+echo -e "${BLUE}[10/11] Generating TLS certificate...${NC}"
 # Generate self-signed certificate
 openssl req -new -newkey rsa:4096 -days 3650 -nodes -x509 \
     -subj "/C=FR/ST=State/L=City/O=Anemone/CN=localhost" \
@@ -361,39 +367,69 @@ chmod 644 "$ANEMONE_DATA_DIR/certs/server.crt"
 echo -e "${GREEN}✓ TLS certificate generated${NC}"
 
 echo ""
-echo -e "${BLUE}[10/10] Generating Samba configuration...${NC}"
+echo -e "${BLUE}[11/11] Compiling Anemone tools and starting services...${NC}"
 
 # Compile anemone-smbgen if not already available
 if ! command -v anemone-smbgen &> /dev/null; then
     echo -e "${YELLOW}  Compiling anemone-smbgen...${NC}"
     cd "$(dirname "$0")"
-    go build -o /usr/local/bin/anemone-smbgen ./cmd/anemone-smbgen
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}Error: Failed to compile anemone-smbgen${NC}"
+
+    # Try to compile with retries (in case of network issues)
+    RETRY_COUNT=0
+    MAX_RETRIES=3
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        go build -o /usr/local/bin/anemone-smbgen ./cmd/anemone-smbgen 2>&1
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}  ✓ anemone-smbgen compiled${NC}"
+            break
+        fi
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+            echo -e "${YELLOW}  Retry $RETRY_COUNT/$MAX_RETRIES...${NC}"
+            sleep 2
+        else
+            echo -e "${RED}  Failed to compile anemone-smbgen after $MAX_RETRIES attempts${NC}"
+            echo -e "${YELLOW}  Continuing without Samba config (can be generated later)${NC}"
+        fi
+    done
+fi
+
+# Generate Samba config if tool is available
+if command -v anemone-smbgen &> /dev/null; then
+    anemone-smbgen "$ANEMONE_DATA_DIR/db/anemone.db" > "$ANEMONE_DATA_DIR/smb/smb.conf.anemone"
+    echo -e "${GREEN}✓ Samba configuration generated${NC}"
+else
+    echo -e "${YELLOW}⚠ Samba configuration will need to be generated manually${NC}"
+fi
+
+# Compile Anemone binary
+echo ""
+echo -e "${YELLOW}  Compiling Anemone server...${NC}"
+cd "$(dirname "$0")"
+
+# Try to compile with retries (in case of network issues)
+RETRY_COUNT=0
+MAX_RETRIES=3
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+    go build -o /usr/local/bin/anemone ./cmd/anemone 2>&1
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}  ✓ Anemone server compiled${NC}"
+        break
+    fi
+    RETRY_COUNT=$((RETRY_COUNT + 1))
+    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+        echo -e "${YELLOW}  Retry $RETRY_COUNT/$MAX_RETRIES...${NC}"
+        sleep 2
+    else
+        echo -e "${RED}Error: Failed to compile Anemone server after $MAX_RETRIES attempts${NC}"
+        echo -e "${YELLOW}Please check your internet connection and try again${NC}"
         exit 1
     fi
-    echo -e "${GREEN}  ✓ anemone-smbgen compiled${NC}"
-fi
+done
 
-# Generate Samba config
-anemone-smbgen "$ANEMONE_DATA_DIR/db/anemone.db" > "$ANEMONE_DATA_DIR/smb/smb.conf.anemone"
-echo -e "${GREEN}✓ Samba configuration generated${NC}"
-
-# Cleanup
-rm -f "$TEMP_JSON" /tmp/anemone-restore-decrypt
-
+# Setup systemd service
 echo ""
-echo -e "${BLUE}[11/12] Compiling Anemone binary...${NC}"
-cd "$(dirname "$0")"
-go build -o /usr/local/bin/anemone ./cmd/anemone
-if [ $? -ne 0 ]; then
-    echo -e "${RED}Error: Failed to compile Anemone binary${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓ Anemone binary compiled${NC}"
-
-echo ""
-echo -e "${BLUE}[12/12] Setting up Anemone service...${NC}"
+echo -e "${YELLOW}  Setting up systemd service...${NC}"
 
 # Check if systemd service already exists
 if [ -f /etc/systemd/system/anemone.service ]; then
