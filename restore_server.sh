@@ -402,10 +402,17 @@ else
     echo -e "${YELLOW}⚠ Samba configuration will need to be generated manually${NC}"
 fi
 
+# Copy web assets to data directory
+echo ""
+echo -e "${YELLOW}  Copying web assets...${NC}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cp -r "$SCRIPT_DIR/web" "$ANEMONE_DATA_DIR/"
+echo -e "${GREEN}  ✓ Web assets copied${NC}"
+
 # Compile Anemone binary
 echo ""
 echo -e "${YELLOW}  Compiling Anemone server...${NC}"
-cd "$(dirname "$0")"
+cd "$SCRIPT_DIR"
 
 # Try to compile with retries (in case of network issues)
 RETRY_COUNT=0
