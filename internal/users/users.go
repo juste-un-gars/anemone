@@ -41,6 +41,12 @@ func CreateFirstAdmin(db *sql.DB, username, password, email, masterKey string) (
 		return nil, "", fmt.Errorf("failed to hash password: %w", err)
 	}
 
+	// Encrypt password for SMB restoration
+	passwordEncrypted, err := crypto.EncryptPassword(password, masterKey)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to encrypt password: %w", err)
+	}
+
 	// Generate encryption key
 	encryptionKey, err := crypto.GenerateEncryptionKey()
 	if err != nil {
@@ -60,12 +66,12 @@ func CreateFirstAdmin(db *sql.DB, username, password, email, masterKey string) (
 	now := time.Now()
 	result, err := db.Exec(`
 		INSERT INTO users (
-			username, password_hash, email,
+			username, password_hash, password_encrypted, email,
 			encryption_key_hash, encryption_key_encrypted,
 			is_admin, quota_total_gb, quota_backup_gb,
 			created_at, activated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, username, passwordHash, email, keyHash, encryptedKey, true, 100, 50, now, now)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, username, passwordHash, passwordEncrypted, email, keyHash, encryptedKey, true, 100, 50, now, now)
 
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to insert user: %w", err)
@@ -190,6 +196,12 @@ func ActivateUser(db *sql.DB, userID int, password, masterKey string) (string, e
 		return "", fmt.Errorf("failed to hash password: %w", err)
 	}
 
+	// Encrypt password for SMB restoration
+	passwordEncrypted, err := crypto.EncryptPassword(password, masterKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to encrypt password: %w", err)
+	}
+
 	// Generate encryption key
 	encryptionKey, err := crypto.GenerateEncryptionKey()
 	if err != nil {
@@ -210,11 +222,12 @@ func ActivateUser(db *sql.DB, userID int, password, masterKey string) (string, e
 	_, err = db.Exec(`
 		UPDATE users
 		SET password_hash = ?,
+		    password_encrypted = ?,
 		    encryption_key_hash = ?,
 		    encryption_key_encrypted = ?,
 		    activated_at = ?
 		WHERE id = ?
-	`, passwordHash, keyHash, encryptedKey, now, userID)
+	`, passwordHash, passwordEncrypted, keyHash, encryptedKey, now, userID)
 
 	if err != nil {
 		return "", fmt.Errorf("failed to activate user: %w", err)
@@ -456,7 +469,7 @@ func UpdateUserLanguage(db *sql.DB, userID int, language string) error {
 
 // ChangePassword changes a user's password (both in DB and SMB)
 // IMPORTANT: The encryption key remains unchanged - password is only for authentication
-func ChangePassword(db *sql.DB, userID int, oldPassword, newPassword string) error {
+func ChangePassword(db *sql.DB, userID int, oldPassword, newPassword, masterKey string) error {
 	// Validate new password length
 	if len(newPassword) < 8 {
 		return fmt.Errorf("new password must be at least 8 characters")
@@ -479,8 +492,14 @@ func ChangePassword(db *sql.DB, userID int, oldPassword, newPassword string) err
 		return fmt.Errorf("failed to hash new password: %w", err)
 	}
 
+	// Encrypt password for SMB restoration
+	passwordEncrypted, err := crypto.EncryptPassword(newPassword, masterKey)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt password: %w", err)
+	}
+
 	// Update password in database
-	_, err = db.Exec("UPDATE users SET password_hash = ? WHERE id = ?", newPasswordHash, userID)
+	_, err = db.Exec("UPDATE users SET password_hash = ?, password_encrypted = ? WHERE id = ?", newPasswordHash, passwordEncrypted, userID)
 	if err != nil {
 		return fmt.Errorf("failed to update password in database: %w", err)
 	}
@@ -516,7 +535,7 @@ func ChangePassword(db *sql.DB, userID int, oldPassword, newPassword string) err
 
 // ResetPassword resets a user's password (used by admin for password reset)
 // It updates both the database and SMB password, without verifying the old password
-func ResetPassword(db *sql.DB, userID int, username, newPassword string) error {
+func ResetPassword(db *sql.DB, userID int, username, newPassword, masterKey string) error {
 	// Validate new password length
 	if len(newPassword) < 8 {
 		return fmt.Errorf("new password must be at least 8 characters")
@@ -528,8 +547,14 @@ func ResetPassword(db *sql.DB, userID int, username, newPassword string) error {
 		return fmt.Errorf("failed to hash new password: %w", err)
 	}
 
+	// Encrypt password for SMB restoration
+	passwordEncrypted, err := crypto.EncryptPassword(newPassword, masterKey)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt password: %w", err)
+	}
+
 	// Update password in database
-	_, err = db.Exec("UPDATE users SET password_hash = ? WHERE id = ?", newPasswordHash, userID)
+	_, err = db.Exec("UPDATE users SET password_hash = ?, password_encrypted = ? WHERE id = ?", newPasswordHash, passwordEncrypted, userID)
 	if err != nil {
 		return fmt.Errorf("failed to update password in database: %w", err)
 	}

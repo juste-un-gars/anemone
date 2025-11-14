@@ -1496,8 +1496,17 @@ func (s *Server) handleResetPasswordSubmit(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Get master key
+	var masterKey string
+	err = s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
+	if err != nil {
+		log.Printf("Error getting master key: %v", err)
+		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=System+configuration+error", tokenString), http.StatusSeeOther)
+		return
+	}
+
 	// Reset password (update DB + SMB)
-	err = users.ResetPassword(s.db, user.ID, user.Username, newPassword)
+	err = users.ResetPassword(s.db, user.ID, user.Username, newPassword, masterKey)
 	if err != nil {
 		log.Printf("Error resetting password: %v", err)
 		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=Failed+to+reset+password", tokenString), http.StatusSeeOther)
@@ -2847,8 +2856,17 @@ func (s *Server) handleSettingsPassword(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Get master key
+	var masterKey string
+	err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
+	if err != nil {
+		log.Printf("Error getting master key: %v", err)
+		http.Redirect(w, r, "/settings?error=System+configuration+error", http.StatusSeeOther)
+		return
+	}
+
 	// Change password (DB + SMB)
-	if err := users.ChangePassword(s.db, session.UserID, currentPassword, newPassword); err != nil {
+	if err := users.ChangePassword(s.db, session.UserID, currentPassword, newPassword, masterKey); err != nil {
 		log.Printf("Error changing password for user %d: %v", session.UserID, err)
 
 		// Check for specific error messages

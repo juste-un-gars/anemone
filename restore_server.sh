@@ -178,6 +178,7 @@ CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
+    password_encrypted BLOB,
     email TEXT,
     encryption_key_hash TEXT NOT NULL,
     encryption_key_encrypted BLOB NOT NULL,
@@ -249,6 +250,7 @@ echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
     ID=$(echo "$user" | jq -r '.id')
     USERNAME=$(echo "$user" | jq -r '.username')
     PASSWORD_HASH=$(echo "$user" | jq -r '.password_hash')
+    PASSWORD_ENCRYPTED=$(echo "$user" | jq -r '.password_encrypted // "" | @base64')
     EMAIL=$(echo "$user" | jq -r '.email // ""')
     ENCRYPTION_KEY_HASH=$(echo "$user" | jq -r '.encryption_key_hash')
     ENCRYPTION_KEY_ENCRYPTED=$(echo "$user" | jq -r '.encryption_key_encrypted | @base64')
@@ -262,7 +264,15 @@ echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
     # Decode base64 encryption key
     ENC_KEY_HEX=$(echo "$ENCRYPTION_KEY_ENCRYPTED" | base64 -d | xxd -p | tr -d '\n')
 
-    sqlite3 "$DB_FILE" "INSERT INTO users (id, username, password_hash, email, encryption_key_hash, encryption_key_encrypted, is_admin, quota_total_gb, quota_backup_gb, language, created_at, activated_at) VALUES ($ID, '$USERNAME', '$PASSWORD_HASH', '$EMAIL', '$ENCRYPTION_KEY_HASH', X'$ENC_KEY_HEX', $IS_ADMIN, $QUOTA_TOTAL, $QUOTA_BACKUP, '$LANGUAGE', '$CREATED_AT', $(if [ "$ACTIVATED_AT" = "NULL" ]; then echo "NULL"; else echo "'$ACTIVATED_AT'"; fi));"
+    # Decode base64 password_encrypted (if exists)
+    if [ -n "$PASSWORD_ENCRYPTED" ]; then
+        PASS_ENC_HEX=$(echo "$PASSWORD_ENCRYPTED" | base64 -d | xxd -p | tr -d '\n')
+        PASS_ENC_SQL="X'$PASS_ENC_HEX'"
+    else
+        PASS_ENC_SQL="NULL"
+    fi
+
+    sqlite3 "$DB_FILE" "INSERT INTO users (id, username, password_hash, password_encrypted, email, encryption_key_hash, encryption_key_encrypted, is_admin, quota_total_gb, quota_backup_gb, language, created_at, activated_at) VALUES ($ID, '$USERNAME', '$PASSWORD_HASH', $PASS_ENC_SQL, '$EMAIL', '$ENCRYPTION_KEY_HASH', X'$ENC_KEY_HEX', $IS_ADMIN, $QUOTA_TOTAL, $QUOTA_BACKUP, '$LANGUAGE', '$CREATED_AT', $(if [ "$ACTIVATED_AT" = "NULL" ]; then echo "NULL"; else echo "'$ACTIVATED_AT'"; fi));"
 done
 
 # Insert shares
@@ -343,21 +353,71 @@ echo -e "${GREEN}✓ System users created ($USER_COUNT users)${NC}"
 echo ""
 echo -e "${BLUE}[9/11] Creating Samba users...${NC}"
 
-# Temporary SMB password (will need to be reset by admin)
-TEMP_SMB_PASSWORD="anemone123"
+# Compile password decryption tool
+echo -e "${YELLOW}  Compiling password decryption tool...${NC}"
+cd "$(dirname "$0")"
+go build -o /tmp/anemone-decrypt-password ./cmd/anemone-decrypt-password 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "${RED}  Failed to compile password decryption tool${NC}"
+    echo -e "${YELLOW}  Using temporary password instead${NC}"
+    DECRYPT_TOOL_AVAILABLE=false
+else
+    echo -e "${GREEN}  ✓ Password decryption tool compiled${NC}"
+    DECRYPT_TOOL_AVAILABLE=true
+fi
 
-echo -e "${YELLOW}  Using temporary SMB password for all users: ${TEMP_SMB_PASSWORD}${NC}"
-echo -e "${YELLOW}  ⚠️  Admin should reset SMB passwords after restoration!${NC}"
+# Get master key from JSON
+MASTER_KEY=$(echo "$DECRYPTED_JSON" | jq -r '.system_config[] | select(.key == "master_key") | .value')
+
+if [ -z "$MASTER_KEY" ]; then
+    echo -e "${YELLOW}  ⚠️  Master key not found in backup${NC}"
+    echo -e "${YELLOW}  Using temporary password instead${NC}"
+    DECRYPT_TOOL_AVAILABLE=false
+fi
+
+# Temporary SMB password (fallback)
+TEMP_SMB_PASSWORD="anemone123"
 
 echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
     USERNAME=$(echo "$user" | jq -r '.username')
+    PASSWORD_ENCRYPTED=$(echo "$user" | jq -r '.password_encrypted // ""')
 
-    # Create SMB user with temporary password
-    (echo "$TEMP_SMB_PASSWORD"; echo "$TEMP_SMB_PASSWORD") | smbpasswd -a "$USERNAME" -s 2>/dev/null || true
-    smbpasswd -e "$USERNAME" 2>/dev/null || true
-    echo -e "  ${GREEN}✓${NC} Created SMB user: $USERNAME (password: $TEMP_SMB_PASSWORD)"
+    # Try to decrypt password if tool is available and password_encrypted exists
+    if [ "$DECRYPT_TOOL_AVAILABLE" = true ] && [ -n "$PASSWORD_ENCRYPTED" ]; then
+        # Convert JSON array to base64 string
+        PASSWORD_B64=$(echo "$PASSWORD_ENCRYPTED" | base64 -w 0)
+
+        # Decrypt password
+        DECRYPTED_PASSWORD=$(/tmp/anemone-decrypt-password "$PASSWORD_B64" "$MASTER_KEY" 2>/dev/null)
+
+        if [ $? -eq 0 ] && [ -n "$DECRYPTED_PASSWORD" ]; then
+            # Use decrypted password
+            (echo "$DECRYPTED_PASSWORD"; echo "$DECRYPTED_PASSWORD") | smbpasswd -a "$USERNAME" -s 2>/dev/null || true
+            smbpasswd -e "$USERNAME" 2>/dev/null || true
+            echo -e "  ${GREEN}✓${NC} Created SMB user: $USERNAME (password restored from backup)"
+        else
+            # Fallback to temporary password
+            (echo "$TEMP_SMB_PASSWORD"; echo "$TEMP_SMB_PASSWORD") | smbpasswd -a "$USERNAME" -s 2>/dev/null || true
+            smbpasswd -e "$USERNAME" 2>/dev/null || true
+            echo -e "  ${YELLOW}○${NC} Created SMB user: $USERNAME (using temporary password: $TEMP_SMB_PASSWORD)"
+        fi
+    else
+        # Use temporary password
+        (echo "$TEMP_SMB_PASSWORD"; echo "$TEMP_SMB_PASSWORD") | smbpasswd -a "$USERNAME" -s 2>/dev/null || true
+        smbpasswd -e "$USERNAME" 2>/dev/null || true
+        echo -e "  ${YELLOW}○${NC} Created SMB user: $USERNAME (using temporary password: $TEMP_SMB_PASSWORD)"
+    fi
 done
-echo -e "${GREEN}✓ Samba users created with temporary passwords${NC}"
+
+if [ "$DECRYPT_TOOL_AVAILABLE" = true ]; then
+    echo -e "${GREEN}✓ Samba users created with restored passwords${NC}"
+else
+    echo -e "${YELLOW}✓ Samba users created with temporary passwords${NC}"
+    echo -e "${YELLOW}  ⚠️  Admin should reset SMB passwords after restoration!${NC}"
+fi
+
+# Cleanup
+rm -f /tmp/anemone-decrypt-password 2>/dev/null
 
 echo ""
 echo -e "${BLUE}[10/11] Generating TLS certificate...${NC}"

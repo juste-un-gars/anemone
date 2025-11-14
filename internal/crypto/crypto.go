@@ -10,6 +10,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 
@@ -210,4 +211,87 @@ func DecryptStream(reader io.Reader, writer io.Writer, encryptionKey string) err
 	}
 
 	return nil
+}
+
+// EncryptPassword encrypts a plaintext password using the master key
+// Returns base64-encoded encrypted password suitable for database storage
+// Used to securely store passwords for SMB restoration after backup/restore
+func EncryptPassword(password, masterKey string) ([]byte, error) {
+	if password == "" {
+		return nil, errors.New("password cannot be empty")
+	}
+	if masterKey == "" {
+		return nil, errors.New("master key cannot be empty")
+	}
+
+	// Derive a proper 32-byte key from master key
+	hash := sha256.Sum256([]byte(masterKey))
+	key := hash[:]
+
+	// Create AES cipher
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	// Create GCM mode
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	// Generate nonce
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, fmt.Errorf("failed to generate nonce: %w", err)
+	}
+
+	// Encrypt password
+	ciphertext := gcm.Seal(nonce, nonce, []byte(password), nil)
+	return ciphertext, nil
+}
+
+// DecryptPassword decrypts an encrypted password using the master key
+// Returns the plaintext password
+// Used to restore SMB passwords after backup/restore
+func DecryptPassword(encryptedPassword []byte, masterKey string) (string, error) {
+	if len(encryptedPassword) == 0 {
+		return "", errors.New("encrypted password cannot be empty")
+	}
+	if masterKey == "" {
+		return "", errors.New("master key cannot be empty")
+	}
+
+	// Derive a proper 32-byte key from master key
+	hash := sha256.Sum256([]byte(masterKey))
+	key := hash[:]
+
+	// Create AES cipher
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return "", fmt.Errorf("failed to create cipher: %w", err)
+	}
+
+	// Create GCM mode
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", fmt.Errorf("failed to create GCM: %w", err)
+	}
+
+	// Extract nonce and ciphertext
+	nonceSize := gcm.NonceSize()
+	if len(encryptedPassword) < nonceSize {
+		return "", errors.New("encrypted password is too short")
+	}
+
+	nonce := encryptedPassword[:nonceSize]
+	ciphertext := encryptedPassword[nonceSize:]
+
+	// Decrypt password
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt password: %w", err)
+	}
+
+	return string(plaintext), nil
 }

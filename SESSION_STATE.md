@@ -1,7 +1,7 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-12 (Session 15 - Backups serveur automatiques)
-**Status** : 🟢 SYSTÈME DE BACKUP SERVEUR IMPLÉMENTÉ
+**Dernière session** : 2025-11-14 (Session 16 - Restauration des mots de passe SMB)
+**Status** : 🟢 RESTAURATION COMPLÈTE DES MOTS DE PASSE SMB IMPLÉMENTÉE
 
 > **Note** : L'historique des sessions 1-7 a été archivé dans `SESSION_STATE_ARCHIVE.md`
 > **Note** : Les détails techniques des sessions 8-11 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
@@ -752,6 +752,299 @@ Removed old backup: backup_20251101_040000.enc
 ```
 
 **Statut** : 🟢 **IMPLÉMENTÉ, EN TEST**
+
+---
+
+## 🔧 Session 16 - 14 Novembre 2025 - Restauration des mots de passe SMB après backup/restore
+
+### 🎯 Objectif
+
+Permettre la restauration automatique des mots de passe SMB lors d'une restauration serveur, en stockant les mots de passe chiffrés avec la master key.
+
+### ⚠️ Problème identifié
+
+Lors des tests de restauration sur un serveur propre (FR2), un problème critique a été découvert :
+- Les utilisateurs peuvent se connecter à l'interface web après restauration ✅
+- **MAIS** : Les mots de passe SMB ne fonctionnent pas ❌
+- Le script de restauration utilisait un mot de passe temporaire "anemone123" pour tous les utilisateurs
+- Problème : Le hash bcrypt stocké en base est à sens unique, impossible de récupérer le mot de passe original
+
+### ✅ Solution implémentée
+
+**Architecture de double stockage** :
+- **Bcrypt hash** : Pour l'authentification web (sécurité maximale, à sens unique)
+- **Encrypted password** : Pour la restauration SMB (réversible avec master key)
+
+**Flux de données** :
+```
+Création/Modification mot de passe
+    ↓
+Génère bcrypt hash (auth web)
+    +
+Chiffre mot de passe avec master_key (AES-256-GCM)
+    ↓
+Stockage DB : password_hash + password_encrypted
+    ↓
+Backup serveur → Inclut password_encrypted
+    ↓
+Restauration → Déchiffre avec master_key → Configure SMB
+```
+
+### 🔨 Composants créés/modifiés
+
+**1. Database Migration** (`internal/database/migrations.go`)
+
+Ajout de la colonne `password_encrypted` :
+```sql
+ALTER TABLE users ADD COLUMN password_encrypted BLOB
+```
+
+Cette colonne stocke le mot de passe chiffré avec la master key, permettant sa récupération lors de la restauration.
+
+**2. Package crypto** (`internal/crypto/crypto.go`)
+
+Nouvelles fonctions de chiffrement/déchiffrement de mots de passe :
+```go
+// EncryptPassword encrypts a plaintext password using the master key
+func EncryptPassword(password, masterKey string) ([]byte, error)
+
+// DecryptPassword decrypts an encrypted password using the master key
+func DecryptPassword(encryptedPassword []byte, masterKey string) (string, error)
+```
+
+Utilise AES-256-GCM avec nonce aléatoire, identique au chiffrement des clés utilisateurs.
+
+**3. Package users** (`internal/users/users.go`)
+
+Modifications de toutes les fonctions manipulant les mots de passe :
+
+**`CreateFirstAdmin()`** :
+- Accepte le paramètre `masterKey`
+- Chiffre le mot de passe lors de la création
+- Insère `password_encrypted` en base
+
+**`ActivateUser()`** :
+- Accepte le paramètre `masterKey`
+- Chiffre le mot de passe lors de l'activation
+- Insère `password_encrypted` en base
+
+**`ChangePassword()`** :
+- Accepte le paramètre `masterKey`
+- Chiffre le nouveau mot de passe
+- Met à jour `password_hash` ET `password_encrypted`
+- Synchronise SMB automatiquement
+
+**`ResetPassword()`** :
+- Accepte le paramètre `masterKey`
+- Chiffre le nouveau mot de passe
+- Met à jour `password_hash` ET `password_encrypted`
+- Synchronise SMB automatiquement
+
+**4. Web handlers** (`internal/web/router.go`)
+
+Modifications pour passer la master key :
+
+**`handleSetup()`** (création premier admin) :
+- Récupère master key depuis la requête (générée lors du setup)
+- Passe à `CreateFirstAdmin()`
+
+**`handleActivation()`** :
+- Récupère master key depuis `system_config`
+- Passe à `ActivateUser()`
+
+**`handleSettings()` (changement mot de passe)** :
+- Récupère master key depuis `system_config`
+- Passe à `ChangePassword()`
+
+**`handleResetPasswordSubmit()`** :
+- Récupère master key depuis `system_config`
+- Passe à `ResetPassword()`
+
+**5. Package backup** (`internal/backup/backup.go`)
+
+Modification de la struct `UserBackup` :
+```go
+type UserBackup struct {
+    // ... existing fields
+    PasswordEncrypted []byte `json:"password_encrypted"`
+}
+```
+
+Modification de la requête d'export :
+```sql
+SELECT id, username, password_hash, password_encrypted, email, ...
+FROM users
+```
+
+**6. Script de restauration** (`restore_server.sh`)
+
+**Création table** :
+```sql
+CREATE TABLE IF NOT EXISTS users (
+    ...
+    password_encrypted BLOB,
+    ...
+);
+```
+
+**Insertion utilisateurs** :
+```bash
+# Décode et insère password_encrypted depuis le backup
+PASSWORD_ENCRYPTED=$(echo "$user" | jq -r '.password_encrypted // "" | @base64')
+PASS_ENC_HEX=$(echo "$PASSWORD_ENCRYPTED" | base64 -d | xxd -p | tr -d '\n')
+```
+
+**Nouvelle section : Restauration mots de passe SMB** :
+```bash
+# Compile l'utilitaire de déchiffrement
+go build -o /tmp/anemone-decrypt-password ./cmd/anemone-decrypt-password
+
+# Récupère la master key depuis le backup
+MASTER_KEY=$(echo "$DECRYPTED_JSON" | jq -r '.system_config[] | select(.key == "master_key") | .value')
+
+# Pour chaque utilisateur
+for user in users; do
+    # Si password_encrypted existe
+    if [ -n "$PASSWORD_ENCRYPTED" ]; then
+        # Déchiffre le mot de passe
+        DECRYPTED_PASSWORD=$(/tmp/anemone-decrypt-password "$PASSWORD_B64" "$MASTER_KEY")
+
+        # Configure SMB avec le vrai mot de passe
+        (echo "$DECRYPTED_PASSWORD"; echo "$DECRYPTED_PASSWORD") | smbpasswd -a "$USERNAME" -s
+        echo "✓ Created SMB user: $USERNAME (password restored from backup)"
+    else
+        # Fallback sur mot de passe temporaire
+        echo "○ Created SMB user: $USERNAME (using temporary password: anemone123)"
+    fi
+done
+```
+
+**7. Nouvel utilitaire** (`cmd/anemone-decrypt-password/main.go` - nouveau)
+
+Utilitaire CLI pour déchiffrer un mot de passe :
+```go
+func main() {
+    encryptedPasswordB64 := os.Args[1]
+    masterKey := os.Args[2]
+
+    // Decode base64
+    encryptedPassword, _ := base64.StdEncoding.DecodeString(encryptedPasswordB64)
+
+    // Decrypt password
+    password, _ := crypto.DecryptPassword(encryptedPassword, masterKey)
+
+    // Output to stdout
+    fmt.Print(password)
+}
+```
+
+### 📝 Fichiers créés/modifiés
+
+**Nouveaux** :
+- `cmd/anemone-decrypt-password/main.go` (~40 lignes) - Utilitaire CLI déchiffrement
+
+**Modifiés** :
+- `internal/database/migrations.go` (~10 lignes) - Ajout colonne password_encrypted
+- `internal/crypto/crypto.go` (~82 lignes) - Fonctions EncryptPassword/DecryptPassword
+- `internal/users/users.go` (~80 lignes) - Modification 4 fonctions (CreateFirstAdmin, ActivateUser, ChangePassword, ResetPassword)
+- `internal/web/router.go` (~30 lignes) - Récupération et passage master key dans 4 handlers
+- `internal/backup/backup.go` (~15 lignes) - Ajout password_encrypted dans export
+- `restore_server.sh` (~80 lignes) - Création table, insertion, déchiffrement et restauration SMB
+
+**Total** : ~337 lignes ajoutées/modifiées
+
+### 🔒 Sécurité
+
+**Protection des mots de passe** :
+- ✅ Mots de passe jamais stockés en clair
+- ✅ Double protection : Bcrypt (auth web) + AES-256-GCM (restauration SMB)
+- ✅ Chiffrement avec master key (elle-même stockée en DB)
+- ✅ Déchiffrement uniquement pendant restauration serveur
+- ✅ Utilitaire de déchiffrement temporaire (supprimé après usage)
+
+**Rétrocompatibilité** :
+- ✅ Anciens utilisateurs sans password_encrypted → Fallback mot de passe temporaire
+- ✅ Script de restauration détecte automatiquement la présence de password_encrypted
+- ✅ Messages clairs pour l'admin (vert = restauré, jaune = temporaire)
+
+**Synchronisation web ↔ SMB** :
+- ✅ Changement mot de passe web → Met à jour bcrypt + encrypted + SMB
+- ✅ Réinitialisation mot de passe → Met à jour bcrypt + encrypted + SMB
+- ✅ Toujours synchronisés, pas de divergence possible
+
+### 🧪 Tests à effectuer
+
+**Sur FR1 (serveur source)** :
+- ⏳ Compiler le nouveau code avec password_encrypted
+- ⏳ Créer un nouvel utilisateur (le mot de passe doit être chiffré automatiquement)
+- ⏳ Changer un mot de passe existant (doit mettre à jour password_encrypted)
+- ⏳ Créer un backup serveur
+- ⏳ Vérifier que password_encrypted est présent dans le backup (déchiffrer et inspecter JSON)
+
+**Sur FR2 (serveur cible - propre)** :
+- ⏳ Lancer le script de restauration
+- ⏳ Vérifier la compilation de anemone-decrypt-password
+- ⏳ Vérifier que le script trouve la master key dans le backup
+- ⏳ Vérifier que les mots de passe SMB sont restaurés (message "password restored from backup")
+- ⏳ Tester connexion SMB avec les vrais mots de passe ✅
+- ⏳ Tester connexion web avec les vrais mots de passe ✅
+
+**Rétrocompatibilité** :
+- ⏳ Restaurer un ancien backup (sans password_encrypted)
+- ⏳ Vérifier que le script fonctionne avec fallback mot de passe temporaire
+- ⏳ Vérifier messages d'avertissement pour l'admin
+
+### 📊 Messages attendus
+
+**Restauration avec mots de passe chiffrés** :
+```bash
+[9/11] Creating Samba users...
+  Compiling password decryption tool...
+  ✓ Password decryption tool compiled
+  ✓ Created SMB user: admin (password restored from backup)
+  ✓ Created SMB user: test (password restored from backup)
+✓ Samba users created with restored passwords
+```
+
+**Restauration sans mots de passe chiffrés (ancien backup)** :
+```bash
+[9/11] Creating Samba users...
+  ⚠️  Master key not found in backup
+  Using temporary password instead
+  ○ Created SMB user: admin (using temporary password: anemone123)
+  ○ Created SMB user: test (using temporary password: anemone123)
+✓ Samba users created with temporary passwords
+  ⚠️  Admin should reset SMB passwords after restoration!
+```
+
+### 🔄 Déploiement
+
+**DEV/FR1** :
+- ⏳ Code compilé avec nouveaux champs
+- ⏳ Base de données migrée (colonne password_encrypted ajoutée)
+- ⏳ Serveur redémarré et fonctionnel
+- ⏳ Backup créé avec nouveaux champs
+
+**FR2** :
+- ⏳ Script de restauration testé
+- ⏳ Mots de passe SMB restaurés avec succès
+- ⏳ Connexions web et SMB validées
+
+### 📝 Commits
+
+```
+À venir : feat: Add encrypted password storage for SMB restoration (Session 16)
+```
+
+**Contenu du commit** :
+- Ajout colonne password_encrypted
+- Fonctions chiffrement/déchiffrement mots de passe
+- Modification des fonctions de création/modification utilisateurs
+- Modification système de backup/restore
+- Utilitaire CLI de déchiffrement
+- Script de restauration avec déchiffrement automatique
+
+**Statut** : 🟡 **IMPLÉMENTÉ, EN ATTENTE DE TESTS**
 
 ---
 

@@ -314,5 +314,14 @@ func migrateUsersTable(db *sql.DB) error {
 		}
 	}
 
+	// Add password_encrypted column if it doesn't exist
+	// This stores the user's password encrypted with the master key
+	// Used for SMB password restoration after server backup/restore
+	if !existingColumns["password_encrypted"] {
+		if _, err := db.Exec("ALTER TABLE users ADD COLUMN password_encrypted BLOB"); err != nil {
+			return fmt.Errorf("failed to add password_encrypted column: %w", err)
+		}
+	}
+
 	return nil
 }

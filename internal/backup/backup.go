@@ -38,17 +38,18 @@ type ConfigItem struct {
 
 // UserBackup represents a user with all their data
 type UserBackup struct {
-	ID                     int       `json:"id"`
-	Username               string    `json:"username"`
-	PasswordHash           string    `json:"password_hash"`
-	Email                  string    `json:"email"`
-	EncryptionKeyHash      string    `json:"encryption_key_hash"`
-	EncryptionKeyEncrypted []byte    `json:"encryption_key_encrypted"`
-	IsAdmin                bool      `json:"is_admin"`
-	QuotaTotalGB           int       `json:"quota_total_gb"`
-	QuotaBackupGB          int       `json:"quota_backup_gb"`
-	Language               string    `json:"language"`
-	CreatedAt              time.Time `json:"created_at"`
+	ID                     int        `json:"id"`
+	Username               string     `json:"username"`
+	PasswordHash           string     `json:"password_hash"`
+	PasswordEncrypted      []byte     `json:"password_encrypted"`
+	Email                  string     `json:"email"`
+	EncryptionKeyHash      string     `json:"encryption_key_hash"`
+	EncryptionKeyEncrypted []byte     `json:"encryption_key_encrypted"`
+	IsAdmin                bool       `json:"is_admin"`
+	QuotaTotalGB           int        `json:"quota_total_gb"`
+	QuotaBackupGB          int        `json:"quota_backup_gb"`
+	Language               string     `json:"language"`
+	CreatedAt              time.Time  `json:"created_at"`
 	ActivatedAt            *time.Time `json:"activated_at"`
 }
 
@@ -117,7 +118,7 @@ func ExportConfiguration(db *sql.DB, serverName string) (*ServerBackup, error) {
 	}
 
 	// Export users
-	userRows, err := db.Query(`SELECT id, username, password_hash, email, encryption_key_hash,
+	userRows, err := db.Query(`SELECT id, username, password_hash, password_encrypted, email, encryption_key_hash,
 		encryption_key_encrypted, is_admin, quota_total_gb, quota_backup_gb, language,
 		created_at, activated_at FROM users`)
 	if err != nil {
@@ -129,11 +130,13 @@ func ExportConfiguration(db *sql.DB, serverName string) (*ServerBackup, error) {
 		var user UserBackup
 		var email, language sql.NullString
 		var activatedAt sql.NullTime
-		if err := userRows.Scan(&user.ID, &user.Username, &user.PasswordHash, &email,
+		var passwordEncrypted []byte
+		if err := userRows.Scan(&user.ID, &user.Username, &user.PasswordHash, &passwordEncrypted, &email,
 			&user.EncryptionKeyHash, &user.EncryptionKeyEncrypted, &user.IsAdmin,
 			&user.QuotaTotalGB, &user.QuotaBackupGB, &language, &user.CreatedAt, &activatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan user row: %w", err)
 		}
+		user.PasswordEncrypted = passwordEncrypted
 		if email.Valid {
 			user.Email = email.String
 		}
