@@ -383,16 +383,75 @@ echo -e "${GREEN}✓ Samba configuration generated${NC}"
 rm -f "$TEMP_JSON" /tmp/anemone-restore-decrypt
 
 echo ""
+echo -e "${BLUE}[11/12] Compiling Anemone binary...${NC}"
+cd "$(dirname "$0")"
+go build -o /usr/local/bin/anemone ./cmd/anemone
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Error: Failed to compile Anemone binary${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ Anemone binary compiled${NC}"
+
+echo ""
+echo -e "${BLUE}[12/12] Setting up Anemone service...${NC}"
+
+# Check if systemd service already exists
+if [ -f /etc/systemd/system/anemone.service ]; then
+    echo -e "${GREEN}✓ Systemd service already exists${NC}"
+else
+    echo -e "${YELLOW}  Creating systemd service...${NC}"
+    cat > /etc/systemd/system/anemone.service <<EOF
+[Unit]
+Description=Anemone NAS Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/srv/anemone
+Environment="ANEMONE_DATA_DIR=/srv/anemone"
+ExecStart=/usr/local/bin/anemone
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    systemctl daemon-reload
+    systemctl enable anemone
+    echo -e "${GREEN}  ✓ Systemd service created and enabled${NC}"
+fi
+
+# Start Anemone service
+systemctl restart anemone
+sleep 2
+
+if systemctl is-active --quiet anemone; then
+    echo -e "${GREEN}✓ Anemone service started successfully${NC}"
+else
+    echo -e "${RED}⚠ Failed to start Anemone service${NC}"
+    echo -e "${YELLOW}  Check logs: journalctl -u anemone -n 50${NC}"
+fi
+
+# Reload Samba
+systemctl reload smbd 2>/dev/null || systemctl restart smbd 2>/dev/null || true
+
+echo ""
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}✓ Server configuration restored successfully!${NC}"
+echo -e "${GREEN}✓ Server restoration complete!${NC}"
 echo -e "${GREEN}========================================${NC}"
+echo ""
+echo -e "${GREEN}Server status:${NC}"
+systemctl status anemone --no-pager -l | head -10
 echo ""
 echo -e "${YELLOW}Next steps:${NC}"
-echo -e "  1. Review the restored configuration"
-echo -e "  2. Start Anemone service: ${BLUE}sudo systemctl start anemone${NC}"
-echo -e "  3. Reload Samba: ${BLUE}sudo systemctl reload smbd${NC}"
-echo -e "  4. Check logs: ${BLUE}sudo journalctl -u anemone -f${NC}"
+echo -e "  1. Access web interface: ${BLUE}https://$(hostname -I | awk '{print $1}'):8443${NC}"
+echo -e "  2. Login with restored credentials"
+echo -e "  3. Check logs: ${BLUE}sudo journalctl -u anemone -f${NC}"
 echo ""
-echo -e "${YELLOW}Backup of previous configuration saved to:${NC}"
-echo -e "  $BACKUP_DIR"
-echo ""
+if [ -d "$BACKUP_DIR" ]; then
+    echo -e "${YELLOW}Backup of previous configuration saved to:${NC}"
+    echo -e "  $BACKUP_DIR"
+    echo ""
+fi
