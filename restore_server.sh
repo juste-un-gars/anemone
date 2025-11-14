@@ -214,12 +214,12 @@ echo "$DECRYPTED_JSON" | jq -r '.shares[] | @json' | while read -r share; do
     ID=$(echo "$share" | jq -r '.id')
     USER_ID=$(echo "$share" | jq -r '.user_id')
     NAME=$(echo "$share" | jq -r '.name')
-    PATH=$(echo "$share" | jq -r '.path')
+    SHARE_PATH=$(echo "$share" | jq -r '.path')
     PROTOCOL=$(echo "$share" | jq -r '.protocol')
     SYNC_ENABLED=$(echo "$share" | jq -r '.sync_enabled')
     CREATED_AT=$(echo "$share" | jq -r '.created_at')
 
-    sqlite3 "$DB_FILE" "INSERT INTO shares (id, user_id, name, path, protocol, sync_enabled, created_at) VALUES ($ID, $USER_ID, '$NAME', '$PATH', '$PROTOCOL', $SYNC_ENABLED, '$CREATED_AT');"
+    sqlite3 "$DB_FILE" "INSERT INTO shares (id, user_id, name, path, protocol, sync_enabled, created_at) VALUES ($ID, $USER_ID, '$NAME', '$SHARE_PATH', '$PROTOCOL', $SYNC_ENABLED, '$CREATED_AT');"
 done
 
 # Insert peers
