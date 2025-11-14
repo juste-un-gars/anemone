@@ -254,26 +254,33 @@
                 // Checkbox column
                 const checkboxCell = document.createElement('td');
                 checkboxCell.className = 'px-6 py-4 whitespace-nowrap';
-                checkboxCell.innerHTML = `
-                    <input type="checkbox" class="item-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                           data-path="${item.path}"
-                           data-is-dir="${item.is_dir}"
-                           onchange="toggleItem('${item.path}', ${item.is_dir})">
-                `;
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'item-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500';
+                checkbox.dataset.path = item.path;
+                checkbox.dataset.isDir = item.is_dir;
+                checkbox.addEventListener('change', () => toggleItem(item.path, item.is_dir));
+                checkboxCell.appendChild(checkbox);
                 row.appendChild(checkboxCell);
 
                 // Name column
                 const nameCell = document.createElement('td');
                 nameCell.className = 'px-6 py-4 whitespace-nowrap';
                 if (item.is_dir) {
-                    nameCell.innerHTML = `
-                        <a href="#" class="flex items-center text-blue-600 hover:text-blue-800" onclick="navigateToDir('${item.path}'); return false;">
-                            <svg class="mr-2 h-5 w-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                            </svg>
-                            ${item.name}
-                        </a>
+                    const link = document.createElement('a');
+                    link.href = '#';
+                    link.className = 'flex items-center text-blue-600 hover:text-blue-800';
+                    link.innerHTML = `
+                        <svg class="mr-2 h-5 w-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                        ${item.name}
                     `;
+                    link.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        navigateToDir(item.path);
+                    });
+                    nameCell.appendChild(link);
                 } else {
                     nameCell.innerHTML = `
                         <div class="flex items-center">
@@ -302,11 +309,15 @@
                 const actionsCell = document.createElement('td');
                 actionsCell.className = 'px-6 py-4 whitespace-nowrap text-right text-sm font-medium';
                 if (!item.is_dir) {
-                    actionsCell.innerHTML = `
-                        <a href="#" class="text-blue-600 hover:text-blue-900" onclick="downloadFile('${item.path}'); return false;">
-                            ${lang === 'fr' ? 'Télécharger' : 'Download'}
-                        </a>
-                    `;
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = '#';
+                    downloadLink.className = 'text-blue-600 hover:text-blue-900';
+                    downloadLink.textContent = lang === 'fr' ? 'Télécharger' : 'Download';
+                    downloadLink.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        downloadFile(item.path);
+                    });
+                    actionsCell.appendChild(downloadLink);
                 }
                 row.appendChild(actionsCell);
 
@@ -338,15 +349,24 @@
 
         function updateBreadcrumb() {
             const breadcrumb = document.getElementById('breadcrumb');
-            breadcrumb.innerHTML = `
-                <li>
-                    <a href="#" class="breadcrumb-link text-gray-500 hover:text-gray-700" onclick="navigateToDir('/'); return false;">
-                        <svg class="flex-shrink-0 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-                        </svg>
-                    </a>
-                </li>
+            breadcrumb.innerHTML = '';
+
+            // Root breadcrumb item
+            const rootLi = document.createElement('li');
+            const rootLink = document.createElement('a');
+            rootLink.href = '#';
+            rootLink.className = 'breadcrumb-link text-gray-500 hover:text-gray-700';
+            rootLink.innerHTML = `
+                <svg class="flex-shrink-0 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                </svg>
             `;
+            rootLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                navigateToDir('/');
+            });
+            rootLi.appendChild(rootLink);
+            breadcrumb.appendChild(rootLi);
 
             if (currentPath !== '/') {
                 const parts = currentPath.split('/').filter(p => p);
@@ -356,14 +376,26 @@
                     const isLast = index === parts.length - 1;
                     const li = document.createElement('li');
                     li.className = 'flex items-center';
-                    li.innerHTML = `
-                        <svg class="flex-shrink-0 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-                        </svg>
-                        <a href="#" class="ml-2 text-sm font-medium ${isLast ? 'text-gray-700' : 'text-gray-500 hover:text-gray-700'}" onclick="navigateToDir('${accPath}'); return false;">
-                            ${part}
-                        </a>
-                    `;
+
+                    const separator = document.createElement('svg');
+                    separator.className = 'flex-shrink-0 h-5 w-5 text-gray-400';
+                    separator.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+                    separator.setAttribute('viewBox', '0 0 20 20');
+                    separator.setAttribute('fill', 'currentColor');
+                    separator.innerHTML = '<path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />';
+                    li.appendChild(separator);
+
+                    const partLink = document.createElement('a');
+                    partLink.href = '#';
+                    partLink.className = `ml-2 text-sm font-medium ${isLast ? 'text-gray-700' : 'text-gray-500 hover:text-gray-700'}`;
+                    partLink.textContent = part;
+                    const pathToNavigate = accPath;
+                    partLink.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        navigateToDir(pathToNavigate);
+                    });
+                    li.appendChild(partLink);
+
                     breadcrumb.appendChild(li);
                 });
             }

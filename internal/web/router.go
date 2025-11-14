@@ -3593,9 +3593,18 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Download encrypted file from peer
-	url := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-file?user_id=%d&share_name=%s&path=%s",
-		peer.Address, peer.Port, session.UserID, shareName, filePath)
+	// Download encrypted file from peer (with proper URL encoding)
+	baseURL := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-file", peer.Address, peer.Port)
+	fileURL, err := buildURL(baseURL, map[string]string{
+		"user_id":    strconv.Itoa(session.UserID),
+		"share_name": shareName,
+		"path":       filePath,
+	})
+	if err != nil {
+		log.Printf("Error building URL: %v", err)
+		http.Error(w, "Failed to build request URL", http.StatusInternalServerError)
+		return
+	}
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -3605,7 +3614,7 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 		Timeout:   120 * time.Second, // Longer timeout for large files
 	}
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", fileURL, nil)
 	if err != nil {
 		log.Printf("Error creating request: %v", err)
 		http.Error(w, "Failed to create request", http.StatusInternalServerError)
