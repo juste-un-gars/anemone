@@ -288,8 +288,9 @@ echo "$DECRYPTED_JSON" | jq -r '.shares[] | @json' | while read -r share; do
     sqlite3 "$DB_FILE" "INSERT INTO shares (id, user_id, name, path, protocol, sync_enabled, created_at) VALUES ($ID, $USER_ID, '$NAME', '$SHARE_PATH', '$PROTOCOL', $SYNC_ENABLED, '$CREATED_AT');"
 done
 
-# Insert peers
-echo "$DECRYPTED_JSON" | jq -r '.peers[] | @json' | while read -r peer; do
+# Insert peers (if any exist)
+if echo "$DECRYPTED_JSON" | jq -e '.peers' > /dev/null 2>&1 && [ "$(echo "$DECRYPTED_JSON" | jq '.peers')" != "null" ]; then
+    echo "$DECRYPTED_JSON" | jq -r '.peers[] | @json' | while read -r peer; do
     ID=$(echo "$peer" | jq -r '.id')
     NAME=$(echo "$peer" | jq -r '.name')
     ADDRESS=$(echo "$peer" | jq -r '.address')
@@ -307,7 +308,8 @@ echo "$DECRYPTED_JSON" | jq -r '.peers[] | @json' | while read -r peer; do
     CREATED_AT=$(echo "$peer" | jq -r '.created_at')
 
     sqlite3 "$DB_FILE" "INSERT INTO peers (id, name, address, port, public_key, password, enabled, status, sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month, sync_interval_minutes, created_at) VALUES ($ID, '$NAME', '$ADDRESS', $PORT, $(if [ -z "$PUBLIC_KEY" ]; then echo "NULL"; else echo "'$PUBLIC_KEY'"; fi), $(if [ -z "$PASSWORD" ]; then echo "NULL"; else echo "'$PASSWORD'"; fi), $ENABLED, '$STATUS', $SYNC_ENABLED, '$SYNC_FREQUENCY', '$SYNC_TIME', $(if [ "$SYNC_DAY_OF_WEEK" = "NULL" ]; then echo "NULL"; else echo "$SYNC_DAY_OF_WEEK"; fi), $(if [ "$SYNC_DAY_OF_MONTH" = "NULL" ]; then echo "NULL"; else echo "$SYNC_DAY_OF_MONTH"; fi), $SYNC_INTERVAL_MINUTES, '$CREATED_AT');"
-done
+    done
+fi
 
 # Insert sync_config (if it exists in backup)
 if echo "$DECRYPTED_JSON" | jq -e '.sync_config' > /dev/null 2>&1; then
@@ -356,7 +358,7 @@ echo -e "${BLUE}[9/11] Creating Samba users...${NC}"
 # Compile password decryption tool
 echo -e "${YELLOW}  Compiling password decryption tool...${NC}"
 cd "$(dirname "$0")"
-go build -o /tmp/anemone-decrypt-password ./cmd/anemone-decrypt-password 2>&1
+go build -o /tmp/anemone-decrypt-password ./cmd/anemone-decrypt-password </dev/null 2>&1
 if [ $? -ne 0 ]; then
     echo -e "${RED}  Failed to compile password decryption tool${NC}"
     echo -e "${YELLOW}  Using temporary password instead${NC}"
@@ -383,12 +385,10 @@ echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
     PASSWORD_ENCRYPTED=$(echo "$user" | jq -r '.password_encrypted // ""')
 
     # Try to decrypt password if tool is available and password_encrypted exists
-    if [ "$DECRYPT_TOOL_AVAILABLE" = true ] && [ -n "$PASSWORD_ENCRYPTED" ]; then
-        # Convert JSON array to base64 string
-        PASSWORD_B64=$(echo "$PASSWORD_ENCRYPTED" | base64 -w 0)
-
+    if [ "$DECRYPT_TOOL_AVAILABLE" = true ] && [ -n "$PASSWORD_ENCRYPTED" ] && [ "$PASSWORD_ENCRYPTED" != "null" ]; then
+        # PASSWORD_ENCRYPTED is already base64 from JSON, use it directly
         # Decrypt password
-        DECRYPTED_PASSWORD=$(/tmp/anemone-decrypt-password "$PASSWORD_B64" "$MASTER_KEY" 2>/dev/null)
+        DECRYPTED_PASSWORD=$(/tmp/anemone-decrypt-password "$PASSWORD_ENCRYPTED" "$MASTER_KEY" 2>/dev/null)
 
         if [ $? -eq 0 ] && [ -n "$DECRYPTED_PASSWORD" ]; then
             # Use decrypted password
