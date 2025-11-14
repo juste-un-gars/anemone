@@ -403,8 +403,16 @@
 
         function downloadFile(filePath) {
             if (!currentBackup) return;
+            const fileName = filePath.split('/').pop(); // Extract filename
             const url = `/api/restore/download?peer_id=${currentBackup.peer_id}&backup=${encodeURIComponent(currentBackup.share_name)}&file=${encodeURIComponent(filePath)}`;
-            window.location.href = url;
+
+            // Create temporary link with download attribute to force download
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName; // Force download with original filename
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
 
         function formatBytes(bytes) {
