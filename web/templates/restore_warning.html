@@ -159,17 +159,58 @@
 </div>
 
 <script>
-    // Update hidden share_name field when peer is selected
-    document.getElementById('peerSelect').addEventListener('change', function() {
-        var selectedOption = this.options[this.selectedIndex];
-        var shareName = selectedOption.getAttribute('data-share-name');
-        document.getElementById('shareName').value = shareName || '';
-        console.log('Selected peer_id:', this.value, 'share_name:', shareName);
-    });
+    (function() {
+        console.log('Restore warning script loaded');
+        var peerSelect = document.getElementById('peerSelect');
+
+        if (!peerSelect) {
+            console.error('ERROR: peerSelect element not found');
+            return;
+        }
+
+        console.log('DEBUG: peerSelect found, options count:', peerSelect.options.length);
+
+        // Update hidden share_name field when peer is selected
+        peerSelect.addEventListener('change', function() {
+            var selectedOption = this.options[this.selectedIndex];
+            var shareName = selectedOption.getAttribute('data-share-name');
+            document.getElementById('shareName').value = shareName || '';
+            console.log('Selected peer_id:', this.value, 'share_name:', shareName);
+        });
+
+        // Auto-select if there's only one backup available
+        if (peerSelect.options.length === 2) {
+            // Only 2 options: the placeholder + 1 backup
+            console.log('Auto-selecting the only available backup');
+            peerSelect.selectedIndex = 1;
+
+            // Manually trigger the change logic
+            var selectedOption = peerSelect.options[1];
+            var shareName = selectedOption.getAttribute('data-share-name');
+            document.getElementById('shareName').value = shareName || '';
+            console.log('Auto-selected peer_id:', peerSelect.value, 'share_name:', shareName);
+        }
+    })();
 
     // Handle bulk restore form submission
     document.getElementById('bulkRestoreForm')?.addEventListener('submit', function(e) {
         e.preventDefault();
+
+        // Validate peer selection
+        var peerSelect = document.getElementById('peerSelect');
+        var shareName = document.getElementById('shareName');
+
+        if (!peerSelect.value || peerSelect.value === '') {
+            alert('Veuillez sélectionner un serveur source avant de lancer la restauration.');
+            return;
+        }
+
+        if (!shareName.value || shareName.value === '') {
+            alert('Erreur: Le nom du partage n\'a pas été détecté. Veuillez réessayer.');
+            return;
+        }
+
+        console.log('Submitting restore: peer_id=' + peerSelect.value + ', share_name=' + shareName.value);
 
         if (!confirm('Êtes-vous sûr de vouloir lancer la restauration automatique ? Cette opération peut prendre du temps.')) {
             return;
