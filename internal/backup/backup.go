@@ -129,14 +129,18 @@ func ExportConfiguration(db *sql.DB, serverName string) (*ServerBackup, error) {
 	for userRows.Next() {
 		var user UserBackup
 		var email, language sql.NullString
+		var encryptionKeyEncrypted sql.NullString
 		var activatedAt sql.NullTime
 		var passwordEncrypted []byte
 		if err := userRows.Scan(&user.ID, &user.Username, &user.PasswordHash, &passwordEncrypted, &email,
-			&user.EncryptionKeyHash, &user.EncryptionKeyEncrypted, &user.IsAdmin,
+			&user.EncryptionKeyHash, &encryptionKeyEncrypted, &user.IsAdmin,
 			&user.QuotaTotalGB, &user.QuotaBackupGB, &language, &user.CreatedAt, &activatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan user row: %w", err)
 		}
 		user.PasswordEncrypted = passwordEncrypted
+		if encryptionKeyEncrypted.Valid {
+			user.EncryptionKeyEncrypted = encryptionKeyEncrypted.String
+		}
 		if email.Valid {
 			user.Email = email.String
 		}
