@@ -48,10 +48,11 @@
             </ul>
         </div>
 
-        <!-- Available Backups -->
-        {{if .AvailableBackups}}
+        <!-- Available Backups (Admin only) -->
+        {{if and .Session.IsAdmin .AvailableBackups}}
         <div class="bg-white shadow rounded-lg p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">📦 Vos sauvegardes disponibles</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">📦 Sauvegardes disponibles</h3>
+            <p class="text-sm text-blue-600 mb-3">ℹ️ En tant qu'administrateur, vous pouvez restaurer les fichiers des utilisateurs depuis l'interface admin</p>
             <div class="space-y-3">
                 {{range .AvailableBackups}}
                 <div class="border border-gray-200 rounded-md p-4">
@@ -86,61 +87,19 @@
                 </form>
             </div>
 
-            <!-- Option 2: Automatic Restore -->
-            {{if .AvailableBackups}}
+            <!-- Option 2: Admin Restore Link (Admin only) -->
+            {{if .Session.IsAdmin}}
             <div class="bg-white shadow rounded-lg p-6 border-2 border-purple-200 hover:border-purple-400 transition">
                 <h3 class="text-xl font-semibold text-gray-900 mb-3">
-                    Option 2 : Restauration automatique
+                    Option 2 : Restaurer les fichiers des utilisateurs (Admin)
                 </h3>
                 <p class="text-gray-700 mb-4">
-                    Restaurer tous mes fichiers depuis un serveur pair distant.<br>
-                    <span class="text-sm text-gray-600">(Peut prendre du temps selon la taille des données)</span>
+                    Accéder à l'interface admin pour restaurer automatiquement les fichiers de tous les utilisateurs depuis les serveurs pairs.<br>
+                    <span class="text-sm text-gray-600">(Recommandé pour une restauration complète du serveur)</span>
                 </p>
-
-                <form id="bulkRestoreForm" method="POST" action="/restore-warning/bulk">
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Choisir le serveur source :
-                        </label>
-                        <select name="peer_id" id="peerSelect" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md border" required>
-                            <option value="">-- Sélectionner un serveur --</option>
-                            {{range .AvailableBackups}}
-                            <option value="{{.PeerID}}" data-share-name="{{.ShareName}}">{{.PeerName}} - {{.ShareName}} ({{.FileCount}} fichiers, {{.TotalSize}})</option>
-                            {{end}}
-                        </select>
-                        <input type="hidden" name="share_name" id="shareName" value="">
-                    </div>
-
-                    <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
-                        <p class="text-sm text-yellow-800">
-                            ⚠️ <strong>Attention :</strong> Cette opération peut prendre plusieurs minutes ou heures selon la taille de vos données. Ne fermez pas cette page pendant la restauration.
-                        </p>
-                    </div>
-
-                    <button type="submit" class="w-full px-6 py-3 border border-transparent text-base font-medium rounded-md text-white anemone-gradient hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
-                        🚀 Lancer la restauration automatique
-                    </button>
-                </form>
-
-                <!-- Progress (hidden by default) -->
-                <div id="progressContainer" class="hidden mt-6">
-                    <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
-                        <p class="font-semibold text-blue-900 mb-2">⏳ Restauration en cours...</p>
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 mb-2">
-                            <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
-                        </div>
-                        <p id="progressText" class="text-sm text-blue-800">Initialisation...</p>
-                    </div>
-                </div>
-            </div>
-            {{else}}
-            <div class="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                <h3 class="text-xl font-semibold text-gray-600 mb-3">
-                    Option 2 : Restauration automatique
-                </h3>
-                <p class="text-gray-600">
-                    Aucune sauvegarde disponible sur les serveurs pairs distants.
-                </p>
+                <a href="/admin/restore-users" class="block w-full px-6 py-3 border border-transparent text-base font-medium rounded-md text-white text-center anemone-gradient hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                    🔧 Accéder à l'interface de restauration admin
+                </a>
             </div>
             {{end}}
 

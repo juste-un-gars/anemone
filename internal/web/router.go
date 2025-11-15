@@ -208,6 +208,10 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/admin/backup/create", auth.RequireAdmin(server.handleAdminBackupCreate))
 	mux.HandleFunc("/admin/backup/download", auth.RequireAdmin(server.handleAdminBackupDownload))
 
+	// Admin routes - Restore all users (after server restoration)
+	mux.HandleFunc("/admin/restore-users", auth.RequireAdmin(server.handleAdminRestoreUsers))
+	mux.HandleFunc("/admin/restore-users/restore", auth.RequireAdmin(server.handleAdminRestoreUsersRestore))
+
 	// User routes (with restore check)
 	mux.HandleFunc("/trash", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleTrash)))
 	mux.HandleFunc("/trash/", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleTrashActions)))
@@ -4610,5 +4614,216 @@ func (s *Server) handleRestoreWarningBulk(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Bulk restore started in background",
+	})
+}
+
+// handleAdminRestoreUsers displays all users and their available backups for restoration
+// GET /admin/restore-users
+func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	// Get all users (except admin)
+	rows, err := s.db.Query("SELECT id, username FROM users WHERE is_admin = 0 ORDER BY username")
+	if err != nil {
+		log.Printf("Error getting users: %v", err)
+		http.Error(w, "Failed to get users", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type UserBackup struct {
+		UserID       int
+		Username     string
+		PeerID       int
+		PeerName     string
+		ShareName    string
+		FileCount    int
+		TotalSize    int64
+		LastModified time.Time
+	}
+
+	var allBackups []UserBackup
+
+	// For each user, check available backups on all peers
+	for rows.Next() {
+		var userID int
+		var username string
+		if err := rows.Scan(&userID, &username); err != nil {
+			continue
+		}
+
+		// Get all peers
+		allPeers, err := peers.GetAll(s.db)
+		if err != nil {
+			log.Printf("Error getting peers: %v", err)
+			continue
+		}
+
+		// Query each peer for this user's backups
+		for _, peer := range allPeers {
+			if !peer.SyncEnabled {
+				continue
+			}
+
+			// Build URL
+			url := fmt.Sprintf("https://%s:%d/api/sync/list-user-backups?user_id=%d",
+				peer.Address, peer.Port, userID)
+
+			// Create HTTP client
+			tr := &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			}
+			client := &http.Client{
+				Transport: tr,
+				Timeout:   10 * time.Second,
+			}
+
+			// Create request
+			req, err := http.NewRequest("GET", url, nil)
+			if err != nil {
+				continue
+			}
+
+			// Add P2P authentication header
+			if peer.Password != nil && *peer.Password != "" {
+				req.Header.Set("X-Sync-Password", *peer.Password)
+			}
+
+			// Execute request
+			resp, err := client.Do(req)
+			if err != nil {
+				continue
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				continue
+			}
+
+			// Parse response
+			type BackupInfo struct {
+				ShareName    string    `json:"share_name"`
+				FileCount    int       `json:"file_count"`
+				TotalSize    int64     `json:"total_size"`
+				LastModified time.Time `json:"last_modified"`
+			}
+			var peerBackups []BackupInfo
+			if err := json.NewDecoder(resp.Body).Decode(&peerBackups); err != nil {
+				continue
+			}
+
+			// Add to results
+			for _, backup := range peerBackups {
+				allBackups = append(allBackups, UserBackup{
+					UserID:       userID,
+					Username:     username,
+					PeerID:       peer.ID,
+					PeerName:     peer.Name,
+					ShareName:    backup.ShareName,
+					FileCount:    backup.FileCount,
+					TotalSize:    backup.TotalSize,
+					LastModified: backup.LastModified,
+				})
+			}
+		}
+	}
+
+	// Render template
+	data := map[string]interface{}{
+		"Session": session,
+		"Lang":    lang,
+		"Backups": allBackups,
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "admin_restore_users.html", data); err != nil {
+		log.Printf("Error executing template: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+	}
+}
+
+// handleAdminRestoreUsersRestore handles bulk restoration of a user's files
+// POST /admin/restore-users/restore
+func (s *Server) handleAdminRestoreUsersRestore(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Get parameters
+	userIDStr := r.FormValue("user_id")
+	peerIDStr := r.FormValue("peer_id")
+	shareName := r.FormValue("share_name")
+
+	if userIDStr == "" || peerIDStr == "" || shareName == "" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Missing parameters",
+		})
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid user_id",
+		})
+		return
+	}
+
+	peerID, err := strconv.Atoi(peerIDStr)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid peer_id",
+		})
+		return
+	}
+
+	// Get username for logging
+	var username string
+	err = s.db.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&username)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "User not found",
+		})
+		return
+	}
+
+	log.Printf("Admin %s starting bulk restore for user %s (id %d) from peer %d share %s",
+		session.Username, username, userID, peerID, shareName)
+
+	// Start bulk restore in background
+	go func() {
+		err := bulkrestore.BulkRestoreFromPeer(s.db, userID, peerID, shareName, s.cfg.DataDir, nil)
+		if err != nil {
+			log.Printf("Admin bulk restore failed for user %s: %v", username, err)
+		} else {
+			log.Printf("Admin bulk restore completed successfully for user %s", username)
+		}
+	}()
+
+	// Return immediate response
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "Bulk restore started in background for user " + username,
 	})
 }

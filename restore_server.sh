@@ -375,6 +375,12 @@ sqlite3 "$DB_FILE" "INSERT OR REPLACE INTO system_config (key, value, updated_at
 # Set all users' restore_acknowledged to 0 (they need to acknowledge the restore)
 sqlite3 "$DB_FILE" "UPDATE users SET restore_acknowledged = 0, restore_completed = 0;"
 
+# Disable all peers to prevent automatic sync from deleting backup files
+# Admin must manually re-enable peers after restoring user files
+sqlite3 "$DB_FILE" "UPDATE peers SET sync_enabled = 0;"
+echo -e "${YELLOW}⚠️  All peers have been disabled to prevent data loss${NC}"
+echo -e "${YELLOW}   Re-enable peers after restoring user files from admin interface${NC}"
+
 echo -e "${GREEN}✓ Database restored${NC}"
 
 echo ""
