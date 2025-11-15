@@ -33,7 +33,7 @@ type FileEntry struct {
 
 // Manifest represents the backup manifest
 type Manifest struct {
-	Files []FileEntry `json:"files"`
+	Files map[string]FileEntry `json:"files"` // Map indexed by file path
 }
 
 // RestoreProgress holds the restoration progress
