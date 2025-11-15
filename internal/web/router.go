@@ -4087,7 +4087,15 @@ func (s *Server) handleAPISyncDownloadEncryptedManifest(w http.ResponseWriter, r
 	}
 
 	// Build backup path
-	backupDir := fmt.Sprintf("%d_%s", userID, shareName)
+	// Convert share name to directory name (e.g., "backup_test" -> "test")
+	// Convention: incoming/{user_id}_{username}/ but API uses backup_{username}
+	username := shareName
+	if strings.HasPrefix(shareName, "backup_") {
+		username = strings.TrimPrefix(shareName, "backup_")
+	} else if strings.HasPrefix(shareName, "data_") {
+		username = strings.TrimPrefix(shareName, "data_")
+	}
+	backupDir := fmt.Sprintf("%d_%s", userID, username)
 	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", backupDir)
 	manifestPath := filepath.Join(backupPath, ".anemone-manifest.json.enc")
 
@@ -4134,7 +4142,15 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 	}
 
 	// Build backup path
-	backupDir := fmt.Sprintf("%d_%s", userID, shareName)
+	// Convert share name to directory name (e.g., "backup_test" -> "test")
+	// Convention: incoming/{user_id}_{username}/ but API uses backup_{username}
+	username := shareName
+	if strings.HasPrefix(shareName, "backup_") {
+		username = strings.TrimPrefix(shareName, "backup_")
+	} else if strings.HasPrefix(shareName, "data_") {
+		username = strings.TrimPrefix(shareName, "data_")
+	}
+	backupDir := fmt.Sprintf("%d_%s", userID, username)
 	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", backupDir)
 
 	// Build encrypted file path
