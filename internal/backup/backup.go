@@ -44,7 +44,7 @@ type UserBackup struct {
 	PasswordEncrypted      []byte     `json:"password_encrypted"`
 	Email                  string     `json:"email"`
 	EncryptionKeyHash      string     `json:"encryption_key_hash"`
-	EncryptionKeyEncrypted []byte     `json:"encryption_key_encrypted"`
+	EncryptionKeyEncrypted string     `json:"encryption_key_encrypted"` // String because stored as TEXT (base64) in DB
 	IsAdmin                bool       `json:"is_admin"`
 	QuotaTotalGB           int        `json:"quota_total_gb"`
 	QuotaBackupGB          int        `json:"quota_backup_gb"`
