@@ -297,10 +297,10 @@ echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
         exit 1
     fi
 
-    # Decode base64 re-encrypted key for database insertion
-    ENC_KEY_HEX=$(echo "$NEW_ENCRYPTION_KEY_ENCRYPTED" | base64 -d | xxd -p | tr -d '\n')
+    # Insert encryption_key_encrypted as TEXT (base64 string), not as BLOB
+    # The Go code expects to read a base64 string, not raw bytes
 
-    # Decode base64 password_encrypted (if exists)
+    # Decode base64 password_encrypted (if exists) and insert as BLOB
     if [ -n "$PASSWORD_ENCRYPTED" ]; then
         PASS_ENC_HEX=$(echo "$PASSWORD_ENCRYPTED" | base64 -d | xxd -p | tr -d '\n')
         PASS_ENC_SQL="X'$PASS_ENC_HEX'"
@@ -308,7 +308,7 @@ echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
         PASS_ENC_SQL="NULL"
     fi
 
-    sqlite3 "$DB_FILE" "INSERT INTO users (id, username, password_hash, password_encrypted, email, encryption_key_hash, encryption_key_encrypted, is_admin, quota_total_gb, quota_backup_gb, language, created_at, activated_at) VALUES ($ID, '$USERNAME', '$PASSWORD_HASH', $PASS_ENC_SQL, '$EMAIL', '$ENCRYPTION_KEY_HASH', X'$ENC_KEY_HEX', $IS_ADMIN, $QUOTA_TOTAL, $QUOTA_BACKUP, '$LANGUAGE', '$CREATED_AT', $(if [ "$ACTIVATED_AT" = "NULL" ]; then echo "NULL"; else echo "'$ACTIVATED_AT'"; fi));"
+    sqlite3 "$DB_FILE" "INSERT INTO users (id, username, password_hash, password_encrypted, email, encryption_key_hash, encryption_key_encrypted, is_admin, quota_total_gb, quota_backup_gb, language, created_at, activated_at) VALUES ($ID, '$USERNAME', '$PASSWORD_HASH', $PASS_ENC_SQL, '$EMAIL', '$ENCRYPTION_KEY_HASH', '$NEW_ENCRYPTION_KEY_ENCRYPTED', $IS_ADMIN, $QUOTA_TOTAL, $QUOTA_BACKUP, '$LANGUAGE', '$CREATED_AT', $(if [ "$ACTIVATED_AT" = "NULL" ]; then echo "NULL"; else echo "'$ACTIVATED_AT'"; fi));"
 done
 
 # Count users to display success message
