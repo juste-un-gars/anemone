@@ -4033,7 +4033,9 @@ func (s *Server) handleAPISyncListUserBackups(w http.ResponseWriter, r *http.Req
 			continue
 		}
 
-		shareName := strings.TrimPrefix(entry.Name(), prefix)
+		// Extract username from directory name: {user_id}_{username} -> backup_{username}
+		username := strings.TrimPrefix(entry.Name(), prefix)
+		shareName := "backup_" + username
 		backupPath := filepath.Join(backupsDir, entry.Name())
 
 		// Get modification time

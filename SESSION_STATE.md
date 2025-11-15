@@ -1442,7 +1442,138 @@ Fichiers utilisateur (backup sur pairs distants)
    - Se connecter au partage `backup_test`
    - Vérifier tous les fichiers présents et lisibles
 
+### 🔨 Problèmes rencontrés et correctifs appliqués
+
+#### 1. Double encodage base64 dans `encryption_key_encrypted`
+- **Problème** : Dans `restore_server.sh`, les commandes jq utilisaient `| @base64` sur des valeurs déjà encodées en base64 dans le JSON
+- **Cause** : `encryption_key_encrypted` stocké comme `[]byte` dans Go → JSON marshal l'encode automatiquement en base64
+- **Fix commit 4fb306d** : Suppression de `| @base64` dans les commandes jq
+- **Résultat** : Problème persiste avec nouveaux backups
+
+#### 2. Type de données `encryption_key_encrypted` dans export backup
+- **Problème** : Le champ `EncryptionKeyEncrypted []byte` était lu comme BLOB même si SQLite stocke en TEXT
+- **Cause** : Go's `json.Marshal()` encode les `[]byte` en base64 automatiquement
+- **Fix commit fbcf7b9** : Changement du type de `[]byte` vers `string` dans la struct `UserBackup`
+- **Résultat** : Toujours double encodage
+
+#### 3. Lecture SQLite BLOB vs TEXT
+- **Problème** : Même avec le type `string`, Go lisait toujours comme BLOB
+- **Cause** : Le scan direct dans un string conserve le comportement BLOB
+- **Fix commit c09574d** : Utilisation de `sql.NullString` comme variable intermédiaire
+- **Résultat** : Correctif appliqué mais binaire pas déployé
+
+#### 4. Binaire incorrect exécuté sur FR1 et FR3
+- **Problème** : Modifications non prises en compte malgré compilation
+- **Cause** : systemd exécutait `/home/franck/anemone/anemone` au lieu de `/usr/local/bin/anemone`
+- **Fix** : Compilation vers le bon chemin et redémarrage service
+- **Résultat** : Binaire correct maintenant déployé
+
+#### 5. Insertion BLOB au lieu de TEXT pour `encryption_key_encrypted`
+- **Problème** : Erreur "cipher: message authentication failed" lors de restauration fichiers
+- **Cause** : `restore_server.sh` décodait base64 et insérait comme hex BLOB (72 bytes) au lieu de TEXT base64 (96 chars)
+- **Fix commit 2c93955** : Insertion directe de `$NEW_ENCRYPTION_KEY_ENCRYPTED` sans décodage base64
+- **Résultat** : Valeur stockée correctement en TEXT
+
+#### 6. Format Manifest incompatible
+- **Problème** : Erreur "json: cannot unmarshal object into Go struct field Manifest.files of type []bulkrestore.FileEntry"
+- **Cause** : Le manifest généré par `internal/sync/manifest.go` utilise `Files map[string]FileMetadata` mais `internal/bulkrestore/bulkrestore.go` attendait `Files []FileEntry`
+- **Fix commit 7c48184** : Changement de `Files []FileEntry` vers `Files map[string]FileEntry`
+- **Résultat** : Parsing manifest fonctionne
+
+#### 7. Nom de share hardcodé au lieu de lookup DB
+- **Problème** : Erreur "unknown share name: test"
+- **Cause** : Code dans `bulkrestore.go` n'acceptait que les noms hardcodés "backup" ou "data"
+- **Fix commit daaa39d** : Query database pour obtenir le path du share au lieu de hardcodé
+- **Résultat** : Accepte maintenant les shares custom
+
+#### 8. Share manquant dans la base de données
+- **Problème** : Erreur "share not found for user 2: test"
+- **Cause** : FR3 avait seulement le share "data_test" mais pas "backup_test"
+- **Fix** : Création manuelle du share "test" (incorrect - devait être "backup_test")
+- **Résultat** : Share créé mais mauvais nom
+
+#### 9. Convention de nommage des shares de backup
+- **Problème** : FR2 liste le backup comme "test" alors que le share s'appelle "backup_test"
+- **Cause** : API `/api/sync/list-user-backups` sur FR2 utilisait le nom du répertoire (`incoming/2_test`) au lieu du nom du share (`backup_test`)
+- **Convention** : `incoming/{user_id}_{username}` → `backup_{username}`
+- **Fix** : Modification de `handleAPISyncListUserBackups` dans `internal/web/router.go` ligne 4036-4038
+  ```go
+  // Avant
+  shareName := strings.TrimPrefix(entry.Name(), prefix) // "test"
+
+  // Après
+  username := strings.TrimPrefix(entry.Name(), prefix)
+  shareName := "backup_" + username // "backup_test"
+  ```
+- **Déploiement** : Binaire recompilé et déployé sur FR2
+- **Résultat** : API renvoie maintenant `{"share_name":"backup_test",...}`
+
+### ⚠️ Problème restant (NON RÉSOLU)
+
+**Symptôme** :
+- Interface web affiche "✓ Restauration terminée avec succès !"
+- Mais aucun fichier n'apparaît dans le répertoire `backup_test`
+- Logs du serveur ne montrent pas d'activité de restauration récente
+
+**Actions nécessaires pour la prochaine session** :
+
+1. **Analyser le flux complet de restauration** :
+   - Interface web `/restore-warning` → Envoi formulaire avec peer_id et share_name
+   - Backend `handleRestoreWarningBulk()` → Lance `bulkrestore.BulkRestoreFromPeer()`
+   - Vérifier que le bon share_name est passé (devrait être "backup_test")
+   - Vérifier les logs côté serveur pour voir si la restauration démarre vraiment
+
+2. **Comprendre l'architecture backup/restore** :
+   - **Backup** : Comment les fichiers sont sauvegardés sur FR2
+     - Structure répertoire : `/srv/anemone/backups/incoming/2_test/`
+     - Format des fichiers : `.enc` (chiffrés)
+     - Manifest : `.anemone-manifest.json.enc`
+   - **Restore** : Comment les fichiers doivent être restaurés sur FR3
+     - Déchiffrement avec la clé utilisateur
+     - Placement dans `/srv/anemone/shares/test/backup/` (path du share backup_test)
+     - Vérification des permissions et ownership
+
+3. **Tracer le problème étape par étape** :
+   - Activer des logs détaillés dans `bulkrestore.go`
+   - Vérifier si le téléchargement du manifest fonctionne
+   - Vérifier si le parsing du manifest fonctionne
+   - Vérifier si la boucle de téléchargement des fichiers s'exécute
+   - Vérifier les erreurs silencieuses qui ne remontent pas à l'interface
+
+4. **Vérifier la cohérence des noms** :
+   - Share name dans la page web : devrait afficher "backup_test"
+   - Share name envoyé au backend : devrait être "backup_test"
+   - Share name utilisé pour le query DB : devrait trouver le share avec path `/srv/anemone/shares/test/backup/`
+   - Share name utilisé pour l'API vers FR2 : "backup_test" doit être converti en chemin correct `incoming/2_test/`
+
+### 📝 Fichiers modifiés dans cette session
+
+**Modifiés** :
+- `internal/backup/backup.go` - Type de `EncryptionKeyEncrypted` changé vers `string` + lecture via `sql.NullString`
+- `internal/bulkrestore/bulkrestore.go` - Type `Manifest.Files` changé vers `map[string]FileEntry` + query DB pour share path
+- `internal/web/router.go` - API `/api/sync/list-user-backups` applique convention `backup_{username}`
+- `restore_server.sh` - Insertion `encryption_key_encrypted` comme TEXT au lieu de BLOB
+- `cmd/anemone-reencrypt-key/main.go` - Outil de re-chiffrement des clés utilisateur
+
+**Commits** :
+```
+4fb306d - fix: Remove double base64 encoding in restore script
+fbcf7b9 - fix: Change EncryptionKeyEncrypted type to string to prevent double encoding
+c09574d - fix: Use sql.NullString to properly read encryption_key_encrypted as TEXT
+2c93955 - fix: Insert encryption_key_encrypted as TEXT not BLOB in restore script
+7c48184 - fix: Change Manifest.Files to map instead of slice
+daaa39d - fix: Query database for share path instead of hardcoded names
+(non commité) - fix: Apply backup_{username} convention in list-user-backups API
+```
+
 ---
 
-**État session 17** : 🟢 **IMPLÉMENTÉE, PRÊTE POUR TESTS E2E**
-**Résolution** : Le re-chiffrement des clés utilisateur permet maintenant la restauration des fichiers après restauration serveur
+**État session 17** : 🟡 **PROBLÈME PARTIELLEMENT RÉSOLU - NÉCESSITE DIAGNOSTIC APPROFONDI**
+**Résolution partielle** :
+- ✅ Re-chiffrement des clés utilisateur fonctionne
+- ✅ Convention de nommage des shares corrigée
+- ✅ Tous les problèmes d'encodage base64 résolus
+- ✅ Parsing du manifest corrigé
+- ❌ Restauration des fichiers ne fonctionne toujours pas (cause inconnue)
+
+**Prochaine session** : Diagnostic complet du flux de restauration et analyse des logs détaillés
