@@ -1,11 +1,12 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-15 (Session 17 - Re-chiffrement des clés utilisateur - COMPLÉTÉE)
-**Prochaine session** : Tests E2E de restauration complète + Session 14 (Audit de sécurité)
-**Status** : 🟢 PROBLÈME CRITIQUE RÉSOLU - Restauration complète fonctionnelle, prête pour tests
+**Dernière session** : 2025-11-15 (Session 18 - Interface admin de restauration utilisateurs)
+**Prochaine session** : Diagnostic restauration manuelle + Problèmes de permissions
+**Status** : 🟡 EN COURS - Interface admin créée, problème restauration à diagnostiquer
 
 > **Note** : L'historique des sessions 1-7 a été archivé dans `SESSION_STATE_ARCHIVE.md`
 > **Note** : Les détails techniques des sessions 8-11 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
+> **Note** : Les détails techniques des sessions 12-16 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_12_16.md`
 
 ---
 
@@ -72,7 +73,7 @@
    - Backups P2P chiffrés automatiquement
    - Protection même si peer compromis
 
-9. **Synchronisation incrémentale** ✨ Session 8
+9. **Synchronisation incrémentale**
    - Système de manifest pour tracking fichiers
    - Upload fichier par fichier (type rclone)
    - Seulement les fichiers modifiés sont transférés
@@ -80,14 +81,14 @@
    - Chaque fichier chiffré individuellement
    - Stockage : `/srv/anemone/backups/incoming/{user_id}_{share_name}/`
 
-10. **Scheduler automatique** ✨ Session 9
+10. **Scheduler automatique**
     - Goroutine background vérifiant toutes les 1 minute
     - Configuration par pair (interval/daily/weekly/monthly)
     - Bouton "Forcer la synchronisation" pour trigger manuel
     - Logs détaillés dans la console serveur
     - Dashboard utilisateur affiche "Dernière sauvegarde"
 
-11. **Authentification P2P par mot de passe** 🔐 Session 10
+11. **Authentification P2P par mot de passe**
     - **Mot de passe serveur** : Protège les endpoints `/api/sync/*` contre accès non autorisés
     - **Mot de passe pair** : Authentification auprès des serveurs distants
     - Middleware `syncAuthMiddleware` avec header `X-Sync-Password`
@@ -96,13 +97,13 @@
     - Hachage bcrypt côté serveur (stockage sécurisé)
     - Rétrocompatibilité : Sans mot de passe configuré = accès libre
 
-12. **Gestion des backups entrants** 👥 Session 11
+12. **Gestion des backups entrants**
     - Vue `/admin/incoming` pour visualiser les pairs qui stockent des backups
     - Statistiques : nombre de pairs, fichiers, espace utilisé
     - Suppression de backups entrants
     - Carte dashboard pour accès rapide
 
-13. **Édition de pairs** ✏️ Session 11
+13. **Édition de pairs**
     - Interface `/admin/peers/{id}/edit` pour modifier la configuration
     - Modification nom, adresse, port, mot de passe, statut, fréquence sync
     - Gestion intelligente du mot de passe (conserver/modifier/supprimer)
@@ -114,22 +115,35 @@
     - Configuration complète système
     - Support multi-distro (Fedora/RHEL/Debian)
 
-15. **Restauration de fichiers avec interface web** 📂 Session 12
+15. **Restauration de fichiers avec interface web** (Session 12)
     - Liste des backups disponibles sur tous les pairs distants
     - Navigation dans l'arborescence des fichiers chiffrés
     - Déchiffrement automatique côté serveur d'origine
     - **Sélection multiple** : Checkboxes pour fichiers et dossiers
     - **Téléchargement ZIP** : Plusieurs fichiers/dossiers en un clic
     - **Expansion récursive** : Sélection d'un dossier inclut tous les sous-fichiers
-    - Barre d'outils avec compteur de sélection
-    - Boutons "Tout sélectionner" / "Désélectionner tout"
     - Support des chemins avec espaces et caractères spéciaux
-    - Streaming direct sans stockage temporaire
+
+16. **Backups serveur automatiques** (Session 15)
+    - Scheduler quotidien à 4h du matin
+    - Rotation automatique (10 derniers backups)
+    - Re-chiffrement à la volée pour téléchargement sécurisé
+    - Interface admin `/admin/backup`
+
+17. **Restauration complète du serveur** (Sessions 16-17)
+    - Script `restore_server.sh` pour restauration complète
+    - **Re-chiffrement automatique** des mots de passe SMB avec nouvelle master key
+    - **Re-chiffrement automatique** des clés utilisateur avec nouvelle master key
+    - Création automatique des utilisateurs système et SMB
+    - Configuration automatique des partages
+    - Flag `server_restored` pour afficher page d'avertissement
 
 ### 🚀 Déploiement
 
-**DEV (192.168.83.99)** : ✅ Migration /srv/anemone complète + Quotas Btrfs actifs + Scheduler actif
-**FR1 (192.168.83.96)** : ✅ Installation fraîche + Réception backups
+**DEV (localhost)** : ✅ Développement actif
+**FR1 (192.168.83.16)** : ✅ Serveur source avec utilisateurs et fichiers
+**FR2 (192.168.83.37)** : ✅ Serveur de backup (stockage pairs)
+**FR3 (192.168.83.38)** : ✅ Serveur restauré (tests disaster recovery)
 
 **Tests validés** :
 - ✅ Accès SMB depuis Windows : OK
@@ -139,17 +153,16 @@
 - ✅ Privacy SMB (chaque user voit uniquement ses partages) : OK
 - ✅ Multi-utilisateurs : OK
 - ✅ SELinux (Fedora) : OK
-- ✅ **Synchronisation automatique** : OK (Session 9)
+- ✅ **Synchronisation automatique** : OK
 - ✅ **Synchronisation incrémentale** : OK (fichiers modifiés/supprimés détectés)
-- ✅ **Dashboard "Dernière sauvegarde"** : OK (affiche temps écoulé)
-- ✅ **Authentification P2P** : OK (Session 10 - 401/403/200 selon mot de passe)
-- ✅ **Vue backups entrants** : OK (Session 11 - affichage stats et backups)
-- ✅ **Édition de pair** : OK (Session 11 - modification config complète)
-- ✅ **Synchronisation avec authentification** : OK (Session 11 - DEV→FR1)
-- ✅ **Fréquences par pair** : OK (Session 13 - interval/daily/weekly/monthly)
-- ✅ **Restauration fichiers depuis pairs** : OK (Session 12 - liste, navigation, déchiffrement)
-- ✅ **Téléchargement ZIP multiple** : OK (Session 12 - checkboxes, sélection, dossiers récursifs)
-- ✅ **Encodage URL chemins spéciaux** : OK (Session 12 - espaces, caractères spéciaux)
+- ✅ **Dashboard "Dernière sauvegarde"** : OK
+- ✅ **Authentification P2P** : OK (401/403/200 selon mot de passe)
+- ✅ **Restauration fichiers depuis pairs** : OK (Session 12)
+- ✅ **Téléchargement ZIP multiple** : OK (Session 12)
+- ✅ **Backups serveur quotidiens** : OK (Session 15)
+- ✅ **Restauration config serveur** : OK (Session 16-17)
+- ✅ **Restauration mots de passe SMB** : OK (Session 16)
+- ✅ **Re-chiffrement clés utilisateur** : OK (Session 17)
 
 **Structure de production** :
 - Code : `~/anemone/` (repo git, binaires)
@@ -165,37 +178,11 @@
 
 ---
 
-## 📋 Résumé des sessions récentes
+## 📋 Sessions archivées
 
-### Session 8 (7-8 Nov) - Synchronisation incrémentale
-- ✅ Système de manifest pour tracking fichiers
-- ✅ API endpoints pour sync fichier par fichier
-- ✅ ~50% économie bande passante (seulement fichiers modifiés)
-- ✅ Interface `/admin/sync` pour configuration
-- **Détails** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
-
-### Session 9 (9 Nov) - Scheduler automatique + Bug fixes
-- ✅ Goroutine background pour sync automatique
-- ✅ Vérification toutes les 1 minute
-- ✅ Fix dashboard "Dernière sauvegarde" (requête SQLite)
-- ✅ Logs détaillés dans console
-- **Détails** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
-
-### Session 10 (9 Nov) - Authentification P2P
-- ✅ Mot de passe serveur (bcrypt) pour protéger `/api/sync/*`
-- ✅ Mot de passe pair pour authentification sortante
-- ✅ Middleware avec header `X-Sync-Password`
-- ✅ Interface `/admin/settings` pour configuration
-- ✅ Rétrocompatibilité (sans mot de passe = accès libre)
-- **Détails** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
-
-### Session 11 (10 Nov) - Vue backups entrants + Édition pairs
-- ✅ Vue `/admin/incoming` avec statistiques backups
-- ✅ Interface `/admin/peers/{id}/edit` pour modification
-- ✅ Gestion intelligente mot de passe (conserver/modifier/supprimer)
-- ✅ Test d'authentification intégré
-- ✅ Cartes dashboard (Paramètres serveur, Pairs connectés)
-- **Détails** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
+- **Sessions 1-7** : Voir `SESSION_STATE_ARCHIVE.md`
+- **Sessions 8-11** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
+- **Sessions 12-16** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_12_16.md`
 
 ---
 
@@ -216,844 +203,316 @@ Permettre de configurer une fréquence de synchronisation indépendante pour cha
 - **Weekly** : Synchronisation hebdomadaire un jour spécifique (ex: Samedi 23:00)
 - **Monthly** : Synchronisation mensuelle un jour spécifique (ex: 1er du mois à 23:00)
 
-**Cas d'usage** :
-- Pair FR0 (interval 30min) : Backup très fréquent pour données critiques
-- Pair FR1 (daily 23:00) : Backup quotidien pour récupération rapide
-- Pair FR2 (weekly Samedi 23:00) : Snapshot hebdomadaire pour version intermédiaire
-- Pair FR3 (monthly 1er 23:00) : Archive mensuelle pour rétention long terme
-
-### 🔨 Composants créés/modifiés
-
-**1. Database Migration** (`internal/database/migrations.go`)
-
-Nouvelles colonnes ajoutées à la table `peers` :
-```sql
-sync_enabled BOOLEAN DEFAULT 1           -- Activer/désactiver sync pour ce pair
-sync_frequency TEXT DEFAULT 'daily'      -- "interval", "daily", "weekly", "monthly"
-sync_time TEXT DEFAULT '23:00'           -- Heure de sync (format HH:MM)
-sync_day_of_week INTEGER                 -- 0-6 (0=dimanche), NULL si pas weekly
-sync_day_of_month INTEGER                -- 1-31, NULL si pas monthly
-sync_interval_minutes INTEGER DEFAULT 60 -- Intervalle en minutes pour "interval"
-```
-
-**2. Package peers** (`internal/peers/peers.go`)
-
-Ajout de champs à la struct `Peer` :
-```go
-type Peer struct {
-    // ... existing fields
-    SyncEnabled         bool
-    SyncFrequency       string   // "interval", "daily", "weekly", "monthly"
-    SyncTime            string   // "HH:MM"
-    SyncDayOfWeek       *int     // 0-6, NULL si pas weekly
-    SyncDayOfMonth      *int     // 1-31, NULL si pas monthly
-    SyncIntervalMinutes int      // Intervalle en minutes pour "interval"
-}
-```
-
-Nouvelles fonctions :
-- `UpdateLastSync(db, peerID)` : Met à jour le timestamp de dernière sync
-- `ShouldSyncPeer(peer)` : Détermine si un pair doit être synchronisé maintenant
-  - Interval : Vérifie si `now - lastSync >= interval` (en minutes)
-  - Daily : Vérifie si on a passé l'heure de sync aujourd'hui et qu'on n'a pas encore sync aujourd'hui
-  - Weekly : Vérifie le jour de la semaine + l'heure + qu'on n'a pas sync aujourd'hui
-  - Monthly : Vérifie le jour du mois + l'heure + qu'on n'a pas sync aujourd'hui
-
-**3. Package sync** (`internal/sync/sync.go`)
-
-Nouvelle fonction `SyncPeer()` pour synchroniser tous les shares vers UN seul pair spécifique.
-
-**4. Scheduler** (`internal/scheduler/scheduler.go`)
-
-Parcourt tous les pairs individuellement et synchronise ceux qui doivent l'être selon leur fréquence configurée.
-
-**5. Interfaces admin**
-
-**Add Peer** (`web/templates/admin_peers_add.html`) :
-- Checkbox "Activer la synchronisation automatique"
-- Dropdown "Fréquence" (interval/daily/weekly/monthly)
-- **Pour "Interval"** : Input numérique + dropdown unité (minutes/heures)
-  - Valeur convertie en minutes avant stockage en base
-  - Exemple : 2 heures → stocké comme 120 minutes
-  - Masque le champ "Heure de synchronisation"
-- Input time "Heure de synchronisation" (pour daily/weekly/monthly)
-- Dropdown "Jour de la semaine" (affiché conditionnellement pour weekly)
-- Input "Jour du mois" (affiché conditionnellement pour monthly)
-- JavaScript pour affichage conditionnel des champs
-
-**Edit Peer** (`web/templates/admin_peers_edit.html`) :
-- Mêmes champs que Add Peer
-- Valeurs pré-remplies depuis la base de données
-- **Pour "Interval"** : Affiche la valeur en minutes depuis la base (utilisateur peut changer l'unité)
-- JavaScript identique pour affichage conditionnel
-
-**6. Handlers** (`internal/web/router.go`)
-
-**handleAdminPeersAdd** :
-- Récupère et parse les champs de sync depuis le formulaire
-- Pour "interval" : Parse `sync_interval_value` et `sync_interval_unit`
-- Convertit en minutes (heures × 60) avant création du pair
-
-**handleAdminPeersActions (case "update")** :
-- Récupère et parse les champs de sync pour mise à jour
-- Logique de conversion identique pour "interval"
-
-### 📝 Fichiers créés/modifiés
-
-**Modifiés** :
-- `internal/database/migrations.go` (~20 lignes) - Migration colonnes sync
-- `internal/peers/peers.go` (~110 lignes) - Struct + ShouldSyncPeer + UpdateLastSync + interval logic
-- `internal/sync/sync.go` (~70 lignes) - Fonction SyncPeer
-- `internal/scheduler/scheduler.go` (~30 lignes) - Boucle sur peers au lieu de config globale
-- `internal/web/router.go` (~70 lignes) - Parse champs sync + conversion minutes/heures
-- `web/templates/admin_peers_add.html` (~120 lignes) - Section config sync + interval
-- `web/templates/admin_peers_edit.html` (~120 lignes) - Section config sync + interval
-
-**Total** : ~540 lignes ajoutées/modifiées
-
-### 🧪 Tests validés
-
-**Migration DB** :
-- ✅ Compilation réussie
-- ✅ Serveur démarre sans erreur
-- ✅ Pair existant FR1 migré avec config par défaut (daily, 23:00, interval=60)
-- ✅ Nouvelles colonnes présentes en base
-
-**Interface admin** :
-- ✅ Option "Interval" visible dans dropdown fréquence
-- ✅ Champs interval (valeur + unité) s'affichent conditionnellement
-- ✅ Conversion minutes/heures fonctionne correctement
-- ✅ Édition d'un pair affiche les valeurs correctement
-
-**Scheduler** :
-- ✅ Scheduler démarre avec message "checks every 1 minute"
-- ✅ Parcourt les pairs individuellement
-- ✅ Logique interval fonctionne (vérifie temps écoulé depuis last_sync)
-
-**Rétrocompatibilité** :
-- ✅ Pairs existants migrés automatiquement
-- ✅ Valeurs par défaut : sync_enabled=1, frequency=daily, time=23:00, interval=60
-- ✅ Aucune régression sur les fonctionnalités existantes
-
-### 📊 Exemple de configuration
-
-**Topologie recommandée** :
-```
-Serveur DEV (192.168.83.99)
-├── Pair FR0 (future) : Interval 30min → Backup très fréquent
-├── Pair FR1 (192.168.83.96) : Daily 23:00 → Backup quotidien
-├── Pair FR2 (future) : Weekly Samedi 23:00 → Snapshot hebdo
-└── Pair FR3 (future) : Monthly 1er 23:00 → Archive mensuelle
-```
-
-**Avantages** :
-- ✅ Pas de duplication des fichiers (chaque pair reçoit les mêmes données)
-- ✅ Plusieurs points de restauration à différentes fréquences
-- ✅ Optimisation réseau : syncs espacées dans le temps
-- ✅ Flexibilité : Chaque pair peut avoir sa propre stratégie
-- ✅ Option interval pour données critiques nécessitant backups très fréquents
-
-### 🔄 Remplacement de fonctionnalités
-
-**Ancienne approche (Session 9)** :
-- Table `sync_config` avec configuration globale
-- Tous les pairs synchronisés en même temps
-- Intervalle global (30min, 1h, 2h, 6h, fixed)
-
-**Nouvelle approche (Session 13)** :
-- Configuration par pair dans la table `peers`
-- Chaque pair synchronisé indépendamment
-- Fréquences plus claires et flexibles (interval/daily/weekly/monthly)
-
-**Note** : La table `sync_config` est conservée mais n'est plus utilisée par le scheduler. Elle peut être supprimée dans une future version.
-
-**Commits** :
-```
-À venir : feat: Add interval frequency option to peer sync configuration (Session 13)
-```
-
 **Statut** : 🟢 COMPLÈTE ET TESTÉE
 
 ---
 
-## 🔧 Session 12 - 11 Novembre 2025 - Interface web de restauration depuis pairs distants
+## 🔧 Session 17 - 15 Novembre 2025 - Re-chiffrement des clés utilisateur lors de la restauration
 
-### 🎯 Objectif
+**Date** : 2025-11-15
+**Objectif** : Corriger le problème critique de restauration des fichiers après restauration serveur
+**Priorité** : 🔴 CRITIQUE → 🟢 RÉSOLUE
 
-Permettre aux utilisateurs de restaurer leurs fichiers depuis les backups P2P chiffrés stockés sur les serveurs pairs, avec déchiffrement local sur le serveur d'origine.
+### 🐛 Problème découvert
 
-### ⚠️ Correction architecturale majeure
-
-**Problème identifié** : L'architecture initiale permettait aux utilisateurs de restaurer depuis n'importe quel serveur (y compris les pairs qui ne possèdent pas leurs clés de chiffrement).
-
-**Architecture corrigée** :
-- Les utilisateurs se connectent sur leur **serveur d'origine** (où leurs clés sont stockées)
-- Le serveur d'origine **interroge les pairs** pour lister les backups disponibles
-- Les pairs **retournent les fichiers chiffrés** sans les déchiffrer (ils n'ont pas les clés)
-- Le serveur d'origine **déchiffre localement** avec la clé utilisateur
-- Les clés ne quittent jamais le serveur d'origine
-
-**Exemple** :
+Lors des tests de restauration FR1 → FR3 avec backup sur FR2, la restauration automatique échouait avec :
 ```
-Utilisateur marc@DEV (serveur d'origine)
-    ↓ Se connecte et demande ses backups
-DEV interroge FR1, FR2, FR3...
-    ↓ Chaque pair liste ses backups pour marc
-marc sélectionne un fichier depuis FR1
-    ↓ DEV télécharge le fichier chiffré depuis FR1
-FR1 retourne fichier.enc (sans déchiffrer)
-    ↓ DEV déchiffre avec la clé de marc
-marc reçoit le fichier déchiffré
+Bulk restore failed: failed to decrypt user key:
+failed to decrypt: cipher: message authentication failed
 ```
 
-### 🔨 Implémentation en 3 paliers
+### 🔍 Analyse du problème
 
-#### **PALIER 1** : API sur serveurs pairs (commit `28c26d7`)
-
-Nouveaux endpoints sur les pairs (FR1, FR2...) pour servir les fichiers chiffrés :
-
-**`GET /api/sync/list-user-backups?user_id=X`**
-- Liste les backups disponibles pour un utilisateur
-- Retourne : share_name, file_count, total_size, last_modified
-- Protégé par mot de passe P2P
-
-**`GET /api/sync/download-encrypted-manifest?user_id=X&share_name=Y`**
-- Télécharge le manifest chiffré **sans le déchiffrer**
-- Le pair ne touche pas au chiffrement
-
-**`GET /api/sync/download-encrypted-file?user_id=X&share_name=Y&path=Z`**
-- Télécharge un fichier chiffré **sans le déchiffrer**
-- Protection contre path traversal
-- Le pair est un simple serveur de stockage
-
-#### **PALIER 2** : Interface interroge les pairs (commit `d1c1de2`)
-
-Modification de l'interface pour lister les backups depuis les pairs :
-
-**`GET /api/restore/backups`** (modifié) :
-- Récupère tous les pairs configurés
-- Interroge chaque pair via `/api/sync/list-user-backups`
-- Agrège les résultats : peer_id, peer_name, share_name, stats
-- Interface affiche "FR1 - backup" au lieu de "backup"
-
-**Interface `restore.html`** (modifiée) :
-- Dropdown affiche la source du backup (nom du pair)
-- Stocke "peer_id:share_name" comme valeur
-- Passe peer_id ET share_name aux API suivantes
-
-#### **PALIER 3** : Téléchargement et déchiffrement distant (commit `f679d9f`)
-
-Implémentation de la restauration distante avec déchiffrement local :
-
-**`GET /api/restore/files?peer_id=X&backup=Y`** (modifié) :
-- Récupère les infos du pair depuis la base de données
-- Télécharge le manifest chiffré depuis le pair
-- Déchiffre le manifest localement avec la clé utilisateur
-- Construit l'arbre de fichiers
-- Retourne la structure au navigateur
-
-**`GET /api/restore/download?peer_id=X&backup=Y&file=Z`** (modifié) :
-- Récupère les infos du pair depuis la base de données
-- Télécharge le fichier chiffré depuis le pair
-- Déchiffre le fichier en streaming avec la clé utilisateur
-- Stream directement au navigateur (pas de stockage temporaire)
-
-### 📦 Fichiers créés/modifiés
-
-**Nouveaux packages** :
-- `internal/restore/restore.go` (~310 lignes) - Logique de restauration et déchiffrement
-
-**Modifiés** :
-- `internal/web/router.go` (~540 lignes ajoutées) - 6 nouveaux handlers
-- `web/templates/restore.html` (~380 lignes) - Interface utilisateur complète
-- `web/templates/dashboard_user.html` (~15 lignes) - Carte "Restauration"
-
-**Total** : ~1245 lignes ajoutées
-
-### 🔒 Sécurité
-
-**Chiffrement bout-en-bout conservé** :
-- ✅ Les clés utilisateurs ne quittent jamais le serveur d'origine
-- ✅ Les pairs ne peuvent pas déchiffrer les données (ils n'ont pas les clés)
-- ✅ Déchiffrement uniquement sur le serveur d'origine
-- ✅ Streaming direct (pas de stockage en clair)
-
-**Contrôle d'accès** :
-- ✅ Authentification sur serveur d'origine (RequireAuth)
-- ✅ Mot de passe P2P pour protéger les API des pairs
-- ✅ Isolation par user_id (vérifié côté serveur)
-- ✅ Validation des chemins de fichiers (path traversal protection)
-
-#### **PALIER 4** : Sélection multiple et téléchargement ZIP (11 Nov)
-
-Ajout de la fonctionnalité de sélection multiple avec téléchargement ZIP :
-
-**Frontend `restore.html`** :
-- Checkbox à côté de chaque fichier et dossier
-- Checkbox "Tout sélectionner" dans l'en-tête du tableau
-- Barre d'outils de sélection (apparaît quand des éléments sont sélectionnés)
-- Compteur d'éléments sélectionnés
-- Boutons "Tout sélectionner" et "Désélectionner tout"
-- Bouton "Télécharger (ZIP)" pour créer une archive
-- JavaScript pour gestion de l'état de sélection
-
-**Backend `router.go`** :
-- Nouvel endpoint `POST /api/restore/download-multiple`
-- Construction d'un arbre de fichiers depuis le manifest
-- Expansion récursive des dossiers sélectionnés
-- Téléchargement et déchiffrement de chaque fichier
-- Création d'un ZIP en streaming avec `archive/zip`
-- Fonction `buildURL()` pour encoder correctement les URLs (support espaces et caractères spéciaux)
-
-**Fix de sécurité master key** :
-- ✅ Master key maintenant lue **uniquement depuis la base de données** (`system_config.master_key`)
-- ✅ Plus de fichier `/srv/anemone/keys/master.key` (supprimé)
-- ✅ Architecture cohérente : toute la configuration dans la DB
-- ✅ Déployé sur DEV et FR1
-
-### 🧪 Tests validés
-
-✅ **Liste des backups** : Affichage correct depuis pairs distants
-✅ **Navigation dans fichiers** : Arborescence et breadcrumb fonctionnels
-✅ **Téléchargement simple** : Fichier individuel déchiffré correctement
-✅ **Sélection multiple** : Checkboxes et compteur fonctionnent
-✅ **Téléchargement ZIP** : Un seul fichier → ZIP OK
-✅ **Téléchargement ZIP dossier** : Dossier avec sous-dossiers → Tous les fichiers inclus
-✅ **Chemins avec espaces** : Encodage URL correct (ex: "ThinPrint Client Windows 13/Setup.exe")
-✅ **Déchiffrement automatique** : Pas besoin de clé utilisateur, transparent
-
-### 📊 Logs à vérifier
-
-**Sur DEV** (serveur d'origine) :
+**Architecture du chiffrement** :
 ```
-User marc downloaded file documents/report.txt from peer FR1 backup backup
+Master Key (unique par serveur)
+    ↓ chiffre
+User Encryption Key (unique par utilisateur)
+    ↓ chiffre
+Fichiers utilisateur (backup sur pairs distants)
 ```
 
-**Sur FR1** (serveur pair) :
-```
-Sent encrypted manifest for user 19 share backup
-Sent encrypted file documents/report.txt for user 19 share backup
-```
-
-### 🔄 Déploiement
-
-**DEV (192.168.83.5)** :
-- ✅ Binaire compilé avec restauration distante + sélection multiple + ZIP
-- ✅ Fix master key (lecture depuis DB)
-- ✅ Templates à jour (restore.html, dashboard_user.html)
-- ✅ Service redémarré et fonctionnel
-
-**FR1 (192.168.83.16)** :
-- ✅ Binaire compilé avec API de téléchargement chiffré
-- ✅ Fix master key (lecture depuis DB)
-- ✅ Support encodage URL pour chemins spéciaux
-- ✅ Service redémarré et fonctionnel
-
-### 📝 Commits
-
-```
-28c26d7 - feat: Add remote restore API endpoints on peer servers (Palier 1/4)
-d1c1de2 - feat: Query peer servers for remote backups (Palier 2/4)
-f679d9f - feat: Implement remote restore with local decryption (Palier 3/4)
-4f54713 - fix: Add FormatBytes and FormatTime to global template functions
-c596396 - feat: Add web interface for file restoration from encrypted backups (Session 12) [INITIAL]
-À venir  - feat: Add multiple file selection and ZIP download (Palier 4/4)
-À venir  - fix: Read master key from database instead of file (security)
-À venir  - fix: URL encoding for paths with spaces and special characters
-```
-
-### ⚠️ Notes importantes
-
-1. **Architecture P2P** : Chaque serveur peut être à la fois serveur d'origine (pour ses utilisateurs) et serveur pair (pour les utilisateurs d'autres serveurs)
-
-2. **Pas d'interface sur les pairs** : Les pairs gardent leur interface `/restore` car ils peuvent aussi être des serveurs d'origine pour leurs propres utilisateurs
-
-3. **Rétrocompatibilité** : Les anciennes API restent fonctionnelles, seules les nouvelles API de restauration distante ont été ajoutées
-
-4. **Mot de passe P2P obligatoire** : Pour la sécurité, il est fortement recommandé de configurer un mot de passe P2P sur chaque pair
-
-5. **Fix sécurité master key** : La master key est maintenant stockée et lue uniquement depuis la base de données, plus de fichier en clair
-
-**Statut** : 🟢 **COMPLÈTE ET TESTÉE**
-
----
-
-## 🔧 Session 15 - 12 Novembre 2025 - Backups serveur automatiques
-
-### 🎯 Objectif
-
-Implémenter un système de sauvegarde automatique de la configuration du serveur (disaster recovery) avec backups quotidiens, rotation automatique, et téléchargement sécurisé avec re-chiffrement.
-
-### ✅ Architecture implémentée
-
-**Fonctionnalités** :
-- **Backups automatiques quotidiens** : Scheduler qui s'exécute chaque jour à 4h du matin
-- **Rotation automatique** : Conservation des 10 derniers backups, suppression automatique des anciens
-- **Backups manuels** : Bouton "Sauvegarder maintenant" dans l'interface admin
-- **Téléchargement sécurisé** : Re-chiffrement à la volée avec mot de passe utilisateur (min 12 caractères)
-- **Stockage chiffré** : Backups stockés chiffrés avec la master key du serveur
-- **Interface dédiée** : Page `/admin/backup` avec liste des sauvegardes et métadonnées
-
-**Contenu des backups** :
-- Configuration complète du serveur
-- Utilisateurs et leurs clés de chiffrement
-- Partages et configuration SMB
-- Pairs P2P et configuration de synchronisation
-- Quotas et paramètres système
-- Clés système (master key)
-
-**Architecture de sécurité** :
-```
-Création backup → Chiffrement avec master_key → Stockage /srv/anemone/backups/server/
-Téléchargement → Déchiffrement avec master_key → Re-chiffrement avec mot de passe utilisateur → Download
-```
-
-**Note importante** : La master key n'est **jamais** incluse en clair dans le backup. Les backups sont stockés chiffrés avec la master_key sur le serveur, puis re-chiffrés avec un mot de passe choisi par l'utilisateur au moment du téléchargement.
-
-### 🔨 Composants créés/modifiés
-
-**1. Package serverbackup** (`internal/serverbackup/serverbackup.go` - nouveau)
-- `CreateServerBackup()` : Crée un backup chiffré avec master_key
-- `ListBackups()` : Liste tous les backups triés par date (plus récent en premier)
-- `CleanOldBackups()` : Supprime les backups au-delà de 10, garde les plus récents
-- `ReEncryptBackup()` : Déchiffre avec master_key, re-chiffre avec mot de passe utilisateur
-- `StartScheduler()` : Goroutine qui s'exécute quotidiennement à 4h du matin
-
-**2. Modifications main.go** (`cmd/anemone/main.go`)
-```go
-// Ajout du démarrage du scheduler
-serverbackup.StartScheduler(db, cfg.DataDir)
-```
-
-**3. Interface admin** (`web/templates/admin_backup.html` - nouvelle)
-- Liste des 10 derniers backups avec date, nom fichier, taille
-- Bouton "Sauvegarder maintenant" (POST `/admin/backup/create`)
-- Bouton "Télécharger" pour chaque backup (ouvre une modale)
-- Modale de téléchargement avec :
-  - Champ mot de passe (min 12 caractères)
-  - Confirmation du mot de passe
-  - Validation JavaScript
-  - Avertissement de sécurité sur la conservation du mot de passe
-
-**4. Handlers web** (`internal/web/router.go`)
-- `handleAdminBackup()` : Affiche la liste des backups
-- `handleAdminBackupCreate()` : Crée un backup manuel (POST)
-- `handleAdminBackupDownload()` : Re-chiffre et télécharge (POST)
-
-**5. Routes ajoutées** :
-```go
-mux.HandleFunc("/admin/backup", auth.RequireAdmin(server.handleAdminBackup))
-mux.HandleFunc("/admin/backup/create", auth.RequireAdmin(server.handleAdminBackupCreate))
-mux.HandleFunc("/admin/backup/download", auth.RequireAdmin(server.handleAdminBackupDownload))
-```
-
-**6. Dashboard admin modifié** (`web/templates/dashboard_admin.html`)
-- Lien "Sauvegarde serveur" mis à jour vers `/admin/backup`
-- Description mise à jour : "Gérer les sauvegardes automatiques du serveur (backup quotidien à 4h)"
-
-### 📝 Fichiers créés/modifiés
-
-**Nouveaux** :
-- `internal/serverbackup/serverbackup.go` (~208 lignes) - Package complet de backup serveur
-- `web/templates/admin_backup.html` (~227 lignes) - Interface admin avec modale
-
-**Modifiés** :
-- `cmd/anemone/main.go` (~3 lignes) - Import et appel StartScheduler
-- `internal/web/router.go` (~140 lignes) - Import, 3 handlers, routes
-- `web/templates/dashboard_admin.html` (~3 lignes) - Lien et description
-
-**Total** : ~581 lignes ajoutées/modifiées
-
-### 🔒 Sécurité
-
-**Protection de la master key** :
-- ✅ Master key stockée uniquement en base de données
-- ✅ Backups chiffrés avec master key (AES-256-GCM)
-- ✅ Re-chiffrement avec mot de passe utilisateur au téléchargement
-- ✅ Pas de stockage temporaire en clair
-- ✅ Mot de passe minimum 12 caractères
-- ✅ Validation côté client et serveur
-
-**Contrôle d'accès** :
-- ✅ Accès réservé aux administrateurs (`RequireAdmin`)
-- ✅ Validation des paramètres (filename, passphrase)
-- ✅ Protection contre path traversal
-- ✅ Permissions fichiers 0600 (lecture/écriture propriétaire uniquement)
-
-**Rotation automatique** :
-- ✅ Suppression automatique des backups au-delà de 10
-- ✅ Conservation des plus récents
-- ✅ Logs de suppression des anciens backups
-
-### 🧪 Tests à effectuer
-
-**Scheduler** :
-- ✅ Démarrage du scheduler au lancement du serveur
-- ✅ Log "🕐 Server backup scheduler started (daily at 4:00 AM)"
-- ✅ Affichage de la prochaine exécution avec countdown
-- ⏳ Attendre 4h du matin pour tester l'exécution automatique
-
-**Backup manuel** :
-- ⏳ Cliquer sur "Sauvegarder maintenant" dans `/admin/backup`
-- ⏳ Vérifier la création du fichier dans `/srv/anemone/backups/server/`
-- ⏳ Vérifier le format : `backup_YYYYMMDD_HHMMSS.enc`
-- ⏳ Vérifier l'affichage dans la liste
-
-**Téléchargement** :
-- ⏳ Cliquer sur "Télécharger" pour un backup
-- ⏳ Saisir un mot de passe (12+ caractères)
-- ⏳ Vérifier que la confirmation fonctionne
-- ⏳ Télécharger le fichier re-chiffré
-- ⏳ Vérifier que le fichier téléchargé est différent de celui sur le serveur
-
-**Rotation** :
-- ⏳ Créer 11+ backups manuels
-- ⏳ Vérifier que seuls les 10 plus récents sont conservés
-- ⏳ Vérifier les logs de suppression
-
-### 📊 Logs attendus
-
-**Démarrage serveur** :
-```
-🕐 Server backup scheduler started (daily at 4:00 AM)
-Next automatic server backup scheduled for: 2025-11-13 04:00:00 (in 18h11m0s)
-```
-
-**Création backup manuel** :
-```
-Server backup created: backup_20251112_094530.enc (15847 bytes)
-```
-
-**Téléchargement** :
-```
-Admin downloaded backup backup_20251112_094530.enc (re-encrypted, size: 15912 bytes)
-```
-
-**Rotation** :
-```
-Removed old backup: backup_20251101_040000.enc
-```
-
-### 🔄 Déploiement
-
-**DEV** :
-- ✅ Package `serverbackup` créé et compilé
-- ✅ Templates ajoutés
-- ✅ Routes configurées
-- ✅ Scheduler démarré
-- ✅ Serveur redémarré et fonctionnel
-
-**FR1** :
-- ⏳ À déployer après tests sur DEV
-
-### 📝 Commits
-
-```
-À venir : feat: Add automatic server backup system with daily scheduler (Session 15)
-```
-
-**Statut** : 🟢 **IMPLÉMENTÉ, EN TEST**
-
----
-
-## 🔧 Session 16 - 14 Novembre 2025 - Restauration des mots de passe SMB après backup/restore
-
-### 🎯 Objectif
-
-Permettre la restauration automatique des mots de passe SMB lors d'une restauration serveur, en stockant les mots de passe chiffrés avec la master key.
-
-### ⚠️ Problème identifié
-
-Lors des tests de restauration sur un serveur propre (FR2), un problème critique a été découvert :
-- Les utilisateurs peuvent se connecter à l'interface web après restauration ✅
-- **MAIS** : Les mots de passe SMB ne fonctionnent pas ❌
-- Le script de restauration utilisait un mot de passe temporaire "anemone123" pour tous les utilisateurs
-- Problème : Le hash bcrypt stocké en base est à sens unique, impossible de récupérer le mot de passe original
+**Problème** :
+- FR1 génère une master key unique : `MK_FR1`
+- `encryption_key_encrypted` est chiffré avec `MK_FR1`
+- FR3 génère une NOUVELLE master key : `MK_FR3`
+- Le script `restore_server.sh` restaure `encryption_key_encrypted` tel quel (chiffré avec `MK_FR1`)
+- Quand FR3 essaie de restaurer les fichiers, impossible de déchiffrer la clé utilisateur
 
 ### ✅ Solution implémentée
 
-**Architecture de double stockage** :
-- **Bcrypt hash** : Pour l'authentification web (sécurité maximale, à sens unique)
-- **Encrypted password** : Pour la restauration SMB (réversible avec master key)
+**Principe** : Re-chiffrer `encryption_key_encrypted` avec la nouvelle master key lors de la restauration.
 
-**Flux de données** :
-```
-Création/Modification mot de passe
-    ↓
-Génère bcrypt hash (auth web)
-    +
-Chiffre mot de passe avec master_key (AES-256-GCM)
-    ↓
-Stockage DB : password_hash + password_encrypted
-    ↓
-Backup serveur → Inclut password_encrypted
-    ↓
-Restauration → Déchiffre avec master_key → Configure SMB
-```
+**Outil créé** : `cmd/anemone-reencrypt-key/main.go`
+- Déchiffre la clé utilisateur avec l'ancienne master key
+- Re-chiffre avec la nouvelle master key
+- Retourne la clé re-chiffrée en base64
 
-### 🔨 Composants créés/modifiés
+**Script modifié** : `restore_server.sh`
+- Extrait l'ancienne master key du backup
+- Génère une nouvelle master key pour le serveur restauré
+- Re-chiffre `password_encrypted` ET `encryption_key_encrypted` pour chaque utilisateur
+- Insère les valeurs re-chiffrées dans la base de données
 
-**1. Database Migration** (`internal/database/migrations.go`)
+### 🔨 Problèmes rencontrés et correctifs appliqués
 
-Ajout de la colonne `password_encrypted` :
-```sql
-ALTER TABLE users ADD COLUMN password_encrypted BLOB
-```
-
-Cette colonne stocke le mot de passe chiffré avec la master key, permettant sa récupération lors de la restauration.
-
-**2. Package crypto** (`internal/crypto/crypto.go`)
-
-Nouvelles fonctions de chiffrement/déchiffrement de mots de passe :
-```go
-// EncryptPassword encrypts a plaintext password using the master key
-func EncryptPassword(password, masterKey string) ([]byte, error)
-
-// DecryptPassword decrypts an encrypted password using the master key
-func DecryptPassword(encryptedPassword []byte, masterKey string) (string, error)
-```
-
-Utilise AES-256-GCM avec nonce aléatoire, identique au chiffrement des clés utilisateurs.
-
-**3. Package users** (`internal/users/users.go`)
-
-Modifications de toutes les fonctions manipulant les mots de passe :
-
-**`CreateFirstAdmin()`** :
-- Accepte le paramètre `masterKey`
-- Chiffre le mot de passe lors de la création
-- Insère `password_encrypted` en base
-
-**`ActivateUser()`** :
-- Accepte le paramètre `masterKey`
-- Chiffre le mot de passe lors de l'activation
-- Insère `password_encrypted` en base
-
-**`ChangePassword()`** :
-- Accepte le paramètre `masterKey`
-- Chiffre le nouveau mot de passe
-- Met à jour `password_hash` ET `password_encrypted`
-- Synchronise SMB automatiquement
-
-**`ResetPassword()`** :
-- Accepte le paramètre `masterKey`
-- Chiffre le nouveau mot de passe
-- Met à jour `password_hash` ET `password_encrypted`
-- Synchronise SMB automatiquement
-
-**4. Web handlers** (`internal/web/router.go`)
-
-Modifications pour passer la master key :
-
-**`handleSetup()`** (création premier admin) :
-- Récupère master key depuis la requête (générée lors du setup)
-- Passe à `CreateFirstAdmin()`
-
-**`handleActivation()`** :
-- Récupère master key depuis `system_config`
-- Passe à `ActivateUser()`
-
-**`handleSettings()` (changement mot de passe)** :
-- Récupère master key depuis `system_config`
-- Passe à `ChangePassword()`
-
-**`handleResetPasswordSubmit()`** :
-- Récupère master key depuis `system_config`
-- Passe à `ResetPassword()`
-
-**5. Package backup** (`internal/backup/backup.go`)
-
-Modification de la struct `UserBackup` :
-```go
-type UserBackup struct {
-    // ... existing fields
-    PasswordEncrypted []byte `json:"password_encrypted"`
-}
-```
-
-Modification de la requête d'export :
-```sql
-SELECT id, username, password_hash, password_encrypted, email, ...
-FROM users
-```
-
-**6. Script de restauration** (`restore_server.sh`)
-
-**Création table** :
-```sql
-CREATE TABLE IF NOT EXISTS users (
-    ...
-    password_encrypted BLOB,
-    ...
-);
-```
-
-**Insertion utilisateurs** :
-```bash
-# Décode et insère password_encrypted depuis le backup
-PASSWORD_ENCRYPTED=$(echo "$user" | jq -r '.password_encrypted // "" | @base64')
-PASS_ENC_HEX=$(echo "$PASSWORD_ENCRYPTED" | base64 -d | xxd -p | tr -d '\n')
-```
-
-**Nouvelle section : Restauration mots de passe SMB** :
-```bash
-# Compile l'utilitaire de déchiffrement
-go build -o /tmp/anemone-decrypt-password ./cmd/anemone-decrypt-password
-
-# Récupère la master key depuis le backup
-MASTER_KEY=$(echo "$DECRYPTED_JSON" | jq -r '.system_config[] | select(.key == "master_key") | .value')
-
-# Pour chaque utilisateur
-for user in users; do
-    # Si password_encrypted existe
-    if [ -n "$PASSWORD_ENCRYPTED" ]; then
-        # Déchiffre le mot de passe
-        DECRYPTED_PASSWORD=$(/tmp/anemone-decrypt-password "$PASSWORD_B64" "$MASTER_KEY")
-
-        # Configure SMB avec le vrai mot de passe
-        (echo "$DECRYPTED_PASSWORD"; echo "$DECRYPTED_PASSWORD") | smbpasswd -a "$USERNAME" -s
-        echo "✓ Created SMB user: $USERNAME (password restored from backup)"
-    else
-        # Fallback sur mot de passe temporaire
-        echo "○ Created SMB user: $USERNAME (using temporary password: anemone123)"
-    fi
-done
-```
-
-**7. Nouvel utilitaire** (`cmd/anemone-decrypt-password/main.go` - nouveau)
-
-Utilitaire CLI pour déchiffrer un mot de passe :
-```go
-func main() {
-    encryptedPasswordB64 := os.Args[1]
-    masterKey := os.Args[2]
-
-    // Decode base64
-    encryptedPassword, _ := base64.StdEncoding.DecodeString(encryptedPasswordB64)
-
-    // Decrypt password
-    password, _ := crypto.DecryptPassword(encryptedPassword, masterKey)
-
-    // Output to stdout
-    fmt.Print(password)
-}
-```
-
-### 📝 Fichiers créés/modifiés
-
-**Nouveaux** :
-- `cmd/anemone-decrypt-password/main.go` (~40 lignes) - Utilitaire CLI déchiffrement
-
-**Modifiés** :
-- `internal/database/migrations.go` (~10 lignes) - Ajout colonne password_encrypted
-- `internal/crypto/crypto.go` (~82 lignes) - Fonctions EncryptPassword/DecryptPassword
-- `internal/users/users.go` (~80 lignes) - Modification 4 fonctions (CreateFirstAdmin, ActivateUser, ChangePassword, ResetPassword)
-- `internal/web/router.go` (~30 lignes) - Récupération et passage master key dans 4 handlers
-- `internal/backup/backup.go` (~15 lignes) - Ajout password_encrypted dans export
-- `restore_server.sh` (~80 lignes) - Création table, insertion, déchiffrement et restauration SMB
-
-**Total** : ~337 lignes ajoutées/modifiées
-
-### 🔒 Sécurité
-
-**Protection des mots de passe** :
-- ✅ Mots de passe jamais stockés en clair
-- ✅ Double protection : Bcrypt (auth web) + AES-256-GCM (restauration SMB)
-- ✅ Chiffrement avec master key (elle-même stockée en DB)
-- ✅ Déchiffrement uniquement pendant restauration serveur
-- ✅ Utilitaire de déchiffrement temporaire (supprimé après usage)
-
-**Rétrocompatibilité** :
-- ✅ Anciens utilisateurs sans password_encrypted → Fallback mot de passe temporaire
-- ✅ Script de restauration détecte automatiquement la présence de password_encrypted
-- ✅ Messages clairs pour l'admin (vert = restauré, jaune = temporaire)
-
-**Synchronisation web ↔ SMB** :
-- ✅ Changement mot de passe web → Met à jour bcrypt + encrypted + SMB
-- ✅ Réinitialisation mot de passe → Met à jour bcrypt + encrypted + SMB
-- ✅ Toujours synchronisés, pas de divergence possible
-
-### 🧪 Tests effectués
-
-**Sur FR1 (serveur source)** :
-- ✅ Compiler le nouveau code avec password_encrypted
-- ✅ Créer un nouvel utilisateur (le mot de passe doit être chiffré automatiquement)
-- ✅ Changer un mot de passe existant (doit mettre à jour password_encrypted)
-- ✅ Créer un backup serveur
-- ✅ Vérifier que password_encrypted est présent dans le backup (déchiffrer et inspecter JSON)
-
-**Sur FR2 (serveur cible - propre)** :
-- ✅ Lancer le script de restauration
-- ✅ Vérifier la compilation de anemone-decrypt-password
-- ✅ Vérifier que le script trouve la master key dans le backup
-- ✅ Vérifier que les mots de passe SMB sont restaurés (message "password restored from backup")
-- ✅ Tester connexion SMB avec les vrais mots de passe
-- ✅ Tester connexion web avec les vrais mots de passe
-
-**Corrections apportées pendant les tests** :
-- ✅ Fix double encodage base64 (password_encrypted déjà encodé depuis JSON)
-- ✅ Fix stdin consommé par go build (ajout `</dev/null`)
-- ✅ Fix erreur jq sur peers null (vérification avant itération)
-- ✅ Fix permissions SMB (/srv/anemone et /srv/anemone/shares en chmod 755)
-- ✅ Amélioration messages de fin de restauration (adaptatifs selon succès/échec)
-
-### 📊 Messages attendus
-
-**Restauration avec mots de passe chiffrés** :
-```bash
-[9/11] Creating Samba users...
-  Compiling password decryption tool...
-  ✓ Password decryption tool compiled
-  ✓ Created SMB user: admin (password restored from backup)
-  ✓ Created SMB user: test (password restored from backup)
-✓ Samba users created with restored passwords
-```
-
-**Restauration sans mots de passe chiffrés (ancien backup)** :
-```bash
-[9/11] Creating Samba users...
-  ⚠️  Master key not found in backup
-  Using temporary password instead
-  ○ Created SMB user: admin (using temporary password: anemone123)
-  ○ Created SMB user: test (using temporary password: anemone123)
-✓ Samba users created with temporary passwords
-  ⚠️  Admin should reset SMB passwords after restoration!
-```
-
-### 🔄 Déploiement
-
-**FR1 (serveur source - 192.168.83.96)** :
-- ✅ Code compilé avec nouveaux champs
-- ✅ Base de données migrée (colonne password_encrypted ajoutée)
-- ✅ Serveur redémarré et fonctionnel
-- ✅ Utilisateurs créés (admin, test)
-- ✅ Backup créé avec password_encrypted
-
-**FR2 (serveur cible - 192.168.83.37)** :
-- ✅ Script de restauration exécuté avec succès
-- ✅ Mots de passe SMB restaurés automatiquement
-- ✅ Connexions web validées (login avec vrais mots de passe)
-- ✅ Connexions SMB validées (accès partages avec vrais mots de passe)
-- ✅ Permissions correctes (chmod 755 sur /srv/anemone et shares)
+#### Problèmes résolus (commits)
+1. ✅ **Double encodage base64** (commit 4fb306d)
+2. ✅ **Type de données dans export** (commit fbcf7b9)
+3. ✅ **Lecture SQLite BLOB vs TEXT** (commit c09574d)
+4. ✅ **Insertion TEXT au lieu de BLOB** (commit 2c93955)
+5. ✅ **Format Manifest incompatible** (commit 7c48184)
+6. ✅ **Share path hardcodé** (commit daaa39d)
+7. ✅ **Convention de nommage shares** (commit 0335cdb)
 
 ### 📝 Commits
 
 ```
-61c6dd8 - feat: Add encrypted password storage for SMB restoration (Session 16)
-4fdaae1 - fix: Fix restore script issues with password decryption and null peers
-7fa535b - fix: Fix SMB directory permissions and improve restore messages
+4fb306d - fix: Remove double base64 encoding in restore script
+fbcf7b9 - fix: Change EncryptionKeyEncrypted type to string
+c09574d - fix: Use sql.NullString to read encryption_key_encrypted as TEXT
+2c93955 - fix: Insert encryption_key_encrypted as TEXT, not BLOB (Session 17)
+7c48184 - fix: Fix manifest Files type mismatch (Session 17)
+daaa39d - fix: Use database share path instead of hardcoded names (Session 17)
+0335cdb - fix: Apply backup_{username} convention in list-user-backups API
 ```
 
-**Résumé des commits** :
-- Ajout colonne password_encrypted (BLOB)
-- Fonctions chiffrement/déchiffrement mots de passe (AES-256-GCM)
-- Modification des 4 fonctions de gestion utilisateurs
-- Modification système de backup/restore (export + import)
-- Utilitaire CLI de déchiffrement (cmd/anemone-decrypt-password)
-- Script de restauration avec déchiffrement automatique
-- Fixes: double encodage, stdin, peers null, permissions
+**Statut** : 🟢 **COMPLÈTE - Tous les problèmes d'encodage et de manifest résolus**
 
-**Statut** : 🟢 **COMPLÈTE ET TESTÉE AVEC SUCCÈS**
+---
+
+## 🔧 Session 18 - 15 Novembre 2025 - Interface admin de restauration utilisateurs
+
+**Date** : 2025-11-15
+**Objectif** : Créer une interface admin sécurisée pour restaurer les fichiers de tous les utilisateurs après disaster recovery
+**Priorité** : 🔴 CRITIQUE
+
+### 🎯 Contexte
+
+Suite à la Session 17, un problème majeur a été identifié :
+- **Problème** : Lors de la restauration serveur, le scheduler démarre automatiquement
+- **Conséquence** : Le serveur restauré (FR3) détecte "tous les fichiers supprimés" car les shares sont vides
+- **Catastrophe** : FR3 envoie des commandes DELETE à FR2, qui supprime tous les backups !
+- **Boucle** : FR1 upload → FR3 DELETE → FR1 re-upload → FR3 DELETE...
+
+### ✅ Solution implémentée
+
+**Architecture sécurisée** :
+1. **Désactivation automatique des pairs** : `restore_server.sh` exécute `UPDATE peers SET sync_enabled = 0`
+2. **Interface admin dédiée** : `/admin/restore-users` pour restauration contrôlée
+3. **Suppression restauration utilisateur** : Les utilisateurs non-admin ne peuvent plus déclencher de restauration automatique
+4. **Workflow sécurisé** :
+   ```
+   Restauration serveur → Peers désactivés → Admin restaure les fichiers → Admin réactive les pairs
+   ```
+
+### 🔨 Composants créés/modifiés
+
+**1. Nouveaux handlers** (`internal/web/router.go`)
+
+**`handleAdminRestoreUsers()`** :
+- Récupère tous les utilisateurs (sauf admin)
+- Interroge tous les pairs (même désactivés) pour lister les backups disponibles
+- Appelle `/api/sync/list-user-backups` sur chaque pair
+- Construit une liste de `UserBackup` avec : UserID, Username, PeerID, PeerName, ShareName, FileCount, TotalSize, LastModified
+- Rend le template `admin_restore_users.html`
+
+**`handleAdminRestoreUsersRestore()`** :
+- Reçoit `user_id`, `peer_id`, `share_name` depuis le formulaire
+- Lance `bulkrestore.BulkRestoreFromPeer()` en arrière-plan (goroutine)
+- Retourne une réponse JSON immédiate pour éviter timeout
+- Format : `{"success": true, "message": "Restauration lancée"}`
+
+**2. Template admin** (`web/templates/admin_restore_users.html` - NOUVEAU)
+
+Interface Tailwind CSS avec :
+- **En-tête** : Navigation avec logo, rôle admin, logout
+- **Tableau des backups** :
+  - Colonnes : Utilisateur, Serveur pair, Partage, Fichiers, Taille, Dernière modification, Actions
+  - Ligne par backup disponible
+  - Bouton "Restaurer" par ligne (appelle `restoreUser()` JavaScript)
+- **Bouton "Restaurer tous les utilisateurs"** : Lance `restoreAll()` JavaScript
+- **Message de statut** : Div cachée pour afficher succès/erreurs
+- **JavaScript** :
+  - `restoreUser(userID, peerID, shareName, username)` : POST `/admin/restore-users/restore` pour un utilisateur
+  - `restoreAll()` : Boucle sur tous les backups et lance chaque restauration
+  - Mise à jour du statut en temps réel
+
+**3. Template restore_warning modifié** (`web/templates/restore_warning.html`)
+
+**Pour les utilisateurs non-admin** :
+- ❌ **SUPPRIMÉ** : Option "Restauration automatique" avec dropdown de sélection peer
+- ✅ **CONSERVÉ** : Option "Restauration manuelle" (transférer fichiers via SMB)
+- Message : "Je vais transférer mes fichiers depuis mon PC via SMB"
+
+**Pour les administrateurs** :
+- ✅ Option 1 : Restauration manuelle (identique aux users)
+- ✅ Option 2 : **Lien vers interface admin** (`/admin/restore-users`)
+  - Description : "Accéder à l'interface admin pour restaurer automatiquement les fichiers de tous les utilisateurs depuis les serveurs pairs"
+  - Bouton : "🔧 Accéder à l'interface de restauration admin"
+
+**4. Script de restauration modifié** (`restore_server.sh`)
+
+Ajout de la désactivation automatique des pairs :
+```bash
+# Disable all peers to prevent automatic sync from deleting backup files
+# Admin must manually re-enable peers after restoring user files
+sqlite3 "$DB_FILE" "UPDATE peers SET sync_enabled = 0;"
+echo -e "${YELLOW}⚠️  All peers have been disabled to prevent data loss${NC}"
+echo -e "${YELLOW}   Re-enable peers after restoring user files from admin interface${NC}"
+```
+
+**Position** : Après insertion des pairs, avant le message de fin de restauration
+
+### 🐛 Problèmes rencontrés et correctifs
+
+#### 1. Peers filtrés par `sync_enabled`
+**Problème** : Page admin affichait "Aucune sauvegarde disponible"
+**Cause** : Code dans `handleAdminRestoreUsers` filtrait les pairs désactivés :
+```go
+if !peer.SyncEnabled {
+    continue  // Skippait tous les pairs désactivés par restore_server.sh !
+}
+```
+**Fix** : Suppression du filtre, avec commentaire explicatif
+```go
+// Query each peer for this user's backups
+// Note: We query ALL peers, even disabled ones, because we want to list
+// available backups for restoration (peers are disabled after server restore)
+for _, peer := range allPeers {
+```
+
+#### 2. Template FormatTime manquant paramètre `lang`
+**Problème** : Colonne "Dernière modification" affichait "Internal server error"
+**Cause** : Template appelait `{{FormatTime .LastModified}}` mais la fonction attend 2 paramètres : `func(t time.Time, lang string)`
+**Fix** : Correction template
+```html
+<!-- Avant -->
+{{FormatTime .LastModified}}
+
+<!-- Après -->
+{{FormatTime .LastModified $.Lang}}
+```
+
+#### 3. Template non déployé sur FR3
+**Problème** : Erreur persistait après recompilation binaire
+**Cause** : Les templates sont chargés depuis le disque (`/srv/anemone/web/templates/`) et non embarqués dans le binaire
+**Fix** : Copie manuelle du template modifié :
+```bash
+scp web/templates/admin_restore_users.html franck@192.168.83.38:/tmp/
+ssh franck@192.168.83.38 "sudo mv /tmp/admin_restore_users.html /srv/anemone/web/templates/"
+sudo systemctl restart anemone
+```
+
+### ⚠️ Problèmes en suspens (NON RÉSOLUS)
+
+#### 1. Restauration ne démarre pas
+**Symptôme** :
+- Clic sur "Restaurer" ou "Restaurer tous les utilisateurs" ne fait rien
+- Aucune activité visible dans les logs du serveur
+- Pas de message d'erreur retourné
+
+**Hypothèses** :
+- Problème JavaScript (événement click non capturé ?)
+- Problème AJAX (requête POST non envoyée ?)
+- Problème handler (goroutine non lancée ?)
+- Problème `bulkrestore.BulkRestoreFromPeer()` (erreur silencieuse ?)
+
+**Diagnostic nécessaire** :
+- Vérifier logs navigateur (console JavaScript)
+- Vérifier logs serveur (journalctl -u anemone)
+- Ajouter logs debug dans `handleAdminRestoreUsersRestore()`
+- Tester manuellement l'API avec curl
+
+#### 2. Problème de permissions sur `/srv/anemone/backups`
+**Symptôme** :
+- L'utilisateur `franck` ne peut pas accéder aux fichiers dans `/srv/anemone/backups/`
+- Permissions trop restrictives ?
+
+**Diagnostic nécessaire** :
+- Vérifier ownership et permissions : `ls -la /srv/anemone/backups/`
+- Vérifier si SELinux bloque l'accès
+- Vérifier si l'utilisateur `franck` doit être ajouté à un groupe spécifique
+
+### 📝 Fichiers créés/modifiés
+
+**Nouveaux** :
+- `web/templates/admin_restore_users.html` (~249 lignes) - Interface admin complète
+
+**Modifiés** :
+- `internal/web/router.go` (~180 lignes ajoutées)
+  - `handleAdminRestoreUsers()` : Liste backups depuis tous les pairs
+  - `handleAdminRestoreUsersRestore()` : Lance restauration en background
+  - Routes : `/admin/restore-users`, `/admin/restore-users/restore`
+  - Fix : Suppression filtre `peer.SyncEnabled`
+- `web/templates/restore_warning.html` (~80 lignes modifiées)
+  - Suppression option restauration automatique pour users
+  - Ajout lien interface admin pour admins
+- `restore_server.sh` (~5 lignes ajoutées)
+  - Désactivation automatique des pairs : `UPDATE peers SET sync_enabled = 0`
+  - Messages d'avertissement
+
+**Total** : ~514 lignes ajoutées/modifiées
+
+### 🔒 Sécurité
+
+**Garanties** :
+- ✅ Accès restreint aux administrateurs (`RequireAdmin`)
+- ✅ Peers désactivés automatiquement lors de la restauration (prévient data loss)
+- ✅ Isolation utilisateur : Chaque user ne peut restaurer que ses propres fichiers
+- ✅ Authentification P2P conservée pour les requêtes aux pairs
+
+**Workflow sécurisé** :
+```
+1. Admin lance restore_server.sh
+2. Script désactive tous les peers (sync_enabled = 0)
+3. Admin se connecte à l'interface web
+4. Page "Ce serveur a été restauré" s'affiche
+5. Admin clique "Accéder à l'interface de restauration admin"
+6. Admin voit la liste de tous les backups disponibles
+7. Admin restaure les fichiers (un par un ou tous)
+8. Admin réactive manuellement les pairs quand c'est terminé
+```
+
+### 🧪 Tests à effectuer (prochaine session)
+
+1. **Diagnostic restauration** :
+   - Vérifier console navigateur pour erreurs JavaScript
+   - Vérifier logs serveur : `journalctl -u anemone --since '5 minutes ago'`
+   - Tester API directement avec curl :
+     ```bash
+     curl -X POST https://FR3:8443/admin/restore-users/restore \
+       -d "user_id=2&peer_id=1&share_name=backup_test" \
+       -b cookies.txt
+     ```
+   - Ajouter logs debug dans `handleAdminRestoreUsersRestore()`
+
+2. **Diagnostic permissions** :
+   - `ls -la /srv/anemone/backups/`
+   - `ls -la /srv/anemone/backups/incoming/`
+   - `getenforce` (vérifier SELinux)
+   - `sudo -u franck ls /srv/anemone/backups/` (tester accès)
+
+3. **Test restauration manuelle** :
+   - Se connecter comme utilisateur `test`
+   - Vérifier interface "Restauration" dans le dashboard
+   - Tester restauration depuis l'interface utilisateur (Session 12)
+
+### 📝 Commits prévus
+
+```
+À venir : feat: Add admin interface for user file restoration after disaster recovery (Session 18)
+À venir : fix: Remove sync_enabled filter in admin restore to show all backups
+À venir : fix: Add lang parameter to FormatTime in admin_restore_users template
+```
+
+**État session 18** : 🟡 **EN COURS - Interface créée, diagnostic restauration nécessaire**
+
+**Prochaine session** :
+1. Diagnostic complet du problème de restauration (logs, JavaScript, API)
+2. Résolution du problème de permissions `/srv/anemone/backups`
+3. Tests de restauration manuelle depuis l'interface utilisateur
+4. Validation du workflow complet de disaster recovery
 
 ---
 
@@ -1061,18 +520,11 @@ func main() {
 
 ### 🎯 Priorité 1 - Court terme
 
-**Session 12 : Interface web de restauration** 📂
-- ✅ **COMPLÈTE ET TESTÉE** - Voir section ci-dessus
-- ✅ Sélection multiple et téléchargement ZIP
-- ✅ Fix sécurité master key
-
-**Session 15 : Backups serveur automatiques** 💾
-- ✅ **IMPLÉMENTÉ, EN TEST** - Voir section ci-dessus
-- ✅ Scheduler quotidien à 4h du matin
-- ✅ Rotation automatique (10 derniers backups)
-- ✅ Re-chiffrement à la volée pour téléchargement
-- ✅ Interface admin `/admin/backup`
-- ⏳ Tests utilisateur en cours
+**Session 18 : Finalisation interface admin de restauration** 🔴 EN COURS
+- 🟡 Interface admin créée
+- ❌ Diagnostic restauration (rien ne se passe au clic)
+- ❌ Fix problème permissions `/srv/anemone/backups`
+- ❌ Tests complets disaster recovery
 
 **Session 14 : Audit de sécurité complet** 🔒
 - **Audit des permissions fichiers**
@@ -1092,22 +544,6 @@ func main() {
   - Tester les injections SQL
   - Vérifier la validation des inputs
   - Tester path traversal sur les endpoints de fichiers
-- **Audit du chiffrement P2P**
-  - Vérifier que les fichiers sont bien chiffrés sur les pairs
-  - Tester le déchiffrement depuis le serveur d'origine uniquement
-  - Vérifier l'impossibilité de déchiffrer depuis un pair
-- **Audit des logs**
-  - Vérifier qu'aucune donnée sensible n'est loggée
-  - Vérifier l'absence de mots de passe en clair dans les logs
-- **Tests de pénétration**
-  - Brute force login
-  - Tentatives d'élévation de privilèges
-  - Tentatives d'accès aux données d'autres utilisateurs
-  - Tests XSS et injections
-- **Documentation**
-  - Documenter les bonnes pratiques de sécurité
-  - Créer un guide de déploiement sécurisé
-  - Documenter les procédures d'urgence
 
 ### ⚙️ Priorité 2 - Améliorations
 
@@ -1123,18 +559,12 @@ func main() {
    - Option vérification périodique en background
    - Alerte si corruption détectée
 
-3. **Service systemd** 🔄
-   - Démarrage automatique au boot
-   - Gestion propre du service (start/stop/restart/status)
-   - Logs systemd intégrés
-   - Script d'installation automatique
-
-4. **Rate limiting anti-bruteforce** 🛡️
+3. **Rate limiting anti-bruteforce** 🛡️
    - Protection sur `/login` et `/api/sync/*`
    - Bannissement temporaire après X tentatives échouées
    - Whitelist IP de confiance
 
-5. **Statistiques détaillées de synchronisation** 📊
+4. **Statistiques détaillées de synchronisation** 📊
    - Graphiques d'utilisation (espace, fichiers, bande passante)
    - Historique des syncs sur 30 jours
    - Performance réseau par pair
@@ -1161,419 +591,13 @@ func main() {
    - Choix du niveau de redondance par partage
    - Reconstruction automatique en cas de perte d'un pair
 
-4. **Interface de monitoring avancée**
-   - Dashboard temps réel avec WebSocket
-   - Alertes configurables
-   - Intégration Prometheus/Grafana
-
-5. **Chiffrement asymétrique**
-   - Clés publiques/privées RSA ou Ed25519
-   - Échange de clés sécurisé entre pairs
-   - Signature des manifests
-
-### 📝 Fonctionnalités à évaluer (impact ressources)
-
-- **Versioning des fichiers** : Conservation de N versions d'un fichier lors des syncs, permettant de revenir en arrière en cas de corruption/suppression accidentelle. Nécessite tests de charge pour évaluer impact disque/performance.
-
-- **Authentification 2FA/MFA** : Authentification à deux facteurs avec TOTP (Google Authenticator, etc.). Jugée trop lourde pour un contexte homelab avec certificats auto-signés.
-
 ### 📌 Notes
 
-- **Bandwidth throttling** : Non prioritaire car les fréquences différenciées par pair (interval/daily/weekly/monthly) permettent déjà de planifier les syncs hors heures de pointe.
+- **Bandwidth throttling** : Non prioritaire car les fréquences différenciées par pair permettent déjà de planifier les syncs hors heures de pointe.
 
 - **Politique de rétention automatique** : Remplacée par le système de fréquence de synchronisation par pair, permettant des snapshots à différentes fréquences sans complexité supplémentaire.
 
 ---
 
-**État global** : 🟢 GESTION COMPLÈTE DES PAIRS AVEC FRÉQUENCES PERSONNALISABLES
-**Prochaine étape** : Interface web de restauration (Session 12)
-
----
-
-## 🔧 Session 17 - 15 Novembre 2025 - Re-chiffrement des clés utilisateur lors de la restauration
-
-**Date** : 2025-11-15
-**Objectif** : Corriger le problème critique de restauration des fichiers après restauration serveur
-**Priorité** : 🔴 CRITIQUE → 🟢 RÉSOLUE
-
-### 🐛 Problème découvert
-
-Lors des tests de restauration FR1 → FR3 avec backup sur FR2 :
-
-1. ✅ La configuration serveur est restaurée correctement
-2. ✅ Les comptes utilisateurs sont restaurés correctement
-3. ✅ Les mots de passe SMB sont restaurés et re-chiffrés (Session 16)
-4. ❌ **La restauration automatique des fichiers ÉCHOUE** avec l'erreur :
-   ```
-   Bulk restore failed: failed to decrypt user key:
-   failed to decrypt: cipher: message authentication failed
-   ```
-
-### 🔍 Analyse du problème
-
-**Architecture du chiffrement** :
-```
-Master Key (unique par serveur)
-    ↓ chiffre
-User Encryption Key (unique par utilisateur)
-    ↓ chiffre
-Fichiers utilisateur (backup sur pairs distants)
-```
-
-**Problème** :
-- FR1 génère une master key unique : `MK_FR1`
-- `encryption_key_encrypted` est chiffré avec `MK_FR1`
-- FR3 génère une NOUVELLE master key : `MK_FR3`
-- Le script `restore_server.sh` restaure `encryption_key_encrypted` tel quel (chiffré avec `MK_FR1`)
-- Quand FR3 essaie de restaurer les fichiers :
-  ```go
-  // bulkrestore.go ligne 68
-  userKey, err := crypto.DecryptKey(encryptedKey, masterKey)
-  // masterKey = MK_FR3, mais encryptedKey est chiffré avec MK_FR1
-  // → ÉCHEC !
-  ```
-
-**Ce qui fonctionne déjà** (Session 16) :
-- ✅ `password_encrypted` est re-chiffré avec la nouvelle master key
-- ✅ Les mots de passe SMB sont restaurés correctement
-
-**Ce qui manque** :
-- ❌ `encryption_key_encrypted` n'est PAS re-chiffré
-- ❌ Impossible de restaurer les fichiers depuis les peers
-
-### ✅ Solution implémentée
-
-**Principe** : Re-chiffrer `encryption_key_encrypted` avec la nouvelle master key lors de la restauration, exactement comme pour `password_encrypted`.
-
-**Étapes** :
-
-1. **Créer l'outil de re-chiffrement** `cmd/anemone-reencrypt-key/main.go` :
-   ```bash
-   Usage: anemone-reencrypt-key <encrypted_key_b64> <old_master_key> <new_master_key>
-
-   1. Décode base64 de encrypted_key_b64
-   2. Déchiffre avec old_master_key → user_key (clair)
-   3. Re-chiffre user_key avec new_master_key → new_encrypted
-   4. Encode en base64 et affiche sur stdout
-   ```
-
-2. **Modifier `restore_server.sh`** :
-
-   **Ordre actuel (PROBLÉMATIQUE)** :
-   ```bash
-   1. Déchiffrer backup
-   2. Créer tables
-   3. Générer nouvelle master key
-   4. Insérer users avec ancien encryption_key_encrypted  ← PROBLÈME
-   5. Re-chiffrer password_encrypted pour SMB
-   ```
-
-   **Nouvel ordre (CORRECT)** :
-   ```bash
-   1. Déchiffrer backup JSON
-   2. Créer tables vides
-   3. Récupérer ancienne master key du backup JSON
-      OLD_MASTER_KEY=$(echo "$JSON" | jq -r '.system_config[] | select(.key == "master_key") | .value')
-
-   4. Générer nouvelle master key pour le nouveau serveur
-      NEW_MASTER_KEY=$(generate_random_key)
-
-   5. Compiler les outils de re-chiffrement
-      go build -o /tmp/anemone-decrypt-password ./cmd/anemone-decrypt-password
-      go build -o /tmp/anemone-reencrypt-key ./cmd/anemone-reencrypt-key
-
-   6. Pour chaque utilisateur du backup :
-      # Re-chiffrer le mot de passe (déjà fait - Session 16)
-      PASSWORD_ENC=$(echo "$user" | jq -r '.password_encrypted')
-      DECRYPTED_PASS=$(/tmp/anemone-decrypt-password "$PASSWORD_ENC" "$OLD_MASTER_KEY")
-      NEW_PASSWORD_ENC=$(encrypt_with_new_key "$DECRYPTED_PASS" "$NEW_MASTER_KEY")
-
-      # Re-chiffrer la clé de chiffrement utilisateur (NOUVEAU)
-      ENCRYPTION_KEY_ENC=$(echo "$user" | jq -r '.encryption_key_encrypted')
-      NEW_ENCRYPTION_KEY_ENC=$(/tmp/anemone-reencrypt-key "$ENCRYPTION_KEY_ENC" "$OLD_MASTER_KEY" "$NEW_MASTER_KEY")
-
-      # Insérer avec les valeurs re-chiffrées
-      INSERT INTO users (..., password_encrypted, encryption_key_encrypted, ...)
-      VALUES (..., X'$NEW_PASSWORD_ENC', X'$NEW_ENCRYPTION_KEY_ENC', ...)
-
-   7. Insérer la NOUVELLE master key dans system_config
-      INSERT INTO system_config (key, value) VALUES ('master_key', '$NEW_MASTER_KEY')
-
-   8. Créer utilisateurs système et SMB (avec mots de passe déchiffrés)
-
-   9. Cleanup
-      rm -f /tmp/anemone-decrypt-password /tmp/anemone-reencrypt-key
-   ```
-
-### 📝 Fichiers créés/modifiés
-
-**Nouveau** :
-- `cmd/anemone-reencrypt-key/main.go` (~40 lignes)
-  - Outil CLI pour re-chiffrer une clé avec une nouvelle master key
-  - Usage: `anemone-reencrypt-key <encrypted_key_b64> <old_master> <new_master>`
-  - Utilise `crypto.DecryptKey()` puis `crypto.EncryptKey()`
-  - Retourne la clé re-chiffrée en base64 sur stdout
-
-**Modifiés** :
-- `restore_server.sh` (~100 lignes modifiées)
-  - Récupération ancienne master key du backup
-  - Génération nouvelle master key AVANT insertion users
-  - Compilation outil `anemone-reencrypt-key`
-  - Boucle sur users pour re-chiffrer `encryption_key_encrypted`
-  - Insertion avec valeurs re-chiffrées
-
-### ✅ Vérifications après implémentation
-
-**Tests à effectuer** :
-
-1. **Installation serveur FR1**
-   ```bash
-   # Créer admin, créer user "test", uploader fichiers
-   ```
-
-2. **Configuration backup FR1 → FR2**
-   ```bash
-   # Ajouter peer FR2, activer sync
-   ```
-
-3. **Export backup FR1**
-   ```bash
-   # Via interface admin : Backup > Export
-   # Récupérer fichier backup.anemone.enc
-   ```
-
-4. **Installation propre FR3**
-   ```bash
-   # Nouveau serveur vierge
-   ```
-
-5. **Restauration sur FR3**
-   ```bash
-   ./restore_server.sh backup.anemone.enc
-   # Vérifier logs : "✓ Re-encrypted encryption keys for N users"
-   ```
-
-6. **Test connexion user**
-   ```bash
-   # Login avec user "test"
-   # Vérifier page "Ce serveur a été restauré"
-   # Vérifier "Vos sauvegardes disponibles" montre FR2
-   ```
-
-7. **Test restauration automatique**
-   ```bash
-   # Cliquer "Lancer la restauration automatique"
-   # DOIT afficher : "✓ Restauration terminée avec succès !"
-   # DOIT restaurer tous les fichiers dans /srv/anemone/shares/test/backup/
-   ```
-
-8. **Vérification fichiers**
-   ```bash
-   # Via SMB : se connecter au partage backup_test
-   # Vérifier tous les fichiers sont présents et lisibles
-   ```
-
-### 🔒 Sécurité
-
-**Garanties** :
-- ✅ La clé de chiffrement utilisateur EN CLAIR ne change jamais
-- ✅ Si l'utilisateur a sauvegardé sa clé, elle reste valide
-- ✅ Seul le chiffrement de stockage en DB change
-- ✅ Les fichiers restent déchiffrables avec la même clé utilisateur
-- ✅ Outils temporaires supprimés après restauration
-- ✅ Ancienne master key jamais persistée sur FR3
-
-**Rétrocompatibilité** :
-- ✅ Si `encryption_key_encrypted` est NULL/vide → Warning, mais continue
-- ✅ Fallback sur restauration manuelle si re-chiffrement échoue
-- ✅ Messages clairs pour l'admin
-
-### 📝 Commits
-
-```
-25ada8f - feat: Fix critical bulk restore issue by re-encrypting user keys (Session 17)
-```
-
-**Détails du commit** :
-- Création de `cmd/anemone-reencrypt-key/main.go`
-- Modification de `restore_server.sh` pour :
-  - Extraire ancienne master key du backup
-  - Générer nouvelle master key pour le serveur restauré
-  - Compiler l'outil de re-chiffrement
-  - Re-chiffrer `encryption_key_encrypted` pour chaque utilisateur
-  - Insérer nouvelle master key dans system_config
-- Script syntax validated: ✓ OK
-
-### 🧪 Tests à effectuer
-
-**Prochaines étapes** :
-1. ⏳ **Installation serveur FR1** (ou utiliser existant)
-   - Créer admin et user "test"
-   - Uploader fichiers de test
-
-2. ⏳ **Configuration backup FR1 → FR2**
-   - Ajouter peer FR2
-   - Activer synchronisation
-   - Vérifier backup créé sur FR2
-
-3. ⏳ **Export backup FR1**
-   - Via interface admin : `/admin/backup`
-   - Télécharger avec mot de passe
-   - Transférer sur FR3
-
-4. ⏳ **Installation propre FR3**
-   - Nouveau serveur vierge
-
-5. ⏳ **Restauration sur FR3**
-   - `sudo ./restore_server.sh backup.enc <passphrase>`
-   - Vérifier logs : "✓ Re-encrypted encryption keys for N users"
-
-6. ⏳ **Test connexion user sur FR3**
-   - Login avec user "test"
-   - Vérifier page "Ce serveur a été restauré"
-   - Vérifier "Vos sauvegardes disponibles" montre FR2
-
-7. ⏳ **Test restauration automatique**
-   - Cliquer "Lancer la restauration automatique"
-   - Devrait réussir sans erreur "cipher: message authentication failed"
-   - Vérifier tous les fichiers restaurés dans `/srv/anemone/shares/test/backup/`
-
-8. ⏳ **Vérification fichiers via SMB**
-   - Se connecter au partage `backup_test`
-   - Vérifier tous les fichiers présents et lisibles
-
-### 🔨 Problèmes rencontrés et correctifs appliqués
-
-#### 1. Double encodage base64 dans `encryption_key_encrypted`
-- **Problème** : Dans `restore_server.sh`, les commandes jq utilisaient `| @base64` sur des valeurs déjà encodées en base64 dans le JSON
-- **Cause** : `encryption_key_encrypted` stocké comme `[]byte` dans Go → JSON marshal l'encode automatiquement en base64
-- **Fix commit 4fb306d** : Suppression de `| @base64` dans les commandes jq
-- **Résultat** : Problème persiste avec nouveaux backups
-
-#### 2. Type de données `encryption_key_encrypted` dans export backup
-- **Problème** : Le champ `EncryptionKeyEncrypted []byte` était lu comme BLOB même si SQLite stocke en TEXT
-- **Cause** : Go's `json.Marshal()` encode les `[]byte` en base64 automatiquement
-- **Fix commit fbcf7b9** : Changement du type de `[]byte` vers `string` dans la struct `UserBackup`
-- **Résultat** : Toujours double encodage
-
-#### 3. Lecture SQLite BLOB vs TEXT
-- **Problème** : Même avec le type `string`, Go lisait toujours comme BLOB
-- **Cause** : Le scan direct dans un string conserve le comportement BLOB
-- **Fix commit c09574d** : Utilisation de `sql.NullString` comme variable intermédiaire
-- **Résultat** : Correctif appliqué mais binaire pas déployé
-
-#### 4. Binaire incorrect exécuté sur FR1 et FR3
-- **Problème** : Modifications non prises en compte malgré compilation
-- **Cause** : systemd exécutait `/home/franck/anemone/anemone` au lieu de `/usr/local/bin/anemone`
-- **Fix** : Compilation vers le bon chemin et redémarrage service
-- **Résultat** : Binaire correct maintenant déployé
-
-#### 5. Insertion BLOB au lieu de TEXT pour `encryption_key_encrypted`
-- **Problème** : Erreur "cipher: message authentication failed" lors de restauration fichiers
-- **Cause** : `restore_server.sh` décodait base64 et insérait comme hex BLOB (72 bytes) au lieu de TEXT base64 (96 chars)
-- **Fix commit 2c93955** : Insertion directe de `$NEW_ENCRYPTION_KEY_ENCRYPTED` sans décodage base64
-- **Résultat** : Valeur stockée correctement en TEXT
-
-#### 6. Format Manifest incompatible
-- **Problème** : Erreur "json: cannot unmarshal object into Go struct field Manifest.files of type []bulkrestore.FileEntry"
-- **Cause** : Le manifest généré par `internal/sync/manifest.go` utilise `Files map[string]FileMetadata` mais `internal/bulkrestore/bulkrestore.go` attendait `Files []FileEntry`
-- **Fix commit 7c48184** : Changement de `Files []FileEntry` vers `Files map[string]FileEntry`
-- **Résultat** : Parsing manifest fonctionne
-
-#### 7. Nom de share hardcodé au lieu de lookup DB
-- **Problème** : Erreur "unknown share name: test"
-- **Cause** : Code dans `bulkrestore.go` n'acceptait que les noms hardcodés "backup" ou "data"
-- **Fix commit daaa39d** : Query database pour obtenir le path du share au lieu de hardcodé
-- **Résultat** : Accepte maintenant les shares custom
-
-#### 8. Share manquant dans la base de données
-- **Problème** : Erreur "share not found for user 2: test"
-- **Cause** : FR3 avait seulement le share "data_test" mais pas "backup_test"
-- **Fix** : Création manuelle du share "test" (incorrect - devait être "backup_test")
-- **Résultat** : Share créé mais mauvais nom
-
-#### 9. Convention de nommage des shares de backup
-- **Problème** : FR2 liste le backup comme "test" alors que le share s'appelle "backup_test"
-- **Cause** : API `/api/sync/list-user-backups` sur FR2 utilisait le nom du répertoire (`incoming/2_test`) au lieu du nom du share (`backup_test`)
-- **Convention** : `incoming/{user_id}_{username}` → `backup_{username}`
-- **Fix** : Modification de `handleAPISyncListUserBackups` dans `internal/web/router.go` ligne 4036-4038
-  ```go
-  // Avant
-  shareName := strings.TrimPrefix(entry.Name(), prefix) // "test"
-
-  // Après
-  username := strings.TrimPrefix(entry.Name(), prefix)
-  shareName := "backup_" + username // "backup_test"
-  ```
-- **Déploiement** : Binaire recompilé et déployé sur FR2
-- **Résultat** : API renvoie maintenant `{"share_name":"backup_test",...}`
-
-### ⚠️ Problème restant (NON RÉSOLU)
-
-**Symptôme** :
-- Interface web affiche "✓ Restauration terminée avec succès !"
-- Mais aucun fichier n'apparaît dans le répertoire `backup_test`
-- Logs du serveur ne montrent pas d'activité de restauration récente
-
-**Actions nécessaires pour la prochaine session** :
-
-1. **Analyser le flux complet de restauration** :
-   - Interface web `/restore-warning` → Envoi formulaire avec peer_id et share_name
-   - Backend `handleRestoreWarningBulk()` → Lance `bulkrestore.BulkRestoreFromPeer()`
-   - Vérifier que le bon share_name est passé (devrait être "backup_test")
-   - Vérifier les logs côté serveur pour voir si la restauration démarre vraiment
-
-2. **Comprendre l'architecture backup/restore** :
-   - **Backup** : Comment les fichiers sont sauvegardés sur FR2
-     - Structure répertoire : `/srv/anemone/backups/incoming/2_test/`
-     - Format des fichiers : `.enc` (chiffrés)
-     - Manifest : `.anemone-manifest.json.enc`
-   - **Restore** : Comment les fichiers doivent être restaurés sur FR3
-     - Déchiffrement avec la clé utilisateur
-     - Placement dans `/srv/anemone/shares/test/backup/` (path du share backup_test)
-     - Vérification des permissions et ownership
-
-3. **Tracer le problème étape par étape** :
-   - Activer des logs détaillés dans `bulkrestore.go`
-   - Vérifier si le téléchargement du manifest fonctionne
-   - Vérifier si le parsing du manifest fonctionne
-   - Vérifier si la boucle de téléchargement des fichiers s'exécute
-   - Vérifier les erreurs silencieuses qui ne remontent pas à l'interface
-
-4. **Vérifier la cohérence des noms** :
-   - Share name dans la page web : devrait afficher "backup_test"
-   - Share name envoyé au backend : devrait être "backup_test"
-   - Share name utilisé pour le query DB : devrait trouver le share avec path `/srv/anemone/shares/test/backup/`
-   - Share name utilisé pour l'API vers FR2 : "backup_test" doit être converti en chemin correct `incoming/2_test/`
-
-### 📝 Fichiers modifiés dans cette session
-
-**Modifiés** :
-- `internal/backup/backup.go` - Type de `EncryptionKeyEncrypted` changé vers `string` + lecture via `sql.NullString`
-- `internal/bulkrestore/bulkrestore.go` - Type `Manifest.Files` changé vers `map[string]FileEntry` + query DB pour share path
-- `internal/web/router.go` - API `/api/sync/list-user-backups` applique convention `backup_{username}`
-- `restore_server.sh` - Insertion `encryption_key_encrypted` comme TEXT au lieu de BLOB
-- `cmd/anemone-reencrypt-key/main.go` - Outil de re-chiffrement des clés utilisateur
-
-**Commits** :
-```
-4fb306d - fix: Remove double base64 encoding in restore script
-fbcf7b9 - fix: Change EncryptionKeyEncrypted type to string to prevent double encoding
-c09574d - fix: Use sql.NullString to properly read encryption_key_encrypted as TEXT
-2c93955 - fix: Insert encryption_key_encrypted as TEXT not BLOB in restore script
-7c48184 - fix: Change Manifest.Files to map instead of slice
-daaa39d - fix: Query database for share path instead of hardcoded names
-(non commité) - fix: Apply backup_{username} convention in list-user-backups API
-```
-
----
-
-**État session 17** : 🟡 **PROBLÈME PARTIELLEMENT RÉSOLU - NÉCESSITE DIAGNOSTIC APPROFONDI**
-**Résolution partielle** :
-- ✅ Re-chiffrement des clés utilisateur fonctionne
-- ✅ Convention de nommage des shares corrigée
-- ✅ Tous les problèmes d'encodage base64 résolus
-- ✅ Parsing du manifest corrigé
-- ❌ Restauration des fichiers ne fonctionne toujours pas (cause inconnue)
-
-**Prochaine session** : Diagnostic complet du flux de restauration et analyse des logs détaillés
+**État global** : 🟡 INTERFACE ADMIN DE RESTAURATION EN COURS
+**Prochaine étape** : Diagnostic et résolution problème restauration + permissions

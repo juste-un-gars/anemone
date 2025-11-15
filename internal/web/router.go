@@ -4666,11 +4666,9 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 		}
 
 		// Query each peer for this user's backups
+		// Note: We query ALL peers, even disabled ones, because we want to list
+		// available backups for restoration (peers are disabled after server restore)
 		for _, peer := range allPeers {
-			if !peer.SyncEnabled {
-				continue
-			}
-
 			// Build URL
 			url := fmt.Sprintf("https://%s:%d/api/sync/list-user-backups?user_id=%d",
 				peer.Address, peer.Port, userID)
