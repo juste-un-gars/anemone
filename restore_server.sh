@@ -239,15 +239,41 @@ CREATE TABLE IF NOT EXISTS sync_config (
 );
 EOF
 
-# Insert system_config
+# Extract old master key from backup (before inserting system_config)
+OLD_MASTER_KEY=$(echo "$DECRYPTED_JSON" | jq -r '.system_config[] | select(.key == "master_key") | .value')
+
+if [ -z "$OLD_MASTER_KEY" ]; then
+    echo -e "${RED}Error: Master key not found in backup${NC}"
+    exit 1
+fi
+
+# Generate NEW master key for this server
+NEW_MASTER_KEY=$(openssl rand -base64 32 | tr -d '\n')
+echo -e "${GREEN}  ✓ Generated new master key for this server${NC}"
+
+# Insert system_config (excluding master_key, we'll insert it later with new value)
 echo "$DECRYPTED_JSON" | jq -r '.system_config[] | @json' | while read -r item; do
     KEY=$(echo "$item" | jq -r '.key')
     VALUE=$(echo "$item" | jq -r '.value')
     UPDATED_AT=$(echo "$item" | jq -r '.updated_at')
-    sqlite3 "$DB_FILE" "INSERT INTO system_config (key, value, updated_at) VALUES ('$KEY', '$VALUE', '$UPDATED_AT');"
+
+    # Skip master_key, we'll insert the new one later
+    if [ "$KEY" != "master_key" ]; then
+        sqlite3 "$DB_FILE" "INSERT INTO system_config (key, value, updated_at) VALUES ('$KEY', '$VALUE', '$UPDATED_AT');"
+    fi
 done
 
-# Insert users
+# Compile encryption key re-encryption tool
+echo -e "${YELLOW}  Compiling encryption key re-encryption tool...${NC}"
+cd "$(dirname "$0")"
+go build -o /tmp/anemone-reencrypt-key ./cmd/anemone-reencrypt-key </dev/null 2>&1
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Error: Failed to compile re-encryption tool${NC}"
+    exit 1
+fi
+echo -e "${GREEN}  ✓ Re-encryption tool compiled${NC}"
+
+# Insert users (with re-encrypted encryption keys)
 echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
     ID=$(echo "$user" | jq -r '.id')
     USERNAME=$(echo "$user" | jq -r '.username')
@@ -263,8 +289,16 @@ echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
     CREATED_AT=$(echo "$user" | jq -r '.created_at')
     ACTIVATED_AT=$(echo "$user" | jq -r '.activated_at // "NULL"')
 
-    # Decode base64 encryption key
-    ENC_KEY_HEX=$(echo "$ENCRYPTION_KEY_ENCRYPTED" | base64 -d | xxd -p | tr -d '\n')
+    # Re-encrypt encryption key with new master key
+    NEW_ENCRYPTION_KEY_ENCRYPTED=$(/tmp/anemone-reencrypt-key "$ENCRYPTION_KEY_ENCRYPTED" "$OLD_MASTER_KEY" "$NEW_MASTER_KEY" 2>&1)
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Error: Failed to re-encrypt key for user $USERNAME${NC}"
+        echo -e "${RED}$NEW_ENCRYPTION_KEY_ENCRYPTED${NC}"
+        exit 1
+    fi
+
+    # Decode base64 re-encrypted key for database insertion
+    ENC_KEY_HEX=$(echo "$NEW_ENCRYPTION_KEY_ENCRYPTED" | base64 -d | xxd -p | tr -d '\n')
 
     # Decode base64 password_encrypted (if exists)
     if [ -n "$PASSWORD_ENCRYPTED" ]; then
@@ -276,6 +310,18 @@ echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
 
     sqlite3 "$DB_FILE" "INSERT INTO users (id, username, password_hash, password_encrypted, email, encryption_key_hash, encryption_key_encrypted, is_admin, quota_total_gb, quota_backup_gb, language, created_at, activated_at) VALUES ($ID, '$USERNAME', '$PASSWORD_HASH', $PASS_ENC_SQL, '$EMAIL', '$ENCRYPTION_KEY_HASH', X'$ENC_KEY_HEX', $IS_ADMIN, $QUOTA_TOTAL, $QUOTA_BACKUP, '$LANGUAGE', '$CREATED_AT', $(if [ "$ACTIVATED_AT" = "NULL" ]; then echo "NULL"; else echo "'$ACTIVATED_AT'"; fi));"
 done
+
+# Count users to display success message
+USER_COUNT=$(echo "$DECRYPTED_JSON" | jq '.users | length')
+echo -e "${GREEN}  ✓ Re-encrypted encryption keys for $USER_COUNT users${NC}"
+
+# Insert NEW master key into system_config
+CURRENT_TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+sqlite3 "$DB_FILE" "INSERT INTO system_config (key, value, updated_at) VALUES ('master_key', '$NEW_MASTER_KEY', '$CURRENT_TIMESTAMP');"
+echo -e "${GREEN}  ✓ Inserted new master key into system_config${NC}"
+
+# Cleanup re-encryption tool
+rm -f /tmp/anemone-reencrypt-key 2>/dev/null
 
 # Insert shares
 echo "$DECRYPTED_JSON" | jq -r '.shares[] | @json' | while read -r share; do
