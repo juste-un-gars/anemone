@@ -140,14 +140,19 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, d
 		userID, peer.Name, progress.TotalFiles, progress.TotalBytes)
 
 	// Determine target directory based on share name
+	// For standard shares (backup/data), use the share name directly
+	// For custom shares, verify they exist in the database
 	var targetDir string
-	if shareName == "backup" {
-		targetDir = filepath.Join(dataDir, "shares", user.Username, "backup")
-	} else if shareName == "data" {
-		targetDir = filepath.Join(dataDir, "shares", user.Username, "data")
-	} else {
-		return fmt.Errorf("unknown share name: %s", shareName)
+	var share struct {
+		Path string
 	}
+	err = db.QueryRow("SELECT path FROM shares WHERE user_id = ? AND name = ?", userID, shareName).Scan(&share.Path)
+	if err != nil {
+		return fmt.Errorf("share not found for user %d: %s (%w)", userID, shareName, err)
+	}
+
+	// Use the path from database
+	targetDir = share.Path
 
 	// Restore each file
 	for _, file := range manifest.Files {
