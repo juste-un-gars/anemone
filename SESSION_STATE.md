@@ -1,8 +1,8 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-15 (Session 18 - Interface admin de restauration utilisateurs)
-**Prochaine session** : Diagnostic restauration manuelle + Problèmes de permissions
-**Status** : 🟡 EN COURS - Interface admin créée, problème restauration à diagnostiquer
+**Dernière session** : 2025-11-16 (Session 18 - Interface admin de restauration utilisateurs + Fix bulk restore)
+**Prochaine session** : Tests interface utilisateur + Audit sécurité
+**Status** : 🟢 COMPLÈTE - Restauration admin fonctionnelle à 100%
 
 > **Note** : L'historique des sessions 1-7 a été archivé dans `SESSION_STATE_ARCHIVE.md`
 > **Note** : Les détails techniques des sessions 8-11 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
@@ -404,35 +404,67 @@ ssh franck@192.168.83.38 "sudo mv /tmp/admin_restore_users.html /srv/anemone/web
 sudo systemctl restart anemone
 ```
 
-### ⚠️ Problèmes en suspens (NON RÉSOLUS)
+### ✅ Problèmes résolus
 
-#### 1. Restauration ne démarre pas
+#### 1. Restauration échouait avec erreurs 400 (RÉSOLU)
+**Symptôme initial** :
+- La restauration se lançait mais tous les téléchargements échouaient avec "status 400"
+- Logs : `Error: Failed to download : status 400` (sans nom de fichier)
+- 7 fichiers détectés mais 0 bytes restaurés, 7 erreurs
+
+**Diagnostic** :
+- Ajout de logs DEBUG dans `bulkrestore.BulkRestoreFromPeer()`
+- Découverte : Le champ `Path` dans `FileEntry` était **vide** pour tous les fichiers
+- La clé de la map contenait le bon chemin (`'02.3mf'`), mais `file.Path` était `""`
+- Les requêtes HTTP envoyaient donc `path=` (vide) → 400 Bad Request
+
+**Cause racine** :
+- Le manifest stocke les fichiers avec le chemin comme **clé de la map**
+- Le champ `file.Path` à l'intérieur de la structure `FileEntry` n'était pas rempli
+- Le code itérait avec `for _, file := range manifest.Files` et utilisait `file.Path`
+- Résultat : toutes les requêtes avaient un paramètre `path` vide
+
+**Solution** :
+- Modifier la boucle : `for filePath, file := range manifest.Files`
+- Utiliser `filePath` (clé de la map) au lieu de `file.Path` (champ vide)
+- Mettre à jour toutes les références pour utiliser la variable `filePath`
+
+**Résultat** :
+```
+Bulk restore completed for user 2: 7 files, 280596 bytes, 0 errors
+```
+✅ **100% de succès !**
+
+#### 2. Fichiers restaurés appartenaient à root:root (RÉSOLU)
 **Symptôme** :
-- Clic sur "Restaurer" ou "Restaurer tous les utilisateurs" ne fait rien
-- Aucune activité visible dans les logs du serveur
-- Pas de message d'erreur retourné
+- Les fichiers restaurés appartenaient à `root:root` au lieu de `test:test`
+- Problème d'accès SMB potentiel
 
-**Hypothèses** :
-- Problème JavaScript (événement click non capturé ?)
-- Problème AJAX (requête POST non envoyée ?)
-- Problème handler (goroutine non lancée ?)
-- Problème `bulkrestore.BulkRestoreFromPeer()` (erreur silencieuse ?)
+**Solution** :
+- Ajout de la fonction helper `setOwnership(path, username)`
+- Utilise `user.Lookup()` pour récupérer UID/GID
+- Appelle `os.Chown()` après création de chaque fichier/dossier
+- Import des packages `os/user` et `strconv`
 
-**Diagnostic nécessaire** :
-- Vérifier logs navigateur (console JavaScript)
-- Vérifier logs serveur (journalctl -u anemone)
-- Ajouter logs debug dans `handleAdminRestoreUsersRestore()`
-- Tester manuellement l'API avec curl
+**Résultat** :
+```
+-rw-r--r-- 1 test test  28K nov.  16 07:08 01.3mf
+-rw-r--r-- 1 test test 181K nov.  16 07:08 02.3mf
+-rw-r--r-- 1 test test 4.0K nov.  16 07:08 multi_size_pages.pdf
+```
+✅ Ownership correct !
 
-#### 2. Problème de permissions sur `/srv/anemone/backups`
-**Symptôme** :
-- L'utilisateur `franck` ne peut pas accéder aux fichiers dans `/srv/anemone/backups/`
-- Permissions trop restrictives ?
+#### 3. Permissions /srv/anemone/backups (PAS UN PROBLÈME)
+**Question** :
+- L'utilisateur `franck` ne peut pas accéder à `/srv/anemone/backups/`
+- Permissions : `drwx------ root:root`
 
-**Diagnostic nécessaire** :
-- Vérifier ownership et permissions : `ls -la /srv/anemone/backups/`
-- Vérifier si SELinux bloque l'accès
-- Vérifier si l'utilisateur `franck` doit être ajouté à un groupe spécifique
+**Réponse** :
+- C'est **normal et sécurisé** !
+- Le service anemone tourne en tant que `root` : `User=root` (systemd)
+- Seul le processus anemone doit avoir accès aux données sensibles (backups, certs, db, smb)
+- Les utilisateurs normaux (comme `franck`) n'ont pas besoin d'accès direct
+- ✅ Bonne pratique de sécurité respectée
 
 ### 📝 Fichiers créés/modifiés
 
@@ -451,8 +483,12 @@ sudo systemctl restart anemone
 - `restore_server.sh` (~5 lignes ajoutées)
   - Désactivation automatique des pairs : `UPDATE peers SET sync_enabled = 0`
   - Messages d'avertissement
+- `internal/bulkrestore/bulkrestore.go` (54 lignes modifiées, 19 supprimées)
+  - **FIX CRITIQUE** : Utilisation clé map au lieu de file.Path vide
+  - Ajout fonction `setOwnership()` pour ownership correct
+  - Import `os/user` et `strconv`
 
-**Total** : ~514 lignes ajoutées/modifiées
+**Total** : ~568 lignes ajoutées/modifiées
 
 ### 🔒 Sécurité
 
@@ -474,45 +510,46 @@ sudo systemctl restart anemone
 8. Admin réactive manuellement les pairs quand c'est terminé
 ```
 
-### 🧪 Tests à effectuer (prochaine session)
+### 🧪 Tests effectués et validés
 
-1. **Diagnostic restauration** :
-   - Vérifier console navigateur pour erreurs JavaScript
-   - Vérifier logs serveur : `journalctl -u anemone --since '5 minutes ago'`
-   - Tester API directement avec curl :
-     ```bash
-     curl -X POST https://FR3:8443/admin/restore-users/restore \
-       -d "user_id=2&peer_id=1&share_name=backup_test" \
-       -b cookies.txt
-     ```
-   - Ajouter logs debug dans `handleAdminRestoreUsersRestore()`
+1. **Test restauration via API** : ✅
+   - Commande curl : `POST /admin/restore-users/restore`
+   - Résultat : 7 files, 280596 bytes, 0 errors
+   - Temps : ~0.3 secondes
 
-2. **Diagnostic permissions** :
-   - `ls -la /srv/anemone/backups/`
-   - `ls -la /srv/anemone/backups/incoming/`
-   - `getenforce` (vérifier SELinux)
-   - `sudo -u franck ls /srv/anemone/backups/` (tester accès)
+2. **Test ownership fichiers** : ✅
+   - Tous les fichiers : `test:test` (correct)
+   - Permissions : `0644` pour fichiers, `0755` pour dossiers
+   - Accessibles via SMB
 
-3. **Test restauration manuelle** :
-   - Se connecter comme utilisateur `test`
-   - Vérifier interface "Restauration" dans le dashboard
-   - Tester restauration depuis l'interface utilisateur (Session 12)
+3. **Test permissions système** : ✅
+   - Service anemone : tourne en `root` (systemd)
+   - `/srv/anemone/backups/` : `drwx------ root:root` (sécurisé)
+   - Seul anemone peut accéder aux données sensibles
 
-### 📝 Commits prévus
+4. **Test workflow disaster recovery complet** : ✅
+   - FR1 → backup sur FR2 → arrêt FR1 → restore_server.sh sur FR3
+   - Peers désactivés automatiquement (prévient data loss)
+   - Restauration admin depuis interface web
+   - Fichiers accessibles via SMB
+
+### 📝 Commits
 
 ```
-À venir : feat: Add admin interface for user file restoration after disaster recovery (Session 18)
-À venir : fix: Remove sync_enabled filter in admin restore to show all backups
-À venir : fix: Add lang parameter to FormatTime in admin_restore_users template
+c9a7d10 - fix: Fix bulk restore to use manifest map keys and set proper file ownership (Session 18)
 ```
 
-**État session 18** : 🟡 **EN COURS - Interface créée, diagnostic restauration nécessaire**
+**Détails commit** :
+- Correction utilisation clé map manifest au lieu de file.Path vide
+- Ajout fonction setOwnership() pour ownership correct
+- 54 insertions, 19 suppressions dans `internal/bulkrestore/bulkrestore.go`
+
+**État session 18** : 🟢 **COMPLÈTE - Restauration admin fonctionnelle à 100%**
 
 **Prochaine session** :
-1. Diagnostic complet du problème de restauration (logs, JavaScript, API)
-2. Résolution du problème de permissions `/srv/anemone/backups`
-3. Tests de restauration manuelle depuis l'interface utilisateur
-4. Validation du workflow complet de disaster recovery
+1. Tests complets de l'interface utilisateur (restauration depuis dashboard)
+2. Audit de sécurité complet (priorité 1 roadmap)
+3. Vérification d'intégrité des backups (priorité 2 roadmap)
 
 ---
 
@@ -520,11 +557,11 @@ sudo systemctl restart anemone
 
 ### 🎯 Priorité 1 - Court terme
 
-**Session 18 : Finalisation interface admin de restauration** 🔴 EN COURS
-- 🟡 Interface admin créée
-- ❌ Diagnostic restauration (rien ne se passe au clic)
-- ❌ Fix problème permissions `/srv/anemone/backups`
-- ❌ Tests complets disaster recovery
+**Session 18 : Interface admin de restauration utilisateurs** 🟢 COMPLÈTE
+- ✅ Interface admin créée (`/admin/restore-users`)
+- ✅ Fix bulk restore (utilisation clé map manifest)
+- ✅ Fix ownership fichiers restaurés (test:test)
+- ✅ Tests complets disaster recovery (7 files, 280596 bytes, 0 errors)
 
 **Session 14 : Audit de sécurité complet** 🔒
 - **Audit des permissions fichiers**
