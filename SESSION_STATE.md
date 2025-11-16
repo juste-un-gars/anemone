@@ -281,268 +281,81 @@ daaa39d - fix: Use database share path instead of hardcoded names (Session 17)
 
 ---
 
-## 🔧 Session 18 - 15 Novembre 2025 - Interface admin de restauration utilisateurs
+## 🔧 Session 18 - 15-16 Novembre 2025 - Interface admin de restauration utilisateurs
 
-**Date** : 2025-11-15
+**Date** : 2025-11-15 et 2025-11-16
 **Objectif** : Créer une interface admin sécurisée pour restaurer les fichiers de tous les utilisateurs après disaster recovery
-**Priorité** : 🔴 CRITIQUE
+**Priorité** : 🔴 CRITIQUE → 🟢 COMPLÈTE
 
-### 🎯 Contexte
+### 🎯 Contexte et Solution
 
-Suite à la Session 17, un problème majeur a été identifié :
-- **Problème** : Lors de la restauration serveur, le scheduler démarre automatiquement
-- **Conséquence** : Le serveur restauré (FR3) détecte "tous les fichiers supprimés" car les shares sont vides
-- **Catastrophe** : FR3 envoie des commandes DELETE à FR2, qui supprime tous les backups !
-- **Boucle** : FR1 upload → FR3 DELETE → FR1 re-upload → FR3 DELETE...
+**Problème initial** :
+- Lors de la restauration serveur, le scheduler démarre automatiquement
+- Le serveur restauré détecte "tous les fichiers supprimés" car les shares sont vides
+- **Risque** : Envoi de commandes DELETE aux pairs → perte totale des backups
 
-### ✅ Solution implémentée
-
-**Architecture sécurisée** :
-1. **Désactivation automatique des pairs** : `restore_server.sh` exécute `UPDATE peers SET sync_enabled = 0`
-2. **Interface admin dédiée** : `/admin/restore-users` pour restauration contrôlée
-3. **Suppression restauration utilisateur** : Les utilisateurs non-admin ne peuvent plus déclencher de restauration automatique
-4. **Workflow sécurisé** :
-   ```
-   Restauration serveur → Peers désactivés → Admin restaure les fichiers → Admin réactive les pairs
-   ```
-
-### 🔨 Composants créés/modifiés
-
-**1. Nouveaux handlers** (`internal/web/router.go`)
-
-**`handleAdminRestoreUsers()`** :
-- Récupère tous les utilisateurs (sauf admin)
-- Interroge tous les pairs (même désactivés) pour lister les backups disponibles
-- Appelle `/api/sync/list-user-backups` sur chaque pair
-- Construit une liste de `UserBackup` avec : UserID, Username, PeerID, PeerName, ShareName, FileCount, TotalSize, LastModified
-- Rend le template `admin_restore_users.html`
-
-**`handleAdminRestoreUsersRestore()`** :
-- Reçoit `user_id`, `peer_id`, `share_name` depuis le formulaire
-- Lance `bulkrestore.BulkRestoreFromPeer()` en arrière-plan (goroutine)
-- Retourne une réponse JSON immédiate pour éviter timeout
-- Format : `{"success": true, "message": "Restauration lancée"}`
-
-**2. Template admin** (`web/templates/admin_restore_users.html` - NOUVEAU)
-
-Interface Tailwind CSS avec :
-- **En-tête** : Navigation avec logo, rôle admin, logout
-- **Tableau des backups** :
-  - Colonnes : Utilisateur, Serveur pair, Partage, Fichiers, Taille, Dernière modification, Actions
-  - Ligne par backup disponible
-  - Bouton "Restaurer" par ligne (appelle `restoreUser()` JavaScript)
-- **Bouton "Restaurer tous les utilisateurs"** : Lance `restoreAll()` JavaScript
-- **Message de statut** : Div cachée pour afficher succès/erreurs
-- **JavaScript** :
-  - `restoreUser(userID, peerID, shareName, username)` : POST `/admin/restore-users/restore` pour un utilisateur
-  - `restoreAll()` : Boucle sur tous les backups et lance chaque restauration
-  - Mise à jour du statut en temps réel
-
-**3. Template restore_warning modifié** (`web/templates/restore_warning.html`)
-
-**Pour les utilisateurs non-admin** :
-- ❌ **SUPPRIMÉ** : Option "Restauration automatique" avec dropdown de sélection peer
-- ✅ **CONSERVÉ** : Option "Restauration manuelle" (transférer fichiers via SMB)
-- Message : "Je vais transférer mes fichiers depuis mon PC via SMB"
-
-**Pour les administrateurs** :
-- ✅ Option 1 : Restauration manuelle (identique aux users)
-- ✅ Option 2 : **Lien vers interface admin** (`/admin/restore-users`)
-  - Description : "Accéder à l'interface admin pour restaurer automatiquement les fichiers de tous les utilisateurs depuis les serveurs pairs"
-  - Bouton : "🔧 Accéder à l'interface de restauration admin"
-
-**4. Script de restauration modifié** (`restore_server.sh`)
-
-Ajout de la désactivation automatique des pairs :
-```bash
-# Disable all peers to prevent automatic sync from deleting backup files
-# Admin must manually re-enable peers after restoring user files
-sqlite3 "$DB_FILE" "UPDATE peers SET sync_enabled = 0;"
-echo -e "${YELLOW}⚠️  All peers have been disabled to prevent data loss${NC}"
-echo -e "${YELLOW}   Re-enable peers after restoring user files from admin interface${NC}"
-```
-
-**Position** : Après insertion des pairs, avant le message de fin de restauration
-
-### 🐛 Problèmes rencontrés et correctifs
-
-#### 1. Peers filtrés par `sync_enabled`
-**Problème** : Page admin affichait "Aucune sauvegarde disponible"
-**Cause** : Code dans `handleAdminRestoreUsers` filtrait les pairs désactivés :
-```go
-if !peer.SyncEnabled {
-    continue  // Skippait tous les pairs désactivés par restore_server.sh !
-}
-```
-**Fix** : Suppression du filtre, avec commentaire explicatif
-```go
-// Query each peer for this user's backups
-// Note: We query ALL peers, even disabled ones, because we want to list
-// available backups for restoration (peers are disabled after server restore)
-for _, peer := range allPeers {
-```
-
-#### 2. Template FormatTime manquant paramètre `lang`
-**Problème** : Colonne "Dernière modification" affichait "Internal server error"
-**Cause** : Template appelait `{{FormatTime .LastModified}}` mais la fonction attend 2 paramètres : `func(t time.Time, lang string)`
-**Fix** : Correction template
-```html
-<!-- Avant -->
-{{FormatTime .LastModified}}
-
-<!-- Après -->
-{{FormatTime .LastModified $.Lang}}
-```
-
-#### 3. Template non déployé sur FR3
-**Problème** : Erreur persistait après recompilation binaire
-**Cause** : Les templates sont chargés depuis le disque (`/srv/anemone/web/templates/`) et non embarqués dans le binaire
-**Fix** : Copie manuelle du template modifié :
-```bash
-scp web/templates/admin_restore_users.html franck@192.168.83.38:/tmp/
-ssh franck@192.168.83.38 "sudo mv /tmp/admin_restore_users.html /srv/anemone/web/templates/"
-sudo systemctl restart anemone
-```
+**Solution implémentée** :
+1. **`restore_server.sh`** désactive automatiquement tous les pairs (`sync_enabled = 0`)
+2. **Interface admin `/admin/restore-users`** pour restauration contrôlée
+3. **Workflow sécurisé** : Restauration → Admin restaure fichiers → Réactivation pairs manuelle
 
 ### ✅ Problèmes résolus
 
-#### 1. Restauration échouait avec erreurs 400 (RÉSOLU)
-**Symptôme initial** :
-- La restauration se lançait mais tous les téléchargements échouaient avec "status 400"
-- Logs : `Error: Failed to download : status 400` (sans nom de fichier)
-- 7 fichiers détectés mais 0 bytes restaurés, 7 erreurs
+**1. Erreurs 400 lors du téléchargement** (15 Nov)
+- **Cause** : Le manifest utilise le chemin de fichier comme clé de map, mais `file.Path` était vide
+- **Solution** : Utiliser `for filePath, file := range manifest.Files` au lieu de `for _, file`
+- **Résultat** : 7 files, 280596 bytes, 0 errors ✅
 
-**Diagnostic** :
-- Ajout de logs DEBUG dans `bulkrestore.BulkRestoreFromPeer()`
-- Découverte : Le champ `Path` dans `FileEntry` était **vide** pour tous les fichiers
-- La clé de la map contenait le bon chemin (`'02.3mf'`), mais `file.Path` était `""`
-- Les requêtes HTTP envoyaient donc `path=` (vide) → 400 Bad Request
+**2. Ownership root:root sur fichiers restaurés** (15 Nov)
+- **Cause** : Pas de changement d'ownership après création des fichiers
+- **Solution** : Ajout fonction `setOwnership()` avec `os.Chown()`
+- **Résultat** : Fichiers appartiennent à `test:test` ✅
 
-**Cause racine** :
-- Le manifest stocke les fichiers avec le chemin comme **clé de la map**
-- Le champ `file.Path` à l'intérieur de la structure `FileEntry` n'était pas rempli
-- Le code itérait avec `for _, file := range manifest.Files` et utilisait `file.Path`
-- Résultat : toutes les requêtes avaient un paramètre `path` vide
+**3. Interface web ne réagissait pas** (16 Nov)
+- **Cause** : JavaScript invalide (`formData 2 _ 1` avec espaces)
+- **Solution** : Réécriture `restoreAll()` avec tableau d'objets
+- **Résultat** : Boutons cliquables, restauration fonctionne ✅
 
-**Solution** :
-- Modifier la boucle : `for filePath, file := range manifest.Files`
-- Utiliser `filePath` (clé de la map) au lieu de `file.Path` (champ vide)
-- Mettre à jour toutes les références pour utiliser la variable `filePath`
+**4. Dossiers parents avec ownership root:root** (16 Nov)
+- **Cause** : `os.MkdirAll()` appelé sans `setOwnership()` pour les dossiers parents
+- **Solution** : Ajout `setOwnership(parentDir, user.Username)` après `MkdirAll()`
+- **Résultat** : Suppression possible via SMB ✅
 
-**Résultat** :
-```
-Bulk restore completed for user 2: 7 files, 280596 bytes, 0 errors
-```
-✅ **100% de succès !**
+### 📝 Composants créés
 
-#### 2. Fichiers restaurés appartenaient à root:root (RÉSOLU)
-**Symptôme** :
-- Les fichiers restaurés appartenaient à `root:root` au lieu de `test:test`
-- Problème d'accès SMB potentiel
+- **Interface admin** : `/admin/restore-users` (liste tous les backups disponibles)
+- **Handlers** : `handleAdminRestoreUsers()`, `handleAdminRestoreUsersRestore()`
+- **Templates** : `admin_restore_users.html`, modification `restore_warning.html`
+- **Script** : `restore_server.sh` désactive automatiquement les pairs
+- **Corrections** : `bulkrestore.go` (clé map + ownership), `admin_restore_users.html` (JavaScript)
 
-**Solution** :
-- Ajout de la fonction helper `setOwnership(path, username)`
-- Utilise `user.Lookup()` pour récupérer UID/GID
-- Appelle `os.Chown()` après création de chaque fichier/dossier
-- Import des packages `os/user` et `strconv`
+### 🧪 Tests validés
 
-**Résultat** :
-```
--rw-r--r-- 1 test test  28K nov.  16 07:08 01.3mf
--rw-r--r-- 1 test test 181K nov.  16 07:08 02.3mf
--rw-r--r-- 1 test test 4.0K nov.  16 07:08 multi_size_pages.pdf
-```
-✅ Ownership correct !
-
-#### 3. Permissions /srv/anemone/backups (PAS UN PROBLÈME)
-**Question** :
-- L'utilisateur `franck` ne peut pas accéder à `/srv/anemone/backups/`
-- Permissions : `drwx------ root:root`
-
-**Réponse** :
-- C'est **normal et sécurisé** !
-- Le service anemone tourne en tant que `root` : `User=root` (systemd)
-- Seul le processus anemone doit avoir accès aux données sensibles (backups, certs, db, smb)
-- Les utilisateurs normaux (comme `franck`) n'ont pas besoin d'accès direct
-- ✅ Bonne pratique de sécurité respectée
-
-### 📝 Fichiers créés/modifiés
-
-**Nouveaux** :
-- `web/templates/admin_restore_users.html` (~249 lignes) - Interface admin complète
-
-**Modifiés** :
-- `internal/web/router.go` (~180 lignes ajoutées)
-  - `handleAdminRestoreUsers()` : Liste backups depuis tous les pairs
-  - `handleAdminRestoreUsersRestore()` : Lance restauration en background
-  - Routes : `/admin/restore-users`, `/admin/restore-users/restore`
-  - Fix : Suppression filtre `peer.SyncEnabled`
-- `web/templates/restore_warning.html` (~80 lignes modifiées)
-  - Suppression option restauration automatique pour users
-  - Ajout lien interface admin pour admins
-- `restore_server.sh` (~5 lignes ajoutées)
-  - Désactivation automatique des pairs : `UPDATE peers SET sync_enabled = 0`
-  - Messages d'avertissement
-- `internal/bulkrestore/bulkrestore.go` (54 lignes modifiées, 19 supprimées)
-  - **FIX CRITIQUE** : Utilisation clé map au lieu de file.Path vide
-  - Ajout fonction `setOwnership()` pour ownership correct
-  - Import `os/user` et `strconv`
-
-**Total** : ~568 lignes ajoutées/modifiées
-
-### 🔒 Sécurité
-
-**Garanties** :
-- ✅ Accès restreint aux administrateurs (`RequireAdmin`)
-- ✅ Peers désactivés automatiquement lors de la restauration (prévient data loss)
-- ✅ Isolation utilisateur : Chaque user ne peut restaurer que ses propres fichiers
-- ✅ Authentification P2P conservée pour les requêtes aux pairs
-
-**Workflow sécurisé** :
-```
-1. Admin lance restore_server.sh
-2. Script désactive tous les peers (sync_enabled = 0)
-3. Admin se connecte à l'interface web
-4. Page "Ce serveur a été restauré" s'affiche
-5. Admin clique "Accéder à l'interface de restauration admin"
-6. Admin voit la liste de tous les backups disponibles
-7. Admin restaure les fichiers (un par un ou tous)
-8. Admin réactive manuellement les pairs quand c'est terminé
-```
-
-### 🧪 Tests effectués et validés
-
-1. **Test restauration via API** : ✅
-   - Commande curl : `POST /admin/restore-users/restore`
-   - Résultat : 7 files, 280596 bytes, 0 errors
-   - Temps : ~0.3 secondes
-
-2. **Test ownership fichiers** : ✅
-   - Tous les fichiers : `test:test` (correct)
-   - Permissions : `0644` pour fichiers, `0755` pour dossiers
-   - Accessibles via SMB
-
-3. **Test permissions système** : ✅
-   - Service anemone : tourne en `root` (systemd)
-   - `/srv/anemone/backups/` : `drwx------ root:root` (sécurisé)
-   - Seul anemone peut accéder aux données sensibles
-
-4. **Test workflow disaster recovery complet** : ✅
-   - FR1 → backup sur FR2 → arrêt FR1 → restore_server.sh sur FR3
-   - Peers désactivés automatiquement (prévient data loss)
-   - Restauration admin depuis interface web
-   - Fichiers accessibles via SMB
+- ✅ **Workflow disaster recovery complet** : FR1 → FR2 → FR3 (restauration + fichiers)
+- ✅ **Restauration API** : 7 files, 280596 bytes, 0 errors en ~0.3s
+- ✅ **Ownership correct** : Tous fichiers/dossiers `test:test`
+- ✅ **Interface web** : Boutons cliquables, JavaScript valide, aucune erreur console
+- ✅ **SMB** : Suppression fichiers/dossiers possible
+- ✅ **Synchronisation** : Nouveaux fichiers détectés et synchronisés (2 min)
 
 ### 📝 Commits
 
 ```
-c9a7d10 - fix: Fix bulk restore to use manifest map keys and set proper file ownership (Session 18)
+e13ab65 - fix: Fix JavaScript template and parent directory ownership in bulk restore (Session 18) [16 Nov]
+c9a7d10 - fix: Fix bulk restore to use manifest map keys and set proper file ownership (Session 18) [16 Nov]
+778fa32 - docs: Update SESSION_STATE.md with Session 18 completion details [16 Nov]
+c869161 - feat: Add admin interface for user file restoration after disaster recovery (Session 18) [15 Nov]
 ```
 
-**Détails commit** :
-- Correction utilisation clé map manifest au lieu de file.Path vide
-- Ajout fonction setOwnership() pour ownership correct
-- 54 insertions, 19 suppressions dans `internal/bulkrestore/bulkrestore.go`
+**Détails des commits** :
+1. **e13ab65** : Fix JavaScript + ownership dossiers parents
+   - Réécriture `restoreAll()` avec tableau au lieu de variables dynamiques
+   - Ajout `setOwnership()` pour dossiers parents créés par `MkdirAll()`
+2. **c9a7d10** : Fix bulk restore avec clé map manifest
+   - Utilisation clé map au lieu de `file.Path` vide
+   - Ajout fonction `setOwnership()` pour fichiers/dossiers
+3. **778fa32** : Documentation de la session 18
+4. **c869161** : Interface admin de restauration (commit initial session 18)
 
 **État session 18** : 🟢 **COMPLÈTE - Restauration admin fonctionnelle à 100%**
 
