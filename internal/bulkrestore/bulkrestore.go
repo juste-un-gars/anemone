@@ -237,11 +237,17 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, d
 			targetFilePath := filepath.Join(targetDir, filePath)
 
 			// Ensure parent directory exists
-			if err := os.MkdirAll(filepath.Dir(targetFilePath), 0755); err != nil {
+			parentDir := filepath.Dir(targetFilePath)
+			if err := os.MkdirAll(parentDir, 0755); err != nil {
 				errMsg := fmt.Sprintf("Failed to create parent directory for %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
 				log.Printf("Error: %s", errMsg)
 				continue
+			}
+
+			// Set parent directory ownership (important for subdirectories)
+			if err := setOwnership(parentDir, user.Username); err != nil {
+				log.Printf("Warning: Failed to set ownership for parent directory of %s: %v", filePath, err)
 			}
 
 			if err := os.WriteFile(targetFilePath, decryptedData, 0644); err != nil {
