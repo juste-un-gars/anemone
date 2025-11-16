@@ -14,7 +14,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/juste-un-gars/anemone/internal/crypto"
@@ -155,8 +157,10 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, d
 	targetDir = share.Path
 
 	// Restore each file
-	for _, file := range manifest.Files {
-		progress.CurrentFile = file.Path
+	// IMPORTANT: Iterate over map to get both the key (file path) and value (file entry)
+	// The manifest stores files with the path as the key, but the Path field in FileEntry may be empty
+	for filePath, file := range manifest.Files {
+		progress.CurrentFile = filePath
 		progress.ProcessedFiles++
 
 		if progressChan != nil {
@@ -165,21 +169,26 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, d
 
 		if file.IsDir {
 			// Create directory
-			dirPath := filepath.Join(targetDir, file.Path)
+			dirPath := filepath.Join(targetDir, filePath)
 			if err := os.MkdirAll(dirPath, 0755); err != nil {
-				errMsg := fmt.Sprintf("Failed to create directory %s: %v", file.Path, err)
+				errMsg := fmt.Sprintf("Failed to create directory %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
 				log.Printf("Error: %s", errMsg)
 				continue
 			}
+
+			// Set directory ownership to user
+			if err := setOwnership(dirPath, user.Username); err != nil {
+				log.Printf("Warning: Failed to set ownership for directory %s: %v", filePath, err)
+			}
 		} else {
 			// Download and decrypt file
 			fileURL := fmt.Sprintf("%s/api/sync/download-encrypted-file?user_id=%d&share_name=%s&path=%s",
-				baseURL, userID, shareName, buildURL(file.Path))
+				baseURL, userID, shareName, buildURL(filePath))
 
 			req, err := http.NewRequest("GET", fileURL, nil)
 			if err != nil {
-				errMsg := fmt.Sprintf("Failed to create request for %s: %v", file.Path, err)
+				errMsg := fmt.Sprintf("Failed to create request for %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
 				log.Printf("Error: %s", errMsg)
 				continue
@@ -191,7 +200,7 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, d
 
 			resp, err := client.Do(req)
 			if err != nil {
-				errMsg := fmt.Sprintf("Failed to download %s: %v", file.Path, err)
+				errMsg := fmt.Sprintf("Failed to download %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
 				log.Printf("Error: %s", errMsg)
 				continue
@@ -199,7 +208,7 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, d
 
 			if resp.StatusCode != http.StatusOK {
 				resp.Body.Close()
-				errMsg := fmt.Sprintf("Failed to download %s: status %d", file.Path, resp.StatusCode)
+				errMsg := fmt.Sprintf("Failed to download %s: status %d", filePath, resp.StatusCode)
 				progress.Errors = append(progress.Errors, errMsg)
 				log.Printf("Error: %s", errMsg)
 				continue
@@ -209,7 +218,7 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, d
 			encryptedData, err := io.ReadAll(resp.Body)
 			resp.Body.Close()
 			if err != nil {
-				errMsg := fmt.Sprintf("Failed to read %s: %v", file.Path, err)
+				errMsg := fmt.Sprintf("Failed to read %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
 				log.Printf("Error: %s", errMsg)
 				continue
@@ -218,37 +227,37 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, d
 			// Decrypt file
 			decryptedData, err := decryptData(encryptedData, userKey)
 			if err != nil {
-				errMsg := fmt.Sprintf("Failed to decrypt %s: %v", file.Path, err)
+				errMsg := fmt.Sprintf("Failed to decrypt %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
 				log.Printf("Error: %s", errMsg)
 				continue
 			}
 
 			// Write file to disk
-			filePath := filepath.Join(targetDir, file.Path)
+			targetFilePath := filepath.Join(targetDir, filePath)
 
 			// Ensure parent directory exists
-			if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-				errMsg := fmt.Sprintf("Failed to create parent directory for %s: %v", file.Path, err)
+			if err := os.MkdirAll(filepath.Dir(targetFilePath), 0755); err != nil {
+				errMsg := fmt.Sprintf("Failed to create parent directory for %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
 				log.Printf("Error: %s", errMsg)
 				continue
 			}
 
-			if err := os.WriteFile(filePath, decryptedData, 0644); err != nil {
-				errMsg := fmt.Sprintf("Failed to write %s: %v", file.Path, err)
+			if err := os.WriteFile(targetFilePath, decryptedData, 0644); err != nil {
+				errMsg := fmt.Sprintf("Failed to write %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
 				log.Printf("Error: %s", errMsg)
 				continue
 			}
 
 			// Set file ownership to user
-			// Note: This requires root privileges, might fail in development
-			// In production with proper setup, this should work
-			// For now, we'll skip ownership setting errors
+			if err := setOwnership(targetFilePath, user.Username); err != nil {
+				log.Printf("Warning: Failed to set ownership for %s: %v", filePath, err)
+			}
 
 			progress.ProcessedBytes += file.Size
-			log.Printf("Restored file: %s (%d bytes)", file.Path, file.Size)
+			log.Printf("Restored file: %s (%d bytes)", filePath, file.Size)
 		}
 
 		if progressChan != nil {
@@ -281,4 +290,30 @@ func decryptData(encryptedData []byte, encryptionKey string) ([]byte, error) {
 	}
 
 	return writer.Bytes(), nil
+}
+
+// setOwnership changes the ownership of a file or directory to the specified user
+func setOwnership(path, username string) error {
+	// Lookup user to get UID and GID
+	u, err := user.Lookup(username)
+	if err != nil {
+		return fmt.Errorf("user lookup failed: %w", err)
+	}
+
+	uid, err := strconv.Atoi(u.Uid)
+	if err != nil {
+		return fmt.Errorf("invalid UID: %w", err)
+	}
+
+	gid, err := strconv.Atoi(u.Gid)
+	if err != nil {
+		return fmt.Errorf("invalid GID: %w", err)
+	}
+
+	// Change ownership (requires root privileges)
+	if err := os.Chown(path, uid, gid); err != nil {
+		return fmt.Errorf("chown failed: %w", err)
+	}
+
+	return nil
 }
