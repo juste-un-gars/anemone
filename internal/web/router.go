@@ -207,6 +207,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/admin/backup", auth.RequireAdmin(server.handleAdminBackup))
 	mux.HandleFunc("/admin/backup/create", auth.RequireAdmin(server.handleAdminBackupCreate))
 	mux.HandleFunc("/admin/backup/download", auth.RequireAdmin(server.handleAdminBackupDownload))
+	mux.HandleFunc("/admin/backup/delete", auth.RequireAdmin(server.handleAdminBackupDelete))
 
 	// Admin routes - Restore all users (after server restoration)
 	mux.HandleFunc("/admin/restore-users", auth.RequireAdmin(server.handleAdminRestoreUsers))
@@ -483,61 +484,103 @@ func (s *Server) getDashboardStats(session *auth.Session) *DashboardStats {
 		TrashCount:     0,
 	}
 
-	// Count users (admin only)
+	// Admin stats: all users
 	if session.IsAdmin {
 		s.db.QueryRow("SELECT COUNT(*) FROM users").Scan(&stats.UserCount)
 		s.db.QueryRow("SELECT COUNT(*) FROM peers").Scan(&stats.PeerCount)
-	}
 
-	// Get quota information
-	quotaInfo, err := quota.GetUserQuota(s.db, session.UserID)
-	if err != nil {
-		log.Printf("Error getting quota info: %v", err)
-	} else {
-		stats.QuotaInfo = quotaInfo
-		stats.StorageUsed = fmt.Sprintf("%.2f GB", quotaInfo.UsedTotalGB)
-		stats.StorageQuota = fmt.Sprintf("%d GB", quotaInfo.QuotaTotalGB)
-		stats.StoragePercent = int(quotaInfo.PercentUsed)
-	}
-
-	// Get user's shares for trash count
-	userShares, err := shares.GetByUser(s.db, session.UserID)
-	if err != nil {
-		log.Printf("Error getting shares for stats: %v", err)
-		return stats
-	}
-
-	// Count trash items
-	totalTrashCount := 0
-	for _, share := range userShares {
-		username := session.Username
-		trashItems, err := trash.ListTrashItems(share.Path, username)
+		// Calculate total storage used by all users
+		var totalUsedGB float64
+		rows, err := s.db.Query("SELECT id FROM users")
 		if err != nil {
-			log.Printf("Error listing trash for share %s: %v", share.Name, err)
-			continue
-		}
-		totalTrashCount += len(trashItems)
-	}
-	stats.TrashCount = totalTrashCount
-
-	// Get last backup time from sync_log
-	var lastSync sql.NullTime
-	err = s.db.QueryRow(`
-		SELECT completed_at
-		FROM sync_log
-		WHERE user_id = ? AND status = 'success'
-		ORDER BY completed_at DESC
-		LIMIT 1
-	`, session.UserID).Scan(&lastSync)
-
-	if err == nil && lastSync.Valid {
-		duration := time.Since(lastSync.Time)
-		if duration < time.Hour {
-			stats.LastBackup = fmt.Sprintf("Il y a %d minutes", int(duration.Minutes()))
-		} else if duration < 24*time.Hour {
-			stats.LastBackup = fmt.Sprintf("Il y a %d heures", int(duration.Hours()))
+			log.Printf("Error querying users for storage stats: %v", err)
 		} else {
-			stats.LastBackup = fmt.Sprintf("Il y a %d jours", int(duration.Hours()/24))
+			defer rows.Close()
+			for rows.Next() {
+				var userID int
+				if err := rows.Scan(&userID); err != nil {
+					continue
+				}
+				quotaInfo, err := quota.GetUserQuota(s.db, userID)
+				if err != nil {
+					continue
+				}
+				totalUsedGB += quotaInfo.UsedTotalGB
+			}
+			stats.StorageUsed = fmt.Sprintf("%.2f GB", totalUsedGB)
+		}
+
+		// Get last backup time from any user
+		var lastSync sql.NullTime
+		err = s.db.QueryRow(`
+			SELECT completed_at
+			FROM sync_log
+			WHERE status = 'success'
+			ORDER BY completed_at DESC
+			LIMIT 1
+		`).Scan(&lastSync)
+
+		if err == nil && lastSync.Valid {
+			duration := time.Since(lastSync.Time)
+			if duration < time.Hour {
+				stats.LastBackup = fmt.Sprintf("Il y a %d minutes", int(duration.Minutes()))
+			} else if duration < 24*time.Hour {
+				stats.LastBackup = fmt.Sprintf("Il y a %d heures", int(duration.Hours()))
+			} else {
+				stats.LastBackup = fmt.Sprintf("Il y a %d jours", int(duration.Hours()/24))
+			}
+		}
+	} else {
+		// User stats: personal quota
+		quotaInfo, err := quota.GetUserQuota(s.db, session.UserID)
+		if err != nil {
+			log.Printf("Error getting quota info: %v", err)
+		} else {
+			stats.QuotaInfo = quotaInfo
+			stats.StorageUsed = fmt.Sprintf("%.2f GB", quotaInfo.UsedTotalGB)
+			stats.StorageQuota = fmt.Sprintf("%d GB", quotaInfo.QuotaTotalGB)
+			stats.StoragePercent = int(quotaInfo.PercentUsed)
+		}
+
+		// Get user's shares for trash count
+		userShares, err := shares.GetByUser(s.db, session.UserID)
+		if err != nil {
+			log.Printf("Error getting shares for stats: %v", err)
+			return stats
+		}
+
+		// Count trash items
+		totalTrashCount := 0
+		for _, share := range userShares {
+			username := session.Username
+			trashItems, err := trash.ListTrashItems(share.Path, username)
+			if err != nil {
+				log.Printf("Error listing trash for share %s: %v", share.Name, err)
+				continue
+			}
+			totalTrashCount += len(trashItems)
+		}
+		stats.TrashCount = totalTrashCount
+
+		// Get last backup time from sync_log
+		var lastSync sql.NullTime
+		err = s.db.QueryRow(`
+			SELECT completed_at
+			FROM sync_log
+			WHERE user_id = ? AND status = 'success'
+			ORDER BY completed_at DESC
+			LIMIT 1
+		`, session.UserID).Scan(&lastSync)
+
+		if err == nil && lastSync.Valid {
+			duration := time.Since(lastSync.Time)
+			if duration < time.Hour {
+				stats.LastBackup = fmt.Sprintf("Il y a %d minutes", int(duration.Minutes()))
+			} else if duration < 24*time.Hour {
+				stats.LastBackup = fmt.Sprintf("Il y a %d heures", int(duration.Hours()))
+			} else {
+				stats.LastBackup = fmt.Sprintf("Il y a %d jours", int(duration.Hours()/24))
+			}
 		}
 	}
 
@@ -4427,6 +4470,48 @@ func (s *Server) handleAdminBackupDownload(w http.ResponseWriter, r *http.Reques
 	w.Write(reEncryptedData)
 
 	log.Printf("Admin downloaded backup %s (re-encrypted, size: %d bytes)", filename, len(reEncryptedData))
+}
+
+// handleAdminBackupDelete deletes a server backup file
+func (s *Server) handleAdminBackupDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get filename from form
+	filename := r.FormValue("filename")
+	if filename == "" {
+		http.Error(w, "Missing filename", http.StatusBadRequest)
+		return
+	}
+
+	// Security: prevent path traversal
+	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+		http.Error(w, "Invalid filename", http.StatusBadRequest)
+		return
+	}
+
+	// Get backup directory path
+	backupDir := filepath.Join(s.cfg.DataDir, "backups", "server")
+	backupPath := filepath.Join(backupDir, filename)
+
+	// Check if file exists
+	if _, err := os.Stat(backupPath); os.IsNotExist(err) {
+		http.Error(w, "Backup file not found", http.StatusNotFound)
+		return
+	}
+
+	// Delete the backup file
+	if err := os.Remove(backupPath); err != nil {
+		log.Printf("Error deleting backup %s: %v", filename, err)
+		http.Error(w, "Failed to delete backup", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Admin deleted backup %s", filename)
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Backup deleted successfully"))
 }
 
 // handleRestoreWarning displays the restore warning page
