@@ -867,6 +867,18 @@ func (s *Server) handleAdminUsersAdd(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Validate username format (prevent command injection)
+		if err := users.ValidateUsername(username); err != nil {
+			data := TemplateData{
+				Lang:    lang,
+				Title:   i18n.T(lang, "users.add.title"),
+				Session: session,
+				Error:   fmt.Sprintf("Invalid username format: %v", err),
+			}
+			s.templates.ExecuteTemplate(w, "admin_users_add.html", data)
+			return
+		}
+
 		// Check if username already exists
 		_, err := users.GetByUsername(s.db, username)
 		if err == nil {

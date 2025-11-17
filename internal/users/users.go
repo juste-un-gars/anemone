@@ -10,11 +10,34 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/juste-un-gars/anemone/internal/crypto"
 	"github.com/juste-un-gars/anemone/internal/smb"
 )
+
+// usernameRegex validates username format to prevent command injection
+// Only allows: letters (a-z, A-Z), numbers (0-9), underscore (_), and hyphen (-)
+var usernameRegex = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// ValidateUsername checks if a username has a valid format
+// Returns an error if the username is invalid
+func ValidateUsername(username string) error {
+	if username == "" {
+		return fmt.Errorf("username cannot be empty")
+	}
+	if len(username) < 2 {
+		return fmt.Errorf("username must be at least 2 characters")
+	}
+	if len(username) > 32 {
+		return fmt.Errorf("username must not exceed 32 characters")
+	}
+	if !usernameRegex.MatchString(username) {
+		return fmt.Errorf("username can only contain letters, numbers, underscore (_) and hyphen (-)")
+	}
+	return nil
+}
 
 // User represents a user account
 type User struct {
@@ -35,6 +58,11 @@ type User struct {
 
 // CreateFirstAdmin creates the first administrator user during setup
 func CreateFirstAdmin(db *sql.DB, username, password, email, masterKey string) (*User, string, error) {
+	// Validate username format (prevent command injection)
+	if err := ValidateUsername(username); err != nil {
+		return nil, "", fmt.Errorf("invalid username: %w", err)
+	}
+
 	// Hash password
 	passwordHash, err := crypto.HashPassword(password)
 	if err != nil {

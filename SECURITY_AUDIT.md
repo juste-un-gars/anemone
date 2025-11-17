@@ -27,19 +27,48 @@
 
 ### ⚠️ Vulnérabilités et Améliorations Recommandées
 
-| Priorité | Vulnérabilité | Impact | Fichier | Ligne |
-|----------|---------------|--------|---------|-------|
-| 🔴 **HAUTE** | Injection de commandes via username | Exécution code arbitraire | `internal/web/router.go` | 852-892 |
-| 🟠 **MOYENNE** | Absence headers HTTP sécurité | XSS, Clickjacking, MITM | Tous endpoints | - |
-| 🟠 **MOYENNE** | Pas de protection CSRF explicite | Cross-Site Request Forgery | Routes POST/DELETE | - |
-| 🟡 **FAIBLE** | Sync auth désactivé par défaut | Accès non autorisé API sync | `internal/web/router.go` | 271-273 |
-| 🟡 **FAIBLE** | bcrypt cost = 10 (bas) | Bruteforce plus facile | `internal/crypto/crypto.go` | 97 |
+| Priorité | Vulnérabilité | Impact | Fichier | Ligne | Status |
+|----------|---------------|--------|---------|-------|--------|
+| 🔴 **HAUTE** | ~~Injection de commandes via username~~ | ~~Exécution code arbitraire~~ | `internal/users/users.go` | 26-40 | ✅ **CORRIGÉ** |
+| 🟠 **MOYENNE** | Absence headers HTTP sécurité | XSS, Clickjacking, MITM | Tous endpoints | - | ⚠️ À corriger |
+| 🟠 **MOYENNE** | Pas de protection CSRF explicite | Cross-Site Request Forgery | Routes POST/DELETE | - | ⚠️ À corriger |
+| 🟡 **FAIBLE** | Sync auth désactivé par défaut | Accès non autorisé API sync | `internal/web/router.go` | 271-273 | ⚠️ À corriger |
+| 🟡 **FAIBLE** | bcrypt cost = 10 (bas) | Bruteforce plus facile | `internal/crypto/crypto.go` | 97 | ⚠️ À corriger |
 
-### 📈 Score Global : 7.5/10
+### 📈 Score Global : 8.0/10 (↑ +0.5)
 
-**Excellent** : Crypto, SQL injection, Path traversal
+**Excellent** : Crypto, SQL injection, Path traversal, Input validation
 **Bon** : Authentification, hashing mots de passe
-**À améliorer** : Headers HTTP, CSRF, validation input
+**À améliorer** : Headers HTTP, CSRF
+
+---
+
+## 🔧 Corrections Appliquées
+
+### ✅ 1. Injection de commandes (CORRIGÉ - Session 21)
+
+**Date correction** : 2025-11-17
+
+**Problème** : Username non validé → injection commandes shell possible
+
+**Solution implémentée** :
+- Ajout fonction `ValidateUsername()` dans `internal/users/users.go:26-40`
+- Validation avec regex : `^[a-zA-Z0-9_-]+$`
+- Contraintes :
+  - Minimum 2 caractères
+  - Maximum 32 caractères
+  - Uniquement : lettres, chiffres, underscore (_), tiret (-)
+
+**Fichiers modifiés** :
+- `internal/users/users.go` : Fonction de validation + application dans `CreateFirstAdmin()`
+- `internal/web/router.go:870-880` : Application dans `handleAdminUsersAdd()`
+
+**Tests** :
+- ✅ Compilation réussie
+- ✅ Usernames valides acceptés : `alice`, `bob_test`, `user-123`
+- ✅ Usernames malveillants bloqués : `test; rm -rf /`, `../etc/passwd`, `user$evil`
+
+**Impact sécurité** : Vulnérabilité critique éliminée ✅
 
 ---
 
