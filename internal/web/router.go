@@ -60,6 +60,7 @@ type TemplateData struct {
 	Lang          string
 	Title         string
 	EncryptionKey string
+	SyncPassword  string // Generated sync authentication password (setup only)
 	Error         string
 	Session       *auth.Session
 	Stats         *DashboardStats
@@ -759,6 +760,25 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Generate random sync authentication password (secure by default)
+		syncPasswordBytes := make([]byte, 24) // 24 bytes = 192 bits
+		if _, err := rand.Read(syncPasswordBytes); err != nil {
+			log.Printf("Error generating sync password: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		// Use base64 URL encoding for password-safe characters
+		syncPassword := base64.URLEncoding.EncodeToString(syncPasswordBytes)
+
+		// Save sync password hash to database
+		if err := syncauth.SetSyncAuthPassword(s.db, syncPassword); err != nil {
+			log.Printf("Error setting sync password: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		log.Printf("✅ Generated sync authentication password (must be changed by admin)")
+
 		// Store encryption key in session/cookie temporarily
 		http.SetCookie(w, &http.Cookie{
 			Name:     "setup_key",
@@ -769,11 +789,12 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 			MaxAge:   600,   // 10 minutes to complete setup
 		})
 
-		// Show success page with encryption key
+		// Show success page with encryption key and sync password
 		data := TemplateData{
-			Lang:          lang,
-			Title:         i18n.T(lang, "setup.success.title"),
+			Lang:         lang,
+			Title:        i18n.T(lang, "setup.success.title"),
 			EncryptionKey: encryptionKey,
+			SyncPassword: syncPassword, // Display generated sync password
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "setup_success.html", data); err != nil {

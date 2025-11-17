@@ -21,11 +21,12 @@
 2. **Hashing mots de passe** : bcrypt avec salt automatique (DefaultCost = 10)
 3. **Injections SQL** : Utilisation systématique de requêtes paramétrées
 4. **Path traversal** : Protection robuste avec `filepath.Abs()` + `HasPrefix()`
-5. **Authentification API Sync** : Mot de passe bcrypt avec header X-Sync-Password
+5. **Authentification API Sync** : Mot de passe généré automatiquement au setup (192 bits, secure by default)
 6. **Clés de chiffrement** : Master key en DB, clés utilisateur chiffrées
 7. **Sessions** : Cookie SameSite=Strict, HttpOnly, Secure, renouvellement automatique
 8. **Headers HTTP** : HSTS, CSP, X-Frame-Options, X-Content-Type-Options (protection complète)
 9. **Validation entrées** : Regex stricte sur username (prévention injection commandes)
+10. **Protection CSRF** : SameSite=Strict + Secure cookies (blocage requêtes cross-origin)
 
 ### ⚠️ Vulnérabilités et Améliorations Recommandées
 
@@ -34,10 +35,10 @@
 | 🔴 **HAUTE** | ~~Injection de commandes via username~~ | ~~Exécution code arbitraire~~ | `internal/users/users.go` | 26-40 | ✅ **CORRIGÉ** |
 | 🟠 **MOYENNE** | ~~Absence headers HTTP sécurité~~ | ~~XSS, Clickjacking, MITM~~ | `internal/web/router.go` | 305-333 | ✅ **CORRIGÉ** |
 | 🟠 **MOYENNE** | ~~Pas de protection CSRF explicite~~ | ~~Cross-Site Request Forgery~~ | `internal/auth/session.go` | 153 | ✅ **CORRIGÉ** |
-| 🟡 **FAIBLE** | Sync auth désactivé par défaut | Accès non autorisé API sync | `internal/web/router.go` | 271-273 | ⚠️ À corriger |
+| 🟡 **FAIBLE** | ~~Sync auth désactivé par défaut~~ | ~~Accès non autorisé API sync~~ | `internal/web/router.go` | 762-779 | ✅ **CORRIGÉ** |
 | 🟡 **FAIBLE** | bcrypt cost = 10 (bas) | Bruteforce plus facile | `internal/crypto/crypto.go` | 97 | ⚠️ À corriger |
 
-### 📈 Score Global : 9.0/10 (↑ +1.5)
+### 📈 Score Global : 9.5/10 (↑ +2.0)
 
 **Excellent** : Crypto, SQL injection, Path traversal, Input validation
 **Bon** : Authentification, hashing mots de passe
@@ -152,6 +153,64 @@
 - SameSite=Strict peut forcer re-login si utilisateur accède via lien externe (email, bookmark)
 - Ce comportement est acceptable pour une application sensible comme un NAS
 - Protège contre attaques CSRF même si utilisateur visite site malveillant en parallèle
+
+---
+
+### ✅ 4. Génération automatique mot de passe sync (CORRIGÉ - Session 21)
+
+**Date correction** : 2025-11-17
+
+**Problème** : API sync non protégée par défaut → Si admin oublie de configurer le mot de passe, l'API sync reste accessible sans authentification
+
+**Solution implémentée** : **Secure by default**
+- Génération automatique d'un mot de passe sync aléatoire lors du setup initial
+- 24 bytes (192 bits) encodé en base64 = mot de passe fort
+- Affichage du mot de passe généré dans la page de succès (avec encryption key)
+- Admin doit copier ce mot de passe pour l'utiliser sur les pairs
+- Admin peut le changer plus tard dans Paramètres > Synchronisation
+
+**Changements** :
+1. `internal/web/router.go:762-779` : Génération + sauvegarde mot de passe sync
+   - Génère 24 bytes aléatoires cryptographiquement forts
+   - Encode en base64 URL-safe
+   - Hash avec bcrypt et sauvegarde via `SetSyncAuthPassword()`
+   - Ajoute au TemplateData pour affichage
+
+2. `internal/web/router.go:63` : Ajout champ `SyncPassword` dans `TemplateData`
+
+3. `web/templates/setup_success.html:73-94` : Affichage mot de passe sync
+   - Section dédiée avec bordure purple (vs bleu pour encryption key)
+   - Bouton copier intégré
+   - Avertissement : "Vous devez changer ce mot de passe dès que possible"
+
+4. `internal/i18n/i18n.go:101-103, 417-419` : Traductions FR + EN
+   - `setup.success.sync_password`
+   - `setup.success.sync_password_help`
+   - `setup.success.sync_password_change`
+
+**Fichiers modifiés** :
+- `internal/web/router.go` : Génération + affichage mot de passe
+- `web/templates/setup_success.html` : UI affichage mot de passe
+- `internal/i18n/i18n.go` : Traductions
+
+**Tests** :
+- ✅ Compilation réussie
+- ✅ Mot de passe sync généré automatiquement au setup
+- ✅ Mot de passe affiché dans page succès (avec bouton copier)
+- ✅ Plus d'API sync non protégée par défaut
+
+**Impact sécurité** :
+✅ **Secure by default** : API sync toujours protégée dès l'installation
+✅ **Mot de passe fort** : 192 bits d'entropie (impossible à deviner)
+✅ **UX améliorée** : Admin n'a pas besoin de penser à configurer manuellement
+✅ **Flexibilité** : Admin peut changer le mot de passe dans les settings
+✅ Score amélioré : 9.0/10 → 9.5/10
+
+**Avantages de cette approche** (suggérée par l'utilisateur) :
+- Élimine le risque d'oubli de configuration
+- Force l'admin à copier le mot de passe (= sensibilisation sécurité)
+- Mot de passe aléatoire plus sûr qu'un mot de passe choisi manuellement
+- Cohérent avec l'approche utilisée pour l'encryption key
 
 ---
 
