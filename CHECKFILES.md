@@ -198,12 +198,12 @@
 
 ---
 
-## 🗑️ Répertoire _old/ (OBSOLÈTE - 78 MB, 2675 fichiers)
+## 🗑️ Répertoire _old/ (ARCHIVÉ)
 
-**Statut** : ⚠️ **À SUPPRIMER** - Aucune référence dans le code actif
+**Statut** : ✅ **DÉPLACÉ** → `/home/franck/old_anemone`
 **Taille** : 78 MB
 **Fichiers** : 2675
-**Vérification** : 2025-11-17
+**Date déplacement** : 2025-11-17
 
 **Contenu** :
 - Ancien système Python/Docker
@@ -211,7 +211,8 @@
 - Ancienne documentation (phases 1-4)
 - Services obsolètes (api, core, restic, shares)
 
-**Aucune référence** trouvée dans le code Go, templates HTML ou scripts actifs.
+**Vérification** : Aucune référence trouvée dans le code Go, templates HTML ou scripts actifs.
+**Action** : Déplacé hors du projet pour archivage sécurisé.
 
 ### Ancien code Python/Docker
 | Fichier/Dossier | Statut | Notes |

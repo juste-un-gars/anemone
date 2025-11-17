@@ -318,12 +318,12 @@ Après 19 sessions et de nombreuses modifications, nécessité de :
 
 ### 🗑️ Fichiers obsolètes identifiés
 
-**Répertoire _old/** ⚠️
+**Répertoire _old/** ✅ DÉPLACÉ
 - **Taille** : 78 MB
 - **Fichiers** : 2675 fichiers
 - **Contenu** : Ancien système Python/Docker, scripts Restic/Wireguard, ancienne doc
 - **Statut** : Aucune référence dans le code actif
-- **Recommandation** : Suppression complète
+- **Action** : Déplacé vers `/home/franck/old_anemone` pour archivage sécurisé
 
 **Fichiers déplacés dans _audit_temp/** (3 fichiers)
 - `cmd/test-manifest/` - Programme de test
@@ -365,7 +365,7 @@ Après 19 sessions et de nombreuses modifications, nécessité de :
 
 **Recommandations** :
 1. ✅ Garder `_audit_temp/` temporairement pour validation
-2. ⚠️ Supprimer `_old/` (78 MB, 2675 fichiers obsolètes)
+2. ✅ `_old/` déplacé vers `/home/franck/old_anemone` (78 MB archivés)
 3. ✅ Code très propre, prêt pour audit sécurité (Session 21)
 
 **État session 20** : ✅ **TERMINÉE - Audit complet réussi (85 fichiers, 96.5% code actif)**
@@ -384,7 +384,7 @@ Après 19 sessions et de nombreuses modifications, nécessité de :
 - ✅ Scripts auditées (5/5)
 - ✅ Documentation auditée (3/3)
 - ✅ Compilation vérifiée (go build + go vet)
-- ⚠️ Répertoire _old/ identifié (78 MB à supprimer)
+- ✅ Répertoire _old/ déplacé vers /home/franck/old_anemone (78 MB archivés)
 
 **Session 21 : Audit de sécurité complet** 🔒
 - **Audit des permissions fichiers**
