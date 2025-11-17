@@ -1,8 +1,8 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-16 (Session 18 - Interface admin de restauration utilisateurs + Fix bulk restore)
-**Prochaine session** : Tests interface utilisateur + Audit sécurité
-**Status** : 🟢 COMPLÈTE - Restauration admin fonctionnelle à 100%
+**Dernière session** : 2025-11-17 (Session 19 - Outil de décryptage manuel pour disaster recovery)
+**Prochaine session** : Audit sécurité + Améliorations
+**Status** : 🟢 COMPLÈTE - Outil de récupération manuelle opérationnel
 
 > **Note** : L'historique des sessions 1-7 a été archivé dans `SESSION_STATE_ARCHIVE.md`
 > **Note** : Les détails techniques des sessions 8-11 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
@@ -138,6 +138,14 @@
     - Configuration automatique des partages
     - Flag `server_restored` pour afficher page d'avertissement
 
+18. **Outil de décryptage manuel** (Session 19)
+    - **Commande CLI** : `anemone-decrypt` pour récupération manuelle des backups
+    - **Décryptage sans serveur** : Utilise uniquement la clé utilisateur sauvegardée
+    - **Mode récursif** : Support des sous-répertoires avec option `-r`
+    - **Batch processing** : Déchiffre automatiquement tous les fichiers .enc
+    - **Use case critique** : Récupération d'urgence si serveur complètement perdu
+    - **Indépendance totale** : Fonctionne sans base de données ni master key
+
 ### 🚀 Déploiement
 
 **DEV (localhost)** : ✅ Développement actif
@@ -163,12 +171,13 @@
 - ✅ **Restauration config serveur** : OK (Session 16-17)
 - ✅ **Restauration mots de passe SMB** : OK (Session 16)
 - ✅ **Re-chiffrement clés utilisateur** : OK (Session 17)
+- ✅ **Décryptage manuel sans serveur** : OK (Session 19)
 
 **Structure de production** :
 - Code : `~/anemone/` (repo git, binaires)
 - Données : `/srv/anemone/` (db, certs, shares, smb, backups)
 - Base de données : `/srv/anemone/db/anemone.db`
-- Binaires système : `/usr/local/bin/` (anemone, anemone-dfree, anemone-smbgen, anemone-migrate)
+- Binaires système : `/usr/local/bin/` (anemone, anemone-dfree, anemone-smbgen, anemone-migrate, anemone-decrypt)
 - Service : `systemd` (démarrage automatique)
 
 ### 📦 Liens utiles
@@ -366,6 +375,150 @@ c869161 - feat: Add admin interface for user file restoration after disaster rec
 
 ---
 
+## 🔧 Session 19 - 17 Novembre 2025 - Outil de décryptage manuel pour disaster recovery
+
+**Date** : 2025-11-17
+**Objectif** : Créer un outil CLI autonome pour décrypter manuellement les backups sans serveur
+**Priorité** : 🟡 IMPORTANT → 🟢 COMPLÈTE
+
+### 🎯 Contexte et Solution
+
+**Problématique** :
+- Les clés de chiffrement sont affichées une seule fois lors de la création/activation du compte
+- Si le serveur principal est complètement perdu (panne matérielle, incendie, etc.)
+- L'utilisateur possède toujours :
+  1. Sa clé de chiffrement sauvegardée
+  2. Les fichiers chiffrés sur les serveurs pairs (FR2, etc.)
+- **Question** : Comment récupérer les fichiers sans le serveur principal ?
+
+**Solution implémentée** :
+- **Outil CLI standalone** : `anemone-decrypt`
+- **Indépendance totale** : Fonctionne sans base de données, sans master key, sans serveur
+- **Input** : Fichiers .enc + clé utilisateur (32 bytes base64)
+- **Output** : Fichiers déchiffrés dans leur état original
+
+### ✅ Architecture
+
+**Hiérarchie de chiffrement existante** :
+```
+Master Key (unique par serveur, stockée en DB)
+    ↓ chiffre
+User Encryption Key (32 bytes, unique par utilisateur)
+    ↓ chiffre
+Fichiers de backup sur pairs distants
+```
+
+**Workflow disaster recovery** :
+```
+1. SSH sur serveur pair (ex: FR2)
+2. Copier /srv/anemone/backups/incoming/X_sharename/*.enc
+3. Exécuter: anemone-decrypt -key=<user_key> -dir=./backups -r
+4. Récupération complète des fichiers déchiffrés ✅
+```
+
+### 🔨 Composants créés
+
+**1. cmd/anemone-decrypt/main.go**
+- Parser CLI avec flags (key, dir, out, recursive)
+- Scan des fichiers .enc récursif ou non
+- Décryptage batch avec barre de progression
+- Gestion d'erreurs et cleanup automatique
+- Affichage formaté (taille fichiers, statistiques)
+
+**2. Fonctionnalités**
+- `-key` : Clé de chiffrement base64 (obligatoire)
+- `-dir` : Répertoire source (défaut: répertoire courant)
+- `-out` : Répertoire destination (défaut: même que source)
+- `-r` : Mode récursif pour sous-répertoires
+- `-h` : Aide complète avec exemples
+
+**3. Installation**
+- Binaire compilé : `~/anemone/anemone-decrypt`
+- Installation système : `/usr/local/bin/anemone-decrypt`
+- Accessible partout : `anemone-decrypt -h`
+
+### 🧪 Tests validés
+
+**Test 1 : Fichiers générés localement**
+- ✅ 5 fichiers de test créés avec clé connue
+- ✅ Décryptage récursif réussi (5/5 fichiers)
+- ✅ Contenu vérifié : identique à l'original
+
+**Test 2 : Fichiers réels depuis FR2**
+- ✅ 3 fichiers copiés depuis backup production (user "test")
+- ✅ Clé utilisateur déchiffrée depuis DB : `0kMrSgGbiIWM8dggYP6nuCPcSAHlELQikuJz3LQvEec=`
+- ✅ Décryptage réussi :
+  - `printer-qrcode.pdf` : 5.5 KB (PDF 1 page)
+  - `03.3mf` : 19.2 KB (fichier 3D printing)
+  - `temp/multi_size_pages.pdf` : 4.0 KB (PDF 6 pages)
+- ✅ Fichiers validés avec `file` : types corrects
+
+**Test 3 : Gestion d'erreurs**
+- ✅ Clé incorrecte détectée : "message authentication failed"
+- ✅ Répertoire inexistant : erreur claire
+- ✅ Absence de fichiers .enc : message informatif
+
+### 📝 Utilisation
+
+```bash
+# Cas d'usage typique : Disaster recovery
+# 1. Récupérer fichiers chiffrés depuis pair
+scp -r user@peer:/srv/anemone/backups/incoming/2_backup_user/ ./my-backups/
+
+# 2. Décrypter avec la clé sauvegardée lors de l'activation
+anemone-decrypt -key="YOUR_BASE64_KEY" -dir=./my-backups -out=./restored -r
+
+# 3. Vérifier les fichiers restaurés
+ls -lh ./restored/
+```
+
+**Output exemple** :
+```
+🔐 Anemone Manual Decryption Tool
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Source directory: ./my-backups
+Output directory: ./restored
+Recursive: true
+
+Found 3 encrypted file(s)
+
+[1/3] 🔓 document.pdf.enc... ✅ OK (1.2 MB)
+[2/3] 🔓 photo.jpg.enc... ✅ OK (3.4 MB)
+[3/3] 🔓 archive.zip.enc... ✅ OK (15.8 MB)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Successfully decrypted: 3
+
+🎉 All files decrypted successfully!
+```
+
+### 💡 Points importants
+
+**1. Sauvegarder la clé utilisateur**
+- Affichée **UNE SEULE FOIS** lors de l'activation
+- Stocker dans un gestionnaire de mots de passe
+- Sans cette clé + sans serveur = données perdues
+
+**2. Indépendance totale**
+- Pas besoin de la master key
+- Pas besoin de la base de données
+- Pas besoin du serveur Anemone
+- Juste : clé utilisateur + fichiers .enc
+
+**3. Sécurité**
+- Fichiers originaux .enc jamais modifiés
+- En cas d'erreur, fichier output supprimé automatiquement
+- Validation AEAD (AES-256-GCM) garantit l'intégrité
+
+**État session 19** : 🟢 **COMPLÈTE - Outil de récupération manuelle opérationnel**
+
+**Prochaine session** :
+1. Audit de sécurité complet (priorité 1 roadmap)
+2. Tests interface utilisateur restauration
+3. Améliorations et optimisations
+
+---
+
 ## 📝 Prochaines étapes (Roadmap)
 
 ### 🎯 Priorité 1 - Court terme
@@ -376,7 +529,14 @@ c869161 - feat: Add admin interface for user file restoration after disaster rec
 - ✅ Fix ownership fichiers restaurés (test:test)
 - ✅ Tests complets disaster recovery (7 files, 280596 bytes, 0 errors)
 
-**Session 14 : Audit de sécurité complet** 🔒
+**Session 19 : Outil de décryptage manuel pour disaster recovery** 🟢 COMPLÈTE
+- ✅ CLI `anemone-decrypt` créé et testé
+- ✅ Décryptage sans serveur (clé utilisateur uniquement)
+- ✅ Tests avec fichiers réels depuis FR2 (3 fichiers, 100% succès)
+- ✅ Mode récursif fonctionnel
+- ✅ Installation système (`/usr/local/bin/`)
+
+**Session 20 : Audit de sécurité complet** 🔒
 - **Audit des permissions fichiers**
   - Vérifier permissions `/srv/anemone/` (600/700)
   - Vérifier ownership des fichiers sensibles
