@@ -21,6 +21,9 @@ vendor/
 /anemone-smbgen
 /anemone-migrate
 /anemone-restore-decrypt
+/anemone-decrypt
+/anemone-decrypt-password
+/anemone-reencrypt-key
 
 # OS
 .DS_Store
