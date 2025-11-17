@@ -141,14 +141,16 @@ func (sm *SessionManager) cleanupExpiredSessions() {
 }
 
 // SetSessionCookie sets the session cookie in the response
+// Uses SameSite=Strict for maximum CSRF protection (prevents cross-origin requests)
+// Uses Secure=true to enforce HTTPS only (works with HSTS header)
 func SetSessionCookie(w http.ResponseWriter, sessionID string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     SessionCookieName,
 		Value:    sessionID,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false, // Set to true in production with HTTPS
-		SameSite: http.SameSiteLaxMode,
+		Secure:   true, // Enforce HTTPS (required with HSTS header)
+		SameSite: http.SameSiteStrictMode, // Strong CSRF protection
 		MaxAge:   int(SessionDuration.Seconds()),
 	})
 }
