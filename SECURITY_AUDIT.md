@@ -30,12 +30,12 @@
 | Priorité | Vulnérabilité | Impact | Fichier | Ligne | Status |
 |----------|---------------|--------|---------|-------|--------|
 | 🔴 **HAUTE** | ~~Injection de commandes via username~~ | ~~Exécution code arbitraire~~ | `internal/users/users.go` | 26-40 | ✅ **CORRIGÉ** |
-| 🟠 **MOYENNE** | Absence headers HTTP sécurité | XSS, Clickjacking, MITM | Tous endpoints | - | ⚠️ À corriger |
+| 🟠 **MOYENNE** | ~~Absence headers HTTP sécurité~~ | ~~XSS, Clickjacking, MITM~~ | `internal/web/router.go` | 305-333 | ✅ **CORRIGÉ** |
 | 🟠 **MOYENNE** | Pas de protection CSRF explicite | Cross-Site Request Forgery | Routes POST/DELETE | - | ⚠️ À corriger |
 | 🟡 **FAIBLE** | Sync auth désactivé par défaut | Accès non autorisé API sync | `internal/web/router.go` | 271-273 | ⚠️ À corriger |
 | 🟡 **FAIBLE** | bcrypt cost = 10 (bas) | Bruteforce plus facile | `internal/crypto/crypto.go` | 97 | ⚠️ À corriger |
 
-### 📈 Score Global : 8.0/10 (↑ +0.5)
+### 📈 Score Global : 8.5/10 (↑ +1.0)
 
 **Excellent** : Crypto, SQL injection, Path traversal, Input validation
 **Bon** : Authentification, hashing mots de passe
@@ -69,6 +69,47 @@
 - ✅ Usernames malveillants bloqués : `test; rm -rf /`, `../etc/passwd`, `user$evil`
 
 **Impact sécurité** : Vulnérabilité critique éliminée ✅
+
+---
+
+### ✅ 2. Headers HTTP de sécurité (CORRIGÉ - Session 21)
+
+**Date correction** : 2025-11-17
+
+**Problème** : Aucun header de sécurité HTTP → vulnérabilités XSS, clickjacking, MITM
+
+**Solution implémentée** :
+- Middleware `securityHeadersMiddleware()` dans `internal/web/router.go:305-333`
+- Appliqué automatiquement à tous les endpoints (ligne 249)
+
+**Headers ajoutés** :
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains` (HSTS - Force HTTPS 1 an)
+- `X-Content-Type-Options: nosniff` (Empêche MIME sniffing)
+- `X-Frame-Options: DENY` (Empêche clickjacking)
+- `X-XSS-Protection: 1; mode=block` (Protection XSS legacy)
+- `Content-Security-Policy` (Restreint chargement ressources externes)
+  - `default-src 'self'` - Uniquement même origine
+  - `style-src 'self' 'unsafe-inline'` - Styles inline autorisés (UI)
+  - `script-src 'self'` - Scripts uniquement même origine
+  - `frame-ancestors 'none'` - Pas d'embedding
+- `Referrer-Policy: strict-origin-when-cross-origin` (Protection vie privée)
+- `Permissions-Policy: geolocation=(), microphone=(), camera=()` (Désactive fonctions navigateur inutiles)
+
+**Fichiers modifiés** :
+- `internal/web/router.go:305-333` : Fonction middleware
+- `internal/web/router.go:249` : Application globale
+
+**Tests** :
+- ✅ Compilation réussie
+- ✅ Headers ajoutés sur toutes les réponses HTTP
+- ✅ Protection XSS, clickjacking, MIME sniffing active
+
+**Impact sécurité** :
+✅ Protection contre XSS (Cross-Site Scripting)
+✅ Protection contre clickjacking
+✅ Protection contre MITM (Man-in-the-Middle) via HSTS
+✅ Protection contre MIME sniffing
+✅ Score amélioré : 8.0/10 → 8.5/10
 
 ---
 

@@ -245,7 +245,8 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/api/sync/download-encrypted-manifest", server.syncAuthMiddleware(server.handleAPISyncDownloadEncryptedManifest))
 	mux.HandleFunc("/api/sync/download-encrypted-file", server.syncAuthMiddleware(server.handleAPISyncDownloadEncryptedFile))
 
-	return mux
+	// Apply security headers middleware to all routes
+	return securityHeadersMiddleware(mux)
 }
 
 // isSetupCompleted checks if initial setup is done
@@ -298,6 +299,38 @@ func (s *Server) syncAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		// Password is valid, continue to handler
 		next(w, r)
 	}
+}
+
+// securityHeadersMiddleware adds security headers to all HTTP responses
+// Protects against XSS, clickjacking, MIME sniffing, and enforces HTTPS
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// HSTS - Force HTTPS for 1 year (31536000 seconds)
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+
+		// Prevent MIME sniffing (force browser to respect Content-Type)
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+
+		// Prevent clickjacking (don't allow embedding in iframes)
+		w.Header().Set("X-Frame-Options", "DENY")
+
+		// XSS Protection (legacy but still useful)
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+
+		// Content Security Policy - Restrict resource loading
+		// default-src 'self' - Only load resources from same origin
+		// style-src 'self' 'unsafe-inline' - Allow inline styles (needed for some UI)
+		// script-src 'self' - Only execute scripts from same origin
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'")
+
+		// Referrer Policy - Don't leak referrer to external sites
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
+
+		// Permissions Policy - Disable unnecessary browser features
+		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 // getLang gets language from user preference (DB), query param, or config
