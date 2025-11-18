@@ -2693,6 +2693,10 @@ func (s *Server) handleAPISyncManifestGet(w http.ResponseWriter, r *http.Request
 // Body: encrypted manifest data
 func (s *Server) handleAPISyncManifestPut(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
+	sourceServer := r.URL.Query().Get("source_server")
+	if sourceServer == "" {
+		sourceServer = "unknown"
+	}
 	userIDStr := r.URL.Query().Get("user_id")
 	shareName := r.URL.Query().Get("share_name")
 
@@ -2707,6 +2711,12 @@ func (s *Server) handleAPISyncManifestPut(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Security check: prevent path traversal
+	if strings.Contains(sourceServer, "..") {
+		http.Error(w, "Invalid source_server (path traversal detected)", http.StatusBadRequest)
+		return
+	}
+
 	// Read encrypted manifest from request body
 	encryptedData, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -2715,9 +2725,9 @@ func (s *Server) handleAPISyncManifestPut(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Build backup directory path directly (no need to check if user exists locally)
+	// Build backup directory path with source server separation
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
-	backupDir := filepath.Join("/srv/anemone/backups/incoming", backupDirName)
+	backupDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer, backupDirName)
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		log.Printf("Error creating backup directory: %v", err)
 		http.Error(w, "Failed to create backup directory", http.StatusInternalServerError)
@@ -2770,9 +2780,15 @@ func (s *Server) handleAPISyncSourceInfo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Build backup directory path
+	// Extract source_server from query parameter
+	sourceServer := r.URL.Query().Get("source_server")
+	if sourceServer == "" {
+		sourceServer = "unknown"
+	}
+
+	// Build backup directory path with source server separation
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
-	backupDir := filepath.Join("/srv/anemone/backups/incoming", backupDirName)
+	backupDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer, backupDirName)
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		log.Printf("Error creating backup directory: %v", err)
 		http.Error(w, "Failed to create backup directory", http.StatusInternalServerError)
@@ -2808,7 +2824,7 @@ func (s *Server) handleAPISyncFile(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleAPISyncFileUpload handles uploading a single encrypted file
-// POST /api/sync/file
+// POST /api/sync/file?source_server=X
 // Multipart form with: user_id, share_name, relative_path, file
 func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request) {
 	// Parse multipart form (max 10GB)
@@ -2816,6 +2832,12 @@ func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request)
 		log.Printf("Error parsing multipart form: %v", err)
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
+	}
+
+	// Get source_server from query params
+	sourceServer := r.URL.Query().Get("source_server")
+	if sourceServer == "" {
+		sourceServer = "unknown"
 	}
 
 	// Get metadata from form
@@ -2835,7 +2857,7 @@ func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Security check: prevent path traversal
-	if strings.Contains(relativePath, "..") {
+	if strings.Contains(relativePath, "..") || strings.Contains(sourceServer, "..") {
 		http.Error(w, "Invalid relative_path (path traversal detected)", http.StatusBadRequest)
 		return
 	}
@@ -2849,9 +2871,9 @@ func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request)
 	}
 	defer file.Close()
 
-	// Build backup directory path directly (no need to check if user exists locally)
+	// Build backup directory path with source server separation
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
-	backupDir := filepath.Join("/srv/anemone/backups/incoming", backupDirName)
+	backupDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer, backupDirName)
 	targetPath := filepath.Join(backupDir, relativePath)
 
 	// Create parent directory if needed
@@ -2888,6 +2910,10 @@ func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request)
 // DELETE /api/sync/file?user_id=5&share_name=backup&path=documents/report.pdf.enc
 func (s *Server) handleAPISyncFileDelete(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
+	sourceServer := r.URL.Query().Get("source_server")
+	if sourceServer == "" {
+		sourceServer = "unknown"
+	}
 	userIDStr := r.URL.Query().Get("user_id")
 	shareName := r.URL.Query().Get("share_name")
 	relativePath := r.URL.Query().Get("path")
@@ -2904,14 +2930,14 @@ func (s *Server) handleAPISyncFileDelete(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Security check: prevent path traversal
-	if strings.Contains(relativePath, "..") {
+	if strings.Contains(relativePath, "..") || strings.Contains(sourceServer, "..") {
 		http.Error(w, "Invalid path (path traversal detected)", http.StatusBadRequest)
 		return
 	}
 
-	// Build backup directory path directly (no need to check if user exists locally)
+	// Build backup directory path with source server separation
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
-	backupDir := filepath.Join("/srv/anemone/backups/incoming", backupDirName)
+	backupDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer, backupDirName)
 	targetPath := filepath.Join(backupDir, relativePath)
 
 	// Delete file

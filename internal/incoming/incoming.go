@@ -6,7 +6,6 @@ package incoming
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,6 +28,7 @@ type IncomingBackup struct {
 
 // ScanIncomingBackups scans the /srv/anemone/backups/incoming/ directory
 // and returns information about all backups stored on this server
+// Directory structure: /srv/anemone/backups/incoming/{source_server}/{user_id}_{share_name}/
 func ScanIncomingBackups(db *sql.DB, backupsDir string) ([]*IncomingBackup, error) {
 	// Check if backups directory exists
 	if _, err := os.Stat(backupsDir); os.IsNotExist(err) {
@@ -36,71 +36,75 @@ func ScanIncomingBackups(db *sql.DB, backupsDir string) ([]*IncomingBackup, erro
 		return []*IncomingBackup{}, nil
 	}
 
-	// Read all entries in backups/incoming/
-	entries, err := os.ReadDir(backupsDir)
+	// Read all source server directories in backups/incoming/
+	serverEntries, err := os.ReadDir(backupsDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read backups directory: %w", err)
 	}
 
 	var backups []*IncomingBackup
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
+	// Iterate over each source server directory
+	for _, serverEntry := range serverEntries {
+		if !serverEntry.IsDir() {
 			continue
 		}
 
-		// Parse directory name: {user_id}_{share_name}
-		parts := strings.SplitN(entry.Name(), "_", 2)
-		if len(parts) != 2 {
-			continue // Invalid format
-		}
+		sourceServer := serverEntry.Name()
+		serverDir := filepath.Join(backupsDir, sourceServer)
 
-		var userID int
-		if _, err := fmt.Sscanf(parts[0], "%d", &userID); err != nil {
-			continue // Invalid user_id
-		}
-		shareName := parts[1]
-
-		// Get username from database
-		username := "Unknown"
-		err := db.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&username)
-		if err != nil && err != sql.ErrNoRows {
-			// Continue even if user doesn't exist locally
-			username = fmt.Sprintf("User #%d", userID)
-		}
-
-		// Scan directory for files and stats
-		backupPath := filepath.Join(backupsDir, entry.Name())
-		fileCount, totalSize, lastModified, hasManifest, err := scanBackupDirectory(backupPath)
+		// Read all backup directories for this source server
+		backupEntries, err := os.ReadDir(serverDir)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan backup %s: %w", entry.Name(), err)
+			continue // Skip if we can't read this server's directory
 		}
 
-		// Try to read source server name from .source-info.json
-		sourceServer := "Unknown"
-		sourceInfoPath := filepath.Join(backupPath, ".source-info.json")
-		if sourceInfoData, err := os.ReadFile(sourceInfoPath); err == nil {
-			var sourceInfo map[string]string
-			if err := json.Unmarshal(sourceInfoData, &sourceInfo); err == nil {
-				if name, ok := sourceInfo["source_server"]; ok && name != "" {
-					sourceServer = name
-				}
+		for _, entry := range backupEntries {
+			if !entry.IsDir() {
+				continue
 			}
-		}
 
-		backup := &IncomingBackup{
-			UserID:       userID,
-			Username:     username,
-			ShareName:    shareName,
-			SourceServer: sourceServer,
-			Path:         backupPath,
-			FileCount:    fileCount,
-			TotalSize:    totalSize,
-			LastModified: lastModified,
-			HasManifest:  hasManifest,
-		}
+			// Parse directory name: {user_id}_{share_name}
+			parts := strings.SplitN(entry.Name(), "_", 2)
+			if len(parts) != 2 {
+				continue // Invalid format
+			}
 
-		backups = append(backups, backup)
+			var userID int
+			if _, err := fmt.Sscanf(parts[0], "%d", &userID); err != nil {
+				continue // Invalid user_id
+			}
+			shareName := parts[1]
+
+			// Get username from database
+			username := "Unknown"
+			err := db.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&username)
+			if err != nil && err != sql.ErrNoRows {
+				// Continue even if user doesn't exist locally
+				username = fmt.Sprintf("User #%d", userID)
+			}
+
+			// Scan directory for files and stats
+			backupPath := filepath.Join(serverDir, entry.Name())
+			fileCount, totalSize, lastModified, hasManifest, err := scanBackupDirectory(backupPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to scan backup %s: %w", entry.Name(), err)
+			}
+
+			backup := &IncomingBackup{
+				UserID:       userID,
+				Username:     username,
+				ShareName:    shareName,
+				SourceServer: sourceServer,
+				Path:         backupPath,
+				FileCount:    fileCount,
+				TotalSize:    totalSize,
+				LastModified: lastModified,
+				HasManifest:  hasManifest,
+			}
+
+			backups = append(backups, backup)
+		}
 	}
 
 	return backups, nil

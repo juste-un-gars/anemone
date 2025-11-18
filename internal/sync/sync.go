@@ -398,7 +398,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		}
 
 		// Upload encrypted file
-		uploadURL := fmt.Sprintf("https://%s:%d/api/sync/file", req.PeerAddress, req.PeerPort)
+		uploadURL := fmt.Sprintf("https://%s:%d/api/sync/file?source_server=%s", req.PeerAddress, req.PeerPort, req.SourceServer)
 
 		var requestBody bytes.Buffer
 		writer := multipart.NewWriter(&requestBody)
@@ -452,8 +452,8 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	// Delete obsolete files on peer
 	for _, relativePath := range delta.ToDelete {
 		remoteMeta := remoteManifest.Files[relativePath]
-		deleteURL := fmt.Sprintf("https://%s:%d/api/sync/file?user_id=%d&share_name=%s&path=%s",
-			req.PeerAddress, req.PeerPort, req.UserID, shareName, remoteMeta.EncryptedPath)
+		deleteURL := fmt.Sprintf("https://%s:%d/api/sync/file?source_server=%s&user_id=%d&share_name=%s&path=%s",
+			req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName, remoteMeta.EncryptedPath)
 
 		deleteReq, err := http.NewRequest(http.MethodDelete, deleteURL, nil)
 		if err != nil {
@@ -498,8 +498,8 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	}
 
 	// Upload encrypted manifest
-	manifestURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?user_id=%d&share_name=%s",
-		req.PeerAddress, req.PeerPort, req.UserID, shareName)
+	manifestURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?source_server=%s&user_id=%d&share_name=%s",
+		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
 
 	manifestPutReq, err := http.NewRequest(http.MethodPut, manifestURL, &encryptedManifest)
 	if err != nil {
@@ -535,8 +535,8 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	}
 	sourceInfoJSON, _ := json.Marshal(sourceInfo)
 
-	sourceInfoURL := fmt.Sprintf("https://%s:%d/api/sync/source-info?user_id=%d&share_name=%s",
-		req.PeerAddress, req.PeerPort, req.UserID, shareName)
+	sourceInfoURL := fmt.Sprintf("https://%s:%d/api/sync/source-info?source_server=%s&user_id=%d&share_name=%s",
+		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
 
 	sourceInfoReq, err := http.NewRequest(http.MethodPut, sourceInfoURL, bytes.NewReader(sourceInfoJSON))
 	if err == nil {
