@@ -119,6 +119,15 @@ func RestoreItem(sharePath, username, relPath string) error {
 		return fmt.Errorf("failed to restore file: %w", err)
 	}
 
+	// Fix permissions after restore to ensure files are readable
+	// u+rwX = user can read/write/execute(dirs only)
+	// go+rX = group and others can read/execute(dirs only)
+	// This gives 755 for directories and 644 for files
+	cmdChmod := exec.Command("sudo", "chmod", "-R", "u+rwX,go+rX", originalPath)
+	if err := cmdChmod.Run(); err != nil {
+		return fmt.Errorf("failed to fix permissions: %w", err)
+	}
+
 	// Clean up empty directories in trash
 	cleanupEmptyDirs(filepath.Dir(trashPath), filepath.Join(sharePath, ".trash", username))
 
