@@ -137,15 +137,15 @@
                             <div class="flex items-center">
                                 <div class="flex-shrink-0 h-10 w-10 flex items-center justify-center bg-purple-100 rounded-full">
                                     <span class="text-purple-600 font-semibold">
-                                        {{if .Username}}{{slice .Username 0 1 | printf "%s" | printf "%s"}}{{else}}?{{end}}
+                                        {{if .SourceServer}}{{slice .SourceServer 0 1 | printf "%s" | printf "%s"}}{{else}}?{{end}}
                                     </span>
                                 </div>
                                 <div class="ml-4">
                                     <div class="text-sm font-medium text-gray-900">
-                                        {{.Username}}
+                                        {{.SourceServer}}
                                     </div>
                                     <div class="text-sm text-gray-500">
-                                        ID: {{.UserID}}
+                                        User: {{.Username}} (ID: {{.UserID}})
                                     </div>
                                 </div>
                             </div>

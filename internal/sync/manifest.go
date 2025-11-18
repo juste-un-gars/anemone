@@ -26,11 +26,12 @@ type FileMetadata struct {
 
 // SyncManifest represents the complete manifest of synced files
 type SyncManifest struct {
-	Version   int                      `json:"version"`
-	LastSync  time.Time                `json:"last_sync"`
-	UserID    int                      `json:"user_id"`
-	ShareName string                   `json:"share_name"`
-	Files     map[string]FileMetadata  `json:"files"`
+	Version      int                     `json:"version"`
+	LastSync     time.Time               `json:"last_sync"`
+	UserID       int                     `json:"user_id"`
+	ShareName    string                  `json:"share_name"`
+	SourceServer string                  `json:"source_server"` // Name of the server that created this backup
+	Files        map[string]FileMetadata `json:"files"`
 }
 
 // SyncDelta represents changes between local and remote manifests
@@ -42,13 +43,14 @@ type SyncDelta struct {
 
 // BuildManifest scans a directory recursively and creates a manifest
 // Excludes hidden files/directories and the .trash directory
-func BuildManifest(sourceDir string, userID int, shareName string) (*SyncManifest, error) {
+func BuildManifest(sourceDir string, userID int, shareName string, sourceServer string) (*SyncManifest, error) {
 	manifest := &SyncManifest{
-		Version:   1,
-		LastSync:  time.Now(),
-		UserID:    userID,
-		ShareName: shareName,
-		Files:     make(map[string]FileMetadata),
+		Version:      1,
+		LastSync:     time.Now(),
+		UserID:       userID,
+		ShareName:    shareName,
+		SourceServer: sourceServer,
+		Files:        make(map[string]FileMetadata),
 	}
 
 	err := filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {

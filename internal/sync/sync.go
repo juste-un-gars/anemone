@@ -10,6 +10,7 @@ import (
 	"compress/gzip"
 	"crypto/tls"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -43,6 +44,7 @@ type SyncRequest struct {
 	PeerAddress  string
 	PeerPort     int
 	PeerPassword string // Optional password for peer authentication
+	SourceServer string // Name of the source server (for manifest identification)
 }
 
 // CreateSyncLog creates a new sync log entry and returns its ID
@@ -131,6 +133,19 @@ func GetSyncLogs(db *sql.DB, userID int, limit int) ([]*SyncLog, error) {
 	}
 
 	return logs, nil
+}
+
+// GetServerName retrieves the NAS name from system config
+func GetServerName(db *sql.DB) (string, error) {
+	var serverName string
+	err := db.QueryRow("SELECT value FROM system_config WHERE key = 'nas_name'").Scan(&serverName)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return "Unknown", nil // Default if not configured
+		}
+		return "", fmt.Errorf("failed to get server name: %w", err)
+	}
+	return serverName, nil
 }
 
 // GetUserEncryptionKey retrieves and decrypts the user's encryption key
@@ -279,7 +294,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	shareName := filepath.Base(filepath.Dir(req.SharePath))
 
 	// Build local manifest
-	localManifest, err := BuildManifest(req.SharePath, req.UserID, shareName)
+	localManifest, err := BuildManifest(req.SharePath, req.UserID, shareName, req.SourceServer)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to build local manifest: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
@@ -513,6 +528,26 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		return fmt.Errorf(errMsg)
 	}
 
+	// Upload source server info (unencrypted metadata for display purposes)
+	sourceInfo := map[string]string{
+		"source_server": req.SourceServer,
+		"synced_at":     time.Now().Format(time.RFC3339),
+	}
+	sourceInfoJSON, _ := json.Marshal(sourceInfo)
+
+	sourceInfoURL := fmt.Sprintf("https://%s:%d/api/sync/source-info?user_id=%d&share_name=%s",
+		req.PeerAddress, req.PeerPort, req.UserID, shareName)
+
+	sourceInfoReq, err := http.NewRequest(http.MethodPut, sourceInfoURL, bytes.NewReader(sourceInfoJSON))
+	if err == nil {
+		sourceInfoReq.Header.Set("Content-Type", "application/json")
+		if req.PeerPassword != "" {
+			sourceInfoReq.Header.Set("X-Sync-Password", req.PeerPassword)
+		}
+		// Send source info (ignore errors - it's just metadata)
+		client.Do(sourceInfoReq)
+	}
+
 	// Update log with success
 	err = UpdateSyncLog(db, logID, "success", totalFiles, totalBytes, "")
 	if err != nil {
@@ -589,6 +624,12 @@ func SyncAllUsers(db *sql.DB) (int, int, string) {
 		return 0, 0, "No enabled peers"
 	}
 
+	// Get server name for manifest identification
+	serverName, err := GetServerName(db)
+	if err != nil {
+		return 0, 1, fmt.Sprintf("Failed to get server name: %v", err)
+	}
+
 	// Sync each share to each peer
 	successCount := 0
 	errorCount := 0
@@ -610,6 +651,7 @@ func SyncAllUsers(db *sql.DB) (int, int, string) {
 				PeerAddress:  peer.Address,
 				PeerPort:     peer.Port,
 				PeerPassword: peerPassword,
+				SourceServer: serverName,
 			}
 
 			if err := SyncShareIncremental(db, req); err != nil {
@@ -797,6 +839,12 @@ func SyncPeer(db *sql.DB, peerID int, peerName, peerAddress string, peerPort int
 	errorCount := 0
 	var lastError string
 
+	// Get server name for manifest identification
+	serverName, err := GetServerName(db)
+	if err != nil {
+		return 0, 1, fmt.Sprintf("Failed to get server name: %v", err)
+	}
+
 	// Get peer password (empty string if NULL)
 	password := ""
 	if peerPassword != nil {
@@ -812,6 +860,7 @@ func SyncPeer(db *sql.DB, peerID int, peerName, peerAddress string, peerPort int
 			PeerAddress:  peerAddress,
 			PeerPort:     peerPort,
 			PeerPassword: password,
+			SourceServer: serverName,
 		}
 
 		if err := SyncShareIncremental(db, req); err != nil {

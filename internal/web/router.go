@@ -239,6 +239,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 
 	// API routes - Incremental sync (manifest-based, protected by password authentication)
 	mux.HandleFunc("/api/sync/manifest", server.syncAuthMiddleware(server.handleAPISyncManifest))       // GET/PUT
+	mux.HandleFunc("/api/sync/source-info", server.syncAuthMiddleware(server.handleAPISyncSourceInfo)) // PUT
 	mux.HandleFunc("/api/sync/file", server.syncAuthMiddleware(server.handleAPISyncFile))               // POST/DELETE
 
 	// API routes - Remote restore (protected by password authentication)
@@ -2485,6 +2486,14 @@ func (s *Server) handleSyncShare(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get server name for manifest identification
+	serverName, err := sync.GetServerName(s.db)
+	if err != nil {
+		log.Printf("Error getting server name: %v", err)
+		http.Error(w, "Failed to get server name", http.StatusInternalServerError)
+		return
+	}
+
 	// Synchronize to each enabled peer
 	successCount := 0
 	errorCount := 0
@@ -2492,12 +2501,13 @@ func (s *Server) handleSyncShare(w http.ResponseWriter, r *http.Request) {
 
 	for _, peer := range enabledPeers {
 		req := &sync.SyncRequest{
-			ShareID:     shareID,
-			PeerID:      peer.ID,
-			UserID:      share.UserID,
-			SharePath:   share.Path,
-			PeerAddress: peer.Address,
-			PeerPort:    peer.Port,
+			ShareID:      shareID,
+			PeerID:       peer.ID,
+			UserID:       share.UserID,
+			SharePath:    share.Path,
+			PeerAddress:  peer.Address,
+			PeerPort:     peer.Port,
+			SourceServer: serverName,
 		}
 
 		// Use incremental sync (manifest-based)
@@ -2728,6 +2738,61 @@ func (s *Server) handleAPISyncManifestPut(w http.ResponseWriter, r *http.Request
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"success": true, "message": "Manifest updated"}`)
+}
+
+// handleAPISyncSourceInfo handles PUT request to store source server information
+func (s *Server) handleAPISyncSourceInfo(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse query parameters
+	userIDStr := r.URL.Query().Get("user_id")
+	shareName := r.URL.Query().Get("share_name")
+
+	if userIDStr == "" || shareName == "" {
+		http.Error(w, "Missing user_id or share_name", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	// Read JSON data from request body
+	sourceInfoData, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Error reading request body: %v", err)
+		http.Error(w, "Failed to read source info data", http.StatusBadRequest)
+		return
+	}
+
+	// Build backup directory path
+	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
+	backupDir := filepath.Join("/srv/anemone/backups/incoming", backupDirName)
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		log.Printf("Error creating backup directory: %v", err)
+		http.Error(w, "Failed to create backup directory", http.StatusInternalServerError)
+		return
+	}
+
+	// Write source info file (unencrypted metadata)
+	sourceInfoPath := filepath.Join(backupDir, ".source-info.json")
+	if err := os.WriteFile(sourceInfoPath, sourceInfoData, 0644); err != nil {
+		log.Printf("Error writing source info file: %v", err)
+		http.Error(w, "Failed to write source info", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Successfully updated source info for user %d, share %s", userID, shareName)
+
+	// Return success
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"success": true, "message": "Source info updated"}`)
 }
 
 // handleAPISyncFile handles POST and DELETE requests for individual files

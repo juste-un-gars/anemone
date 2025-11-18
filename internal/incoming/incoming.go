@@ -6,6 +6,7 @@ package incoming
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ type IncomingBackup struct {
 	UserID       int       `json:"user_id"`
 	Username     string    `json:"username"`
 	ShareName    string    `json:"share_name"`
+	SourceServer string    `json:"source_server"` // Name of the remote server that sent this backup
 	Path         string    `json:"path"`
 	FileCount    int       `json:"file_count"`
 	TotalSize    int64     `json:"total_size"`
@@ -74,10 +76,23 @@ func ScanIncomingBackups(db *sql.DB, backupsDir string) ([]*IncomingBackup, erro
 			return nil, fmt.Errorf("failed to scan backup %s: %w", entry.Name(), err)
 		}
 
+		// Try to read source server name from .source-info.json
+		sourceServer := "Unknown"
+		sourceInfoPath := filepath.Join(backupPath, ".source-info.json")
+		if sourceInfoData, err := os.ReadFile(sourceInfoPath); err == nil {
+			var sourceInfo map[string]string
+			if err := json.Unmarshal(sourceInfoData, &sourceInfo); err == nil {
+				if name, ok := sourceInfo["source_server"]; ok && name != "" {
+					sourceServer = name
+				}
+			}
+		}
+
 		backup := &IncomingBackup{
 			UserID:       userID,
 			Username:     username,
 			ShareName:    shareName,
+			SourceServer: sourceServer,
 			Path:         backupPath,
 			FileCount:    fileCount,
 			TotalSize:    totalSize,
