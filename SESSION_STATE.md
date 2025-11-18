@@ -1,8 +1,8 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-18 (Session 22 - Dernière correction sécurité)
+**Dernière session** : 2025-11-18 (Session 23 - Correctifs bugs critiques)
 **Prochaine session** : Tests et déploiement
-**Status** : 🟢 COMPLÈTE - 5/5 vulnérabilités corrigées (Score 10/10) 🎉
+**Status** : 🟢 OPÉRATIONNELLE - Tous les bugs critiques corrigés
 
 > **Note** : L'historique des sessions 1-7 a été archivé dans `SESSION_STATE_ARCHIVE.md`
 > **Note** : Les détails techniques des sessions 8-11 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
@@ -434,6 +434,296 @@ d3bbfa3 - security: Complete security audit - 5 vulnerabilities identified
 ```
 
 **État** : ✅ **TERMINÉE - Score sécurité parfait : 10/10** 🎉
+
+---
+
+## 🐛 Session 23 - 18 Novembre 2025 - Correctifs bugs critiques
+
+**Date** : 2025-11-18
+**Objectif** : Corriger bugs découverts lors des tests sur FR1/FR2
+**Statut** : ✅ **COMPLÉTÉ - 5 bugs critiques corrigés**
+
+### 🎯 Bugs découverts et corrigés
+
+#### Bug 1 : CSP bloquant Tailwind CSS et HTMX sur page setup ✅
+
+**Problème** :
+- Content-Security-Policy trop stricte bloquait les CDN externes
+- Page setup affichait un "gros i noir" sans styles
+
+**Solution** :
+- Modification du CSP dans `internal/web/router.go:325`
+- Autorisation de `https://cdn.tailwindcss.com` et `https://unpkg.com`
+
+**Commit** : `[commit hash]`
+
+---
+
+#### Bug 2 : Répertoires supprimés invisibles dans la corbeille ✅
+
+**Problème** :
+- Seuls les fichiers apparaissaient dans la corbeille
+- Les répertoires supprimés étaient invisibles dans l'interface web
+
+**Solution** :
+- Ajout champ `IsDir bool` à la structure `TrashItem`
+- Réécriture de `ListTrashItems()` pour utiliser `os.ReadDir()` (top-level items)
+- Ajout fonction `calculateDirSize()` pour calculer taille répertoires
+- Modification template `trash.html` pour afficher icône dossier
+- Modification `DeleteItem()` pour utiliser `rm -rf` (support répertoires)
+
+**Fichiers modifiés** :
+- `internal/trash/trash.go` : Refonte complète listing corbeille
+- `web/templates/trash.html` : Ajout icônes conditionnelles
+
+**Commit** : `[commit hash]`
+
+---
+
+#### Bug 3 : Test connexion P2P réussissait avec mauvais mot de passe ✅
+
+**Problème** :
+- `TestConnection()` dans `internal/peers/peers.go` testait uniquement `/api/ping`
+- Endpoint `/api/ping` non protégé → test réussissait même avec mauvais mot de passe
+
+**Solution** :
+- Modification de `TestConnection()` pour tester `/api/sync/manifest` (endpoint protégé)
+- Suppression du check conditionnel qui skipait l'auth si mot de passe vide
+
+**Fichiers modifiés** :
+- `internal/peers/peers.go` : Fonction `TestConnection()`
+
+**Commit** : `[commit hash]`
+
+---
+
+#### Bug 4 : Permissions 700 après restauration depuis corbeille ✅
+
+**Problème** :
+- Fichiers restaurés depuis corbeille avaient permissions 700
+- Service de sync ne pouvait pas lire les fichiers → sync bloquée
+
+**Solution** :
+- Ajout de `chmod -R u+rwX,go+rX` après restauration dans `RestoreItem()`
+- Correction manuelle des permissions existantes sur FR1
+
+**Fichiers modifiés** :
+- `internal/trash/trash.go:RestoreItem()` : Ajout commande chmod
+
+**Commit** : `[commit hash]`
+
+---
+
+#### Bug 5 : **CRITIQUE** - Collision backups multi-serveurs ✅
+
+**Problème critique** :
+- Si FR1 et FR2 ont tous deux un utilisateur "test" avec ID 2
+- Les deux synchronisent vers FR3
+- Les backups écrasent le même répertoire : `/srv/anemone/backups/incoming/2_test/`
+- **Résultat** : Perte de données ! FR2 écrase les backups de FR1
+
+**Solution implémentée** :
+- Changement de structure de répertoires :
+  * **Avant** : `/srv/anemone/backups/incoming/{user_id}_{share_name}/`
+  * **Après** : `/srv/anemone/backups/incoming/{source_server}/{user_id}_{share_name}/`
+- Ajout paramètre `source_server` dans toutes les requêtes API sync
+- Modification de 4 handlers API pour extraire et utiliser `source_server`
+- Mise à jour `ScanIncomingBackups()` pour scanner structure à 2 niveaux
+
+**Fichiers modifiés** :
+- `internal/sync/sync.go` : Ajout `source_server` aux 4 URLs API
+- `internal/web/router.go` : 4 handlers modifiés (FileUpload, FileDelete, ManifestPut, SourceInfo)
+- `internal/incoming/incoming.go` : Scan récursif nouvelle structure
+
+**Impact** :
+- ✅ Chaque serveur source a son propre répertoire
+- ✅ Aucun risque de collision même si user_id identiques
+- ✅ Exemple : FR1 → `/srv/anemone/backups/incoming/FR1/2_test/`
+- ✅ Exemple : FR2 → `/srv/anemone/backups/incoming/FR2/2_test/`
+
+**Commit** : `00e4eef - fix: Prevent backup collision by separating source servers`
+
+---
+
+### 📊 Résumé des corrections
+
+| Bug | Priorité | Description | Status |
+|-----|----------|-------------|--------|
+| 1 | 🟠 MOYENNE | CSP bloquant CDN (page setup) | ✅ CORRIGÉ |
+| 2 | 🟠 MOYENNE | Répertoires invisibles corbeille | ✅ CORRIGÉ |
+| 3 | 🟡 FAIBLE | Test P2P faux positif | ✅ CORRIGÉ |
+| 4 | 🟠 MOYENNE | Permissions 700 après restore | ✅ CORRIGÉ |
+| 5 | 🔴 **CRITIQUE** | Collision backups multi-serveurs | ✅ CORRIGÉ |
+
+### 📝 Commits
+
+```
+[hash] - fix: Allow Tailwind CSS and HTMX CDN in CSP
+[hash] - fix: Show directories in trash interface
+[hash] - fix: Test P2P authentication on protected endpoint
+[hash] - fix: Fix permissions after restore from trash
+00e4eef - fix: Prevent backup collision by separating source servers
+```
+
+**État** : ✅ **TERMINÉE - 5 bugs critiques corrigés (1 critique, 3 moyens, 1 faible)**
+
+---
+
+## 🚧 Session 24 - À FAIRE - Correction restauration après séparation serveurs sources
+
+**Date** : À venir
+**Objectif** : Adapter système de restauration à la nouvelle structure de répertoires
+**Statut** : ⏳ **EN ATTENTE**
+
+### 🎯 Problème identifié
+
+Suite au Bug 5 (séparation serveurs sources), la structure de répertoires a changé :
+- **Avant** : `/srv/anemone/backups/incoming/{user_id}_{share_name}/`
+- **Après** : `/srv/anemone/backups/incoming/{source_server}/{user_id}_{share_name}/`
+
+**Impact** : Les endpoints de restauration ne fonctionnent plus car ils ne savent pas quel serveur source utiliser.
+
+**Use case critique** :
+```
+FR1 : serveur utilisé par l'utilisateur test
+FR2 : sauvegarde à J+1
+FR3 : sauvegarde à J+7
+FR4 : reçoit les backups de FR1, FR2, FR3
+
+Situation actuelle :
+- FR4 a : /incoming/FR1/2_test/
+- FR4 a : /incoming/FR2/2_test/
+- FR4 a : /incoming/FR3/2_test/
+
+Problème : Quand user test demande /api/sync/list-user-backups?user_id=2
+→ FR4 ne sait pas quel source_server retourner
+```
+
+**Requirement** : Préserver la possibilité pour l'utilisateur de choisir depuis quel pair restaurer.
+
+### 🔧 Modifications à implémenter
+
+#### 1. Modifier `handleAPISyncListUserBackups` (✅ FAIT)
+**Fichier** : `internal/web/router.go:4197-4291`
+- Scan de la structure à deux niveaux ✅
+- **À FAIRE** : Ajouter champ `source_server` dans `BackupInfo`
+  ```go
+  type BackupInfo struct {
+      SourceServer string    `json:"source_server"`  // NOUVEAU
+      ShareName    string    `json:"share_name"`
+      FileCount    int       `json:"file_count"`
+      TotalSize    int64     `json:"total_size"`
+      LastModified time.Time `json:"last_modified"`
+  }
+  ```
+
+#### 2. Modifier templates de restauration
+**Fichiers** :
+- `web/templates/restore.html`
+- `web/templates/admin_restore_users.html`
+
+**Changements UI** :
+- Au lieu d'afficher : `"backup_test (2 fichiers, 1.2 MB)"`
+- Afficher : `"backup_test from FR1 (2 fichiers, 1.2 MB)"`
+- Si plusieurs sources : afficher comme entrées distinctes
+  ```
+  ○ backup_test from FR1 (2 fichiers, 1.2 MB) - Dernière modif: 2h ago
+  ○ backup_test from FR2 (5 fichiers, 3.4 MB) - Dernière modif: 1 jour ago
+  ○ backup_test from FR3 (2 fichiers, 1.2 MB) - Dernière modif: 7 jours ago
+  ```
+
+#### 3. Ajouter `source_server` aux requêtes de téléchargement
+**Handlers à modifier** :
+
+**A. `handleAPISyncDownloadEncryptedManifest`** (ligne 4296)
+- Signature actuelle : `GET /api/sync/download-encrypted-manifest?user_id=X&share_name=Y`
+- **Nouvelle signature** : `GET /api/sync/download-encrypted-manifest?user_id=X&share_name=Y&source_server=Z`
+- Modifier construction path :
+  ```go
+  // AVANT
+  backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", backupDir)
+
+  // APRÈS
+  sourceServer := r.URL.Query().Get("source_server")
+  if sourceServer == "" {
+      sourceServer = "unknown"
+  }
+  backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", sourceServer, backupDir)
+  ```
+
+**B. `handleAPISyncDownloadEncryptedFile`** (ligne 4350)
+- Même modification (ajouter paramètre `source_server`)
+
+**C. `handleAPIRestoreFiles`** (ligne 3616)
+- Modifier requête vers pair pour inclure `source_server` :
+  ```go
+  // AVANT
+  url := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-manifest?user_id=%d&share_name=%s",
+      peer.Address, peer.Port, session.UserID, shareName)
+
+  // APRÈS
+  url := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-manifest?user_id=%d&share_name=%s&source_server=%s",
+      peer.Address, peer.Port, session.UserID, shareName, sourceServer)
+  ```
+
+**D. `handleAPIRestoreDownload`** (ligne 3743)
+- Même modification
+
+**E. `handleAPIRestoreDownloadMultiple`** (ligne 3864)
+- Même modification
+
+**F. `handleAdminRestoreUsersRestore`** (ligne 4991)
+- Ajouter `source_server` aux requêtes de restauration bulk
+
+#### 4. Modifier JavaScript frontend
+**Fichiers** :
+- `web/templates/restore.html` : Code JS qui appelle les APIs
+- `web/templates/admin_restore_users.html` : Code JS pour restoration admin
+
+**Changements** :
+- Stocker `source_server` lors de la sélection du backup
+- Passer `source_server` dans tous les appels AJAX
+
+### 📋 Checklist complète
+
+- [x] Modifier `handleAPISyncListUserBackups` pour scanner structure à 2 niveaux
+- [ ] Ajouter champ `source_server` dans `BackupInfo` struct
+- [ ] Modifier `handleAPISyncDownloadEncryptedManifest` (+ source_server param)
+- [ ] Modifier `handleAPISyncDownloadEncryptedFile` (+ source_server param)
+- [ ] Modifier `handleAPIRestoreFiles` (passer source_server)
+- [ ] Modifier `handleAPIRestoreDownload` (passer source_server)
+- [ ] Modifier `handleAPIRestoreDownloadMultiple` (passer source_server)
+- [ ] Modifier `handleAdminRestoreUsersRestore` (passer source_server)
+- [ ] Modifier UI `restore.html` (afficher source_server)
+- [ ] Modifier UI `admin_restore_users.html` (afficher source_server)
+- [ ] Modifier JavaScript frontend pour passer source_server
+- [ ] Tester restauration utilisateur depuis multiple pairs
+- [ ] Tester restauration admin depuis multiple pairs
+
+### 🎯 Tests de validation
+
+1. Setup de test :
+   - FR1 avec user test (ID 2)
+   - FR2 avec user test (ID 2) - différent de FR1
+   - FR4 reçoit backups de FR1 et FR2
+   - Vérifier : `/incoming/FR1/2_test/` et `/incoming/FR2/2_test/` existent
+
+2. Test utilisateur :
+   - Se connecter comme user test sur FR1
+   - Page `/restore` doit lister :
+     * "backup_test from FR2 (...)"
+     * "backup_test from FR4 (...)"
+   - Cliquer sur "backup_test from FR2" → navigation fichiers OK
+   - Télécharger fichier → décryptage et download OK
+   - Télécharger ZIP multiple → OK
+
+3. Test admin :
+   - Page `/admin/restore-users`
+   - Lister backups disponibles pour tous les users
+   - Afficher correctement source_server
+   - Restauration bulk depuis pair spécifique → OK
+
+**État** : ⏳ **EN ATTENTE - Modifications identifiées, à implémenter Session 24**
 
 ---
 

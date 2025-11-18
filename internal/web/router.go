@@ -4208,8 +4208,21 @@ func (s *Server) handleAPISyncListUserBackups(w http.ResponseWriter, r *http.Req
 	}
 
 	// Scan incoming backups directory for this user
+	// Structure: /backups/incoming/{source_server}/{user_id}_{share_name}/
 	backupsDir := filepath.Join(s.cfg.DataDir, "backups", "incoming")
-	entries, err := os.ReadDir(backupsDir)
+
+	type BackupInfo struct {
+		ShareName    string    `json:"share_name"`
+		FileCount    int       `json:"file_count"`
+		TotalSize    int64     `json:"total_size"`
+		LastModified time.Time `json:"last_modified"`
+	}
+
+	var backups []BackupInfo
+	prefix := fmt.Sprintf("%d_", userID)
+
+	// First level: read source server directories
+	serverEntries, err := os.ReadDir(backupsDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// No backups directory yet
@@ -4222,50 +4235,55 @@ func (s *Server) handleAPISyncListUserBackups(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	type BackupInfo struct {
-		ShareName    string    `json:"share_name"`
-		FileCount    int       `json:"file_count"`
-		TotalSize    int64     `json:"total_size"`
-		LastModified time.Time `json:"last_modified"`
-	}
-
-	var backups []BackupInfo
-	prefix := fmt.Sprintf("%d_", userID)
-
-	for _, entry := range entries {
-		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), prefix) {
+	// Iterate over each source server directory
+	for _, serverEntry := range serverEntries {
+		if !serverEntry.IsDir() {
 			continue
 		}
 
-		// Extract username from directory name: {user_id}_{username} -> backup_{username}
-		username := strings.TrimPrefix(entry.Name(), prefix)
-		shareName := "backup_" + username
-		backupPath := filepath.Join(backupsDir, entry.Name())
+		serverDir := filepath.Join(backupsDir, serverEntry.Name())
 
-		// Get modification time
-		info, err := entry.Info()
+		// Second level: read backup directories for this source server
+		backupEntries, err := os.ReadDir(serverDir)
 		if err != nil {
-			continue
+			continue // Skip if we can't read this server's directory
 		}
 
-		// Count files and size
-		var fileCount int
-		var totalSize int64
-		filepath.Walk(backupPath, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() {
-				return nil
+		for _, entry := range backupEntries {
+			if !entry.IsDir() || !strings.HasPrefix(entry.Name(), prefix) {
+				continue
 			}
-			fileCount++
-			totalSize += info.Size()
-			return nil
-		})
 
-		backups = append(backups, BackupInfo{
-			ShareName:    shareName,
-			FileCount:    fileCount,
-			TotalSize:    totalSize,
-			LastModified: info.ModTime(),
-		})
+			// Extract username from directory name: {user_id}_{username} -> backup_{username}
+			username := strings.TrimPrefix(entry.Name(), prefix)
+			shareName := "backup_" + username
+			backupPath := filepath.Join(serverDir, entry.Name())
+
+			// Get modification time
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+
+			// Count files and size
+			var fileCount int
+			var totalSize int64
+			filepath.Walk(backupPath, func(path string, info os.FileInfo, err error) error {
+				if err != nil || info.IsDir() {
+					return nil
+				}
+				fileCount++
+				totalSize += info.Size()
+				return nil
+			})
+
+			backups = append(backups, BackupInfo{
+				ShareName:    shareName,
+				FileCount:    fileCount,
+				TotalSize:    totalSize,
+				LastModified: info.ModTime(),
+			})
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
