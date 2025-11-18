@@ -322,7 +322,7 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		// default-src 'self' - Only load resources from same origin
 		// style-src 'self' 'unsafe-inline' - Allow inline styles (needed for some UI)
 		// script-src 'self' - Only execute scripts from same origin
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'")
 
 		// Referrer Policy - Don't leak referrer to external sites
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
