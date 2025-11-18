@@ -175,37 +175,35 @@ func TestConnection(peer *Peer) (bool, error) {
 		return false, fmt.Errorf("health check failed: status %d", resp.StatusCode)
 	}
 
-	// If password is configured, test authentication on a protected endpoint
+	// ALWAYS test authentication on a protected endpoint, even if password is empty
+	// This detects if the remote server requires a password but we don't have one configured
+	testURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?user_id=1&share_name=test", peer.Address, peer.Port)
+	req, err := http.NewRequest(http.MethodGet, testURL, nil)
+	if err != nil {
+		return false, fmt.Errorf("failed to create auth test request: %w", err)
+	}
+
+	// Add authentication header if password is configured
 	if peer.Password != nil && *peer.Password != "" {
-		// Test /api/sync/manifest endpoint with authentication
-		// We expect either 404 (auth OK, no manifest) or 200 (auth OK, manifest exists)
-		// We reject 401 (no auth header) or 403 (wrong password)
-		testURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?user_id=1&share_name=test", peer.Address, peer.Port)
-		req, err := http.NewRequest(http.MethodGet, testURL, nil)
-		if err != nil {
-			return false, fmt.Errorf("failed to create auth test request: %w", err)
-		}
-
-		// Add authentication header
 		req.Header.Set("X-Sync-Password", *peer.Password)
+	}
 
-		resp, err := client.Do(req)
-		if err != nil {
-			return false, fmt.Errorf("auth test request failed: %w", err)
-		}
-		resp.Body.Close()
+	resp, err = client.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("auth test request failed: %w", err)
+	}
+	resp.Body.Close()
 
-		// Check response status
-		if resp.StatusCode == http.StatusUnauthorized {
-			return false, fmt.Errorf("authentication required: server expects a password")
-		}
-		if resp.StatusCode == http.StatusForbidden {
-			return false, fmt.Errorf("authentication failed: invalid password")
-		}
-		// 200 (manifest exists) or 404 (no manifest) are both OK - authentication succeeded
-		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
-			return false, fmt.Errorf("unexpected auth test response: status %d", resp.StatusCode)
-		}
+	// Check response status
+	if resp.StatusCode == http.StatusUnauthorized {
+		return false, fmt.Errorf("authentication required: server expects a password")
+	}
+	if resp.StatusCode == http.StatusForbidden {
+		return false, fmt.Errorf("authentication failed: invalid password")
+	}
+	// 200 (manifest exists) or 404 (no manifest) are both OK - authentication succeeded
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+		return false, fmt.Errorf("unexpected auth test response: status %d", resp.StatusCode)
 	}
 
 	return true, nil
