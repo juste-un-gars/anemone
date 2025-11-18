@@ -13,17 +13,19 @@ import (
 	"time"
 )
 
-// TrashItem represents a file in the trash
+// TrashItem represents a file or directory in the trash
 type TrashItem struct {
 	Name         string    // Original filename
 	RelativePath string    // Relative path within share
 	TrashedPath  string    // Full path in .trash directory
-	Size         int64     // File size in bytes
+	Size         int64     // File size in bytes (0 for directories)
 	ModTime      time.Time // Last modification time
 	TrashedAt    time.Time // When it was deleted
+	IsDir        bool      // True if this is a directory
 }
 
-// ListTrashItems scans a share's .trash directory and returns all items
+// ListTrashItems scans a share's .trash directory and returns all items (files and directories)
+// Only returns top-level items to avoid showing files inside deleted directories twice
 func ListTrashItems(sharePath, username string) ([]*TrashItem, error) {
 	trashPath := filepath.Join(sharePath, ".trash", username)
 
@@ -34,50 +36,65 @@ func ListTrashItems(sharePath, username string) ([]*TrashItem, error) {
 
 	var items []*TrashItem
 
-	err := filepath.Walk(trashPath, func(path string, info os.FileInfo, err error) error {
+	// Read directory entries (only first level)
+	entries, err := os.ReadDir(trashPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read trash directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		info, err := entry.Info()
 		if err != nil {
-			return err
+			continue // Skip entries we can't read
 		}
 
-		// Skip directories (we only list files)
-		if info.IsDir() {
-			return nil
-		}
+		path := filepath.Join(trashPath, entry.Name())
 
-		// Get relative path from trash root
-		relPath, err := filepath.Rel(trashPath, path)
-		if err != nil {
-			return err
+		// Calculate size (for directories, walk and sum all files)
+		size := info.Size()
+		if entry.IsDir() {
+			size = calculateDirSize(path)
 		}
 
 		item := &TrashItem{
-			Name:         info.Name(),
-			RelativePath: relPath,
+			Name:         entry.Name(),
+			RelativePath: entry.Name(),
 			TrashedPath:  path,
-			Size:         info.Size(),
+			Size:         size,
 			ModTime:      info.ModTime(),
 			TrashedAt:    info.ModTime(), // Samba recycle touches the file
+			IsDir:        entry.IsDir(),
 		}
 
 		items = append(items, item)
-		return nil
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to scan trash: %w", err)
 	}
 
 	return items, nil
 }
 
-// RestoreItem restores a file from trash to its original location
+// calculateDirSize recursively calculates the total size of a directory
+func calculateDirSize(path string) int64 {
+	var size int64
+	filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip errors
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
+	})
+	return size
+}
+
+// RestoreItem restores a file or directory from trash to its original location
 func RestoreItem(sharePath, username, relPath string) error {
 	trashPath := filepath.Join(sharePath, ".trash", username, relPath)
 	originalPath := filepath.Join(sharePath, relPath)
 
-	// Check if file exists in trash
+	// Check if item exists in trash
 	if _, err := os.Stat(trashPath); os.IsNotExist(err) {
-		return fmt.Errorf("file not found in trash")
+		return fmt.Errorf("item not found in trash")
 	}
 
 	// Ensure parent directory exists
@@ -108,19 +125,19 @@ func RestoreItem(sharePath, username, relPath string) error {
 	return nil
 }
 
-// DeleteItem permanently deletes a file from trash
+// DeleteItem permanently deletes a file or directory from trash
 func DeleteItem(sharePath, username, relPath string) error {
 	trashPath := filepath.Join(sharePath, ".trash", username, relPath)
 
-	// Check if file exists
+	// Check if item exists
 	if _, err := os.Stat(trashPath); os.IsNotExist(err) {
-		return fmt.Errorf("file not found in trash")
+		return fmt.Errorf("item not found in trash")
 	}
 
-	// Delete the file (using sudo for permission)
-	cmd := exec.Command("sudo", "rm", "-f", trashPath)
+	// Delete the item (using sudo for permission, -rf to handle directories)
+	cmd := exec.Command("sudo", "rm", "-rf", trashPath)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to delete file: %w", err)
+		return fmt.Errorf("failed to delete item: %w", err)
 	}
 
 	// Clean up empty directories

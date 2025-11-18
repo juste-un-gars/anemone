@@ -111,11 +111,19 @@
                         </td>
                         <td class="px-6 py-4">
                             <div class="flex items-center">
+                                {{if .IsDir}}
+                                <!-- Folder icon -->
+                                <svg class="h-5 w-5 text-yellow-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                                </svg>
+                                {{else}}
+                                <!-- File icon -->
                                 <svg class="h-5 w-5 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                 </svg>
+                                {{end}}
                                 <div>
-                                    <div class="text-sm font-medium text-gray-900">{{.Name}}</div>
+                                    <div class="text-sm font-medium text-gray-900">{{.Name}}{{if .IsDir}}/{{end}}</div>
                                     <div class="text-xs text-gray-500">{{.RelativePath}}</div>
                                 </div>
                             </div>
