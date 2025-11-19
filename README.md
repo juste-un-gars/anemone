@@ -87,6 +87,8 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 - 🗑️ **Per-user trash** with configurable retention
 - 💾 **Quota management** per user (Btrfs only)
 - 👥 **Incoming backups management** - View and manage remote peers storing backups on your server
+- 🔄 **Web restore interface** - Browse and download encrypted backups from peers
+- 🏥 **Disaster recovery** - Server configuration export/import with encryption
 - 🌍 **Multilingual** (French & English)
 - 🔒 **End-to-end encryption** with user-specific keys and master key protection
 
@@ -744,10 +746,14 @@ echo "✓ Anemone removed (system users and SMB users NOT removed - see above)"
   - [x] Delete incoming backups
   - [x] Dashboard integration
 
+**Recently Added** ✨:
+- [x] **Web restore interface** - Browse and download encrypted backups from peers
+- [x] **Server config export/import** - Disaster recovery with encrypted config backups
+- [x] **Admin bulk restore** - Restore all users' files from backup peers
+- [x] **Source server separation** - Support multiple source servers backing up to same peer
+
 **Next Features** 📅:
-- [ ] Web restore interface (browse and download encrypted backups)
 - [ ] Per-peer sync frequency (daily/weekly/monthly snapshots)
-- [ ] Server config export/import (disaster recovery)
 - [ ] Audit trail and logging system
 - [ ] Backup integrity verification tool
 - [ ] systemd service integration

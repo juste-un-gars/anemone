@@ -1,8 +1,8 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-18 (Session 23 - Correctifs bugs critiques)
-**Prochaine session** : Tests et déploiement
-**Status** : 🟢 OPÉRATIONNELLE - Tous les bugs critiques corrigés
+**Dernière session** : 2025-11-19 (Session 24 - Adaptation restauration après séparation serveurs)
+**Prochaine session** : Tests disaster recovery (FR1 → FR4)
+**Status** : 🟢 OPÉRATIONNELLE - Système de restauration adapté
 
 > **Note** : L'historique des sessions 1-7 a été archivé dans `SESSION_STATE_ARCHIVE.md`
 > **Note** : Les détails techniques des sessions 8-11 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
@@ -569,11 +569,11 @@ d3bbfa3 - security: Complete security audit - 5 vulnerabilities identified
 
 ---
 
-## 🚧 Session 24 - À FAIRE - Correction restauration après séparation serveurs sources
+## ✅ Session 24 - 19 Novembre 2025 - Adaptation restauration après séparation serveurs
 
-**Date** : À venir
-**Objectif** : Adapter système de restauration à la nouvelle structure de répertoires
-**Statut** : ⏳ **EN ATTENTE**
+**Date** : 2025-11-19
+**Objectif** : Adapter système de restauration à la nouvelle structure de répertoires (après Bug 5)
+**Statut** : ✅ **COMPLÉTÉ**
 
 ### 🎯 Problème identifié
 
@@ -687,18 +687,22 @@ Problème : Quand user test demande /api/sync/list-user-backups?user_id=2
 ### 📋 Checklist complète
 
 - [x] Modifier `handleAPISyncListUserBackups` pour scanner structure à 2 niveaux
-- [ ] Ajouter champ `source_server` dans `BackupInfo` struct
-- [ ] Modifier `handleAPISyncDownloadEncryptedManifest` (+ source_server param)
-- [ ] Modifier `handleAPISyncDownloadEncryptedFile` (+ source_server param)
-- [ ] Modifier `handleAPIRestoreFiles` (passer source_server)
-- [ ] Modifier `handleAPIRestoreDownload` (passer source_server)
-- [ ] Modifier `handleAPIRestoreDownloadMultiple` (passer source_server)
-- [ ] Modifier `handleAdminRestoreUsersRestore` (passer source_server)
-- [ ] Modifier UI `restore.html` (afficher source_server)
-- [ ] Modifier UI `admin_restore_users.html` (afficher source_server)
-- [ ] Modifier JavaScript frontend pour passer source_server
+- [x] Ajouter champ `source_server` dans `BackupInfo` et `PeerBackup` structs
+- [x] Modifier `handleAPISyncDownloadEncryptedManifest` (+ source_server param)
+- [x] Modifier `handleAPISyncDownloadEncryptedFile` (+ source_server param)
+- [x] Modifier `handleAPIRestoreFiles` (passer source_server)
+- [x] Modifier `handleAPIRestoreDownload` (passer source_server)
+- [x] Modifier `handleAPIRestoreDownloadMultiple` (passer source_server)
+- [x] Modifier `handleAdminRestoreUsersRestore` (passer source_server)
+- [x] Modifier `handleRestoreWarningBulk` (passer source_server)
+- [x] Modifier `BulkRestoreFromPeer` (accepter source_server)
+- [x] Modifier UI `restore.html` (afficher source_server)
+- [x] Modifier UI `admin_restore_users.html` (afficher source_server)
+- [x] Modifier JavaScript frontend pour passer source_server
+- [x] Filtrer backups par serveur actuel (fix: user FR1 voyait backups FR2)
+- [x] Re-chiffrer password_encrypted avec nouvelle master key (restore_server.sh)
 - [ ] Tester restauration utilisateur depuis multiple pairs
-- [ ] Tester restauration admin depuis multiple pairs
+- [ ] Tester disaster recovery (FR1 → FR4)
 
 ### 🎯 Tests de validation
 
@@ -723,7 +727,32 @@ Problème : Quand user test demande /api/sync/list-user-backups?user_id=2
    - Afficher correctement source_server
    - Restauration bulk depuis pair spécifique → OK
 
-**État** : ⏳ **EN ATTENTE - Modifications identifiées, à implémenter Session 24**
+### 📝 Commits réalisés
+
+```
+485eaee - fix: Adapt restore system to source server separation
+934e27c - fix: Filter backups by current server name in restore page
+ed62fcf - fix: Re-encrypt password_encrypted with new master key during restore
+```
+
+### 📊 Résumé des modifications
+
+**Backend (Go)** :
+- ✅ Ajout champ `SourceServer` dans structures `BackupInfo`, `PeerBackup`, `UserBackup`
+- ✅ Modification de 9 handlers API pour accepter/utiliser `source_server`
+- ✅ Filtre des backups par serveur actuel (sécurité : user FR1 ne voit que backups FR1)
+- ✅ Re-chiffrement `password_encrypted` dans `restore_server.sh`
+
+**Frontend (HTML/JS)** :
+- ✅ Affichage "PeerName (from SourceServer)" dans interface restore
+- ✅ Passage de `source_server` dans tous les appels AJAX
+- ✅ Support multi-serveurs dans sélection backups
+
+**Sécurité** :
+- ✅ Isolation complète : chaque serveur ne voit que ses propres backups
+- ✅ Toutes les données re-chiffrées avec nouvelle master key lors restore
+
+**État** : ✅ **COMPLÉTÉ - Système de restauration fonctionnel avec séparation serveurs sources**
 
 ---
 
@@ -769,4 +798,4 @@ Problème : Quand user test demande /api/sync/list-user-backups?user_id=2
 
 ---
 
-**Dernière mise à jour** : 2025-11-18 (Session 22 - 5/5 corrections sécurité appliquées - Score 10/10)
+**Dernière mise à jour** : 2025-11-19 (Session 24 - Système de restauration adapté à la séparation serveurs sources)
