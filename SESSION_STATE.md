@@ -1,8 +1,8 @@
 # 🪸 Anemone - État du Projet
 
-**Dernière session** : 2025-11-19 (Session 24 - Adaptation restauration après séparation serveurs)
-**Prochaine session** : Session 25 - Tests disaster recovery complets
-**Status** : 🟢 OPÉRATIONNELLE - Système de restauration adapté et sécurisé
+**Dernière session** : 2025-11-19 (Session 26 - Internationalisation et traductions FR/EN)
+**Prochaine session** : Session 26 (suite) - Finir traductions puis Session 25 - Tests disaster recovery
+**Status** : 🟡 EN COURS - Traductions FR/EN partielles (3/27 templates corrigés)
 
 > **Note** : Les sessions 1-19 ont été archivées (voir fichiers `SESSION_STATE_ARCHIVE*.md`)
 > **Note** : Les détails techniques des sessions 20-24 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_20_24.md`
@@ -368,6 +368,118 @@ FR5 (new clean server)
 
 ---
 
+## 🌐 Session 26 - Internationalisation et traductions FR/EN
+
+**Date** : 19 Nov 2025
+**Objectif** : Corriger les bugs de langue et compléter les traductions FR/EN de toutes les pages
+**Statut** : 🟡 **EN COURS** (à reprendre demain)
+
+### 🐛 Bugs corrigés
+
+**Bug 1 : Langue non persistante après setup**
+- Problème : Lors du setup en anglais, le dashboard s'affichait en français
+- Cause : La langue stockée en DB n'était pas relue au démarrage du serveur
+- Fix : Lecture de `system_config.language` dans `NewRouter()` avant init i18n
+- Commit : `1c06680`
+
+**Bug 2 : Langue admin non définie lors du setup**
+- Problème : La langue de l'utilisateur admin n'était jamais définie
+- Cause : `CreateFirstAdmin()` n'acceptait pas de paramètre `language`
+- Fix : Ajout paramètre language + stockage dans `users.language` lors de l'INSERT
+- Commit : `835ac82`
+
+**Bug 3 : Traductions manquantes dans dashboard admin**
+- Problème : Textes français hardcodés dans le dashboard
+- Fix : Remplacement par `{{T .Lang "key"}}` + ajout des traductions
+- Commit : `0010622`
+
+### ✅ Travail accompli
+
+1. **Dashboard admin nettoyé**
+   - Suppression de la tuile "Mes partages" (obsolète)
+   - Remplacement de tous les textes hardcodés par des clés de traduction
+   - Ajout des traductions FR/EN pour tous les éléments du dashboard
+
+2. **Templates HTML corrigés (3/27)**
+   - ✅ `web/templates/admin_users.html` - Page gestion utilisateurs (traduction complète + JS)
+   - ✅ `web/templates/admin_backup.html` - Page sauvegardes serveur (traduction complète + modal + JS)
+   - ✅ `web/templates/admin_settings.html` - Page paramètres sécurité (traduction complète)
+
+3. **Traductions ajoutées dans i18n.go**
+   - ~150 nouvelles clés de traduction (FR + EN)
+   - Sections ajoutées :
+     - Admin Users page (11 clés)
+     - Admin Backup page (24 clés)
+     - Admin Settings page (19 clés)
+     - Admin Sync page (21 clés)
+     - Admin Incoming page (18 clés)
+     - Restore Warning page (15 clés)
+     - Restore page (32 clés)
+     - Admin Restore Users page (26 clés)
+
+### ⚠️ Problèmes identifiés
+
+**Architecture de traduction incorrecte**
+- Certaines clés ont été créées avec suffixes `.fr`/`.en` (ex: `"admin.incoming.description.fr"`)
+- Ces clés sont dupliquées dans les deux sections FR et EN (redondance)
+- ❌ Mauvais : `t.translations["fr"]["key.fr"]` et `t.translations["en"]["key.fr"]`
+- ✅ Correct : `t.translations["fr"]["key"]` et `t.translations["en"]["key"]`
+
+**Impact** : Les templates utilisant ces clés doivent faire des conditionnels `{{if eq .Lang "fr"}}...{{else}}...{{end}}` au lieu de simplement `{{T .Lang "key"}}`, ce qui annule l'intérêt du système de traduction.
+
+### 📋 Travail restant
+
+**Pages critiques à corriger** (5 templates + nettoyage i18n.go) :
+1. Nettoyer `internal/i18n/i18n.go` - Supprimer les clés avec `.fr`/`.en` et les remplacer par des clés simples
+2. `web/templates/admin_sync.html` - Synchronisation automatique
+3. `web/templates/admin_incoming.html` - Pairs connectés entrants
+4. `web/templates/restore_warning.html` - Avertissement post-restauration
+5. `web/templates/restore.html` - Interface de restauration utilisateur
+6. `web/templates/admin_restore_users.html` - Restauration admin
+
+**Pages importantes à corriger** (6+ templates) :
+- `web/templates/admin_peers_add.html` - Formulaire ajout pair (config sync complète)
+- `web/templates/admin_peers_edit.html` - Formulaire édition pair
+- `web/templates/admin_peers.html` - Liste des pairs (quelques textes JS)
+- `web/templates/admin_users_quota.html` - Info boxes quotas
+- `web/templates/dashboard_user.html` - Dashboard utilisateur
+- `web/templates/settings.html` - Paramètres utilisateur (1 texte)
+
+**Pages mineures** (OK ou presque OK) :
+- ✅ `web/templates/trash.html` - Complètement traduit
+- `web/templates/admin_users_add.html` - 1 texte (info box)
+
+### 🔧 Commits de cette session
+
+1. `1c06680` - fix: Load language from database after setup
+2. `835ac82` - fix: Set admin language preference during setup
+3. `0010622` - fix: Complete English translations for admin dashboard
+
+### 🎯 Plan pour demain
+
+1. **Nettoyer i18n.go** (PRIORITÉ)
+   - Supprimer toutes les clés avec `.fr`/`.en`
+   - Créer des clés simples dans chaque section de langue
+   - Vérifier la cohérence de toutes les traductions
+
+2. **Corriger les 5 templates critiques**
+   - Remplacer tous les textes hardcodés
+   - Utiliser uniquement `{{T .Lang "key"}}` (pas de conditionnels)
+
+3. **Corriger les autres templates**
+   - Admin peers (add/edit)
+   - Dashboard user
+   - Autres pages mineures
+
+4. **Tester sur FR2**
+   - Vérifier que toutes les pages s'affichent correctement en anglais
+   - Vérifier la cohérence des traductions
+
+5. **Reprendre les tests Session 25**
+   - Une fois les traductions terminées, lancer les tests disaster recovery
+
+---
+
 ## 📝 Prochaines étapes (Roadmap)
 
 ### 🎯 Priorité 1 - Court terme
@@ -410,4 +522,4 @@ FR5 (new clean server)
 
 ---
 
-**Dernière mise à jour** : 2025-11-19 (Session 24 complétée - Session 25 planifiée)
+**Dernière mise à jour** : 2025-11-19 (Session 26 en cours - Traductions FR/EN)
