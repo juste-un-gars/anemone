@@ -1,14 +1,11 @@
 # 🪸 Anemone - État du Projet
 
 **Dernière session** : 2025-11-19 (Session 24 - Adaptation restauration après séparation serveurs)
-**Prochaine session** : Tests disaster recovery (FR1 → FR4)
-**Status** : 🟢 OPÉRATIONNELLE - Système de restauration adapté
+**Prochaine session** : Session 25 - Tests disaster recovery complets
+**Status** : 🟢 OPÉRATIONNELLE - Système de restauration adapté et sécurisé
 
-> **Note** : L'historique des sessions 1-7 a été archivé dans `SESSION_STATE_ARCHIVE.md`
-> **Note** : Les détails techniques des sessions 8-11 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
-> **Note** : Les détails techniques des sessions 12-16 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_12_16.md`
-> **Note** : Les détails techniques des sessions 17-19 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_17_18_19.md`
-> **Note** : Les détails techniques des sessions 13, 17-19 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_13_19.md`
+> **Note** : Les sessions 1-19 ont été archivées (voir fichiers `SESSION_STATE_ARCHIVE*.md`)
+> **Note** : Les détails techniques des sessions 20-24 sont dans `SESSION_STATE_ARCHIVE_SESSIONS_20_24.md`
 
 ---
 
@@ -186,573 +183,188 @@
 - **Sessions 8-11** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_8_11.md`
 - **Sessions 12-16** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_12_16.md`
 - **Sessions 17-19** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_17_18_19.md`
-- **Sessions 13, 17-19** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_13_19.md`
+- **Sessions 20-24** : Voir `SESSION_STATE_ARCHIVE_SESSIONS_20_24.md`
 
 ---
 
-## 🔧 Session 20 - 17 Novembre 2025 - Audit du code et nettoyage
+## 📝 Sessions récentes (Résumé)
 
-**Date** : 2025-11-17
-**Objectif** : Auditer tous les fichiers du projet pour identifier le code mort et les fichiers obsolètes
-**Statut** : ✅ **COMPLÉTÉ**
+### 🔧 Session 20 - Audit du code (17 Nov 2025)
+✅ **COMPLÉTÉ** - Code audit complet : 96.5% code actif, 3.5% obsolète archivé
 
-### 🎯 Résultats
+### 🔒 Session 21 - Audit sécurité (17 Nov 2025)
+✅ **COMPLÉTÉ** - 4/5 vulnérabilités corrigées (Score 9.5/10)
+- Injection commandes username
+- Headers HTTP sécurité
+- Protection CSRF renforcée
+- Sync password auto-généré
 
-**Audit complet** : 85 fichiers auditées
-- ✅ **82 fichiers OK** (96.5%) - Code propre, bien structuré
-- 🗑️ **3 fichiers déplacés** (3.5%) - Code mort minimal
+### 🔒 Session 22 - bcrypt cost (18 Nov 2025)
+✅ **COMPLÉTÉ** - Score sécurité parfait 10/10
+- bcrypt cost: 10 → 12
 
-**Code mort identifié** :
-- 1 programme de test (test-manifest)
-- 1 template non utilisé (base.html)
-- 1 binaire compilé (test-manifest)
+### 🐛 Session 23 - Correctifs bugs (18 Nov 2025)
+✅ **COMPLÉTÉ** - 5 bugs critiques corrigés
+- Bug critique: Collision backups multi-serveurs
+- CSP bloquant CDN
+- Répertoires invisibles corbeille
+- Test P2P faux positif
+- Permissions après restore
 
-**Répertoire _old/** : ✅ ARCHIVÉ
-- Déplacé vers `/home/franck/old_anemone` (78 MB, 2675 fichiers)
-- Ancien système Python/Docker, scripts obsolètes
+### ✅ Session 24 - Adaptation restauration (19 Nov 2025)
+✅ **COMPLÉTÉ** - Système de restauration adapté à la nouvelle structure multi-serveurs
+- Ajout paramètre `source_server` dans toutes les APIs de restauration
+- Filtrage sécurisé : chaque serveur ne voit que ses propres backups
+- Re-chiffrement password_encrypted avec nouvelle master key
+- Désactivation auto-sync après disaster recovery
+- Affichage nom serveur dans headers (identification visuelle)
+- **7 commits** : 485eaee, 934e27c, ed62fcf, e3a1710, 1c49509, 9910126, 57e08b4
 
-### 📝 Commits
+---
 
+## 🧪 Session 25 - Tests disaster recovery complets
+
+**Date** : À FAIRE
+**Objectif** : Tester complètement le système de disaster recovery et la séparation multi-serveurs
+**Statut** : 📋 **PLANIFIÉ**
+
+### 🎯 Plan de test
+
+#### Phase 1: Initial Setup (Verify Bug 5 fix)
 ```
-6ce431f - audit: Start code audit and move unused files
-8d46a52 - chore: Archive _old/ directory
-```
+FR1 (192.168.83.16) - Primary server
+  └─ User: test / password: test
+  └─ Create files: file1.txt, file2.txt
 
-**État** : ✅ **TERMINÉE - Code très propre (96.5% actif), prêt pour audit sécurité**
+FR2 (192.168.83.37) - Primary server  
+  └─ User: test / password: test
+  └─ Create DIFFERENT files: fileA.txt, fileB.txt
 
----
+FR3 (192.168.83.38) - Backup server for both
+  └─ Add FR1 as peer, enable sync
+  └─ Add FR2 as peer, enable sync
+  └─ Force sync or wait
 
-## 🔒 Session 21 - 17 Novembre 2025 - Audit et corrections sécurité
-
-**Date** : 2025-11-17
-**Objectif** : Audit de sécurité complet (OWASP Top 10) + Corrections
-**Statut** : ✅ **COMPLÉTÉ - 4/5 vulnérabilités corrigées**
-
-### 🎯 Audit de sécurité réalisé
-
-**Fichier créé** : `SECURITY_AUDIT.md` (90 points de vérification)
-
-**Points forts identifiés** :
-1. ✅ **Cryptographie** : AES-256-GCM avec authentification
-2. ✅ **Hashing** : bcrypt avec salt automatique
-3. ✅ **SQL injection** : Requêtes paramétrées partout
-4. ✅ **Path traversal** : Protection robuste avec `filepath.Abs()` + `HasPrefix()`
-5. ✅ **Authentification** : Middlewares corrects
-
-### ⚠️ Vulnérabilités trouvées
-
-| # | Priorité | Vulnérabilité | Status |
-|---|----------|---------------|--------|
-| 1 | 🔴 **HAUTE** | Injection de commandes via username | ✅ **CORRIGÉ** |
-| 2 | 🟠 **MOYENNE** | Absence headers HTTP sécurité | ✅ **CORRIGÉ** |
-| 3 | 🟠 **MOYENNE** | Protection CSRF limitée (SameSite=Lax) | ✅ **CORRIGÉ** |
-| 4 | 🟡 **FAIBLE** | Sync auth désactivé par défaut | ✅ **CORRIGÉ** |
-| 5 | 🟡 **FAIBLE** | bcrypt cost = 10 (bas) | ⚠️ **RESTE À CORRIGER** |
-
-### ✅ Corrections appliquées
-
-#### 1. Validation username (🔴 HAUTE) - CORRIGÉ
-
-**Problème** : Username non validé → injection commandes shell possible
-
-**Solution** :
-- Fonction `ValidateUsername()` dans `internal/users/users.go:26-40`
-- Regex : `^[a-zA-Z0-9_-]+$` (2-32 caractères)
-- Appliqué à `CreateFirstAdmin()` et `handleAdminUsersAdd()`
-
-**Impact** : Vulnérabilité critique éliminée ✅
-
-**Fichiers modifiés** :
-- `internal/users/users.go` : Ajout ValidateUsername()
-- `internal/web/router.go:870-880` : Application validation
-
-**Commit** : `8eece84 - security: Fix command injection via username validation`
-
----
-
-#### 2. Headers HTTP sécurité (🟠 MOYENNE) - CORRIGÉ
-
-**Problème** : Aucun header de sécurité HTTP (XSS, clickjacking, MITM possibles)
-
-**Solution** :
-- Middleware `securityHeadersMiddleware()` dans `internal/web/router.go:305-333`
-- 7 headers ajoutés :
-  * `Strict-Transport-Security` (HSTS - Force HTTPS 1 an)
-  * `X-Content-Type-Options: nosniff`
-  * `X-Frame-Options: DENY`
-  * `X-XSS-Protection: 1; mode=block`
-  * `Content-Security-Policy`
-  * `Referrer-Policy: strict-origin-when-cross-origin`
-  * `Permissions-Policy`
-
-**Impact** : Protection complète contre XSS, clickjacking, MITM ✅
-
-**Fichiers modifiés** :
-- `internal/web/router.go:305-333` : Middleware
-- `internal/web/router.go:249` : Application globale
-
-**Commit** : `2a316f0 - security: Add HTTP security headers middleware`
-
----
-
-#### 3. Protection CSRF renforcée (🟠 MOYENNE) - CORRIGÉ
-
-**Problème** : Protection CSRF limitée (SameSite=Lax) → Attaques CSRF possibles
-
-**Solution** :
-- Upgrade vers `SameSite=Strict` (bloque toutes requêtes cross-origin)
-- Activation flag `Secure=true` (HTTPS obligatoire)
-
-**Impact** : Protection CSRF maximale + Cookies sécurisés ✅
-
-**Fichiers modifiés** :
-- `internal/auth/session.go:143-156` : SetSessionCookie() renforcée
-
-**Commit** : `67a0c23 - security: Enforce SameSite=Strict and Secure cookies`
-
-**Note** : SameSite=Strict peut forcer re-login si accès via lien externe (acceptable pour un NAS)
-
----
-
-#### 4. Génération automatique mot de passe sync (🟡 FAIBLE) - CORRIGÉ
-
-**Problème** : API sync non protégée par défaut si admin oublie de configurer
-
-**Solution (idée utilisateur)** :
-- Génération automatique mot de passe sync lors du setup
-- 24 bytes (192 bits) cryptographiquement aléatoires
-- Affichage sur page de succès (comme encryption key)
-- Admin copie le mot de passe pour l'utiliser sur les pairs
-- Changeable dans Paramètres > Synchronisation
-
-**Impact** : Secure by default - API sync toujours protégée ✅
-
-**Fichiers modifiés** :
-- `internal/web/router.go:762-779` : Génération + sauvegarde
-- `internal/web/router.go:63` : Ajout champ TemplateData
-- `web/templates/setup_success.html:73-94` : UI affichage
-- `internal/i18n/i18n.go:101-103, 417-419` : Traductions FR + EN
-
-**Commit** : `503be97 - security: Auto-generate sync password at setup`
-
-**Avantages** :
-- Élimine risque d'oubli de configuration
-- Mot de passe fort (192 bits d'entropie)
-- Force l'admin à copier le mot de passe (sensibilisation sécurité)
-- Cohérent avec l'approche encryption key
-
----
-
-### 📊 Score de sécurité
-
-**Progression** :
-- **Initial** : 7.5/10
-- **Après correction 1** (username) : 8.0/10
-- **Après correction 2** (headers HTTP) : 8.5/10
-- **Après correction 3** (CSRF) : 9.0/10
-- **Après correction 4** (sync password) : **9.5/10** ✅
-
-**Points forts** :
-- ✅ Cryptographie excellente (AES-256-GCM)
-- ✅ Protection injection SQL (requêtes paramétrées)
-- ✅ Protection path traversal robuste
-- ✅ Validation entrées stricte
-- ✅ Headers HTTP sécurité complets
-- ✅ Protection CSRF maximale
-- ✅ Authentification P2P obligatoire (secure by default)
-
-**Reste à corriger** :
-- 🟡 bcrypt cost = 10 → augmenter à 12 (priorité faible)
-
-### 📝 Commits
-
-```
-d3bbfa3 - security: Complete security audit - 5 vulnerabilities identified
-8eece84 - security: Fix command injection via username validation
-2a316f0 - security: Add HTTP security headers middleware
-67a0c23 - security: Enforce SameSite=Strict and Secure cookies
-503be97 - security: Auto-generate sync password at setup (secure by default)
+✅ Expected: FR3 should have:
+   - /incoming/FR1/1_test/
+   - /incoming/FR2/1_test/
 ```
 
-**État** : ✅ **TERMINÉE - 4/5 vulnérabilités corrigées (Score 9.5/10)**
-
----
-
-## 🔒 Session 22 - 18 Novembre 2025 - Dernière correction sécurité (bcrypt cost)
-
-**Date** : 2025-11-18
-**Objectif** : Corriger la dernière vulnérabilité (bcrypt cost = 10)
-**Statut** : ✅ **COMPLÉTÉ - 5/5 vulnérabilités corrigées (Score 10/10)** 🎉
-
-### 🎯 Correction appliquée
-
-**Vulnérabilité 5 : bcrypt cost = 10 (🟡 FAIBLE) - CORRIGÉ**
-
-**Problème** :
-- bcrypt cost = 10 (valeur par défaut Go)
-- Protection faible contre bruteforce avec hardware moderne (GPU/ASIC)
-- Standard OWASP 2025 recommande cost ≥ 12
-
-**Solution implémentée** :
-- Augmentation du bcrypt cost de 10 à 12 dans `internal/crypto/crypto.go:98`
-- Ajout commentaire explicatif sur le niveau de protection
-
-**Impact** :
-- ✅ **Performance** : ~260ms par hash (4x plus lent que cost 10)
-- ✅ **Sécurité** : 4x plus d'itérations = 4x plus lent pour attaquant
-- ✅ **Compatibilité** : Anciens mots de passe (cost 10) continuent de fonctionner
-- ✅ **Rehashing transparent** : Prochain login mettra à jour vers cost 12
-
-**Fichiers modifiés** :
-- `internal/crypto/crypto.go:95-103` : Fonction `HashPassword()` mise à jour
-- `SECURITY_AUDIT.md:217-263` : Documentation correction
-- `SESSION_STATE.md` : Mise à jour scores sécurité
-
-### 📊 Score final de sécurité : 10/10 🎉
-
-**Toutes les vulnérabilités corrigées** :
-1. ✅ Injection de commandes via username (🔴 HAUTE)
-2. ✅ Absence headers HTTP sécurité (🟠 MOYENNE)
-3. ✅ Protection CSRF limitée (🟠 MOYENNE)
-4. ✅ Sync auth désactivé par défaut (🟡 FAIBLE)
-5. ✅ bcrypt cost = 10 (🟡 FAIBLE)
-
-**Points forts du système** :
-- ✅ Cryptographie excellente (AES-256-GCM)
-- ✅ Protection injection SQL (requêtes paramétrées)
-- ✅ Protection path traversal robuste
-- ✅ Validation entrées stricte
-- ✅ Headers HTTP sécurité complets
-- ✅ Protection CSRF maximale
-- ✅ Authentification P2P obligatoire (secure by default)
-- ✅ Hashing mots de passe renforcé (bcrypt cost 12)
-
-### 📝 Commit
-
+#### Phase 2: Backup Visibility Test (Commit 934e27c)
 ```
-[à créer] - security: Increase bcrypt cost from 10 to 12 (OWASP recommendation)
+On FR1:
+  └─ Login as 'test'
+  └─ Go to "Parcourir les backups"
+  
+✅ Expected: Only see backups "(from FR1)"
+❌ Should NOT see: "(from FR2)"
+
+Repeat on FR2 - should only see "(from FR2)"
 ```
 
-**État** : ✅ **TERMINÉE - Score sécurité parfait : 10/10** 🎉
-
----
-
-## 🐛 Session 23 - 18 Novembre 2025 - Correctifs bugs critiques
-
-**Date** : 2025-11-18
-**Objectif** : Corriger bugs découverts lors des tests sur FR1/FR2
-**Statut** : ✅ **COMPLÉTÉ - 5 bugs critiques corrigés**
-
-### 🎯 Bugs découverts et corrigés
-
-#### Bug 1 : CSP bloquant Tailwind CSS et HTMX sur page setup ✅
-
-**Problème** :
-- Content-Security-Policy trop stricte bloquait les CDN externes
-- Page setup affichait un "gros i noir" sans styles
-
-**Solution** :
-- Modification du CSP dans `internal/web/router.go:325`
-- Autorisation de `https://cdn.tailwindcss.com` et `https://unpkg.com`
-
-**Commit** : `[commit hash]`
-
----
-
-#### Bug 2 : Répertoires supprimés invisibles dans la corbeille ✅
-
-**Problème** :
-- Seuls les fichiers apparaissaient dans la corbeille
-- Les répertoires supprimés étaient invisibles dans l'interface web
-
-**Solution** :
-- Ajout champ `IsDir bool` à la structure `TrashItem`
-- Réécriture de `ListTrashItems()` pour utiliser `os.ReadDir()` (top-level items)
-- Ajout fonction `calculateDirSize()` pour calculer taille répertoires
-- Modification template `trash.html` pour afficher icône dossier
-- Modification `DeleteItem()` pour utiliser `rm -rf` (support répertoires)
-
-**Fichiers modifiés** :
-- `internal/trash/trash.go` : Refonte complète listing corbeille
-- `web/templates/trash.html` : Ajout icônes conditionnelles
-
-**Commit** : `[commit hash]`
-
----
-
-#### Bug 3 : Test connexion P2P réussissait avec mauvais mot de passe ✅
-
-**Problème** :
-- `TestConnection()` dans `internal/peers/peers.go` testait uniquement `/api/ping`
-- Endpoint `/api/ping` non protégé → test réussissait même avec mauvais mot de passe
-
-**Solution** :
-- Modification de `TestConnection()` pour tester `/api/sync/manifest` (endpoint protégé)
-- Suppression du check conditionnel qui skipait l'auth si mot de passe vide
-
-**Fichiers modifiés** :
-- `internal/peers/peers.go` : Fonction `TestConnection()`
-
-**Commit** : `[commit hash]`
-
----
-
-#### Bug 4 : Permissions 700 après restauration depuis corbeille ✅
-
-**Problème** :
-- Fichiers restaurés depuis corbeille avaient permissions 700
-- Service de sync ne pouvait pas lire les fichiers → sync bloquée
-
-**Solution** :
-- Ajout de `chmod -R u+rwX,go+rX` après restauration dans `RestoreItem()`
-- Correction manuelle des permissions existantes sur FR1
-
-**Fichiers modifiés** :
-- `internal/trash/trash.go:RestoreItem()` : Ajout commande chmod
-
-**Commit** : `[commit hash]`
-
----
-
-#### Bug 5 : **CRITIQUE** - Collision backups multi-serveurs ✅
-
-**Problème critique** :
-- Si FR1 et FR2 ont tous deux un utilisateur "test" avec ID 2
-- Les deux synchronisent vers FR3
-- Les backups écrasent le même répertoire : `/srv/anemone/backups/incoming/2_test/`
-- **Résultat** : Perte de données ! FR2 écrase les backups de FR1
-
-**Solution implémentée** :
-- Changement de structure de répertoires :
-  * **Avant** : `/srv/anemone/backups/incoming/{user_id}_{share_name}/`
-  * **Après** : `/srv/anemone/backups/incoming/{source_server}/{user_id}_{share_name}/`
-- Ajout paramètre `source_server` dans toutes les requêtes API sync
-- Modification de 4 handlers API pour extraire et utiliser `source_server`
-- Mise à jour `ScanIncomingBackups()` pour scanner structure à 2 niveaux
-
-**Fichiers modifiés** :
-- `internal/sync/sync.go` : Ajout `source_server` aux 4 URLs API
-- `internal/web/router.go` : 4 handlers modifiés (FileUpload, FileDelete, ManifestPut, SourceInfo)
-- `internal/incoming/incoming.go` : Scan récursif nouvelle structure
-
-**Impact** :
-- ✅ Chaque serveur source a son propre répertoire
-- ✅ Aucun risque de collision même si user_id identiques
-- ✅ Exemple : FR1 → `/srv/anemone/backups/incoming/FR1/2_test/`
-- ✅ Exemple : FR2 → `/srv/anemone/backups/incoming/FR2/2_test/`
-
-**Commit** : `00e4eef - fix: Prevent backup collision by separating source servers`
-
----
-
-### 📊 Résumé des corrections
-
-| Bug | Priorité | Description | Status |
-|-----|----------|-------------|--------|
-| 1 | 🟠 MOYENNE | CSP bloquant CDN (page setup) | ✅ CORRIGÉ |
-| 2 | 🟠 MOYENNE | Répertoires invisibles corbeille | ✅ CORRIGÉ |
-| 3 | 🟡 FAIBLE | Test P2P faux positif | ✅ CORRIGÉ |
-| 4 | 🟠 MOYENNE | Permissions 700 après restore | ✅ CORRIGÉ |
-| 5 | 🔴 **CRITIQUE** | Collision backups multi-serveurs | ✅ CORRIGÉ |
-
-### 📝 Commits
-
+#### Phase 3: Admin Filter Test (Commit 1c49509)
 ```
-[hash] - fix: Allow Tailwind CSS and HTMX CDN in CSP
-[hash] - fix: Show directories in trash interface
-[hash] - fix: Test P2P authentication on protected endpoint
-[hash] - fix: Fix permissions after restore from trash
-00e4eef - fix: Prevent backup collision by separating source servers
+On FR1:
+  └─ Login as admin
+  └─ Go to "Restaurer tous les fichiers des utilisateurs"
+  
+✅ Expected: Only see backups "(from FR1)"
+❌ Should NOT see: "(from FR2)"
 ```
 
-**État** : ✅ **TERMINÉE - 5 bugs critiques corrigés (1 critique, 3 moyens, 1 faible)**
-
----
-
-## ✅ Session 24 - 19 Novembre 2025 - Adaptation restauration après séparation serveurs
-
-**Date** : 2025-11-19
-**Objectif** : Adapter système de restauration à la nouvelle structure de répertoires (après Bug 5)
-**Statut** : ✅ **COMPLÉTÉ**
-
-### 🎯 Problème identifié
-
-Suite au Bug 5 (séparation serveurs sources), la structure de répertoires a changé :
-- **Avant** : `/srv/anemone/backups/incoming/{user_id}_{share_name}/`
-- **Après** : `/srv/anemone/backups/incoming/{source_server}/{user_id}_{share_name}/`
-
-**Impact** : Les endpoints de restauration ne fonctionnent plus car ils ne savent pas quel serveur source utiliser.
-
-**Use case critique** :
+#### Phase 4: Full Disaster Recovery (Main test)
 ```
-FR1 : serveur utilisé par l'utilisateur test
-FR2 : sauvegarde à J+1
-FR3 : sauvegarde à J+7
-FR4 : reçoit les backups de FR1, FR2, FR3
-
-Situation actuelle :
-- FR4 a : /incoming/FR1/2_test/
-- FR4 a : /incoming/FR2/2_test/
-- FR4 a : /incoming/FR3/2_test/
-
-Problème : Quand user test demande /api/sync/list-user-backups?user_id=2
-→ FR4 ne sait pas quel source_server retourner
+FR4 (new clean server)
+  └─ scp restore_server.sh to FR4
+  └─ scp FR1 backup (.enc file) to FR4
+  └─ Run: sudo bash restore_server.sh anemone_backup_XXX.enc "passphrase"
+  
+✅ Expected:
+   - Script completes without errors
+   - All users created (admin, test)
+   - SMB users created with passwords
+   - Database restored
 ```
 
-**Requirement** : Préserver la possibilité pour l'utilisateur de choisir depuis quel pair restaurer.
-
-### 🔧 Modifications à implémenter
-
-#### 1. Modifier `handleAPISyncListUserBackups` (✅ FAIT)
-**Fichier** : `internal/web/router.go:4197-4291`
-- Scan de la structure à deux niveaux ✅
-- **À FAIRE** : Ajouter champ `source_server` dans `BackupInfo`
-  ```go
-  type BackupInfo struct {
-      SourceServer string    `json:"source_server"`  // NOUVEAU
-      ShareName    string    `json:"share_name"`
-      FileCount    int       `json:"file_count"`
-      TotalSize    int64     `json:"total_size"`
-      LastModified time.Time `json:"last_modified"`
-  }
-  ```
-
-#### 2. Modifier templates de restauration
-**Fichiers** :
-- `web/templates/restore.html`
-- `web/templates/admin_restore_users.html`
-
-**Changements UI** :
-- Au lieu d'afficher : `"backup_test (2 fichiers, 1.2 MB)"`
-- Afficher : `"backup_test from FR1 (2 fichiers, 1.2 MB)"`
-- Si plusieurs sources : afficher comme entrées distinctes
-  ```
-  ○ backup_test from FR1 (2 fichiers, 1.2 MB) - Dernière modif: 2h ago
-  ○ backup_test from FR2 (5 fichiers, 3.4 MB) - Dernière modif: 1 jour ago
-  ○ backup_test from FR3 (2 fichiers, 1.2 MB) - Dernière modif: 7 jours ago
-  ```
-
-#### 3. Ajouter `source_server` aux requêtes de téléchargement
-**Handlers à modifier** :
-
-**A. `handleAPISyncDownloadEncryptedManifest`** (ligne 4296)
-- Signature actuelle : `GET /api/sync/download-encrypted-manifest?user_id=X&share_name=Y`
-- **Nouvelle signature** : `GET /api/sync/download-encrypted-manifest?user_id=X&share_name=Y&source_server=Z`
-- Modifier construction path :
-  ```go
-  // AVANT
-  backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", backupDir)
-
-  // APRÈS
-  sourceServer := r.URL.Query().Get("source_server")
-  if sourceServer == "" {
-      sourceServer = "unknown"
-  }
-  backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", sourceServer, backupDir)
-  ```
-
-**B. `handleAPISyncDownloadEncryptedFile`** (ligne 4350)
-- Même modification (ajouter paramètre `source_server`)
-
-**C. `handleAPIRestoreFiles`** (ligne 3616)
-- Modifier requête vers pair pour inclure `source_server` :
-  ```go
-  // AVANT
-  url := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-manifest?user_id=%d&share_name=%s",
-      peer.Address, peer.Port, session.UserID, shareName)
-
-  // APRÈS
-  url := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-manifest?user_id=%d&share_name=%s&source_server=%s",
-      peer.Address, peer.Port, session.UserID, shareName, sourceServer)
-  ```
-
-**D. `handleAPIRestoreDownload`** (ligne 3743)
-- Même modification
-
-**E. `handleAPIRestoreDownloadMultiple`** (ligne 3864)
-- Même modification
-
-**F. `handleAdminRestoreUsersRestore`** (ligne 4991)
-- Ajouter `source_server` aux requêtes de restauration bulk
-
-#### 4. Modifier JavaScript frontend
-**Fichiers** :
-- `web/templates/restore.html` : Code JS qui appelle les APIs
-- `web/templates/admin_restore_users.html` : Code JS pour restoration admin
-
-**Changements** :
-- Stocker `source_server` lors de la sélection du backup
-- Passer `source_server` dans tous les appels AJAX
-
-### 📋 Checklist complète
-
-- [x] Modifier `handleAPISyncListUserBackups` pour scanner structure à 2 niveaux
-- [x] Ajouter champ `source_server` dans `BackupInfo` et `PeerBackup` structs
-- [x] Modifier `handleAPISyncDownloadEncryptedManifest` (+ source_server param)
-- [x] Modifier `handleAPISyncDownloadEncryptedFile` (+ source_server param)
-- [x] Modifier `handleAPIRestoreFiles` (passer source_server)
-- [x] Modifier `handleAPIRestoreDownload` (passer source_server)
-- [x] Modifier `handleAPIRestoreDownloadMultiple` (passer source_server)
-- [x] Modifier `handleAdminRestoreUsersRestore` (passer source_server)
-- [x] Modifier `handleRestoreWarningBulk` (passer source_server)
-- [x] Modifier `BulkRestoreFromPeer` (accepter source_server)
-- [x] Modifier UI `restore.html` (afficher source_server)
-- [x] Modifier UI `admin_restore_users.html` (afficher source_server)
-- [x] Modifier JavaScript frontend pour passer source_server
-- [x] Filtrer backups par serveur actuel (fix: user FR1 voyait backups FR2)
-- [x] Re-chiffrer password_encrypted avec nouvelle master key (restore_server.sh)
-- [ ] Tester restauration utilisateur depuis multiple pairs
-- [ ] Tester disaster recovery (FR1 → FR4)
-
-### 🎯 Tests de validation
-
-1. Setup de test :
-   - FR1 avec user test (ID 2)
-   - FR2 avec user test (ID 2) - différent de FR1
-   - FR4 reçoit backups de FR1 et FR2
-   - Vérifier : `/incoming/FR1/2_test/` et `/incoming/FR2/2_test/` existent
-
-2. Test utilisateur :
-   - Se connecter comme user test sur FR1
-   - Page `/restore` doit lister :
-     * "backup_test from FR2 (...)"
-     * "backup_test from FR4 (...)"
-   - Cliquer sur "backup_test from FR2" → navigation fichiers OK
-   - Télécharger fichier → décryptage et download OK
-   - Télécharger ZIP multiple → OK
-
-3. Test admin :
-   - Page `/admin/restore-users`
-   - Lister backups disponibles pour tous les users
-   - Afficher correctement source_server
-   - Restauration bulk depuis pair spécifique → OK
-
-### 📝 Commits réalisés
-
+#### Phase 5: Post-Restore Checks (All recent fixes)
 ```
-485eaee - fix: Adapt restore system to source server separation
-934e27c - fix: Filter backups by current server name in restore page
-ed62fcf - fix: Re-encrypt password_encrypted with new master key during restore
+On FR4 (after restore):
+  └─ Login as admin
+  └─ Verify restore warning page shows
+  
+  Check 1: Global Auto-Sync (NEW FIX - Commit 57e08b4)
+    └─ Go to /admin/sync
+    └─ ✅ "Activer la synchronisation automatique" checkbox should be UNCHECKED
+  
+  Check 2: Peer Sync Status
+    └─ Go to /admin/peers
+    └─ ✅ All peers should show "Désactivé" badge
+  
+  Check 3: Password Re-encryption (Commit ed62fcf)
+    └─ Logout
+    └─ Login as user 'test' with original password
+    └─ ✅ Should work (password re-encrypted with new master key)
 ```
 
-### 📊 Résumé des modifications
+#### Phase 6: User File Restoration
+```
+On FR4 (as admin):
+  └─ From restore warning or admin page
+  └─ Click "Restaurer tous les fichiers des utilisateurs"
+  └─ Select source: FR3 - FR1 (from FR1)
+  └─ Launch restoration
+  
+✅ Expected:
+   - Restoration completes successfully
+   - Files appear in /home/test/anemone/
+   - Files match original FR1 files (file1.txt, file2.txt)
+   - Can access via SMB
+```
 
-**Backend (Go)** :
-- ✅ Ajout champ `SourceServer` dans structures `BackupInfo`, `PeerBackup`, `UserBackup`
-- ✅ Modification de 9 handlers API pour accepter/utiliser `source_server`
-- ✅ Filtre des backups par serveur actuel (sécurité : user FR1 ne voit que backups FR1)
-- ✅ Re-chiffrement `password_encrypted` dans `restore_server.sh`
+#### Phase 7: Source Server Separation (Critical)
+```
+On FR4:
+  └─ Go to peers, re-enable FR3
+  └─ Go to /admin/sync, enable auto-sync
+  └─ Create NEW file: file3.txt in test's share
+  └─ Force sync to FR3
 
-**Frontend (HTML/JS)** :
-- ✅ Affichage "PeerName (from SourceServer)" dans interface restore
-- ✅ Passage de `source_server` dans tous les appels AJAX
-- ✅ Support multi-serveurs dans sélection backups
+On FR3, check /data/incoming/:
+  ✅ Should have 3 directories:
+     - FR1/ (original files from FR1)
+     - FR2/ (original files from FR2)  
+     - FR4/ (new file3.txt from restored server)
+  
+  ❌ Should NOT mix FR4 files into FR1/ directory
+```
 
-**Sécurité** :
-- ✅ Isolation complète : chaque serveur ne voit que ses propres backups
-- ✅ Toutes les données re-chiffrées avec nouvelle master key lors restore
+#### Phase 8: Cross-Restoration Test (Bonus)
+```
+FR5 (new clean server)
+  └─ Try to restore FR1 backup
+  └─ Go to admin restore page
+  └─ Try to restore files from FR3
+  
+✅ Expected: Only sees backups "(from FR1)"
+❌ Should NOT see: "(from FR2)" or "(from FR4)"
+```
 
-**État** : ✅ **COMPLÉTÉ - Système de restauration fonctionnel avec séparation serveurs sources**
+### 📋 Checklist
+
+- [ ] Phase 1: Initial setup (FR1, FR2, FR3)
+- [ ] Phase 2: Backup visibility test
+- [ ] Phase 3: Admin filter test
+- [ ] Phase 4: Full disaster recovery (FR1 → FR4)
+- [ ] Phase 5: Post-restore checks (sync, peers, passwords)
+- [ ] Phase 6: User file restoration
+- [ ] Phase 7: Source server separation validation
+- [ ] Phase 8: Cross-restoration test (FR5)
+
+### 🎯 Focus minimum
+
+**Tests prioritaires** :
+- Phase 4 + 5 (Full disaster recovery with new sync fix)
+- Phase 7 (Verify source server separation still works)
 
 ---
 
@@ -760,11 +372,11 @@ ed62fcf - fix: Re-encrypt password_encrypted with new master key during restore
 
 ### 🎯 Priorité 1 - Court terme
 
-**Session 23 : Tests et préparation release 1.0** 🚀
-- ✅ Tester les corrections sécurité sur FR1/FR2/FR3
-- ✅ Vérifier le login avec nouveaux hashes bcrypt cost 12
-- ✅ Mettre à jour documentation (README, QUICKSTART)
-- ✅ Préparer release 1.0
+**Session 25 : Tests disaster recovery complets** 🧪
+- [ ] Exécuter le plan de test complet (8 phases)
+- [ ] Documenter tous les résultats
+- [ ] Corriger tout bug découvert
+- [ ] Valider que le système est production-ready
 
 ### ⚙️ Priorité 2 - Améliorations futures
 
@@ -798,4 +410,4 @@ ed62fcf - fix: Re-encrypt password_encrypted with new master key during restore
 
 ---
 
-**Dernière mise à jour** : 2025-11-19 (Session 24 - Système de restauration adapté à la séparation serveurs sources)
+**Dernière mise à jour** : 2025-11-19 (Session 24 complétée - Session 25 planifiée)
