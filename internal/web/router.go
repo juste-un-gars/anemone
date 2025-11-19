@@ -744,8 +744,8 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		}
 		masterKey := base64.StdEncoding.EncodeToString(masterKeyBytes)
 
-		// Create first admin user
-		user, encryptionKey, err := users.CreateFirstAdmin(s.db, username, password, email, masterKey)
+		// Create first admin user with language preference
+		user, encryptionKey, err := users.CreateFirstAdmin(s.db, username, password, email, masterKey, language)
 		if err != nil {
 			log.Printf("Error creating admin user: %v", err)
 			http.Error(w, "Failed to create admin user", http.StatusInternalServerError)

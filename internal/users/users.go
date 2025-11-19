@@ -57,7 +57,7 @@ type User struct {
 }
 
 // CreateFirstAdmin creates the first administrator user during setup
-func CreateFirstAdmin(db *sql.DB, username, password, email, masterKey string) (*User, string, error) {
+func CreateFirstAdmin(db *sql.DB, username, password, email, masterKey, language string) (*User, string, error) {
 	// Validate username format (prevent command injection)
 	if err := ValidateUsername(username); err != nil {
 		return nil, "", fmt.Errorf("invalid username: %w", err)
@@ -97,9 +97,9 @@ func CreateFirstAdmin(db *sql.DB, username, password, email, masterKey string) (
 			username, password_hash, password_encrypted, email,
 			encryption_key_hash, encryption_key_encrypted,
 			is_admin, quota_total_gb, quota_backup_gb,
-			created_at, activated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, username, passwordHash, passwordEncrypted, email, keyHash, encryptedKey, true, 100, 50, now, now)
+			created_at, activated_at, language
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, username, passwordHash, passwordEncrypted, email, keyHash, encryptedKey, true, 100, 50, now, now, language)
 
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to insert user: %w", err)
