@@ -81,6 +81,14 @@ type DashboardStats struct {
 
 // NewRouter creates and configures the HTTP router
 func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
+	// Load language from database if setup is completed
+	var dbLang string
+	err := db.QueryRow("SELECT value FROM system_config WHERE key = 'language'").Scan(&dbLang)
+	if err == nil && dbLang != "" {
+		// Use language from database (set during setup)
+		cfg.Language = dbLang
+	}
+
 	// Initialize i18n
 	if err := i18n.Init(cfg.Language); err != nil {
 		log.Printf("Warning: Failed to initialize i18n: %v", err)
