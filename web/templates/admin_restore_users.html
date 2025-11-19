@@ -107,7 +107,7 @@
                                 {{.Username}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{.PeerName}}
+                                {{.PeerName}}{{if .SourceServer}} (from {{.SourceServer}}){{end}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {{.ShareName}}
@@ -122,7 +122,7 @@
                                 {{FormatTime .LastModified $.Lang}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button onclick="restoreUser({{.UserID}}, {{.PeerID}}, '{{.ShareName}}', '{{.Username}}')"
+                                <button onclick="restoreUser({{.UserID}}, {{.PeerID}}, '{{.ShareName}}', '{{.SourceServer}}', '{{.Username}}')"
                                         class="text-indigo-600 hover:text-indigo-900">
                                     {{if eq $.Lang "fr"}}Restaurer{{else}}Restore{{end}}
                                 </button>
@@ -173,7 +173,7 @@
 </div>
 
 <script>
-function restoreUser(userID, peerID, shareName, username) {
+function restoreUser(userID, peerID, shareName, sourceServer, username) {
     if (!confirm('{{if eq .Lang "fr"}}Voulez-vous vraiment restaurer les fichiers de ' + username + ' ?{{else}}Do you really want to restore ' + username + '\'s files?{{end}}')) {
         return;
     }
@@ -187,6 +187,7 @@ function restoreUser(userID, peerID, shareName, username) {
     formData.append('user_id', userID);
     formData.append('peer_id', peerID);
     formData.append('share_name', shareName);
+    formData.append('source_server', sourceServer);
 
     fetch('/admin/restore-users/restore', {
         method: 'POST',
@@ -216,7 +217,7 @@ function restoreAll() {
     // Array of backups to restore
     const backupsToRestore = [
         {{range $index, $backup := .Backups}}
-        {{if $index}},{{end}}{userID: {{$backup.UserID}}, peerID: {{$backup.PeerID}}, shareName: '{{$backup.ShareName}}'}
+        {{if $index}},{{end}}{userID: {{$backup.UserID}}, peerID: {{$backup.PeerID}}, shareName: '{{$backup.ShareName}}', sourceServer: '{{$backup.SourceServer}}'}
         {{end}}
     ];
 
@@ -234,6 +235,7 @@ function restoreAll() {
         formData.append('user_id', backup.userID);
         formData.append('peer_id', backup.peerID);
         formData.append('share_name', backup.shareName);
+        formData.append('source_server', backup.sourceServer);
 
         fetch('/admin/restore-users/restore', {
             method: 'POST',

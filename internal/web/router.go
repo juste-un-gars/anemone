@@ -3525,6 +3525,7 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 		PeerID       int       `json:"peer_id"`
 		PeerName     string    `json:"peer_name"`
 		PeerAddress  string    `json:"peer_address"`
+		SourceServer string    `json:"source_server"`
 		ShareName    string    `json:"share_name"`
 		FileCount    int       `json:"file_count"`
 		TotalSize    int64     `json:"total_size"`
@@ -3580,6 +3581,7 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 
 		// Parse response
 		type BackupInfo struct {
+			SourceServer string    `json:"source_server"`
 			ShareName    string    `json:"share_name"`
 			FileCount    int       `json:"file_count"`
 			TotalSize    int64     `json:"total_size"`
@@ -3597,6 +3599,7 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 				PeerID:       peer.ID,
 				PeerName:     peer.Name,
 				PeerAddress:  peer.Address,
+				SourceServer: backup.SourceServer,
 				ShareName:    backup.ShareName,
 				FileCount:    backup.FileCount,
 				TotalSize:    backup.TotalSize,
@@ -3612,7 +3615,7 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 }
 
 // handleAPIRestoreFiles returns the file tree for a backup from a remote peer
-// GET /api/restore/files?peer_id={id}&backup={share_name}
+// GET /api/restore/files?peer_id={id}&backup={share_name}&source_server={name}
 func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.GetSessionFromContext(r)
 	if !ok {
@@ -3622,8 +3625,9 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 
 	peerIDStr := r.URL.Query().Get("peer_id")
 	shareName := r.URL.Query().Get("backup")
-	if peerIDStr == "" || shareName == "" {
-		http.Error(w, "Missing peer_id or backup parameter", http.StatusBadRequest)
+	sourceServer := r.URL.Query().Get("source_server")
+	if peerIDStr == "" || shareName == "" || sourceServer == "" {
+		http.Error(w, "Missing peer_id, backup, or source_server parameter", http.StatusBadRequest)
 		return
 	}
 
@@ -3668,8 +3672,8 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Download encrypted manifest from peer
-	url := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-manifest?user_id=%d&share_name=%s",
-		peer.Address, peer.Port, session.UserID, shareName)
+	url := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-manifest?user_id=%d&share_name=%s&source_server=%s",
+		peer.Address, peer.Port, session.UserID, shareName, sourceServer)
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -3740,7 +3744,7 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleAPIRestoreDownload downloads and decrypts a file from a remote peer
-// GET /api/restore/download?peer_id={id}&backup={share_name}&file={file_path}
+// GET /api/restore/download?peer_id={id}&backup={share_name}&file={file_path}&source_server={name}
 func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.GetSessionFromContext(r)
 	if !ok {
@@ -3751,9 +3755,10 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 	peerIDStr := r.URL.Query().Get("peer_id")
 	shareName := r.URL.Query().Get("backup")
 	filePath := r.URL.Query().Get("file")
+	sourceServer := r.URL.Query().Get("source_server")
 
-	if peerIDStr == "" || shareName == "" || filePath == "" {
-		http.Error(w, "Missing peer_id, backup, or file parameter", http.StatusBadRequest)
+	if peerIDStr == "" || shareName == "" || filePath == "" || sourceServer == "" {
+		http.Error(w, "Missing peer_id, backup, file, or source_server parameter", http.StatusBadRequest)
 		return
 	}
 
@@ -3800,9 +3805,10 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 	// Download encrypted file from peer (with proper URL encoding)
 	baseURL := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-file", peer.Address, peer.Port)
 	fileURL, err := buildURL(baseURL, map[string]string{
-		"user_id":    strconv.Itoa(session.UserID),
-		"share_name": shareName,
-		"path":       filePath,
+		"user_id":       strconv.Itoa(session.UserID),
+		"share_name":    shareName,
+		"path":          filePath,
+		"source_server": sourceServer,
 	})
 	if err != nil {
 		log.Printf("Error building URL: %v", err)
@@ -3861,7 +3867,7 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 }
 
 // handleAPIRestoreDownloadMultiple downloads and decrypts multiple files/folders from a remote peer as ZIP
-// POST /api/restore/download-multiple?peer_id={id}&backup={share_name}
+// POST /api/restore/download-multiple?peer_id={id}&backup={share_name}&source_server={name}
 // Form data: paths[] (multiple)
 func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.GetSessionFromContext(r)
@@ -3883,10 +3889,11 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 
 	peerIDStr := r.URL.Query().Get("peer_id")
 	shareName := r.URL.Query().Get("backup")
+	sourceServer := r.URL.Query().Get("source_server")
 	paths := r.Form["paths"]
 
-	if peerIDStr == "" || shareName == "" || len(paths) == 0 {
-		http.Error(w, "Missing peer_id, backup, or paths", http.StatusBadRequest)
+	if peerIDStr == "" || shareName == "" || sourceServer == "" || len(paths) == 0 {
+		http.Error(w, "Missing peer_id, backup, source_server, or paths", http.StatusBadRequest)
 		return
 	}
 
@@ -3933,8 +3940,9 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 	// Download manifest to determine which paths are files vs directories
 	baseManifestURL := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-manifest", peer.Address, peer.Port)
 	manifestURL, err := buildURL(baseManifestURL, map[string]string{
-		"user_id":    strconv.Itoa(session.UserID),
-		"share_name": shareName,
+		"user_id":       strconv.Itoa(session.UserID),
+		"share_name":    shareName,
+		"source_server": sourceServer,
 	})
 	if err != nil {
 		http.Error(w, "Failed to build manifest URL", http.StatusInternalServerError)
@@ -4031,9 +4039,10 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 		// Download encrypted file from peer
 		baseURL := fmt.Sprintf("https://%s:%d/api/sync/download-encrypted-file", peer.Address, peer.Port)
 		fileURL, err := buildURL(baseURL, map[string]string{
-			"user_id":    strconv.Itoa(session.UserID),
-			"share_name": shareName,
-			"path":       filePath,
+			"user_id":       strconv.Itoa(session.UserID),
+			"share_name":    shareName,
+			"path":          filePath,
+			"source_server": sourceServer,
 		})
 		if err != nil {
 			log.Printf("Error building URL for file %s: %v", filePath, err)
@@ -4212,6 +4221,7 @@ func (s *Server) handleAPISyncListUserBackups(w http.ResponseWriter, r *http.Req
 	backupsDir := filepath.Join(s.cfg.DataDir, "backups", "incoming")
 
 	type BackupInfo struct {
+		SourceServer string    `json:"source_server"`
 		ShareName    string    `json:"share_name"`
 		FileCount    int       `json:"file_count"`
 		TotalSize    int64     `json:"total_size"`
@@ -4278,6 +4288,7 @@ func (s *Server) handleAPISyncListUserBackups(w http.ResponseWriter, r *http.Req
 			})
 
 			backups = append(backups, BackupInfo{
+				SourceServer: serverEntry.Name(),
 				ShareName:    shareName,
 				FileCount:    fileCount,
 				TotalSize:    totalSize,
@@ -4291,14 +4302,15 @@ func (s *Server) handleAPISyncListUserBackups(w http.ResponseWriter, r *http.Req
 }
 
 // handleAPISyncDownloadEncryptedManifest downloads the encrypted manifest without decrypting it
-// GET /api/sync/download-encrypted-manifest?user_id=X&share_name=Y
+// GET /api/sync/download-encrypted-manifest?user_id=X&share_name=Y&source_server=Z
 // Returns the .anemone-manifest.json.enc file as-is (encrypted)
 func (s *Server) handleAPISyncDownloadEncryptedManifest(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.URL.Query().Get("user_id")
 	shareName := r.URL.Query().Get("share_name")
+	sourceServer := r.URL.Query().Get("source_server")
 
-	if userIDStr == "" || shareName == "" {
-		http.Error(w, "Missing user_id or share_name", http.StatusBadRequest)
+	if userIDStr == "" || shareName == "" || sourceServer == "" {
+		http.Error(w, "Missing user_id, share_name, or source_server", http.StatusBadRequest)
 		return
 	}
 
@@ -4310,7 +4322,7 @@ func (s *Server) handleAPISyncDownloadEncryptedManifest(w http.ResponseWriter, r
 
 	// Build backup path
 	// Convert share name to directory name (e.g., "backup_test" -> "test")
-	// Convention: incoming/{user_id}_{username}/ but API uses backup_{username}
+	// Convention: incoming/{source_server}/{user_id}_{username}/ but API uses backup_{username}
 	username := shareName
 	if strings.HasPrefix(shareName, "backup_") {
 		username = strings.TrimPrefix(shareName, "backup_")
@@ -4318,7 +4330,7 @@ func (s *Server) handleAPISyncDownloadEncryptedManifest(w http.ResponseWriter, r
 		username = strings.TrimPrefix(shareName, "data_")
 	}
 	backupDir := fmt.Sprintf("%d_%s", userID, username)
-	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", backupDir)
+	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", sourceServer, backupDir)
 	manifestPath := filepath.Join(backupPath, ".anemone-manifest.json.enc")
 
 	// Check if manifest exists
@@ -4345,15 +4357,16 @@ func (s *Server) handleAPISyncDownloadEncryptedManifest(w http.ResponseWriter, r
 }
 
 // handleAPISyncDownloadEncryptedFile downloads an encrypted file without decrypting it
-// GET /api/sync/download-encrypted-file?user_id=X&share_name=Y&path=Z
+// GET /api/sync/download-encrypted-file?user_id=X&share_name=Y&path=Z&source_server=W
 // Returns the encrypted file as-is (with .enc extension)
 func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *http.Request) {
 	userIDStr := r.URL.Query().Get("user_id")
 	shareName := r.URL.Query().Get("share_name")
 	filePath := r.URL.Query().Get("path")
+	sourceServer := r.URL.Query().Get("source_server")
 
-	if userIDStr == "" || shareName == "" || filePath == "" {
-		http.Error(w, "Missing user_id, share_name, or path", http.StatusBadRequest)
+	if userIDStr == "" || shareName == "" || filePath == "" || sourceServer == "" {
+		http.Error(w, "Missing user_id, share_name, path, or source_server", http.StatusBadRequest)
 		return
 	}
 
@@ -4365,7 +4378,7 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 
 	// Build backup path
 	// Convert share name to directory name (e.g., "backup_test" -> "test")
-	// Convention: incoming/{user_id}_{username}/ but API uses backup_{username}
+	// Convention: incoming/{source_server}/{user_id}_{username}/ but API uses backup_{username}
 	username := shareName
 	if strings.HasPrefix(shareName, "backup_") {
 		username = strings.TrimPrefix(shareName, "backup_")
@@ -4373,7 +4386,7 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 		username = strings.TrimPrefix(shareName, "data_")
 	}
 	backupDir := fmt.Sprintf("%d_%s", userID, username)
-	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", backupDir)
+	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", sourceServer, backupDir)
 
 	// Build encrypted file path
 	encryptedFilePath := filepath.Join(backupPath, filePath+".enc")
@@ -4830,15 +4843,16 @@ func (s *Server) handleRestoreWarningBulk(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Get peer ID and share name from form
+	// Get peer ID, share name, and source server from form
 	peerIDStr := r.FormValue("peer_id")
 	shareName := r.FormValue("share_name")
+	sourceServer := r.FormValue("source_server")
 
-	if peerIDStr == "" || shareName == "" {
+	if peerIDStr == "" || shareName == "" || sourceServer == "" {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
-			"error":   "Missing peer_id or share_name",
+			"error":   "Missing peer_id, share_name, or source_server",
 		})
 		return
 	}
@@ -4853,13 +4867,13 @@ func (s *Server) handleRestoreWarningBulk(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	log.Printf("User %s starting bulk restore from peer %d share %s", session.Username, peerID, shareName)
+	log.Printf("User %s starting bulk restore from peer %d share %s source %s", session.Username, peerID, shareName, sourceServer)
 
 	// Start bulk restore in background
 	go func() {
 		// Note: We can't use progressChan in a simple HTTP request/response
 		// For now, we'll just do the restore and mark as complete
-		err := bulkrestore.BulkRestoreFromPeer(s.db, session.UserID, peerID, shareName, s.cfg.DataDir, nil)
+		err := bulkrestore.BulkRestoreFromPeer(s.db, session.UserID, peerID, shareName, sourceServer, s.cfg.DataDir, nil)
 		if err != nil {
 			log.Printf("Bulk restore failed for user %s: %v", session.Username, err)
 		} else {
@@ -4902,6 +4916,7 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 		Username     string
 		PeerID       int
 		PeerName     string
+		SourceServer string
 		ShareName    string
 		FileCount    int
 		TotalSize    int64
@@ -4966,6 +4981,7 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 
 			// Parse response
 			type BackupInfo struct {
+				SourceServer string    `json:"source_server"`
 				ShareName    string    `json:"share_name"`
 				FileCount    int       `json:"file_count"`
 				TotalSize    int64     `json:"total_size"`
@@ -4983,6 +4999,7 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 					Username:     username,
 					PeerID:       peer.ID,
 					PeerName:     peer.Name,
+					SourceServer: backup.SourceServer,
 					ShareName:    backup.ShareName,
 					FileCount:    backup.FileCount,
 					TotalSize:    backup.TotalSize,
@@ -5023,8 +5040,9 @@ func (s *Server) handleAdminRestoreUsersRestore(w http.ResponseWriter, r *http.R
 	userIDStr := r.FormValue("user_id")
 	peerIDStr := r.FormValue("peer_id")
 	shareName := r.FormValue("share_name")
+	sourceServer := r.FormValue("source_server")
 
-	if userIDStr == "" || peerIDStr == "" || shareName == "" {
+	if userIDStr == "" || peerIDStr == "" || shareName == "" || sourceServer == "" {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
@@ -5065,12 +5083,12 @@ func (s *Server) handleAdminRestoreUsersRestore(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	log.Printf("Admin %s starting bulk restore for user %s (id %d) from peer %d share %s",
-		session.Username, username, userID, peerID, shareName)
+	log.Printf("Admin %s starting bulk restore for user %s (id %d) from peer %d share %s source %s",
+		session.Username, username, userID, peerID, shareName, sourceServer)
 
 	// Start bulk restore in background
 	go func() {
-		err := bulkrestore.BulkRestoreFromPeer(s.db, userID, peerID, shareName, s.cfg.DataDir, nil)
+		err := bulkrestore.BulkRestoreFromPeer(s.db, userID, peerID, shareName, sourceServer, s.cfg.DataDir, nil)
 		if err != nil {
 			log.Printf("Admin bulk restore failed for user %s: %v", username, err)
 		} else {

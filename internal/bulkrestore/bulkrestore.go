@@ -49,7 +49,7 @@ type RestoreProgress struct {
 }
 
 // BulkRestoreFromPeer restores all files from a peer backup to local shares
-func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, dataDir string, progressChan chan<- RestoreProgress) error {
+func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, sourceServer string, dataDir string, progressChan chan<- RestoreProgress) error {
 	progress := RestoreProgress{}
 
 	// Get user info
@@ -80,7 +80,7 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, d
 
 	// Download and decrypt manifest
 	baseURL := fmt.Sprintf("https://%s:%d", peer.Address, peer.Port)
-	manifestURL := fmt.Sprintf("%s/api/sync/download-encrypted-manifest?user_id=%d&share_name=%s", baseURL, userID, shareName)
+	manifestURL := fmt.Sprintf("%s/api/sync/download-encrypted-manifest?user_id=%d&share_name=%s&source_server=%s", baseURL, userID, shareName, sourceServer)
 
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -183,8 +183,8 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, d
 			}
 		} else {
 			// Download and decrypt file
-			fileURL := fmt.Sprintf("%s/api/sync/download-encrypted-file?user_id=%d&share_name=%s&path=%s",
-				baseURL, userID, shareName, buildURL(filePath))
+			fileURL := fmt.Sprintf("%s/api/sync/download-encrypted-file?user_id=%d&share_name=%s&path=%s&source_server=%s",
+				baseURL, userID, shareName, buildURL(filePath), buildURL(sourceServer))
 
 			req, err := http.NewRequest("GET", fileURL, nil)
 			if err != nil {

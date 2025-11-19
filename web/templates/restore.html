@@ -170,11 +170,12 @@
                 return;
             }
 
-            // Parse "peer_id:share_name"
-            const [peerIdStr, shareName] = value.split(':');
+            // Parse "peer_id:source_server:share_name"
+            const [peerIdStr, sourceServer, ...shareNameParts] = value.split(':');
             const peerId = parseInt(peerIdStr);
+            const shareName = shareNameParts.join(':'); // In case share name contains ':'
 
-            currentBackup = backups.find(b => b.peer_id === peerId && b.share_name === shareName);
+            currentBackup = backups.find(b => b.peer_id === peerId && b.source_server === sourceServer && b.share_name === shareName);
             if (!currentBackup) return;
 
             // Show backup info
@@ -184,7 +185,7 @@
             document.getElementById('backup-info').classList.remove('hidden');
 
             // Load files
-            await loadFiles(peerId, shareName);
+            await loadFiles(peerId, shareName, sourceServer);
         });
 
         async function loadBackups() {
@@ -202,8 +203,8 @@
 
                 backups.forEach(backup => {
                     const option = document.createElement('option');
-                    option.value = `${backup.peer_id}:${backup.share_name}`;
-                    option.textContent = `${backup.peer_name} - ${backup.share_name}`;
+                    option.value = `${backup.peer_id}:${backup.source_server}:${backup.share_name}`;
+                    option.textContent = `${backup.peer_name} - ${backup.share_name} (from ${backup.source_server})`;
                     select.appendChild(option);
                 });
             } catch (error) {
@@ -212,12 +213,12 @@
             }
         }
 
-        async function loadFiles(peerId, shareName) {
+        async function loadFiles(peerId, shareName, sourceServer) {
             document.getElementById('loading').classList.remove('hidden');
             document.getElementById('file-browser').classList.add('hidden');
 
             try {
-                const response = await fetch(`/api/restore/files?peer_id=${peerId}&backup=${encodeURIComponent(shareName)}`);
+                const response = await fetch(`/api/restore/files?peer_id=${peerId}&backup=${encodeURIComponent(shareName)}&source_server=${encodeURIComponent(sourceServer)}`);
                 if (!response.ok) throw new Error('Failed to load files');
 
                 fileTree = await response.json();
@@ -404,7 +405,7 @@
         async function downloadFile(filePath) {
             if (!currentBackup) return;
             const fileName = filePath.split('/').pop(); // Extract filename
-            const url = `/api/restore/download?peer_id=${currentBackup.peer_id}&backup=${encodeURIComponent(currentBackup.share_name)}&file=${encodeURIComponent(filePath)}`;
+            const url = `/api/restore/download?peer_id=${currentBackup.peer_id}&backup=${encodeURIComponent(currentBackup.share_name)}&file=${encodeURIComponent(filePath)}&source_server=${encodeURIComponent(currentBackup.source_server)}`;
 
             try {
                 // Use fetch to get the file as a blob (this forces download even for PDFs)
@@ -536,7 +537,7 @@
 
             // Build the download URL with selected items
             const paths = Array.from(selectedItems);
-            const url = `/api/restore/download-multiple?peer_id=${currentBackup.peer_id}&backup=${encodeURIComponent(currentBackup.share_name)}`;
+            const url = `/api/restore/download-multiple?peer_id=${currentBackup.peer_id}&backup=${encodeURIComponent(currentBackup.share_name)}&source_server=${encodeURIComponent(currentBackup.source_server)}`;
 
             // Create a form to POST the paths
             const form = document.createElement('form');
