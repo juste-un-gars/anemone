@@ -50,7 +50,7 @@
                 {{T .Lang "dashboard.admin.title"}}
             </h2>
             <p class="mt-2 text-gray-600">
-                Bienvenue, {{.Session.Username}} !
+                {{T .Lang "dashboard.welcome_admin"}}, {{.Session.Username}} !
             </p>
         </div>
 
@@ -157,7 +157,7 @@
                     {{T .Lang "dashboard.users"}}
                 </h3>
                 <p class="text-sm text-gray-600 mb-4">
-                    Gérer les utilisateurs et créer des comptes
+                    {{T .Lang "dashboard.users.description"}}
                 </p>
                 <a href="/admin/users" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
                     {{T .Lang "users.title"}}
@@ -167,13 +167,13 @@
             <!-- Shares Card -->
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    📂 Mes partages
+                    📂 {{T .Lang "shares.list"}}
                 </h3>
                 <p class="text-sm text-gray-600 mb-4">
-                    Gérer vos partages SMB/NFS
+                    {{T .Lang "dashboard.shares.description"}}
                 </p>
                 <a href="/admin/shares" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
-                    Voir tous les partages
+                    {{T .Lang "dashboard.shares.button"}}
                 </a>
             </div>
 
@@ -196,49 +196,49 @@
                     {{T .Lang "dashboard.peers"}}
                 </h3>
                 <p class="text-sm text-gray-600 mb-4">
-                    Gérer les pairs pour la sauvegarde
+                    {{T .Lang "dashboard.peers.description"}}
                 </p>
                 <a href="/admin/peers" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
-                    Gérer les pairs
+                    {{T .Lang "dashboard.peers.button"}}
                 </a>
             </div>
 
             <!-- Incoming Backups Card -->
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    👥 Pairs connectés
+                    👥 {{T .Lang "dashboard.incoming.title"}}
                 </h3>
                 <p class="text-sm text-gray-600 mb-4">
-                    Voir les serveurs distants qui stockent des backups sur ce serveur
+                    {{T .Lang "dashboard.incoming.description"}}
                 </p>
                 <a href="/admin/incoming" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
-                    Voir les backups entrants
+                    {{T .Lang "dashboard.incoming.button"}}
                 </a>
             </div>
 
             <!-- Server Settings Card -->
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    🔐 Paramètres serveur
+                    🔐 {{T .Lang "dashboard.server_settings.title"}}
                 </h3>
                 <p class="text-sm text-gray-600 mb-4">
-                    Configurer le mot de passe de synchronisation du serveur
+                    {{T .Lang "dashboard.server_settings.description"}}
                 </p>
                 <a href="/admin/settings" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
-                    Paramètres
+                    {{T .Lang "dashboard.server_settings.button"}}
                 </a>
             </div>
 
             <!-- Server Backup Card -->
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    💾 Sauvegarde serveur
+                    💾 {{T .Lang "dashboard.server_backup.title"}}
                 </h3>
                 <p class="text-sm text-gray-600 mb-4">
-                    Gérer les sauvegardes automatiques du serveur (backup quotidien à 4h)
+                    {{T .Lang "dashboard.server_backup.description"}}
                 </p>
                 <a href="/admin/backup" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
-                    Gérer les sauvegardes
+                    {{T .Lang "dashboard.server_backup.button"}}
                 </a>
             </div>
         </div>
