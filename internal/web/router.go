@@ -3513,6 +3513,14 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Get current server name to filter backups
+	currentServerName, err := sync.GetServerName(s.db)
+	if err != nil {
+		log.Printf("Error getting server name: %v", err)
+		http.Error(w, "Failed to get server name", http.StatusInternalServerError)
+		return
+	}
+
 	// Get all configured peers
 	allPeers, err := peers.GetAll(s.db)
 	if err != nil {
@@ -3593,18 +3601,21 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 			continue
 		}
 
-		// Add peer info to each backup
+		// Add peer info to each backup (filter by current server name)
 		for _, backup := range peerBackups {
-			allBackups = append(allBackups, PeerBackup{
-				PeerID:       peer.ID,
-				PeerName:     peer.Name,
-				PeerAddress:  peer.Address,
-				SourceServer: backup.SourceServer,
-				ShareName:    backup.ShareName,
-				FileCount:    backup.FileCount,
-				TotalSize:    backup.TotalSize,
-				LastModified: backup.LastModified,
-			})
+			// Only show backups from the current server
+			if backup.SourceServer == currentServerName {
+				allBackups = append(allBackups, PeerBackup{
+					PeerID:       peer.ID,
+					PeerName:     peer.Name,
+					PeerAddress:  peer.Address,
+					SourceServer: backup.SourceServer,
+					ShareName:    backup.ShareName,
+					FileCount:    backup.FileCount,
+					TotalSize:    backup.TotalSize,
+					LastModified: backup.LastModified,
+				})
+			}
 		}
 	}
 
