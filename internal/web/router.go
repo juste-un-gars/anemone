@@ -4913,6 +4913,14 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 
 	lang := s.getLang(r)
 
+	// Get current server name to filter backups
+	currentServerName, err := sync.GetServerName(s.db)
+	if err != nil {
+		log.Printf("Error getting server name: %v", err)
+		http.Error(w, "Failed to get server name", http.StatusInternalServerError)
+		return
+	}
+
 	// Get all users (except admin)
 	rows, err := s.db.Query("SELECT id, username FROM users WHERE is_admin = 0 ORDER BY username")
 	if err != nil {
@@ -5003,19 +5011,22 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 				continue
 			}
 
-			// Add to results
+			// Add to results (filter by current server name)
 			for _, backup := range peerBackups {
-				allBackups = append(allBackups, UserBackup{
-					UserID:       userID,
-					Username:     username,
-					PeerID:       peer.ID,
-					PeerName:     peer.Name,
-					SourceServer: backup.SourceServer,
-					ShareName:    backup.ShareName,
-					FileCount:    backup.FileCount,
-					TotalSize:    backup.TotalSize,
-					LastModified: backup.LastModified,
-				})
+				// Only show backups from the current server
+				if backup.SourceServer == currentServerName {
+					allBackups = append(allBackups, UserBackup{
+						UserID:       userID,
+						Username:     username,
+						PeerID:       peer.ID,
+						PeerName:     peer.Name,
+						SourceServer: backup.SourceServer,
+						ShareName:    backup.ShareName,
+						FileCount:    backup.FileCount,
+						TotalSize:    backup.TotalSize,
+						LastModified: backup.LastModified,
+					})
+				}
 			}
 		}
 	}
