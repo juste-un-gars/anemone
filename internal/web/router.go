@@ -86,10 +86,17 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		log.Printf("Warning: Failed to initialize i18n: %v", err)
 	}
 
-	// Create template with translation function
+	// Create template with translation function and server name
 	funcMap := template.FuncMap{
 		"T": func(lang, key string) string {
 			return i18n.T(lang, key)
+		},
+		"ServerName": func() string {
+			serverName, err := sync.GetServerName(db)
+			if err != nil {
+				return "Anemone Server"
+			}
+			return serverName
 		},
 		"divf": func(a, b int64) float64 {
 			return float64(a) / float64(b)
@@ -333,6 +340,15 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// getServerName gets the server name from system_config
+func (s *Server) getServerName() string {
+	serverName, err := sync.GetServerName(s.db)
+	if err != nil {
+		return "Anemone Server" // Fallback
+	}
+	return serverName
 }
 
 // getLang gets language from user preference (DB), query param, or config
