@@ -365,10 +365,10 @@ fi
 
 # Insert sync_config (if it exists in backup)
 if echo "$DECRYPTED_JSON" | jq -e '.sync_config' > /dev/null 2>&1; then
-    SYNC_ENABLED=$(echo "$DECRYPTED_JSON" | jq -r '.sync_config.enabled // 0')
     SYNC_INTERVAL=$(echo "$DECRYPTED_JSON" | jq -r '.sync_config.interval // "1h"')
     FIXED_HOUR=$(echo "$DECRYPTED_JSON" | jq -r '.sync_config.fixed_hour // 23')
-    sqlite3 "$DB_FILE" "INSERT INTO sync_config (id, enabled, interval, fixed_hour) VALUES (1, $SYNC_ENABLED, '$SYNC_INTERVAL', $FIXED_HOUR);"
+    # Always disable auto-sync after restoration to prevent accidental data synchronization
+    sqlite3 "$DB_FILE" "INSERT INTO sync_config (id, enabled, interval, fixed_hour) VALUES (1, 0, '$SYNC_INTERVAL', $FIXED_HOUR);"
 fi
 
 # Add server restoration flags
