@@ -48,7 +48,7 @@
                     {{T .Lang "users.title"}}
                 </h2>
                 <p class="mt-2 text-gray-600">
-                    Gérer les comptes utilisateurs et créer de nouveaux comptes
+                    {{T .Lang "users.page.description"}}
                 </p>
             </div>
             <a href="/admin/users/add" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
@@ -151,8 +151,8 @@
             <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
             </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">Aucun utilisateur</h3>
-            <p class="mt-1 text-sm text-gray-500">Commencez par créer un nouvel utilisateur.</p>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">{{T .Lang "users.empty.title"}}</h3>
+            <p class="mt-1 text-sm text-gray-500">{{T .Lang "users.empty.message"}}</p>
             <div class="mt-6">
                 <a href="/admin/users/add" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
                     <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -167,40 +167,44 @@
 </div>
 
 <script>
+const translations = {
+    deleteWarningTitle: "{{T .Lang "users.delete.warning_title"}}",
+    deleteWarningMessage: "{{T .Lang "users.delete.warning_message"}}",
+    deleteWarningPrompt: "{{T .Lang "users.delete.warning_prompt"}}",
+    deleteConfirm: "{{T .Lang "users.delete.final_confirm"}}",
+    deleteSuccess: "{{T .Lang "users.delete.success"}}",
+    deleteError: "{{T .Lang "users.delete.error"}}",
+    deleteErrorPrefix: "{{T .Lang "users.delete.error_prefix"}}",
+    deleteCancelled: "{{T .Lang "users.delete.cancelled"}}"
+};
+
 function deleteUser(userId, username) {
-    const warningMessage = `⚠️ ATTENTION : SUPPRESSION DÉFINITIVE ⚠️
+    const warningMessage = `${translations.deleteWarningTitle}
 
-Cette action va supprimer DÉFINITIVEMENT :
-• L'utilisateur "${username}" de la base de données
-• TOUS les partages SMB de cet utilisateur
-• TOUS LES FICHIERS sur le disque (backup + data)
-• L'utilisateur système Linux
-• L'utilisateur Samba
+${translations.deleteWarningMessage}
+• ${username}
 
-Cette action est IRRÉVERSIBLE !
-Tous les fichiers de l'utilisateur seront perdus.
-
-Tapez le nom d'utilisateur pour confirmer : "${username}"`;
+${translations.deleteWarningPrompt}`;
 
     const confirmation = prompt(warningMessage);
 
     if (confirmation === username) {
-        if (confirm('Dernière confirmation : Êtes-vous absolument certain de vouloir supprimer cet utilisateur et TOUTES ses données ?')) {
+        if (confirm(translations.deleteConfirm)) {
             fetch('/admin/users/' + userId + '/delete', {
                 method: 'POST',
             }).then(response => {
                 if (response.ok) {
-                    alert('✅ Utilisateur et toutes ses données supprimés avec succès');
+                    alert(translations.deleteSuccess);
                     window.location.reload();
                 } else {
-                    response.text().then(text => alert('❌ Erreur lors de la suppression : ' + text));
+                    response.text().then(text => alert(translations.deleteErrorPrefix + text));
                 }
             }).catch(error => {
-                alert('❌ Erreur : ' + error);
+                alert(translations.deleteError + error);
             });
         }
     } else if (confirmation !== null) {
-        alert('❌ Le nom d\'utilisateur ne correspond pas. Suppression annulée.');
+        alert(translations.deleteCancelled);
     }
 }
 </script>

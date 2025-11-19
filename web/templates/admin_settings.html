@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paramètres de sécurité - Anemone</title>
+    <title>{{T .Lang "admin.settings.title"}} - Anemone</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .anemone-gradient {
@@ -22,13 +22,13 @@
                         🪸 Anemone - {{ServerName}}
                     </a>
                     <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
-                        Admin
+                        {{T .Lang "users.role.admin"}}
                     </span>
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-sm text-gray-700">{{.Session.Username}}</span>
                     <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
-                        Déconnexion
+                        {{T .Lang "dashboard.logout"}}
                     </a>
                 </div>
             </div>
@@ -43,13 +43,13 @@
                 <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                 </svg>
-                Retour au dashboard
+                {{T .Lang "admin.settings.back_dashboard"}}
             </a>
             <h2 class="text-3xl font-bold text-gray-900 mt-2">
-                🔐 Sécurité de la synchronisation P2P
+                🔐 {{T .Lang "admin.settings.sync_security"}}
             </h2>
             <p class="mt-2 text-sm text-gray-600">
-                Protégez votre serveur contre les connexions non autorisées
+                {{T .Lang "admin.settings.sync_description"}}
             </p>
         </div>
 
@@ -86,7 +86,7 @@
         <!-- Sync Auth Password Configuration -->
         <div class="bg-white shadow rounded-lg p-6 mb-6">
             <h3 class="text-lg font-medium text-gray-900 mb-4">
-                Mot de passe de synchronisation
+                {{T .Lang "admin.settings.sync_password"}}
             </h3>
 
             {{if .IsConfigured}}
@@ -98,9 +98,9 @@
                         </svg>
                     </div>
                     <div class="ml-3">
-                        <h4 class="text-sm font-medium text-green-800">Mot de passe configuré</h4>
+                        <h4 class="text-sm font-medium text-green-800">{{T .Lang "admin.settings.password_configured"}}</h4>
                         <p class="mt-1 text-sm text-green-700">
-                            Les endpoints de synchronisation sont protégés. Les pairs doivent fournir le bon mot de passe pour envoyer des backups sur ce serveur.
+                            {{T .Lang "admin.settings.password_configured_help"}}
                         </p>
                     </div>
                 </div>
@@ -114,9 +114,9 @@
                         </svg>
                     </div>
                     <div class="ml-3">
-                        <h4 class="text-sm font-medium text-yellow-800">Aucun mot de passe configuré</h4>
+                        <h4 class="text-sm font-medium text-yellow-800">{{T .Lang "admin.settings.no_password"}}</h4>
                         <p class="mt-1 text-sm text-yellow-700">
-                            ⚠️ N'importe quel serveur peut stocker des backups sur ce serveur sans authentification. Configurez un mot de passe pour sécuriser l'accès.
+                            {{T .Lang "admin.settings.no_password_warning"}}
                         </p>
                     </div>
                 </div>
@@ -126,31 +126,31 @@
             <form method="POST" action="/admin/settings/sync-password" class="space-y-4">
                 <div>
                     <label for="password" class="block text-sm font-medium text-gray-700">
-                        {{if .IsConfigured}}Nouveau mot de passe{{else}}Mot de passe{{end}}
+                        {{if .IsConfigured}}{{T .Lang "admin.settings.new_password"}}{{else}}{{T .Lang "admin.settings.password"}}{{end}}
                     </label>
                     <input type="password" id="password" name="password" required minlength="8"
                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                           placeholder="Minimum 8 caractères">
+                           placeholder="{{T .Lang "admin.settings.password_placeholder"}}">
                     <p class="mt-1 text-sm text-gray-500">
-                        Ce mot de passe devra être configuré sur les pairs qui souhaitent envoyer des backups vers ce serveur.
+                        {{T .Lang "admin.settings.password_help"}}
                     </p>
                 </div>
 
                 <div>
                     <label for="password_confirm" class="block text-sm font-medium text-gray-700">
-                        Confirmer le mot de passe
+                        {{T .Lang "admin.settings.confirm_password"}}
                     </label>
                     <input type="password" id="password_confirm" name="password_confirm" required minlength="8"
                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                           placeholder="Confirmer le mot de passe">
+                           placeholder="{{T .Lang "admin.settings.confirm_placeholder"}}">
                 </div>
 
                 <div class="flex justify-end space-x-3">
                     <a href="/dashboard" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                        Annuler
+                        {{T .Lang "common.cancel"}}
                     </a>
                     <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white anemone-gradient hover:opacity-90">
-                        {{if .IsConfigured}}Modifier le mot de passe{{else}}Configurer le mot de passe{{end}}
+                        {{if .IsConfigured}}{{T .Lang "admin.settings.change_password"}}{{else}}{{T .Lang "admin.settings.configure_password"}}{{end}}
                     </button>
                 </div>
             </form>
@@ -165,19 +165,19 @@
                     </svg>
                 </div>
                 <div class="ml-3">
-                    <h4 class="text-sm font-medium text-blue-800">Comment ça fonctionne ?</h4>
+                    <h4 class="text-sm font-medium text-blue-800">{{T .Lang "admin.settings.how_it_works"}}</h4>
                     <div class="mt-2 text-sm text-blue-700 space-y-2">
                         <p>
-                            • Le mot de passe configuré ici protège les endpoints <code class="bg-blue-100 px-1 rounded">/api/sync/*</code> de ce serveur
+                            • {{T .Lang "admin.settings.info_1"}}
                         </p>
                         <p>
-                            • Lorsqu'un pair souhaite envoyer des backups vers ce serveur, il doit fournir ce mot de passe
+                            • {{T .Lang "admin.settings.info_2"}}
                         </p>
                         <p>
-                            • Le mot de passe est envoyé dans le header HTTP <code class="bg-blue-100 px-1 rounded">X-Sync-Password</code>
+                            • {{T .Lang "admin.settings.info_3"}}
                         </p>
                         <p>
-                            • Si le mot de passe est incorrect ou manquant, la synchronisation est rejetée (401/403)
+                            • {{T .Lang "admin.settings.info_4"}}
                         </p>
                     </div>
                 </div>

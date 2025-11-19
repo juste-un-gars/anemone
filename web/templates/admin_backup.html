@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sauvegardes serveur - Anemone</title>
+    <title>{{T .Lang "backup.title"}} - Anemone</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         .anemone-gradient {
@@ -22,13 +22,13 @@
                         🪸 Anemone - {{ServerName}}
                     </a>
                     <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
-                        Admin
+                        {{T .Lang "users.role.admin"}}
                     </span>
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-sm text-gray-700">{{.Session.Username}}</span>
                     <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
-                        Déconnexion
+                        {{T .Lang "dashboard.logout"}}
                     </a>
                 </div>
             </div>
@@ -38,26 +38,26 @@
     <!-- Main Content -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div class="mb-6">
-            <a href="/admin" class="text-purple-600 hover:text-purple-800">← Retour au dashboard</a>
+            <a href="/admin" class="text-purple-600 hover:text-purple-800">← {{T .Lang "backup.back_dashboard"}}</a>
         </div>
 
         <!-- Header -->
         <div class="mb-8">
-            <h2 class="text-3xl font-bold text-gray-900">💾 Sauvegardes serveur</h2>
+            <h2 class="text-3xl font-bold text-gray-900">💾 {{T .Lang "backup.title"}}</h2>
             <p class="mt-2 text-gray-600">
-                Backups automatiques quotidiens à 4h du matin • Conservation des 10 derniers
+                {{T .Lang "backup.schedule_info"}}
             </p>
         </div>
 
         <!-- Manual Backup -->
         <div class="bg-white shadow rounded-lg p-6 mb-8">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Sauvegarde manuelle</h3>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">{{T .Lang "backup.manual.title"}}</h3>
             <p class="text-sm text-gray-600 mb-4">
-                Créer une sauvegarde immédiate de la configuration du serveur
+                {{T .Lang "backup.manual.description"}}
             </p>
             <form method="POST" action="/admin/backup/create">
                 <button type="submit" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
-                    📥 Sauvegarder maintenant
+                    📥 {{T .Lang "backup.manual.button"}}
                 </button>
             </form>
         </div>
@@ -65,7 +65,7 @@
         <!-- Backups List -->
         <div class="bg-white shadow rounded-lg">
             <div class="px-6 py-4 border-b border-gray-200">
-                <h3 class="text-lg font-semibold text-gray-900">Dernières sauvegardes</h3>
+                <h3 class="text-lg font-semibold text-gray-900">{{T .Lang "backup.list.title"}}</h3>
             </div>
 
             {{if .Backups}}
@@ -90,10 +90,10 @@
                         </div>
                         <div class="flex space-x-2">
                             <button onclick="downloadBackup('{{.Filename}}')" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                                📥 Télécharger
+                                📥 {{T $.Lang "backup.action.download"}}
                             </button>
                             <button onclick="deleteBackup('{{.Filename}}')" class="inline-flex items-center px-3 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50">
-                                🗑️ Supprimer
+                                🗑️ {{T $.Lang "backup.action.delete"}}
                             </button>
                         </div>
                     </div>
@@ -105,9 +105,9 @@
                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                 </svg>
-                <h3 class="mt-2 text-sm font-medium text-gray-900">Aucune sauvegarde</h3>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">{{T .Lang "backup.empty.title"}}</h3>
                 <p class="mt-1 text-sm text-gray-500">
-                    Créez une sauvegarde manuelle ou attendez la prochaine sauvegarde automatique
+                    {{T .Lang "backup.empty.message"}}
                 </p>
             </div>
             {{end}}
@@ -115,13 +115,13 @@
 
         <!-- Info Box -->
         <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h4 class="text-sm font-semibold text-blue-900 mb-2">ℹ️ Informations importantes</h4>
+            <h4 class="text-sm font-semibold text-blue-900 mb-2">ℹ️ {{T .Lang "backup.info.title"}}</h4>
             <ul class="text-sm text-blue-800 space-y-1">
-                <li>• Les sauvegardes sont chiffrées et stockées sur le serveur</li>
-                <li>• Lors du téléchargement, vous devrez choisir un mot de passe pour sécuriser le fichier</li>
-                <li>• Conservez précieusement ce mot de passe, vous en aurez besoin pour la restauration</li>
-                <li>• Les sauvegardes incluent : utilisateurs, partages, pairs, configuration système</li>
-                <li>• Les fichiers utilisateurs ne sont PAS inclus dans les sauvegardes serveur</li>
+                <li>• {{T .Lang "backup.info.encrypted"}}</li>
+                <li>• {{T .Lang "backup.info.password_required"}}</li>
+                <li>• {{T .Lang "backup.info.keep_password"}}</li>
+                <li>• {{T .Lang "backup.info.includes"}}</li>
+                <li>• {{T .Lang "backup.info.no_files"}}</li>
             </ul>
         </div>
     </div>
@@ -137,7 +137,7 @@
                 <div class="sm:flex sm:items-start">
                     <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
                         <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">
-                            Télécharger la sauvegarde
+                            {{T .Lang "backup.download.title"}}
                         </h3>
 
                         <form id="downloadForm" method="POST" action="/admin/backup/download">
@@ -145,39 +145,39 @@
 
                             <div class="mb-4">
                                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Mot de passe de chiffrement
+                                    {{T .Lang "backup.download.password"}}
                                 </label>
                                 <input type="password" name="passphrase" id="passphrase" required minlength="12"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                    placeholder="Minimum 12 caractères">
+                                    placeholder="{{T .Lang "backup.download.password_placeholder"}}">
                                 <p class="mt-1 text-xs text-gray-500">
-                                    Ce mot de passe chiffrera le fichier téléchargé
+                                    {{T .Lang "backup.download.password_help"}}
                                 </p>
                             </div>
 
                             <div class="mb-4">
                                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Confirmer le mot de passe
+                                    {{T .Lang "backup.download.confirm"}}
                                 </label>
                                 <input type="password" name="passphrase_confirm" id="passphrase_confirm" required minlength="12"
                                     class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                    placeholder="Saisir à nouveau">
+                                    placeholder="{{T .Lang "backup.download.confirm_placeholder"}}">
                             </div>
 
                             <div class="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
                                 <p class="text-xs text-yellow-800">
-                                    ⚠️ <strong>Notez ce mot de passe !</strong> Vous en aurez besoin pour restaurer le serveur.
+                                    {{T .Lang "backup.download.warning"}}
                                 </p>
                             </div>
 
                             <div class="flex justify-end space-x-3">
                                 <button type="button" onclick="closeModal()"
                                     class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
-                                    Annuler
+                                    {{T .Lang "common.cancel"}}
                                 </button>
                                 <button type="submit"
                                     class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white anemone-gradient hover:opacity-90">
-                                    Télécharger
+                                    {{T .Lang "backup.action.download"}}
                                 </button>
                             </div>
                         </form>
@@ -189,6 +189,14 @@
 </div>
 
 <script>
+    const backupTranslations = {
+        deleteConfirm: "{{T .Lang "backup.delete.confirm"}}",
+        deleteSuccess: "{{T .Lang "backup.delete.success"}}",
+        deleteError: "{{T .Lang "backup.delete.error"}}",
+        passwordMismatch: "{{T .Lang "backup.download.error_mismatch"}}",
+        passwordTooShort: "{{T .Lang "backup.download.error_length"}}"
+    };
+
     function downloadBackup(filename) {
         document.getElementById('downloadFilename').value = filename;
         document.getElementById('downloadModal').classList.remove('hidden');
@@ -201,7 +209,7 @@
     }
 
     function deleteBackup(filename) {
-        if (!confirm('Êtes-vous sûr de vouloir supprimer cette sauvegarde ?\n\n' + filename + '\n\nCette action est irréversible.')) {
+        if (!confirm(backupTranslations.deleteConfirm + '\n\n' + filename)) {
             return;
         }
 
@@ -214,16 +222,16 @@
         })
         .then(response => {
             if (response.ok) {
-                alert('Sauvegarde supprimée avec succès');
+                alert(backupTranslations.deleteSuccess);
                 location.reload();
             } else {
                 return response.text().then(text => {
-                    throw new Error(text || 'Erreur lors de la suppression');
+                    throw new Error(text || backupTranslations.deleteError);
                 });
             }
         })
         .catch(error => {
-            alert('Erreur : ' + error.message);
+            alert(backupTranslations.deleteError + ': ' + error.message);
         });
     }
 
@@ -233,13 +241,13 @@
 
         if (passphrase !== confirm) {
             e.preventDefault();
-            alert('Les mots de passe ne correspondent pas !');
+            alert(backupTranslations.passwordMismatch);
             return;
         }
 
         if (passphrase.length < 12) {
             e.preventDefault();
-            alert('Le mot de passe doit contenir au moins 12 caractères');
+            alert(backupTranslations.passwordTooShort);
             return;
         }
     });
