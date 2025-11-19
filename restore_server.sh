@@ -440,7 +440,7 @@ fi
 TEMP_SMB_PASSWORD="anemone123"
 
 # Read users from database (password_encrypted is now re-encrypted with new master key)
-sqlite3 "$DB_FILE" "SELECT username, password_encrypted FROM users WHERE password_encrypted IS NOT NULL;" | while IFS='|' read -r USERNAME PASSWORD_ENCRYPTED_HEX; do
+sqlite3 "$DB_FILE" "SELECT username, hex(password_encrypted) FROM users WHERE password_encrypted IS NOT NULL;" | while IFS='|' read -r USERNAME PASSWORD_ENCRYPTED_HEX; do
     # Convert hex to base64 for decryption tool
     PASSWORD_ENCRYPTED=$(echo "$PASSWORD_ENCRYPTED_HEX" | xxd -r -p | base64)
 
