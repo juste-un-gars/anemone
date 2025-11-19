@@ -273,7 +273,7 @@ if [ $? -ne 0 ]; then
 fi
 echo -e "${GREEN}  ✓ Re-encryption tool compiled${NC}"
 
-# Insert users (with re-encrypted encryption keys)
+# Insert users (with re-encrypted encryption keys and passwords)
 echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
     ID=$(echo "$user" | jq -r '.id')
     USERNAME=$(echo "$user" | jq -r '.username')
@@ -297,12 +297,16 @@ echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
         exit 1
     fi
 
-    # Insert encryption_key_encrypted as TEXT (base64 string), not as BLOB
-    # The Go code expects to read a base64 string, not raw bytes
-
-    # Decode base64 password_encrypted (if exists) and insert as BLOB
-    if [ -n "$PASSWORD_ENCRYPTED" ]; then
-        PASS_ENC_HEX=$(echo "$PASSWORD_ENCRYPTED" | base64 -d | xxd -p | tr -d '\n')
+    # Re-encrypt password with new master key (if exists)
+    if [ -n "$PASSWORD_ENCRYPTED" ] && [ "$PASSWORD_ENCRYPTED" != "null" ]; then
+        NEW_PASSWORD_ENCRYPTED=$(/tmp/anemone-reencrypt-key "$PASSWORD_ENCRYPTED" "$OLD_MASTER_KEY" "$NEW_MASTER_KEY" 2>&1)
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error: Failed to re-encrypt password for user $USERNAME${NC}"
+            echo -e "${RED}$NEW_PASSWORD_ENCRYPTED${NC}"
+            exit 1
+        fi
+        # Decode base64 and insert as BLOB
+        PASS_ENC_HEX=$(echo "$NEW_PASSWORD_ENCRYPTED" | base64 -d | xxd -p | tr -d '\n')
         PASS_ENC_SQL="X'$PASS_ENC_HEX'"
     else
         PASS_ENC_SQL="NULL"
@@ -313,7 +317,7 @@ done
 
 # Count users to display success message
 USER_COUNT=$(echo "$DECRYPTED_JSON" | jq '.users | length')
-echo -e "${GREEN}  ✓ Re-encrypted encryption keys for $USER_COUNT users${NC}"
+echo -e "${GREEN}  ✓ Re-encrypted encryption keys and passwords for $USER_COUNT users${NC}"
 
 # Insert NEW master key into system_config
 CURRENT_TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
@@ -422,11 +426,12 @@ else
     DECRYPT_TOOL_AVAILABLE=true
 fi
 
-# Get master key from JSON
-MASTER_KEY=$(echo "$DECRYPTED_JSON" | jq -r '.system_config[] | select(.key == "master_key") | .value')
+# Use NEW master key to decrypt passwords (since they were re-encrypted with it)
+# Note: We re-encrypted passwords with NEW_MASTER_KEY in the user insertion loop above
+MASTER_KEY="$NEW_MASTER_KEY"
 
 if [ -z "$MASTER_KEY" ]; then
-    echo -e "${YELLOW}  ⚠️  Master key not found in backup${NC}"
+    echo -e "${YELLOW}  ⚠️  Master key not found${NC}"
     echo -e "${YELLOW}  Using temporary password instead${NC}"
     DECRYPT_TOOL_AVAILABLE=false
 fi
@@ -434,14 +439,14 @@ fi
 # Temporary SMB password (fallback)
 TEMP_SMB_PASSWORD="anemone123"
 
-echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
-    USERNAME=$(echo "$user" | jq -r '.username')
-    PASSWORD_ENCRYPTED=$(echo "$user" | jq -r '.password_encrypted // ""')
+# Read users from database (password_encrypted is now re-encrypted with new master key)
+sqlite3 "$DB_FILE" "SELECT username, password_encrypted FROM users WHERE password_encrypted IS NOT NULL;" | while IFS='|' read -r USERNAME PASSWORD_ENCRYPTED_HEX; do
+    # Convert hex to base64 for decryption tool
+    PASSWORD_ENCRYPTED=$(echo "$PASSWORD_ENCRYPTED_HEX" | xxd -r -p | base64)
 
-    # Try to decrypt password if tool is available and password_encrypted exists
-    if [ "$DECRYPT_TOOL_AVAILABLE" = true ] && [ -n "$PASSWORD_ENCRYPTED" ] && [ "$PASSWORD_ENCRYPTED" != "null" ]; then
-        # PASSWORD_ENCRYPTED is already base64 from JSON, use it directly
-        # Decrypt password
+    # Try to decrypt password if tool is available
+    if [ "$DECRYPT_TOOL_AVAILABLE" = true ] && [ -n "$PASSWORD_ENCRYPTED" ]; then
+        # Decrypt password using NEW master key
         DECRYPTED_PASSWORD=$(/tmp/anemone-decrypt-password "$PASSWORD_ENCRYPTED" "$MASTER_KEY" 2>/dev/null)
 
         if [ $? -eq 0 ] && [ -n "$DECRYPTED_PASSWORD" ]; then
@@ -461,6 +466,13 @@ echo "$DECRYPTED_JSON" | jq -r '.users[] | @json' | while read -r user; do
         smbpasswd -e "$USERNAME" 2>/dev/null || true
         echo -e "  ${YELLOW}○${NC} Created SMB user: $USERNAME (using temporary password: $TEMP_SMB_PASSWORD)"
     fi
+done
+
+# Also handle users without password_encrypted (just create with temp password)
+sqlite3 "$DB_FILE" "SELECT username FROM users WHERE password_encrypted IS NULL;" | while read -r USERNAME; do
+    (echo "$TEMP_SMB_PASSWORD"; echo "$TEMP_SMB_PASSWORD") | smbpasswd -a "$USERNAME" -s 2>/dev/null || true
+    smbpasswd -e "$USERNAME" 2>/dev/null || true
+    echo -e "  ${YELLOW}○${NC} Created SMB user: $USERNAME (using temporary password: $TEMP_SMB_PASSWORD)"
 done
 
 if [ "$DECRYPT_TOOL_AVAILABLE" = true ]; then
