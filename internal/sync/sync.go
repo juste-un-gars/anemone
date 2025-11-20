@@ -372,6 +372,13 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		return fmt.Errorf(errMsg)
 	}
 
+	// Debug log for delta
+	log.Printf("📊 Sync delta for user %d to peer %d: %d to add, %d to update, %d to delete",
+		req.UserID, req.PeerID, len(delta.ToAdd), len(delta.ToUpdate), len(delta.ToDelete))
+	if len(delta.ToDelete) > 0 {
+		log.Printf("🗑️  Files to delete: %v", delta.ToDelete)
+	}
+
 	var totalBytes int64 = 0
 	totalFiles := len(delta.ToAdd) + len(delta.ToUpdate)
 
@@ -480,6 +487,8 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
 			return fmt.Errorf(errMsg)
 		}
+
+		log.Printf("✅ Deleted obsolete file on peer: %s (encrypted: %s)", relativePath, remoteMeta.EncryptedPath)
 	}
 
 	// Marshal and encrypt updated manifest
