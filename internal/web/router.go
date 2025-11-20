@@ -1684,16 +1684,21 @@ func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get recent syncs (last 20)
+	recentSyncs := s.getRecentSyncs(20)
+
 	data := struct {
-		Lang    string
-		Title   string
-		Session *auth.Session
-		Peers   []*peers.Peer
+		Lang        string
+		Title       string
+		Session     *auth.Session
+		Peers       []*peers.Peer
+		RecentSyncs []SyncReportEntry
 	}{
-		Lang:    lang,
-		Title:   i18n.T(lang, "peers.title"),
-		Session: session,
-		Peers:   peersList,
+		Lang:        lang,
+		Title:       i18n.T(lang, "peers.title"),
+		Session:     session,
+		Peers:       peersList,
+		RecentSyncs: recentSyncs,
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_peers.html", data); err != nil {
