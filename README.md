@@ -109,10 +109,15 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 
 /srv/anemone/                    # Data (production)
 ├── db/anemone.db               # SQLite database
-├── shares/                     # User shares
+├── shares/                     # User shares (local data)
 │   └── username/
 │       ├── backup/             # Synced to peers
 │       └── data/               # Local only
+├── incoming/                   # Backups from remote peers
+│   └── source_server_name/     # Organized by source server
+│       └── username/           # Then by username
+│           └── share_name/     # Then by share name
+│               └── *.enc       # Encrypted backup files
 ├── certs/                      # TLS certificates
 └── smb/smb.conf                # Generated Samba config
 ```
