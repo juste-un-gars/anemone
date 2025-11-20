@@ -98,6 +98,8 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 │   ├── crypto/                  # Encryption utilities
 │   ├── quota/                   # Quota enforcement
 │   ├── trash/                   # Trash management
+│   ├── i18n/                    # Internationalization (FR/EN)
+│   │   └── locales/             # JSON translation files (fr.json, en.json)
 │   └── web/                     # HTTP handlers
 ├── web/
 │   ├── static/                  # CSS, JS, images
@@ -452,15 +454,33 @@ View and manage remote peers storing backups on your server:
 
 ## 🌍 Internationalization
 
-Supported languages:
-- 🇫🇷 French (Français)
-- 🇬🇧 English
+Anemone features a modern JSON-based internationalization system that makes it easy to add new languages.
+
+**Supported languages**:
+- 🇫🇷 French (Français) - 495 keys
+- 🇬🇧 English - 495 keys
 
 **Language Selection**:
 - Default language chosen during initial setup
 - Users can change their language anytime in **Settings** page
 - Language preference saved per user in database
-- All UI elements fully translated (templates, forms, buttons, messages)
+- All UI elements fully translated (templates, forms, buttons, messages, JavaScript)
+
+**Architecture**:
+- JSON-based translation files (`internal/i18n/locales/*.json`)
+- Single binary with embedded translations (`//go:embed`)
+- Easy to add new languages (~15 minutes)
+- Non-technical translators can contribute
+- Complete guide in `internal/i18n/locales/README.md`
+
+**Adding a new language**:
+1. Copy `internal/i18n/locales/fr.json` to `[language_code].json`
+2. Translate the 495 values
+3. Add 5 lines of code to `internal/i18n/i18n.go`
+4. Update `GetAvailableLanguages()`
+5. Compile and test
+
+See `internal/i18n/locales/README.md` for detailed instructions.
 
 ## 📊 Database Schema
 
@@ -902,7 +922,7 @@ echo "✓ Anemone removed (system users and SMB users NOT removed - see above)"
 
 ## 📝 Development Status
 
-**Current Status**: 🟢 PRODUCTION READY (All core features complete)
+**Current Status**: 🟡 BETA - All core features complete, pending long-term testing
 
 **Implemented** ✅:
 - [x] Setup page & initial configuration
@@ -977,11 +997,11 @@ echo "✓ Anemone removed (system users and SMB users NOT removed - see above)"
 - [ ] Per-peer sync frequency (daily/weekly/monthly snapshots)
 - [ ] Audit trail and logging system
 - [ ] Backup integrity verification tool
-- [ ] systemd service integration
 - [ ] Rate limiting (anti-bruteforce)
 - [ ] Advanced statistics and monitoring
 - [ ] Notification system (webhooks, Home Assistant, email)
 - [ ] Complete user guide with screenshots
+- [ ] Web-based admin restore interface improvements
 
 ## 🤝 Contributing
 
