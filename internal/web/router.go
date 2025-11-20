@@ -94,12 +94,17 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		log.Printf("Warning: Failed to initialize i18n: %v", err)
 	}
 
-	// Create template with translation function and server name
-	funcMap := template.FuncMap{
-		"T": func(lang, key string) string {
-			return i18n.T(lang, key)
-		},
-		"ServerName": func() string {
+	// Create translator instance
+	translator, err := i18n.New()
+	if err != nil {
+		log.Printf("Warning: Failed to create translator: %v", err)
+	}
+
+	// Start with translator's FuncMap (includes T with parameter support)
+	funcMap := translator.FuncMap()
+
+	// Add additional template functions
+	funcMap["ServerName"] = func() string {
 			serverName, err := sync.GetServerName(db)
 			if err != nil {
 				return "Anemone Server"
