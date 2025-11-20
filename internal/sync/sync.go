@@ -373,9 +373,18 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		return fmt.Errorf(errMsg)
 	}
 
+	// Debug log for manifests
+	log.Printf("📊 Sync user %d to peer %d:", req.UserID, req.PeerID)
+	log.Printf("   Local manifest has %d files", len(localManifest.Files))
+	if remoteManifest != nil {
+		log.Printf("   Remote manifest has %d files", len(remoteManifest.Files))
+	} else {
+		log.Printf("   Remote manifest is nil (first sync)")
+	}
+
 	// Debug log for delta
-	log.Printf("📊 Sync delta for user %d to peer %d: %d to add, %d to update, %d to delete",
-		req.UserID, req.PeerID, len(delta.ToAdd), len(delta.ToUpdate), len(delta.ToDelete))
+	log.Printf("   Delta: %d to add, %d to update, %d to delete",
+		len(delta.ToAdd), len(delta.ToUpdate), len(delta.ToDelete))
 	if len(delta.ToDelete) > 0 {
 		log.Printf("🗑️  Files to delete: %v", delta.ToDelete)
 	}
