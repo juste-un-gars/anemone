@@ -1685,14 +1685,49 @@ func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get recent syncs (last 20)
-	recentSyncs := s.getRecentSyncs(20)
+	type RecentSync struct {
+		Username    string
+		PeerName    string
+		StartedAt   time.Time
+		Status      string
+		FilesSynced int
+		BytesSynced int64
+	}
+
+	query := `
+		SELECT u.username, p.name, sl.started_at, sl.status, sl.files_synced, sl.bytes_synced
+		FROM sync_log sl
+		JOIN users u ON sl.user_id = u.id
+		JOIN peers p ON sl.peer_id = p.id
+		ORDER BY sl.started_at DESC
+		LIMIT 20
+	`
+
+	rows, err := s.db.Query(query)
+	if err != nil {
+		log.Printf("Error getting recent syncs: %v", err)
+		// Continue with empty list
+	}
+
+	var recentSyncs []RecentSync
+	if rows != nil {
+		defer rows.Close()
+		for rows.Next() {
+			var rs RecentSync
+			if err := rows.Scan(&rs.Username, &rs.PeerName, &rs.StartedAt, &rs.Status, &rs.FilesSynced, &rs.BytesSynced); err != nil {
+				log.Printf("Error scanning sync log: %v", err)
+				continue
+			}
+			recentSyncs = append(recentSyncs, rs)
+		}
+	}
 
 	data := struct {
 		Lang        string
 		Title       string
 		Session     *auth.Session
 		Peers       []*peers.Peer
-		RecentSyncs []SyncReportEntry
+		RecentSyncs []RecentSync
 	}{
 		Lang:        lang,
 		Title:       i18n.T(lang, "peers.title"),
