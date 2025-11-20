@@ -47,7 +47,7 @@
                 {{T .Lang "dashboard.user.title"}}
             </h2>
             <p class="mt-2 text-gray-600">
-                Bienvenue, {{.Session.Username}} !
+                {{T .Lang "dashboard.user.welcome" "username" .Session.Username}}
             </p>
         </div>
 
@@ -72,7 +72,7 @@
                                     {{.Stats.QuotaInfo.UsedBackupGB | printf "%.2f"}} GB
                                 </dd>
                                 <dd class="text-sm text-gray-500">
-                                    sur {{.Stats.QuotaInfo.QuotaBackupGB}} GB
+                                    {{T .Lang "dashboard.user.quota.on"}} {{.Stats.QuotaInfo.QuotaBackupGB}} GB
                                     ({{.Stats.QuotaInfo.PercentBackup | printf "%.1f"}}%)
                                 </dd>
                             </dl>
@@ -93,11 +93,11 @@
                         {{end}}
                     </div>
                     {{if eq .Stats.QuotaInfo.BackupAlertLevel "critical"}}
-                    <p class="text-xs text-red-600 mt-2 font-medium">⚠️ Quota dépassé</p>
+                    <p class="text-xs text-red-600 mt-2 font-medium">⚠️ {{T .Lang "dashboard.user.quota.exceeded"}}</p>
                     {{else if eq .Stats.QuotaInfo.BackupAlertLevel "danger"}}
-                    <p class="text-xs text-orange-600 mt-2 font-medium">⚠️ Quota presque atteint</p>
+                    <p class="text-xs text-orange-600 mt-2 font-medium">⚠️ {{T .Lang "dashboard.user.quota.almost_full"}}</p>
                     {{else if eq .Stats.QuotaInfo.BackupAlertLevel "warning"}}
-                    <p class="text-xs text-yellow-700 mt-2">⚠️ 75% utilisé</p>
+                    <p class="text-xs text-yellow-700 mt-2">⚠️ {{T .Lang "dashboard.user.quota.warning"}}</p>
                     {{end}}
                 </div>
             </div>
@@ -120,7 +120,7 @@
                                     {{.Stats.QuotaInfo.UsedDataGB | printf "%.2f"}} GB
                                 </dd>
                                 <dd class="text-sm text-gray-500">
-                                    sur {{.Stats.QuotaInfo.QuotaDataGB}} GB
+                                    {{T .Lang "dashboard.user.quota.on"}} {{.Stats.QuotaInfo.QuotaDataGB}} GB
                                     ({{.Stats.QuotaInfo.PercentData | printf "%.1f"}}%)
                                 </dd>
                             </dl>
@@ -212,13 +212,13 @@
             <!-- Restore -->
             <div class="bg-white shadow rounded-lg p-6">
                 <h3 class="text-lg font-medium text-gray-900 mb-4">
-                    📂 {{if eq .Lang "fr"}}Restauration{{else}}Restore Files{{end}}
+                    📂 {{T .Lang "dashboard.user.restore.title"}}
                 </h3>
                 <p class="text-sm text-gray-600 mb-4">
-                    {{if eq .Lang "fr"}}Restaurez vos fichiers depuis les sauvegardes chiffrées.{{else}}Restore your files from encrypted backups.{{end}}
+                    {{T .Lang "dashboard.user.restore.description"}}
                 </p>
                 <a href="/restore" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
-                    {{if eq .Lang "fr"}}Parcourir les backups{{else}}Browse backups{{end}}
+                    {{T .Lang "dashboard.user.restore.button"}}
                 </a>
             </div>
         </div>

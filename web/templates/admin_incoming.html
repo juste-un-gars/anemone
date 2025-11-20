@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pairs connectés - Anemone</title>
+    <title>{{T .Lang "admin.incoming.title"}} - Anemone</title>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -44,14 +44,10 @@
         <!-- Header -->
         <div class="mb-8">
             <h2 class="text-3xl font-bold text-gray-900">
-                👥 Pairs connectés à moi
+                👥 {{T .Lang "admin.incoming.title"}}
             </h2>
             <p class="mt-2 text-gray-600">
-                {{if eq .Lang "fr"}}
-                    Serveurs distants qui stockent des backups sur ce serveur
-                {{else}}
-                    Remote servers storing backups on this server
-                {{end}}
+                {{T .Lang "admin.incoming.description"}}
             </p>
         </div>
 
@@ -74,7 +70,7 @@
             <div class="bg-white overflow-hidden shadow rounded-lg">
                 <div class="px-4 py-5 sm:p-6">
                     <dt class="text-sm font-medium text-gray-500 truncate">
-                        {{if eq .Lang "fr"}}Pairs connectés{{else}}Connected Peers{{end}}
+                        {{T .Lang "admin.incoming.stats.peers"}}
                     </dt>
                     <dd class="mt-1 text-3xl font-semibold text-gray-900">
                         {{len .Backups}}
@@ -85,7 +81,7 @@
             <div class="bg-white overflow-hidden shadow rounded-lg">
                 <div class="px-4 py-5 sm:p-6">
                     <dt class="text-sm font-medium text-gray-500 truncate">
-                        {{if eq .Lang "fr"}}Fichiers stockés{{else}}Files Stored{{end}}
+                        {{T .Lang "admin.incoming.stats.files"}}
                     </dt>
                     <dd class="mt-1 text-3xl font-semibold text-gray-900">
                         {{.TotalFiles}}
@@ -96,7 +92,7 @@
             <div class="bg-white overflow-hidden shadow rounded-lg">
                 <div class="px-4 py-5 sm:p-6">
                     <dt class="text-sm font-medium text-gray-500 truncate">
-                        {{if eq .Lang "fr"}}Espace utilisé{{else}}Space Used{{end}}
+                        {{T .Lang "admin.incoming.stats.space"}}
                     </dt>
                     <dd class="mt-1 text-3xl font-semibold text-gray-900">
                         {{.TotalSize}}
@@ -111,22 +107,22 @@
                 <thead class="bg-gray-50">
                     <tr>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {{if eq .Lang "fr"}}Utilisateur{{else}}User{{end}}
+                            {{T .Lang "admin.incoming.table.user"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {{if eq .Lang "fr"}}Partage{{else}}Share{{end}}
+                            {{T .Lang "admin.incoming.table.share"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {{if eq .Lang "fr"}}Fichiers{{else}}Files{{end}}
+                            {{T .Lang "admin.incoming.table.files"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {{if eq .Lang "fr"}}Taille{{else}}Size{{end}}
+                            {{T .Lang "admin.incoming.table.size"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {{if eq .Lang "fr"}}Dernière modification{{else}}Last Modified{{end}}
+                            {{T .Lang "admin.incoming.table.modified"}}
                         </th>
                         <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Actions
+                            {{T .Lang "admin.incoming.table.actions"}}
                         </th>
                     </tr>
                 </thead>
@@ -167,10 +163,10 @@
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <form method="POST" action="/admin/incoming/delete" class="inline"
-                                  onsubmit="return confirm('{{if eq $.Lang "fr"}}Voulez-vous vraiment supprimer ce backup ?{{else}}Are you sure you want to delete this backup?{{end}}');">
+                                  onsubmit="return confirm('{{T $.Lang "admin.incoming.confirm_delete"}}');">
                                 <input type="hidden" name="path" value="{{.Path}}">
                                 <button type="submit" class="text-red-600 hover:text-red-900">
-                                    {{if eq $.Lang "fr"}}Supprimer{{else}}Delete{{end}}
+                                    {{T $.Lang "admin.incoming.action.delete"}}
                                 </button>
                             </form>
                         </td>
@@ -187,14 +183,10 @@
                       d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
             </svg>
             <h3 class="mt-2 text-sm font-medium text-gray-900">
-                {{if eq .Lang "fr"}}Aucun backup reçu{{else}}No backups received{{end}}
+                {{T .Lang "admin.incoming.empty.title"}}
             </h3>
             <p class="mt-1 text-sm text-gray-500">
-                {{if eq .Lang "fr"}}
-                    Aucun serveur distant ne stocke actuellement de backups sur ce serveur.
-                {{else}}
-                    No remote servers are currently storing backups on this server.
-                {{end}}
+                {{T .Lang "admin.incoming.empty.message"}}
             </p>
         </div>
         {{end}}
@@ -202,7 +194,7 @@
         <!-- Back Button -->
         <div class="mt-8">
             <a href="/dashboard" class="text-sm text-gray-600 hover:text-gray-900">
-                ← {{if eq .Lang "fr"}}Retour au tableau de bord{{else}}Back to dashboard{{end}}
+                ← {{T .Lang "admin.incoming.back_dashboard"}}
             </a>
         </div>
     </div>

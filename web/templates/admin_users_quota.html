@@ -135,22 +135,10 @@
                     </div>
                     <div class="ml-3 flex-1">
                         <h4 class="text-sm font-medium text-blue-800">
-                            {{if eq .Lang "fr"}}
-                            ℹ️ Note sur les quotas et la compression
-                            {{else}}
-                            ℹ️ Note about quotas and compression
-                            {{end}}
+                            {{T .Lang "users.quota.compression_note_title"}}
                         </h4>
                         <p class="mt-1 text-sm text-blue-700">
-                            {{if eq .Lang "fr"}}
-                            Les quotas sont appliqués sur l'espace disque <strong>réel</strong> utilisé.
-                            Grâce à la compression Btrfs, les utilisateurs peuvent stocker <strong>plus de données</strong>
-                            que la limite du quota (généralement 20-50% de plus selon le type de fichiers).
-                            {{else}}
-                            Quotas are applied to the <strong>actual</strong> disk space used.
-                            Thanks to Btrfs compression, users can store <strong>more data</strong>
-                            than the quota limit (typically 20-50% more depending on file types).
-                            {{end}}
+                            {{T .Lang "users.quota.compression_note_text"}}
                         </p>
                     </div>
                 </div>
@@ -170,11 +158,7 @@
                            required
                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
                     <p class="mt-1 text-sm text-gray-500">
-                        {{if eq .Lang "fr"}}
-                        Espace alloué pour les sauvegardes synchronisées
-                        {{else}}
-                        Space allocated for synchronized backups
-                        {{end}}
+                        {{T .Lang "users.quota.backup_help"}}
                     </p>
                 </div>
 
@@ -191,11 +175,7 @@
                            required
                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
                     <p class="mt-1 text-sm text-gray-500">
-                        {{if eq .Lang "fr"}}
-                        Espace alloué pour les données locales
-                        {{else}}
-                        Space allocated for local data
-                        {{end}}
+                        {{T .Lang "users.quota.data_help"}}
                     </p>
                 </div>
 
@@ -203,11 +183,7 @@
                 <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
                     <div class="flex justify-between items-center">
                         <span class="text-sm font-medium text-gray-700">
-                            {{if eq .Lang "fr"}}
-                            📊 Total (backup + data)
-                            {{else}}
-                            📊 Total (backup + data)
-                            {{end}}
+                            {{T .Lang "users.quota.total_label"}}
                         </span>
                         <span class="text-lg font-semibold text-purple-600" id="quota_total_display">
                             {{.User.QuotaTotalGB}} GB

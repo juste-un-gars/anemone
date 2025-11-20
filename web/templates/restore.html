@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{if eq .Lang "fr"}}Restaurer des fichiers{{else}}Restore Files{{end}} - Anemone</title>
+    <title>{{T .Lang "restore.title"}} - Anemone</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50">
@@ -17,17 +17,17 @@
                     </div>
                     <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
                         <a href="/dashboard" class="text-gray-500 hover:text-gray-700 inline-flex items-center px-1 pt-1 text-sm font-medium">
-                            {{if eq .Lang "fr"}}Tableau de bord{{else}}Dashboard{{end}}
+                            {{T .Lang "restore.nav.dashboard"}}
                         </a>
                         <a href="/restore" class="border-b-2 border-blue-500 text-gray-900 inline-flex items-center px-1 pt-1 text-sm font-medium">
-                            {{if eq .Lang "fr"}}Restauration{{else}}Restore{{end}}
+                            {{T .Lang "restore.nav.restore"}}
                         </a>
                     </div>
                 </div>
                 <div class="flex items-center">
                     <span class="text-sm text-gray-700">{{.Session.Username}}</span>
                     <a href="/logout" class="ml-4 px-4 py-2 text-sm text-gray-700 hover:text-gray-900">
-                        {{if eq .Lang "fr"}}Déconnexion{{else}}Logout{{end}}
+                        {{T .Lang "dashboard.logout"}}
                     </a>
                 </div>
             </div>
@@ -37,29 +37,29 @@
     <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div class="px-4 py-6 sm:px-0">
             <h1 class="text-3xl font-bold text-gray-900 mb-6">
-                {{if eq .Lang "fr"}}Restaurer des fichiers{{else}}Restore Files{{end}}
+                {{T .Lang "restore.page_title"}}
             </h1>
 
             <!-- Backup selection -->
             <div class="bg-white shadow rounded-lg p-6 mb-6">
                 <label for="backup-select" class="block text-sm font-medium text-gray-700 mb-2">
-                    {{if eq .Lang "fr"}}Sélectionnez un backup{{else}}Select a backup{{end}}
+                    {{T .Lang "restore.select_backup"}}
                 </label>
                 <select id="backup-select" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                    <option value="">{{if eq .Lang "fr"}}Choisir un backup...{{else}}Choose a backup...{{end}}</option>
+                    <option value="">{{T .Lang "restore.choose_backup"}}</option>
                 </select>
                 <div id="backup-info" class="mt-4 hidden">
                     <div class="grid grid-cols-3 gap-4 text-sm">
                         <div>
-                            <span class="text-gray-500">{{if eq .Lang "fr"}}Fichiers:{{else}}Files:{{end}}</span>
+                            <span class="text-gray-500">{{T .Lang "restore.backup_info.files"}}</span>
                             <span id="backup-file-count" class="ml-2 font-semibold">-</span>
                         </div>
                         <div>
-                            <span class="text-gray-500">{{if eq .Lang "fr"}}Taille:{{else}}Size:{{end}}</span>
+                            <span class="text-gray-500">{{T .Lang "restore.backup_info.size"}}</span>
                             <span id="backup-size" class="ml-2 font-semibold">-</span>
                         </div>
                         <div>
-                            <span class="text-gray-500">{{if eq .Lang "fr"}}Dernière modif.:{{else}}Last modified:{{end}}</span>
+                            <span class="text-gray-500">{{T .Lang "restore.backup_info.modified"}}</span>
                             <span id="backup-date" class="ml-2 font-semibold">-</span>
                         </div>
                     </div>
@@ -69,7 +69,7 @@
             <!-- Loading state -->
             <div id="loading" class="hidden bg-white shadow rounded-lg p-12 text-center">
                 <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                <p class="mt-4 text-gray-600">{{if eq .Lang "fr"}}Chargement des fichiers...{{else}}Loading files...{{end}}</p>
+                <p class="mt-4 text-gray-600">{{T .Lang "restore.loading"}}</p>
             </div>
 
             <!-- File browser -->
@@ -92,19 +92,19 @@
                 <!-- Selection toolbar -->
                 <div id="selection-toolbar" class="hidden bg-blue-50 px-6 py-3 border-b border-blue-200 flex items-center justify-between">
                     <div class="flex items-center space-x-4">
-                        <span id="selection-count" class="text-sm font-medium text-blue-900">0 {{if eq .Lang "fr"}}élément(s) sélectionné(s){{else}}item(s) selected{{end}}</span>
+                        <span id="selection-count" class="text-sm font-medium text-blue-900">0 {{T .Lang "restore.selection.count"}}</span>
                         <button onclick="selectAll()" class="text-sm text-blue-600 hover:text-blue-800">
-                            {{if eq .Lang "fr"}}Tout sélectionner{{else}}Select all{{end}}
+                            {{T .Lang "restore.selection.select_all"}}
                         </button>
                         <button onclick="clearSelection()" class="text-sm text-blue-600 hover:text-blue-800">
-                            {{if eq .Lang "fr"}}Désélectionner tout{{else}}Clear selection{{end}}
+                            {{T .Lang "restore.selection.clear"}}
                         </button>
                     </div>
                     <button onclick="downloadSelection()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
                         <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
-                        {{if eq .Lang "fr"}}Télécharger (ZIP){{else}}Download (ZIP){{end}}
+                        {{T .Lang "restore.selection.download"}}
                     </button>
                 </div>
 
@@ -117,16 +117,16 @@
                                     <input type="checkbox" id="select-all-checkbox" onchange="toggleSelectAll()" class="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500">
                                 </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    {{if eq .Lang "fr"}}Nom{{else}}Name{{end}}
+                                    {{T .Lang "restore.file_browser.name"}}
                                 </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    {{if eq .Lang "fr"}}Taille{{else}}Size{{end}}
+                                    {{T .Lang "restore.file_browser.size"}}
                                 </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    {{if eq .Lang "fr"}}Modifié{{else}}Modified{{end}}
+                                    {{T .Lang "restore.file_browser.modified"}}
                                 </th>
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    {{if eq .Lang "fr"}}Actions{{else}}Actions{{end}}
+                                    {{T .Lang "restore.file_browser.actions"}}
                                 </th>
                             </tr>
                         </thead>
@@ -142,14 +142,22 @@
                 <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                 </svg>
-                <h3 class="mt-2 text-sm font-medium text-gray-900">{{if eq .Lang "fr"}}Aucun backup disponible{{else}}No backups available{{end}}</h3>
-                <p class="mt-1 text-sm text-gray-500">{{if eq .Lang "fr"}}Aucune sauvegarde n'a encore été effectuée.{{else}}No backups have been created yet.{{end}}</p>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">{{T .Lang "restore.empty.title"}}</h3>
+                <p class="mt-1 text-sm text-gray-500">{{T .Lang "restore.empty.message"}}</p>
             </div>
         </div>
     </div>
 
     <script>
         const lang = '{{.Lang}}';
+        const t = {
+            errorLoadingBackups: '{{T .Lang "restore.error.loading"}}',
+            errorLoadingFiles: '{{T .Lang "restore.error.files"}}',
+            downloadAction: '{{T .Lang "restore.action.download"}}',
+            errorDownload: '{{T .Lang "restore.error.download"}}',
+            selectionCount: '{{T .Lang "restore.selection.count"}}',
+            errorSelection: '{{T .Lang "restore.error.selection"}}'
+        };
         let backups = [];
         let currentBackup = null;
         let currentPath = '/';
@@ -209,7 +217,7 @@
                 });
             } catch (error) {
                 console.error('Error loading backups:', error);
-                alert(lang === 'fr' ? 'Erreur lors du chargement des backups' : 'Error loading backups');
+                alert(t.errorLoadingBackups);
             }
         }
 
@@ -227,7 +235,7 @@
                 document.getElementById('file-browser').classList.remove('hidden');
             } catch (error) {
                 console.error('Error loading files:', error);
-                alert(lang === 'fr' ? 'Erreur lors du chargement des fichiers' : 'Error loading files');
+                alert(t.errorLoadingFiles);
             } finally {
                 document.getElementById('loading').classList.add('hidden');
             }
@@ -313,7 +321,7 @@
                     const downloadLink = document.createElement('a');
                     downloadLink.href = '#';
                     downloadLink.className = 'text-blue-600 hover:text-blue-900';
-                    downloadLink.textContent = lang === 'fr' ? 'Télécharger' : 'Download';
+                    downloadLink.textContent = t.downloadAction;
                     downloadLink.addEventListener('click', (e) => {
                         e.preventDefault();
                         downloadFile(item.path);
@@ -431,7 +439,7 @@
                 window.URL.revokeObjectURL(blobUrl);
             } catch (error) {
                 console.error('Download error:', error);
-                alert(lang === 'fr' ? 'Erreur lors du téléchargement' : 'Download error');
+                alert(t.errorDownload);
             }
         }
 
@@ -514,9 +522,7 @@
 
             if (count > 0) {
                 toolbar.classList.remove('hidden');
-                countElement.textContent = lang === 'fr'
-                    ? `${count} élément(s) sélectionné(s)`
-                    : `${count} item(s) selected`;
+                countElement.textContent = `${count} ${t.selectionCount}`;
             } else {
                 toolbar.classList.add('hidden');
             }
@@ -529,7 +535,7 @@
 
         async function downloadSelection() {
             if (selectedItems.size === 0) {
-                alert(lang === 'fr' ? 'Veuillez sélectionner au moins un élément' : 'Please select at least one item');
+                alert(t.errorSelection);
                 return;
             }
 
