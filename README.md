@@ -12,31 +12,6 @@ Anemone is under active development and may contain bugs, security vulnerabiliti
 
 ---
 
-## ⚠️ DISCLAIMER - LIMITATION DE RESPONSABILITÉ
-
-**IMPORTANT - LIRE ATTENTIVEMENT**
-
-Ce logiciel est fourni "TEL QUEL", sans garantie d'aucune sorte, expresse ou implicite.
-
-L'auteur et les contributeurs ne pourront en aucun cas être tenus responsables de :
-- ❌ Perte de données, corruption ou suppression de fichiers
-- ❌ Dommages directs ou indirects résultant de l'utilisation du logiciel
-- ❌ Interruptions de service ou dysfonctionnements
-- ❌ Problèmes de sécurité ou violations de données
-- ❌ Tout autre dommage, même si l'auteur a été informé de leur possibilité
-
-**Vous utilisez ce logiciel à vos propres risques.**
-
-Il est FORTEMENT recommandé de :
-- ✅ Tester en environnement de développement avant toute utilisation en production
-- ✅ Maintenir des sauvegardes externes de vos données critiques
-- ✅ Ne pas utiliser comme seule solution de backup
-- ✅ Vérifier régulièrement l'intégrité de vos backups
-
-**Ce logiciel ne doit PAS être utilisé pour des données critiques sans backups externes.**
-
-Pour plus de détails, consultez la licence AGPL v3.0 (sections 15 et 16).
-
 ## ⚠️ DISCLAIMER - LIABILITY LIMITATION
 
 **IMPORTANT - READ CAREFULLY**
@@ -515,6 +490,252 @@ ENABLE_HTTPS=true               # Enable HTTPS (default: true)
 LANGUAGE=fr                     # Default language (fr/en)
 TLS_CERT_PATH=                  # Custom TLS certificate path
 TLS_KEY_PATH=                   # Custom TLS key path
+```
+
+## 💿 Use an External Drive for Anemone
+
+You can store all Anemone data on an external USB drive by mounting it to `/srv/anemone`.
+
+### 🎯 Why Use an External Drive?
+
+- **Larger storage capacity** - Store more user backups
+- **Portability** - Move data between servers easily
+- **Hardware isolation** - Separate data from system disk
+- **Easy expansion** - Upgrade storage without system changes
+
+### 📝 Step-by-Step Setup
+
+#### 1. Identify Your USB Drive
+
+```bash
+lsblk
+# or
+sudo fdisk -l
+```
+
+Look for your USB drive (example: `/dev/sdb1`)
+
+#### 2. Format the Drive (Optional - ⚠️ Erases All Data)
+
+```bash
+# Format as ext4 (recommended for Linux)
+sudo mkfs.ext4 /dev/sdb1
+
+# Give it a label for easy identification
+sudo e2label /dev/sdb1 ANEMONE_DATA
+```
+
+**For Btrfs** (recommended if you need quota enforcement):
+```bash
+sudo mkfs.btrfs -L ANEMONE_DATA /dev/sdb1
+```
+
+#### 3. Fresh Installation (No Existing Data)
+
+```bash
+# Create mount point
+sudo mkdir -p /srv/anemone
+
+# Mount the drive
+sudo mount /dev/sdb1 /srv/anemone
+
+# Set correct permissions
+sudo chown -R anemone:anemone /srv/anemone
+sudo chmod 755 /srv/anemone
+```
+
+#### 4. Migration from Existing Installation
+
+```bash
+# Stop Anemone service
+sudo systemctl stop anemone
+
+# Mount drive temporarily
+sudo mkdir -p /mnt/usb
+sudo mount /dev/sdb1 /mnt/usb
+
+# Copy all existing data
+sudo rsync -av /srv/anemone/ /mnt/usb/
+
+# Unmount and remount on correct path
+sudo umount /mnt/usb
+sudo mount /dev/sdb1 /srv/anemone
+
+# Set permissions
+sudo chown -R anemone:anemone /srv/anemone
+sudo chmod 755 /srv/anemone
+
+# Start Anemone
+sudo systemctl start anemone
+```
+
+#### 5. Configure Automatic Mounting (/etc/fstab)
+
+**⚠️ IMPORTANT**: Use UUID, not `/dev/sdX` (device names can change!)
+
+```bash
+# Get the drive's UUID
+sudo blkid /dev/sdb1
+# Example output: UUID="abc123-def456-..."
+
+# Edit fstab
+sudo nano /etc/fstab
+```
+
+**Add this line** (replace UUID with your actual value):
+```
+UUID=abc123-def456-...  /srv/anemone  ext4  defaults,nofail  0  2
+```
+
+**For Btrfs:**
+```
+UUID=abc123-def456-...  /srv/anemone  btrfs  defaults,nofail  0  2
+```
+
+**Important flags**:
+- `defaults` - Standard mount options
+- `nofail` - System boots even if USB drive is disconnected
+- `0` - No dump (backup) needed
+- `2` - Check filesystem on boot (after root filesystem)
+
+#### 6. Test the Configuration
+
+```bash
+# Test fstab configuration
+sudo mount -a
+
+# Verify mount
+df -h | grep anemone
+mount | grep anemone
+
+# Check permissions
+ls -la /srv/anemone
+
+# Test Anemone
+sudo systemctl restart anemone
+sudo systemctl status anemone
+```
+
+### 🔧 Configure Systemd (Optional but Recommended)
+
+Edit `/etc/systemd/system/anemone.service` to ensure mount is ready:
+
+```ini
+[Unit]
+Description=Anemone Backup System
+After=network.target
+RequiresMountsFor=/srv/anemone
+
+[Service]
+Type=simple
+User=anemone
+ExecStart=/usr/local/bin/anemone
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Apply changes:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart anemone
+```
+
+### ⚠️ Important Precautions
+
+1. **Always use UUID in /etc/fstab**
+   - ❌ Never use `/dev/sdX` (unstable if you plug other devices)
+   - ✅ Always use `UUID=...` (stable identifier)
+
+2. **Use `nofail` option**
+   - System will boot even if USB drive is disconnected
+   - Without it, boot may fail or hang
+
+3. **USB 3.0+ recommended**
+   - USB 2.0 works but will be slow for large backups
+   - USB 3.0 or faster recommended for best performance
+
+4. **Backup considerations**
+   - External drives can fail
+   - Use Anemone's P2P sync to other servers for redundancy
+   - Consider having multiple backup locations
+
+5. **Power considerations**
+   - Some USB drives need external power
+   - Ensure stable power supply to avoid data corruption
+
+### ✅ Verification Checklist
+
+```bash
+# 1. Mount is active
+mount | grep anemone
+# Expected: /dev/sdb1 on /srv/anemone type ext4 (rw,relatime)
+
+# 2. Permissions are correct
+ls -la /srv/anemone
+# Expected: drwxr-xr-x ... anemone anemone ...
+
+# 3. Anemone service is running
+sudo systemctl status anemone
+# Expected: Active: active (running)
+
+# 4. Data is on external drive
+df -h /srv/anemone
+# Check that mounted device is your USB drive
+
+# 5. Files are being created correctly
+ls -la /srv/anemone/
+# Expected: db/ shares/ certs/ smb/
+```
+
+### 🔄 Unmounting Safely
+
+If you need to disconnect the USB drive:
+
+```bash
+# 1. Stop Anemone service
+sudo systemctl stop anemone
+
+# 2. Ensure no processes are using the mount
+sudo lsof +D /srv/anemone
+sudo fuser -m /srv/anemone
+
+# 3. Unmount safely
+sudo umount /srv/anemone
+
+# 4. Now safe to disconnect USB drive
+```
+
+### 🚨 Troubleshooting External Drive
+
+**Problem**: Drive not mounting on boot
+```bash
+# Check fstab syntax
+sudo mount -a
+
+# Check system logs
+sudo journalctl -xe | grep mount
+```
+
+**Problem**: Permission denied errors
+```bash
+# Fix ownership
+sudo chown -R anemone:anemone /srv/anemone
+sudo chmod 755 /srv/anemone
+```
+
+**Problem**: Anemone won't start after mounting
+```bash
+# Check if mount is correct
+mount | grep anemone
+
+# Check Anemone logs
+sudo journalctl -u anemone -n 50
+
+# Verify data directory structure
+ls -la /srv/anemone/
 ```
 
 ## 🐛 Troubleshooting
