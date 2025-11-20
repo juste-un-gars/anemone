@@ -53,168 +53,177 @@
 - [x] Status: ✅ RÉUSSI
 
 #### 2.2 - Validation création utilisateur (mots de passe différents)
-- [ ] Tenter création utilisateur avec 2 mots de passe différents
-- [ ] **Résultat attendu**: ❌ Doit refuser
-- [ ] **Résultat obtenu**:
-- [ ] Status: ⏳
+- [x] Tenter création utilisateur avec 2 mots de passe différents
+- [x] **Résultat attendu**: ❌ Doit refuser
+- [x] **Résultat obtenu**: ✅ Système refuse bien la création
+- [x] Status: ✅ RÉUSSI
+- [x] **Bonus**: Test suppression/recréation utilisateur → OK
+- [x] **Bonus**: Test suppression utilisateur avec sync → Données protégées par chiffrement mais restent sur pairs (voir notes RGPD)
 
 ---
 
 ### Phase 3 : Création des utilisateurs de test
 
 #### 3.1 - Création utilisateur "test" sur FR1
-- [ ] Créer utilisateur "test" sur FR1
-- [ ] Upload de quelques fichiers test
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Créer utilisateur "test" sur FR1
+- [x] Upload de quelques fichiers test
+- [x] **Résultat**: ✅ Utilisateur créé avec succès
+- [x] Status: ✅ RÉUSSI
 
 #### 3.2 - Création utilisateur "test" sur FR2
-- [ ] Créer utilisateur "test" sur FR2
-- [ ] Upload de quelques fichiers test
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Créer utilisateur "test" sur FR2
+- [x] Upload de quelques fichiers test
+- [x] **Résultat**: ✅ Utilisateur créé avec succès (personne différente, même nom)
+- [x] Status: ✅ RÉUSSI
 
 #### 3.3 - Création utilisateur "marc" sur FR1
-- [ ] Créer utilisateur "marc" sur FR1
-- [ ] Upload de quelques fichiers test
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Créer utilisateur "marc" sur FR1
+- [x] Upload de quelques fichiers test
+- [x] **Résultat**: ✅ Utilisateur créé avec succès
+- [x] Status: ✅ RÉUSSI
 
 #### 3.4 - Création utilisateur "marc" sur FR2
-- [ ] Créer utilisateur "marc" sur FR2
-- [ ] Upload de quelques fichiers test
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Créer utilisateur "marc" sur FR2
+- [x] Upload de quelques fichiers test
+- [x] **Résultat**: ✅ Utilisateur créé avec succès (personne différente, même nom)
+- [x] Status: ✅ RÉUSSI
+
+#### 3.5 - Synchronisation et vérification isolation
+- [x] Synchroniser FR1 et FR2 vers FR3
+- [x] Vérifier que chaque utilisateur voit UNIQUEMENT ses propres backups
+- [x] **Observation**: Sur FR3, répertoires avec ID unique (ex: 4_test, 5_test)
+- [x] **Résultat**: ✅ Isolation parfaite - Aucune fuite de données entre utilisateurs
+- [x] Status: ✅ RÉUSSI
 
 ---
 
 ### Phase 4 : Tests de la corbeille
 
 #### 4.1 - Test suppression fichier (utilisateur test sur FR1)
-- [ ] Supprimer un fichier de l'utilisateur test
-- [ ] Vérifier présence dans la corbeille
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Supprimer un fichier de l'utilisateur test
+- [x] Vérifier présence dans la corbeille
+- [x] **Résultat**: ✅ Fichier bien présent dans la corbeille
+- [x] Status: ✅ RÉUSSI
 
 #### 4.2 - Test restauration depuis corbeille
-- [ ] Restaurer le fichier supprimé
-- [ ] Vérifier que le fichier est revenu
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Restaurer le fichier supprimé
+- [x] Vérifier que le fichier est revenu
+- [x] **Résultat**: ✅ Fichier restauré avec succès
+- [x] Status: ✅ RÉUSSI
 
 #### 4.3 - Test suppression définitive depuis corbeille
-- [ ] Supprimer définitivement un fichier de la corbeille
-- [ ] Vérifier qu'il n'est plus récupérable
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Supprimer définitivement un fichier de la corbeille
+- [x] Vérifier qu'il n'est plus récupérable
+- [x] **Résultat**: ✅ Fichier définitivement supprimé, non récupérable
+- [x] Status: ✅ RÉUSSI
 
 ---
 
 ### Phase 5 : Tests de connexion de pairs (mauvais mot de passe)
 
 #### 5.1 - Connexion FR1 → FR3 avec mauvais mot de passe
-- [ ] Tenter connexion avec mauvais mot de passe
-- [ ] **Résultat attendu**: ❌ Connexion refusée
-- [ ] **Résultat obtenu**:
-- [ ] Status: ⏳
+- [x] Tenter connexion avec mauvais mot de passe
+- [x] **Résultat attendu**: ❌ Connexion refusée
+- [x] **Résultat obtenu**: ✅ Connexion refusée correctement
+- [x] Status: ✅ RÉUSSI
 
 #### 5.2 - Connexion FR2 → FR3 avec mauvais mot de passe
-- [ ] Tenter connexion avec mauvais mot de passe
-- [ ] **Résultat attendu**: ❌ Connexion refusée
-- [ ] **Résultat obtenu**:
-- [ ] Status: ⏳
+- [x] Tenter connexion avec mauvais mot de passe
+- [x] **Résultat attendu**: ❌ Connexion refusée
+- [x] **Résultat obtenu**: ✅ Connexion refusée correctement
+- [x] Status: ✅ RÉUSSI
 
 ---
 
 ### Phase 6 : Tests de connexion de pairs (correction et bon mot de passe)
 
 #### 6.1 - Connexion FR1 → FR3 avec bon mot de passe
-- [ ] Corriger le mot de passe
-- [ ] Tenter connexion avec bon mot de passe
-- [ ] **Résultat attendu**: ✅ Connexion réussie
-- [ ] **Résultat obtenu**:
-- [ ] Status: ⏳
+- [x] Corriger le mot de passe
+- [x] Tenter connexion avec bon mot de passe
+- [x] **Résultat attendu**: ✅ Connexion réussie
+- [x] **Résultat obtenu**: ✅ Connexion réussie
+- [x] Status: ✅ RÉUSSI
 
 #### 6.2 - Connexion FR2 → FR3 avec bon mot de passe
-- [ ] Corriger le mot de passe
-- [ ] Tenter connexion avec bon mot de passe
-- [ ] **Résultat attendu**: ✅ Connexion réussie
-- [ ] **Résultat obtenu**:
-- [ ] Status: ⏳
+- [x] Corriger le mot de passe
+- [x] Tenter connexion avec bon mot de passe
+- [x] **Résultat attendu**: ✅ Connexion réussie
+- [x] **Résultat obtenu**: ✅ Connexion réussie
+- [x] Status: ✅ RÉUSSI
 
 ---
 
 ### Phase 7 : Tests de connexion de pairs (changement bon → mauvais)
 
 #### 7.1 - Changement mot de passe FR1 → FR3 (bon → mauvais)
-- [ ] Changer le bon mot de passe pour un mauvais sur FR1
-- [ ] **Résultat attendu**: ❌ Connexion ne doit plus fonctionner
-- [ ] **Résultat obtenu**:
-- [ ] Status: ⏳
+- [x] Changer le bon mot de passe pour un mauvais sur FR1
+- [x] **Résultat attendu**: ❌ Connexion ne doit plus fonctionner
+- [x] **Résultat obtenu**: ✅ Connexion ne fonctionne plus
+- [x] Status: ✅ RÉUSSI
 
 #### 7.2 - Remise du bon mot de passe FR1 → FR3
-- [ ] Remettre le bon mot de passe sur FR1
-- [ ] **Résultat attendu**: ✅ Connexion doit refonctionner
-- [ ] **Résultat obtenu**:
-- [ ] Status: ⏳
+- [x] Remettre le bon mot de passe sur FR1
+- [x] **Résultat attendu**: ✅ Connexion doit refonctionner
+- [x] **Résultat obtenu**: ✅ Connexion refonctionne
+- [x] Status: ✅ RÉUSSI
 
 ---
 
 ### Phase 8 : Activation et test de la synchronisation
 
 #### 8.1 - Activation synchro FR1 → FR3
-- [ ] Activer la synchronisation automatique FR1 → FR3
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Activer la synchronisation automatique FR1 → FR3
+- [x] **Résultat**: ✅ Synchronisation activée avec succès
+- [x] Status: ✅ RÉUSSI
 
 #### 8.2 - Activation synchro FR2 → FR3
-- [ ] Activer la synchronisation automatique FR2 → FR3
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Activer la synchronisation automatique FR2 → FR3
+- [x] **Résultat**: ✅ Synchronisation activée avec succès
+- [x] Status: ✅ RÉUSSI
 
 #### 8.3 - Vérification synchronisation FR1 → FR3
-- [ ] Vérifier que les fichiers de FR1 sont bien synchronisés sur FR3
-- [ ] Vérifier les logs de synchronisation
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Vérifier que les fichiers de FR1 sont bien synchronisés sur FR3
+- [x] Vérifier les logs de synchronisation
+- [x] **Résultat**: ✅ Fichiers bien synchronisés
+- [x] Status: ✅ RÉUSSI
 
 #### 8.4 - Vérification synchronisation FR2 → FR3
-- [ ] Vérifier que les fichiers de FR2 sont bien synchronisés sur FR3
-- [ ] Vérifier les logs de synchronisation
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Vérifier que les fichiers de FR2 sont bien synchronisés sur FR3
+- [x] Vérifier les logs de synchronisation
+- [x] **Résultat**: ✅ Fichiers bien synchronisés
+- [x] Status: ✅ RÉUSSI
 
 ---
 
 ### Phase 9 : Tests de restauration depuis FR3
 
 #### 9.1 - Restauration fichiers utilisateur "test" depuis FR3 (backup FR1)
-- [ ] Se connecter sur FR1 en tant que "test"
-- [ ] Restaurer des fichiers depuis FR3
-- [ ] Vérifier que les fichiers sont bien restaurés
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Se connecter sur FR1 en tant que "test"
+- [x] Restaurer des fichiers depuis FR3
+- [x] Vérifier que les fichiers sont bien restaurés
+- [x] **Résultat**: ✅ Fichiers restaurés avec succès
+- [x] Status: ✅ RÉUSSI
 
 #### 9.2 - Restauration fichiers utilisateur "test" depuis FR3 (backup FR2)
-- [ ] Se connecter sur FR2 en tant que "test"
-- [ ] Restaurer des fichiers depuis FR3
-- [ ] Vérifier que les fichiers sont bien restaurés
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Se connecter sur FR2 en tant que "test"
+- [x] Restaurer des fichiers depuis FR3
+- [x] Vérifier que les fichiers sont bien restaurés
+- [x] **Résultat**: ✅ Fichiers restaurés avec succès
+- [x] Status: ✅ RÉUSSI
 
 #### 9.3 - Restauration fichiers utilisateur "marc" depuis FR3 (backup FR1)
-- [ ] Se connecter sur FR1 en tant que "marc"
-- [ ] Restaurer des fichiers depuis FR3
-- [ ] Vérifier que les fichiers sont bien restaurés
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Se connecter sur FR1 en tant que "marc"
+- [x] Restaurer des fichiers depuis FR3
+- [x] Vérifier que les fichiers sont bien restaurés
+- [x] **Résultat**: ✅ Fichiers restaurés avec succès
+- [x] Status: ✅ RÉUSSI
 
 #### 9.4 - Restauration fichiers utilisateur "marc" depuis FR3 (backup FR2)
-- [ ] Se connecter sur FR2 en tant que "marc"
-- [ ] Restaurer des fichiers depuis FR3
-- [ ] Vérifier que les fichiers sont bien restaurés
-- [ ] **Résultat**:
-- [ ] Status: ⏳
+- [x] Se connecter sur FR2 en tant que "marc"
+- [x] Restaurer des fichiers depuis FR3
+- [x] Vérifier que les fichiers sont bien restaurés
+- [x] **Résultat**: ✅ Fichiers restaurés avec succès
+- [x] Status: ✅ RÉUSSI
 
 ---
 
@@ -446,17 +455,79 @@
 
 ### Problèmes rencontrés
 
-(Aucun pour le moment)
+#### ⚠️ Dashboard utilisateur - Erreur template (RÉSOLU)
+- **Symptôme**: Internal Server Error sur dashboard utilisateur
+- **Cause**: Fonction T dans router.go ne supportait pas les paramètres de substitution
+- **Solution**: Utilisation du FuncMap() du Translator avec support des paramètres
+- **Commit**: 08bafee
+- **Status**: ✅ RÉSOLU
 
 ### Améliorations suggérées
 
-(Aucune pour le moment)
+#### 🔒 CRITIQUE - Suppression utilisateur et RGPD
+- **Problème identifié**: Quand un utilisateur est supprimé sur le serveur principal :
+  - ✅ Données locales supprimées correctement
+  - ✅ Partages SMB supprimés correctement
+  - ❌ Backups restent sur les serveurs pairs (FR3)
+  - ✅ **Protection par chiffrement**: Un nouvel utilisateur avec le même nom ne peut PAS déchiffrer les anciennes données (clé différente)
+  - ❌ **Problème RGPD**: Violation du droit à l'oubli (Article 17) - les données doivent être supprimées même si chiffrées
+
+- **Test effectué**:
+  1. Créé utilisateur "test" avec des fichiers
+  2. Synchronisé sur FR3
+  3. Supprimé "test" sur FR1
+  4. Recréé "test" avec mot de passe différent
+  5. ✅ Les anciennes données sont visibles dans "Parcourir les backups" mais NON déchiffrables
+  6. ❌ Les données restent stockées sur FR3 (problème RGPD)
+
+- **Solution à implémenter**:
+  - Option A: Suppression immédiate sur les pairs via API lors de la suppression utilisateur
+  - Option B: Marquage "deleted" + suppression automatique après X jours
+  - Option C: Confirmation admin "Supprimer aussi les backups sur les pairs ?"
+
+- **Priorité**: HAUTE (conformité RGPD)
+- **Status**: À implémenter après les tests Session 25
+
+#### ⚠️ IMPORTANT - Synchronisation des suppressions de fichiers
+- **Problème identifié**: Quand un fichier est supprimé (mis à la corbeille) sur le serveur principal :
+  - ✅ Fichier va bien dans la corbeille locale
+  - ✅ Interface web filtre correctement (fichier n'apparaît pas dans "Restaurer")
+  - ❌ Fichier reste physiquement présent sur FR3 (serveur pair)
+  - ❌ **Impact**: Fichiers orphelins qui consomment de l'espace disque inutilement
+  - ❌ **Impact RGPD**: Même problème que pour les utilisateurs supprimés
+
+- **Test effectué**:
+  1. Supprimé des fichiers de l'utilisateur "test" sur FR1 (mis à la corbeille)
+  2. Vérifié sur FR3 : fichiers toujours présents physiquement dans le répertoire
+  3. Testé "Restaurer" via interface web : fichiers n'apparaissent pas (bon)
+  4. Conclusion : Logique de filtrage OK, mais synchronisation des suppressions manquante
+
+- **Solution à implémenter**:
+  - Option A: Synchroniser les suppressions (corbeille) vers les pairs
+  - Option B: Synchroniser les suppressions définitives vers les pairs
+  - Option C: Les deux (recommandé)
+
+- **Priorité**: MOYENNE-HAUTE (espace disque + cohérence des données)
+- **Status**: À implémenter après les tests Session 25
 
 ### Points d'attention
 
 - Les tests de la Phase 16 valident que le système de backup/restore fonctionne de bout en bout
 - La synchronisation doit être héritée correctement après disaster recovery
 - Les noms de serveurs doivent être préservés lors de la restauration
+
+### Observations positives
+
+#### 🔒 Système d'ID unique pour les utilisateurs
+- **Observation**: Sur FR3, chaque utilisateur a un répertoire avec ID unique (ex: `4_test`, `5_test`)
+- **Avantage**: Même si un utilisateur est supprimé puis recréé avec le même nom, les données sont isolées
+- **Sécurité**:
+  - ✅ Impossible de créer deux utilisateurs avec le même nom sur un serveur
+  - ✅ Utilisateurs multi-serveurs (test@FR1 et test@FR2) sont bien distincts
+  - ✅ Chaque utilisateur ne voit QUE ses propres backups lors de la restauration
+  - ✅ Aucune fuite de données entre utilisateurs
+  - ✅ Clés de chiffrement uniques par utilisateur/création
+- **Status**: Excellente architecture de sécurité ✅
 
 ---
 

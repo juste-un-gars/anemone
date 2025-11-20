@@ -1722,18 +1722,26 @@ func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Get success/error messages from query params
+	successMsg := r.URL.Query().Get("success")
+	errorMsg := r.URL.Query().Get("error")
+
 	data := struct {
 		Lang        string
 		Title       string
 		Session     *auth.Session
 		Peers       []*peers.Peer
 		RecentSyncs []RecentSync
+		Success     string
+		Error       string
 	}{
 		Lang:        lang,
 		Title:       i18n.T(lang, "peers.title"),
 		Session:     session,
 		Peers:       peersList,
 		RecentSyncs: recentSyncs,
+		Success:     successMsg,
+		Error:       errorMsg,
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_peers.html", data); err != nil {
@@ -3447,12 +3455,12 @@ func (s *Server) handleAdminSyncForce(w http.ResponseWriter, r *http.Request) {
 	if errorCount > 0 {
 		errorMsg := fmt.Sprintf("Synchronisation partielle : %d réussis, %d échecs. Dernière erreur: %s",
 			successCount, errorCount, lastError)
-		http.Redirect(w, r, "/admin/sync?error="+errorMsg, http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/peers?error="+errorMsg, http.StatusSeeOther)
 	} else if successCount == 0 {
-		http.Redirect(w, r, "/admin/sync?error=Aucune+synchronisation+effectuée+(pas+de+partages+activés+ou+pas+de+pairs)", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/peers?error=Aucune+synchronisation+effectuée+(pas+de+partages+activés+ou+pas+de+pairs)", http.StatusSeeOther)
 	} else {
 		successMsg := fmt.Sprintf("Synchronisation réussie : %d synchronisations effectuées", successCount)
-		http.Redirect(w, r, "/admin/sync?success="+successMsg, http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/peers?success="+successMsg, http.StatusSeeOther)
 	}
 }
 
