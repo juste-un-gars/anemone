@@ -105,57 +105,56 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 
 	// Add additional template functions
 	funcMap["ServerName"] = func() string {
-			serverName, err := sync.GetServerName(db)
-			if err != nil {
-				return "Anemone Server"
-			}
-			return serverName
-		},
-		"divf": func(a, b int64) float64 {
-			return float64(a) / float64(b)
-		},
-		"FormatBytes": func(bytes int64) string {
-			const unit = 1024
-			if bytes < unit {
-				return fmt.Sprintf("%d B", bytes)
-			}
-			div, exp := int64(unit), 0
-			for n := bytes / unit; n >= unit; n /= unit {
-				div *= unit
-				exp++
-			}
-			return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
-		},
-		"FormatTime": func(t time.Time, lang string) string {
-			now := time.Now()
-			diff := now.Sub(t)
+		serverName, err := sync.GetServerName(db)
+		if err != nil {
+			return "Anemone Server"
+		}
+		return serverName
+	}
+	funcMap["divf"] = func(a, b int64) float64 {
+		return float64(a) / float64(b)
+	}
+	funcMap["FormatBytes"] = func(bytes int64) string {
+		const unit = 1024
+		if bytes < unit {
+			return fmt.Sprintf("%d B", bytes)
+		}
+		div, exp := int64(unit), 0
+		for n := bytes / unit; n >= unit; n /= unit {
+			div *= unit
+			exp++
+		}
+		return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+	}
+	funcMap["FormatTime"] = func(t time.Time, lang string) string {
+		now := time.Now()
+		diff := now.Sub(t)
 
-			if diff < time.Minute {
-				if lang == "fr" {
-					return "À l'instant"
-				}
-				return "Just now"
-			}
-			if diff < time.Hour {
-				mins := int(diff.Minutes())
-				if lang == "fr" {
-					return fmt.Sprintf("Il y a %d min", mins)
-				}
-				return fmt.Sprintf("%d min ago", mins)
-			}
-			if diff < 24*time.Hour {
-				hours := int(diff.Hours())
-				if lang == "fr" {
-					return fmt.Sprintf("Il y a %d h", hours)
-				}
-				return fmt.Sprintf("%d h ago", hours)
-			}
-			days := int(diff.Hours() / 24)
+		if diff < time.Minute {
 			if lang == "fr" {
-				return fmt.Sprintf("Il y a %d j", days)
+				return "À l'instant"
 			}
-			return fmt.Sprintf("%d d ago", days)
-		},
+			return "Just now"
+		}
+		if diff < time.Hour {
+			mins := int(diff.Minutes())
+			if lang == "fr" {
+				return fmt.Sprintf("Il y a %d min", mins)
+			}
+			return fmt.Sprintf("%d min ago", mins)
+		}
+		if diff < 24*time.Hour {
+			hours := int(diff.Hours())
+			if lang == "fr" {
+				return fmt.Sprintf("Il y a %d h", hours)
+			}
+			return fmt.Sprintf("%d h ago", hours)
+		}
+		days := int(diff.Hours() / 24)
+		if lang == "fr" {
+			return fmt.Sprintf("Il y a %d j", days)
+		}
+		return fmt.Sprintf("%d d ago", days)
 	}
 
 	templates := template.Must(template.New("").Funcs(funcMap).ParseGlob(filepath.Join("web", "templates", "*.html")))
