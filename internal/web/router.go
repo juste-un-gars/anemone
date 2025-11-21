@@ -1881,14 +1881,57 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Get master key for password encryption
+		var masterKey string
+		if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
+			log.Printf("Error getting master key: %v", err)
+			data := struct {
+				Lang    string
+				Title   string
+				Session *auth.Session
+				Error   string
+			}{
+				Lang:    lang,
+				Title:   i18n.T(lang, "peers.add.title"),
+				Session: session,
+				Error:   "Erreur système",
+			}
+			if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
+				log.Printf("Error rendering peers add template: %v", err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+			return
+		}
+
 		// Create peer
 		var pkPtr *string
 		if publicKey != "" {
 			pkPtr = &publicKey
 		}
-		var pwPtr *string
+		// Encrypt peer password before storing
+		var pwPtr *[]byte
 		if password != "" {
-			pwPtr = &password
+			encrypted, err := peers.EncryptPeerPassword(password, masterKey)
+			if err != nil {
+				log.Printf("Error encrypting peer password: %v", err)
+				data := struct {
+					Lang    string
+					Title   string
+					Session *auth.Session
+					Error   string
+				}{
+					Lang:    lang,
+					Title:   i18n.T(lang, "peers.add.title"),
+					Session: session,
+					Error:   "Erreur lors du chiffrement du mot de passe",
+				}
+				if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
+					log.Printf("Error rendering peers add template: %v", err)
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				}
+				return
+			}
+			pwPtr = encrypted
 		}
 		peer := &peers.Peer{
 			Name:               name,
@@ -2018,6 +2061,14 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
+		// Get master key for password encryption
+		var masterKey string
+		if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
+			log.Printf("Error getting master key: %v", err)
+			http.Redirect(w, r, fmt.Sprintf("/admin/peers/%d/edit?error=System+configuration+error", peerID), http.StatusSeeOther)
+			return
+		}
+
 		// Update fields
 		peer.Name = r.FormValue("name")
 		peer.Address = r.FormValue("address")
@@ -2032,11 +2083,18 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 		// Update password if provided
 		password := r.FormValue("password")
 		if password != "" {
-			peer.Password = &password
+			// Encrypt new password before storing
+			encrypted, err := peers.EncryptPeerPassword(password, masterKey)
+			if err != nil {
+				log.Printf("Error encrypting peer password: %v", err)
+				http.Redirect(w, r, fmt.Sprintf("/admin/peers/%d/edit?error=Failed+to+encrypt+password", peerID), http.StatusSeeOther)
+				return
+			}
+			peer.Password = encrypted
 		} else if r.FormValue("clear_password") == "1" {
 			peer.Password = nil
 		}
-		// If password is empty and clear_password is not checked, keep existing password
+		// If password is empty and clear_password is not checked, keep existing password (already encrypted)
 
 		// Update enabled status
 		peer.Enabled = r.FormValue("enabled") == "1"
@@ -2129,7 +2187,15 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
-		online, err := peers.TestConnection(peer)
+		// Get master key for password decryption
+		var masterKey string
+		if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
+			log.Printf("Error getting master key: %v", err)
+			http.Error(w, "System configuration error", http.StatusInternalServerError)
+			return
+		}
+
+		online, err := peers.TestConnection(peer, masterKey)
 		if err != nil {
 			log.Printf("Error testing peer connection: %v", err)
 		}
@@ -3891,6 +3957,14 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Get master key for password decryption
+	var masterKey string
+	if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
+		log.Printf("Error getting master key: %v", err)
+		http.Error(w, "System configuration error", http.StatusInternalServerError)
+		return
+	}
+
 	// Get all configured peers
 	allPeers, err := peers.GetAll(s.db)
 	if err != nil {
@@ -3899,7 +3973,7 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	type PeerBackup struct {
+	type PeerBackup struct{
 		PeerID       int       `json:"peer_id"`
 		PeerName     string    `json:"peer_name"`
 		PeerAddress  string    `json:"peer_address"`
@@ -3939,9 +4013,14 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 			continue
 		}
 
-		// Add P2P authentication header if peer has password
-		if peer.Password != nil && *peer.Password != "" {
-			req.Header.Set("X-Sync-Password", *peer.Password)
+		// Decrypt and add P2P authentication header if peer has password
+		if peer.Password != nil && len(*peer.Password) > 0 {
+			peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
+			if err != nil {
+				log.Printf("Error decrypting password for peer %s: %v", peer.Name, err)
+				continue
+			}
+			req.Header.Set("X-Sync-Password", peerPassword)
 		}
 
 		// Execute request
@@ -4071,9 +4150,15 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Add P2P authentication
-	if peer.Password != nil && *peer.Password != "" {
-		req.Header.Set("X-Sync-Password", *peer.Password)
+	// Decrypt and add P2P authentication
+	if peer.Password != nil && len(*peer.Password) > 0 {
+		peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
+		if err != nil {
+			log.Printf("Error decrypting peer password: %v", err)
+			http.Error(w, "Failed to decrypt peer password", http.StatusInternalServerError)
+			return
+		}
+		req.Header.Set("X-Sync-Password", peerPassword)
 	}
 
 	resp, err := client.Do(req)
@@ -4212,9 +4297,15 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Add P2P authentication
-	if peer.Password != nil && *peer.Password != "" {
-		req.Header.Set("X-Sync-Password", *peer.Password)
+	// Decrypt and add P2P authentication
+	if peer.Password != nil && len(*peer.Password) > 0 {
+		peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
+		if err != nil {
+			log.Printf("Error decrypting peer password: %v", err)
+			http.Error(w, "Failed to decrypt peer password", http.StatusInternalServerError)
+			return
+		}
+		req.Header.Set("X-Sync-Password", peerPassword)
 	}
 
 	resp, err := client.Do(req)
@@ -4344,8 +4435,15 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 		return
 	}
 
-	if peer.Password != nil && *peer.Password != "" {
-		manifestReq.Header.Set("X-Sync-Password", *peer.Password)
+	// Decrypt and add P2P authentication
+	if peer.Password != nil && len(*peer.Password) > 0 {
+		peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
+		if err != nil {
+			log.Printf("Error decrypting peer password: %v", err)
+			http.Error(w, "Failed to decrypt peer password", http.StatusInternalServerError)
+			return
+		}
+		manifestReq.Header.Set("X-Sync-Password", peerPassword)
 	}
 
 	manifestResp, err := client.Do(manifestReq)
@@ -4436,8 +4534,14 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 			continue
 		}
 
-		if peer.Password != nil && *peer.Password != "" {
-			fileReq.Header.Set("X-Sync-Password", *peer.Password)
+		// Decrypt and add P2P authentication
+		if peer.Password != nil && len(*peer.Password) > 0 {
+			peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
+			if err != nil {
+				log.Printf("Error decrypting peer password: %v", err)
+				continue
+			}
+			fileReq.Header.Set("X-Sync-Password", peerPassword)
 		}
 
 		fileResp, err := client.Do(fileReq)
@@ -5115,25 +5219,36 @@ func (s *Server) handleRestoreWarning(w http.ResponseWriter, r *http.Request) {
 	// Get all peers
 	peersList, err := peers.GetAll(s.db)
 	if err == nil {
-		client := &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
-			Timeout: 10 * time.Second,
-		}
-
-		for _, peer := range peersList {
-			// Query peer for user's backups
-			url := fmt.Sprintf("https://%s:%d/api/sync/list-user-backups?user_id=%d", peer.Address, peer.Port, session.UserID)
-
-			req, err := http.NewRequest("GET", url, nil)
-			if err != nil {
-				continue
+		// Get master key for password decryption
+		var masterKey string
+		if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
+			log.Printf("Error getting master key: %v", err)
+		} else {
+			client := &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				},
+				Timeout: 10 * time.Second,
 			}
 
-			if peer.Password != nil && *peer.Password != "" {
-				req.Header.Set("X-Sync-Password", *peer.Password)
-			}
+			for _, peer := range peersList {
+				// Query peer for user's backups
+				url := fmt.Sprintf("https://%s:%d/api/sync/list-user-backups?user_id=%d", peer.Address, peer.Port, session.UserID)
+
+				req, err := http.NewRequest("GET", url, nil)
+				if err != nil {
+					continue
+				}
+
+				// Decrypt and add P2P authentication
+				if peer.Password != nil && len(*peer.Password) > 0 {
+					peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
+					if err != nil {
+						log.Printf("Error decrypting peer password: %v", err)
+						continue
+					}
+					req.Header.Set("X-Sync-Password", peerPassword)
+				}
 
 			resp, err := client.Do(req)
 			if err != nil {
@@ -5162,6 +5277,7 @@ func (s *Server) handleRestoreWarning(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			resp.Body.Close()
+		}
 		}
 	}
 
@@ -5314,6 +5430,14 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 
 	var allBackups []UserBackup
 
+	// Get master key for password decryption
+	var masterKey string
+	if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
+		log.Printf("Error getting master key: %v", err)
+		http.Error(w, "System configuration error", http.StatusInternalServerError)
+		return
+	}
+
 	// For each user, check available backups on all peers
 	for rows.Next() {
 		var userID int
@@ -5352,9 +5476,14 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 				continue
 			}
 
-			// Add P2P authentication header
-			if peer.Password != nil && *peer.Password != "" {
-				req.Header.Set("X-Sync-Password", *peer.Password)
+			// Decrypt and add P2P authentication header
+			if peer.Password != nil && len(*peer.Password) > 0 {
+				peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
+				if err != nil {
+					log.Printf("Error decrypting peer password: %v", err)
+					continue
+				}
+				req.Header.Set("X-Sync-Password", peerPassword)
 			}
 
 			// Execute request

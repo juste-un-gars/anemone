@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/juste-un-gars/anemone/internal/crypto"
+	"github.com/juste-un-gars/anemone/internal/peers"
 )
 
 // SyncLog represents a synchronization log entry
@@ -633,7 +634,7 @@ func SyncAllUsers(db *sql.DB) (int, int, string) {
 		Name     string
 		Address  string
 		Port     int
-		Password *string
+		Password *[]byte
 	}
 
 	var peersList []PeerInfo
@@ -655,6 +656,13 @@ func SyncAllUsers(db *sql.DB) (int, int, string) {
 		return 0, 1, fmt.Sprintf("Failed to get server name: %v", err)
 	}
 
+	// Get master key for password decryption
+	var masterKey string
+	err = db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
+	if err != nil {
+		return 0, 1, fmt.Sprintf("Failed to get master key: %v", err)
+	}
+
 	// Sync each share to each peer
 	successCount := 0
 	errorCount := 0
@@ -662,10 +670,15 @@ func SyncAllUsers(db *sql.DB) (int, int, string) {
 
 	for _, share := range sharesList {
 		for _, peer := range peersList {
-			// Get peer password (empty string if NULL)
+			// Decrypt peer password
 			peerPassword := ""
-			if peer.Password != nil {
-				peerPassword = *peer.Password
+			if peer.Password != nil && len(*peer.Password) > 0 {
+				peerPassword, err = peers.DecryptPeerPassword(peer.Password, masterKey)
+				if err != nil {
+					errorCount++
+					lastError = fmt.Sprintf("Failed to decrypt password for peer %s: %v", peer.Name, err)
+					continue
+				}
 			}
 
 			req := &SyncRequest{
@@ -830,7 +843,7 @@ func ExtractTarGz(reader io.Reader, destDir string) error {
 
 // SyncPeer synchronizes all enabled shares to a specific peer
 // Returns: successCount, errorCount, lastError
-func SyncPeer(db *sql.DB, peerID int, peerName, peerAddress string, peerPort int, peerPassword *string) (int, int, string) {
+func SyncPeer(db *sql.DB, peerID int, peerName, peerAddress string, peerPort int, peerPassword *[]byte) (int, int, string) {
 	// Get all shares with sync enabled
 	sharesQuery := `SELECT id, user_id, name, path FROM shares WHERE sync_enabled = 1`
 	shareRows, err := db.Query(sharesQuery)
@@ -870,10 +883,20 @@ func SyncPeer(db *sql.DB, peerID int, peerName, peerAddress string, peerPort int
 		return 0, 1, fmt.Sprintf("Failed to get server name: %v", err)
 	}
 
-	// Get peer password (empty string if NULL)
+	// Get master key for password decryption
+	var masterKey string
+	err = db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
+	if err != nil {
+		return 0, 1, fmt.Sprintf("Failed to get master key: %v", err)
+	}
+
+	// Decrypt peer password
 	password := ""
-	if peerPassword != nil {
-		password = *peerPassword
+	if peerPassword != nil && len(*peerPassword) > 0 {
+		password, err = peers.DecryptPeerPassword(peerPassword, masterKey)
+		if err != nil {
+			return 0, 1, fmt.Sprintf("Failed to decrypt password for peer %s: %v", peerName, err)
+		}
 	}
 
 	for _, share := range sharesList {

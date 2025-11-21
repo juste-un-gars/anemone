@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/juste-un-gars/anemone/internal/crypto"
 )
 
 // Peer represents a remote Anemone instance for P2P synchronization
@@ -19,7 +21,7 @@ type Peer struct {
 	Address            string
 	Port               int
 	PublicKey          *string // Can be NULL
-	Password           *string // Can be NULL - password for peer authentication
+	Password           *[]byte // Can be NULL - encrypted password for peer authentication
 	Enabled            bool
 	Status             string // "online", "offline", "error", "unknown"
 	LastSeen           *time.Time
@@ -153,7 +155,7 @@ func UpdateStatus(db *sql.DB, id int, status string) error {
 }
 
 // TestConnection tests if a peer is reachable and validates authentication if password is set
-func TestConnection(peer *Peer) (bool, error) {
+func TestConnection(peer *Peer, masterKey string) (bool, error) {
 	// Create HTTPS client that accepts self-signed certificates
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -175,6 +177,15 @@ func TestConnection(peer *Peer) (bool, error) {
 		return false, fmt.Errorf("health check failed: status %d", resp.StatusCode)
 	}
 
+	// Decrypt password if present
+	var password string
+	if peer.Password != nil && len(*peer.Password) > 0 {
+		password, err = DecryptPeerPassword(peer.Password, masterKey)
+		if err != nil {
+			return false, fmt.Errorf("failed to decrypt password: %w", err)
+		}
+	}
+
 	// ALWAYS test authentication on a protected endpoint, even if password is empty
 	// This detects if the remote server requires a password but we don't have one configured
 	testURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?user_id=1&share_name=test", peer.Address, peer.Port)
@@ -184,8 +195,8 @@ func TestConnection(peer *Peer) (bool, error) {
 	}
 
 	// Add authentication header if password is configured
-	if peer.Password != nil && *peer.Password != "" {
-		req.Header.Set("X-Sync-Password", *peer.Password)
+	if password != "" {
+		req.Header.Set("X-Sync-Password", password)
 	}
 
 	resp, err = client.Do(req)
@@ -308,4 +319,34 @@ func ShouldSyncPeer(peer *Peer) bool {
 	default:
 		return false
 	}
+}
+
+// EncryptPeerPassword encrypts a plaintext password using the master key
+// Returns encrypted password suitable for storing in peer.Password
+func EncryptPeerPassword(plainPassword, masterKey string) (*[]byte, error) {
+	if plainPassword == "" {
+		return nil, nil
+	}
+
+	encrypted, err := crypto.EncryptPassword(plainPassword, masterKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt peer password: %w", err)
+	}
+
+	return &encrypted, nil
+}
+
+// DecryptPeerPassword decrypts an encrypted password using the master key
+// Returns the plaintext password
+func DecryptPeerPassword(encryptedPassword *[]byte, masterKey string) (string, error) {
+	if encryptedPassword == nil || len(*encryptedPassword) == 0 {
+		return "", nil
+	}
+
+	decrypted, err := crypto.DecryptPassword(*encryptedPassword, masterKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to decrypt peer password: %w", err)
+	}
+
+	return decrypted, nil
 }

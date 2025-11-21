@@ -93,9 +93,13 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, s
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Add authentication if peer has password
-	if peer.Password != nil && *peer.Password != "" {
-		req.Header.Set("X-Sync-Password", *peer.Password)
+	// Decrypt and add authentication if peer has password
+	if peer.Password != nil && len(*peer.Password) > 0 {
+		peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt peer password: %w", err)
+		}
+		req.Header.Set("X-Sync-Password", peerPassword)
 	}
 
 	resp, err := client.Do(req)
@@ -194,8 +198,16 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, s
 				continue
 			}
 
-			if peer.Password != nil && *peer.Password != "" {
-				req.Header.Set("X-Sync-Password", *peer.Password)
+			// Decrypt and add authentication if peer has password
+			if peer.Password != nil && len(*peer.Password) > 0 {
+				peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
+				if err != nil {
+					errMsg := fmt.Sprintf("Failed to decrypt peer password: %v", err)
+					progress.Errors = append(progress.Errors, errMsg)
+					log.Printf("Error: %s", errMsg)
+					continue
+				}
+				req.Header.Set("X-Sync-Password", peerPassword)
 			}
 
 			resp, err := client.Do(req)
