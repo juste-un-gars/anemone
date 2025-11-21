@@ -260,6 +260,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/api/sync/manifest", server.syncAuthMiddleware(server.handleAPISyncManifest))       // GET/PUT
 	mux.HandleFunc("/api/sync/source-info", server.syncAuthMiddleware(server.handleAPISyncSourceInfo)) // PUT
 	mux.HandleFunc("/api/sync/file", server.syncAuthMiddleware(server.handleAPISyncFile))               // POST/DELETE
+	mux.HandleFunc("/api/sync/list-physical-files", server.syncAuthMiddleware(server.handleAPISyncListPhysicalFiles)) // GET
 
 	// API routes - Remote restore (protected by password authentication)
 	mux.HandleFunc("/api/sync/list-user-backups", server.syncAuthMiddleware(server.handleAPISyncListUserBackups))
@@ -3034,6 +3035,101 @@ func (s *Server) handleAPISyncFileDelete(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"success": true, "message": "File deleted"}`)
+}
+
+// handleAPISyncListPhysicalFiles lists all physical .enc files in a backup directory
+// GET /api/sync/list-physical-files?source_server=X&user_id=5&share_name=backup
+func (s *Server) handleAPISyncListPhysicalFiles(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	sourceServer := r.URL.Query().Get("source_server")
+	if sourceServer == "" {
+		sourceServer = "unknown"
+	}
+	userIDStr := r.URL.Query().Get("user_id")
+	shareName := r.URL.Query().Get("share_name")
+
+	if userIDStr == "" || shareName == "" {
+		http.Error(w, "Missing user_id or share_name", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	// Security check: prevent path traversal
+	if strings.Contains(sourceServer, "..") {
+		http.Error(w, "Invalid source_server (path traversal detected)", http.StatusBadRequest)
+		return
+	}
+
+	// Build backup directory path with source server separation
+	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
+	backupDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer, backupDirName)
+
+	// Check if backup directory exists
+	if _, err := os.Stat(backupDir); os.IsNotExist(err) {
+		// No backup directory yet - return empty list
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"files":[]}`)
+		return
+	}
+
+	// List all .enc files recursively
+	var files []string
+	err = filepath.Walk(backupDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Skip directories
+		if info.IsDir() {
+			return nil
+		}
+
+		// Skip manifest and source info files
+		if strings.HasPrefix(filepath.Base(path), ".anemone-") ||
+		   strings.HasPrefix(filepath.Base(path), ".source-") {
+			return nil
+		}
+
+		// Only include .enc files
+		if strings.HasSuffix(path, ".enc") {
+			// Get relative path from backup directory
+			relPath, err := filepath.Rel(backupDir, path)
+			if err != nil {
+				return err
+			}
+			// Use forward slashes for consistency
+			relPath = filepath.ToSlash(relPath)
+			files = append(files, relPath)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("Error listing files in %s: %v", backupDir, err)
+		http.Error(w, "Failed to list files", http.StatusInternalServerError)
+		return
+	}
+
+	// Return list of files as JSON
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	// Marshal file list to JSON
+	filesJSON, err := json.Marshal(map[string][]string{"files": files})
+	if err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+	w.Write(filesJSON)
+
+	log.Printf("Listed %d physical files for user %d, share %s", len(files), userID, shareName)
 }
 
 // handleSettings shows the user settings page

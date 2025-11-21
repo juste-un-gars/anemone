@@ -547,6 +547,12 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		return fmt.Errorf(errMsg)
 	}
 
+	// Cleanup orphaned files on peer (files that exist physically but not in manifest)
+	if err := cleanupOrphanedFiles(client, req, localManifest, shareName); err != nil {
+		// Log error but don't fail the sync - cleanup is best-effort
+		log.Printf("⚠️  Warning: Failed to cleanup orphaned files: %v", err)
+	}
+
 	// Upload source server info (unencrypted metadata for display purposes)
 	sourceInfo := map[string]string{
 		"source_server": req.SourceServer,
@@ -891,4 +897,90 @@ func SyncPeer(db *sql.DB, peerID int, peerName, peerAddress string, peerPort int
 	}
 
 	return successCount, errorCount, lastError
+}
+
+// cleanupOrphanedFiles removes files on peer that don't exist in the local manifest
+// This handles orphaned files that were left behind (e.g., from trash deletion)
+func cleanupOrphanedFiles(client *http.Client, req *SyncRequest, localManifest *SyncManifest, shareName string) error {
+	// Fetch list of physical files from peer
+	listURL := fmt.Sprintf("https://%s:%d/api/sync/list-physical-files?source_server=%s&user_id=%d&share_name=%s",
+		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
+
+	listReq, err := http.NewRequest(http.MethodGet, listURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create list request: %w", err)
+	}
+
+	// Add authentication header if password is provided
+	if req.PeerPassword != "" {
+		listReq.Header.Set("X-Sync-Password", req.PeerPassword)
+	}
+
+	resp, err := client.Do(listReq)
+	if err != nil {
+		return fmt.Errorf("failed to fetch physical files list: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to fetch physical files list: status %d", resp.StatusCode)
+	}
+
+	// Parse response
+	var filesList struct {
+		Files []string `json:"files"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&filesList); err != nil {
+		return fmt.Errorf("failed to parse physical files list: %w", err)
+	}
+
+	// Build set of expected files from local manifest
+	expectedFiles := make(map[string]bool)
+	for _, meta := range localManifest.Files {
+		expectedFiles[meta.EncryptedPath] = true
+	}
+
+	// Find orphaned files (physical files not in manifest)
+	var orphanedFiles []string
+	for _, physicalFile := range filesList.Files {
+		if !expectedFiles[physicalFile] {
+			orphanedFiles = append(orphanedFiles, physicalFile)
+		}
+	}
+
+	// Delete orphaned files
+	if len(orphanedFiles) > 0 {
+		log.Printf("🧹 Found %d orphaned file(s) to clean up on peer", len(orphanedFiles))
+
+		for _, orphanedFile := range orphanedFiles {
+			deleteURL := fmt.Sprintf("https://%s:%d/api/sync/file?source_server=%s&user_id=%d&share_name=%s&path=%s",
+				req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName, orphanedFile)
+
+			deleteReq, err := http.NewRequest(http.MethodDelete, deleteURL, nil)
+			if err != nil {
+				log.Printf("⚠️  Failed to create delete request for orphaned file %s: %v", orphanedFile, err)
+				continue
+			}
+
+			if req.PeerPassword != "" {
+				deleteReq.Header.Set("X-Sync-Password", req.PeerPassword)
+			}
+
+			resp, err := client.Do(deleteReq)
+			if err != nil {
+				log.Printf("⚠️  Failed to delete orphaned file %s: %v", orphanedFile, err)
+				continue
+			}
+			resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				log.Printf("⚠️  Failed to delete orphaned file %s: status %d", orphanedFile, resp.StatusCode)
+				continue
+			}
+
+			log.Printf("✅ Deleted orphaned file: %s", orphanedFile)
+		}
+	}
+
+	return nil
 }
