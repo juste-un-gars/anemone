@@ -2842,6 +2842,10 @@ func (s *Server) handleAPISyncManifest(w http.ResponseWriter, r *http.Request) {
 // GET /api/sync/manifest?user_id=5&share_name=backup
 func (s *Server) handleAPISyncManifestGet(w http.ResponseWriter, r *http.Request) {
 	// Parse query parameters
+	sourceServer := r.URL.Query().Get("source_server")
+	if sourceServer == "" {
+		sourceServer = "unknown"
+	}
 	userIDStr := r.URL.Query().Get("user_id")
 	shareName := r.URL.Query().Get("share_name")
 
@@ -2856,10 +2860,10 @@ func (s *Server) handleAPISyncManifestGet(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Build backup directory path directly (no need to check if user exists locally)
-	// Format: /srv/anemone/backups/incoming/{user_id}_{share_name}/
+	// Build backup directory path with source server separation
+	// Format: /srv/anemone/backups/incoming/{source_server}/{user_id}_{share_name}/
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
-	backupDir := filepath.Join("/srv/anemone/backups/incoming", backupDirName)
+	backupDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer, backupDirName)
 	manifestPath := filepath.Join(backupDir, ".anemone-manifest.json.enc")
 
 	// Check if manifest file exists

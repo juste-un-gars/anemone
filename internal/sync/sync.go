@@ -303,8 +303,8 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	}
 
 	// Fetch remote manifest from peer
-	peerURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?user_id=%d&share_name=%s",
-		req.PeerAddress, req.PeerPort, req.UserID, shareName)
+	peerURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?source_server=%s&user_id=%d&share_name=%s",
+		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
 
 	// Create HTTP client that accepts self-signed certs
 	tr := &http.Transport{
