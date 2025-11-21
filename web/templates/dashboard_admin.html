@@ -172,9 +172,14 @@
                 <p class="text-sm text-gray-600 mb-4">
                     {{T .Lang "trash.card_description"}}
                 </p>
-                <a href="/trash" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
-                    {{T .Lang "trash.view_button"}}
-                </a>
+                <div class="flex space-x-3">
+                    <a href="/trash" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        {{T .Lang "trash.view_button"}}
+                    </a>
+                    <a href="/admin/settings/trash" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
+                        ⚙️ Paramètres
+                    </a>
+                </div>
             </div>
 
             <!-- Peers Card -->

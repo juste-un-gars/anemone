@@ -5,8 +5,10 @@
 package users
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -397,6 +399,9 @@ func DeleteUser(db *sql.DB, userID int, dataDir string) error {
 	}
 	rows.Close()
 
+	// Delete user backups on all enabled peers (best-effort, don't fail if peer is down)
+	deleteUserBackupsOnPeers(db, userID)
+
 	// Start transaction for database cleanup
 	tx, err := db.Begin()
 	if err != nil {
@@ -473,6 +478,84 @@ func DeleteUser(db *sql.DB, userID int, dataDir string) error {
 	}
 
 	return nil
+}
+
+// deleteUserBackupsOnPeers deletes user backups on all enabled peers
+// This is called when a user is deleted to comply with GDPR right to be forgotten
+func deleteUserBackupsOnPeers(db *sql.DB, userID int) {
+	// Get server name for source_server parameter
+	var serverName string
+	err := db.QueryRow("SELECT value FROM system_config WHERE key = 'nas_name'").Scan(&serverName)
+	if err != nil {
+		fmt.Printf("Warning: failed to get server name: %v\n", err)
+		serverName = "unknown"
+	}
+
+	// Get sync auth password
+	var syncAuthPassword string
+	err = db.QueryRow("SELECT value FROM system_config WHERE key = 'sync_auth_password'").Scan(&syncAuthPassword)
+	if err != nil {
+		fmt.Printf("Warning: sync auth password not configured, skipping peer backup deletion\n")
+		return
+	}
+
+	// Get all enabled peers
+	rows, err := db.Query("SELECT id, name, address, port, password FROM peers WHERE enabled = 1")
+	if err != nil {
+		fmt.Printf("Warning: failed to query peers: %v\n", err)
+		return
+	}
+	defer rows.Close()
+
+	// Create HTTP client that accepts self-signed certs
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   30 * time.Second,
+	}
+
+	// Delete user backup on each peer
+	for rows.Next() {
+		var peerID int
+		var peerName, peerAddress string
+		var peerPort int
+		var encryptedPassword []byte
+
+		if err := rows.Scan(&peerID, &peerName, &peerAddress, &peerPort, &encryptedPassword); err != nil {
+			fmt.Printf("Warning: failed to scan peer: %v\n", err)
+			continue
+		}
+
+		// Build delete URL
+		deleteURL := fmt.Sprintf("https://%s:%d/api/sync/delete-user-backup?source_server=%s&user_id=%d",
+			peerAddress, peerPort, serverName, userID)
+
+		req, err := http.NewRequest(http.MethodDelete, deleteURL, nil)
+		if err != nil {
+			fmt.Printf("Warning: failed to create delete request for peer %s: %v\n", peerName, err)
+			continue
+		}
+
+		// Add sync authentication header
+		req.Header.Set("X-Sync-Password", syncAuthPassword)
+
+		// Send request
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Printf("Warning: failed to delete user %d backup on peer %s: %v\n", userID, peerName, err)
+			continue
+		}
+		resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			fmt.Printf("Warning: failed to delete user %d backup on peer %s: status %d\n", userID, peerName, resp.StatusCode)
+			continue
+		}
+
+		fmt.Printf("Successfully deleted user %d backup on peer %s\n", userID, peerName)
+	}
 }
 
 // IsActivated checks if the user account is activated

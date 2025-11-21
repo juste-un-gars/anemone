@@ -44,6 +44,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/sync"
 	"github.com/juste-un-gars/anemone/internal/syncauth"
 	"github.com/juste-un-gars/anemone/internal/syncconfig"
+	"github.com/juste-un-gars/anemone/internal/sysconfig"
 	"github.com/juste-un-gars/anemone/internal/trash"
 	"github.com/juste-un-gars/anemone/internal/users"
 )
@@ -213,6 +214,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// Admin routes - Settings
 	mux.HandleFunc("/admin/settings", auth.RequireAdmin(server.handleAdminSettings))
 	mux.HandleFunc("/admin/settings/sync-password", auth.RequireAdmin(server.handleAdminSettingsSyncPassword))
+	mux.HandleFunc("/admin/settings/trash", auth.RequireAdmin(server.handleAdminSettingsTrash))
 
 	// Admin routes - Sync
 	mux.HandleFunc("/admin/sync", auth.RequireAdmin(server.handleAdminSync))
@@ -266,6 +268,9 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/api/sync/list-user-backups", server.syncAuthMiddleware(server.handleAPISyncListUserBackups))
 	mux.HandleFunc("/api/sync/download-encrypted-manifest", server.syncAuthMiddleware(server.handleAPISyncDownloadEncryptedManifest))
 	mux.HandleFunc("/api/sync/download-encrypted-file", server.syncAuthMiddleware(server.handleAPISyncDownloadEncryptedFile))
+
+	// API routes - User management (protected by password authentication)
+	mux.HandleFunc("/api/sync/delete-user-backup", server.syncAuthMiddleware(server.handleAPISyncDeleteUserBackup))
 
 	// Apply security headers middleware to all routes
 	return securityHeadersMiddleware(mux)
@@ -2297,6 +2302,120 @@ func (s *Server) handleAdminSettingsSyncPassword(w http.ResponseWriter, r *http.
 	}
 }
 
+func (s *Server) handleAdminSettingsTrash(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	// GET: Display settings
+	if r.Method == http.MethodGet {
+		// Get current retention days
+		retentionDays, err := sysconfig.GetTrashRetentionDays(s.db)
+		if err != nil {
+			log.Printf("Error getting trash retention days: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		data := struct {
+			Lang           string
+			Session        *auth.Session
+			RetentionDays  int
+			Success        string
+			Error          string
+		}{
+			Lang:           lang,
+			Session:        session,
+			RetentionDays:  retentionDays,
+		}
+
+		if err := s.templates.ExecuteTemplate(w, "admin_settings_trash.html", data); err != nil {
+			log.Printf("Error rendering admin settings trash template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// POST: Update settings
+	if r.Method == http.MethodPost {
+		// Parse form
+		retentionDaysStr := r.FormValue("retention_days")
+
+		// Parse days
+		retentionDays, err := strconv.Atoi(retentionDaysStr)
+		if err != nil || retentionDays < 0 {
+			currentRetentionDays, _ := sysconfig.GetTrashRetentionDays(s.db)
+			data := struct {
+				Lang           string
+				Session        *auth.Session
+				RetentionDays  int
+				Success        string
+				Error          string
+			}{
+				Lang:           lang,
+				Session:        session,
+				RetentionDays:  currentRetentionDays,
+				Error:          "La durée de rétention doit être un nombre positif",
+			}
+			if err := s.templates.ExecuteTemplate(w, "admin_settings_trash.html", data); err != nil {
+				log.Printf("Error rendering admin settings trash template: %v", err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// Update retention days
+		if err := sysconfig.SetTrashRetentionDays(s.db, retentionDays); err != nil {
+			log.Printf("Error setting trash retention days: %v", err)
+			currentRetentionDays, _ := sysconfig.GetTrashRetentionDays(s.db)
+			data := struct {
+				Lang           string
+				Session        *auth.Session
+				RetentionDays  int
+				Success        string
+				Error          string
+			}{
+				Lang:           lang,
+				Session:        session,
+				RetentionDays:  currentRetentionDays,
+				Error:          "Erreur lors de la mise à jour de la durée de rétention",
+			}
+			if err := s.templates.ExecuteTemplate(w, "admin_settings_trash.html", data); err != nil {
+				log.Printf("Error rendering admin settings trash template: %v", err)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+			return
+		}
+
+		// Success
+		log.Printf("Admin %s updated trash retention days to %d", session.Username, retentionDays)
+		data := struct {
+			Lang           string
+			Session        *auth.Session
+			RetentionDays  int
+			Success        string
+			Error          string
+		}{
+			Lang:           lang,
+			Session:        session,
+			RetentionDays:  retentionDays,
+			Success:        "Durée de rétention mise à jour avec succès",
+		}
+
+		if err := s.templates.ExecuteTemplate(w, "admin_settings_trash.html", data); err != nil {
+			log.Printf("Error rendering admin settings trash template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
 func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.GetSessionFromContext(r)
 	if !ok {
@@ -3130,6 +3249,81 @@ func (s *Server) handleAPISyncListPhysicalFiles(w http.ResponseWriter, r *http.R
 	w.Write(filesJSON)
 
 	log.Printf("Listed %d physical files for user %d, share %s", len(files), userID, shareName)
+}
+
+// handleAPISyncDeleteUserBackup deletes all backup data for a user on this peer
+// DELETE /api/sync/delete-user-backup?source_server=X&user_id=5
+func (s *Server) handleAPISyncDeleteUserBackup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse query parameters
+	sourceServer := r.URL.Query().Get("source_server")
+	if sourceServer == "" {
+		sourceServer = "unknown"
+	}
+	userIDStr := r.URL.Query().Get("user_id")
+
+	if userIDStr == "" {
+		http.Error(w, "Missing user_id", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := strconv.Atoi(userIDStr)
+	if err != nil {
+		http.Error(w, "Invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	// Security check: prevent path traversal
+	if strings.Contains(sourceServer, "..") {
+		http.Error(w, "Invalid source_server (path traversal detected)", http.StatusBadRequest)
+		return
+	}
+
+	// Build backup directory path for this user from this source server
+	// Format: /srv/anemone/backups/incoming/{source_server}/{user_id}_*
+	incomingDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer)
+
+	// Check if incoming directory for this source server exists
+	if _, err := os.Stat(incomingDir); os.IsNotExist(err) {
+		// No backups from this server - that's OK
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"success": true, "message": "No backups found for this user", "deleted_directories": 0}`)
+		return
+	}
+
+	// Find all backup directories for this user (user_id_*)
+	pattern := fmt.Sprintf("%d_*", userID)
+	matches, err := filepath.Glob(filepath.Join(incomingDir, pattern))
+	if err != nil {
+		log.Printf("Error globbing backup directories: %v", err)
+		http.Error(w, "Failed to find backup directories", http.StatusInternalServerError)
+		return
+	}
+
+	// Delete all matching directories
+	deletedCount := 0
+	for _, backupDir := range matches {
+		// Delete the entire backup directory (using sudo for permission)
+		cmd := exec.Command("sudo", "rm", "-rf", backupDir)
+		if err := cmd.Run(); err != nil {
+			log.Printf("Warning: failed to delete backup directory %s: %v", backupDir, err)
+			continue
+		}
+		deletedCount++
+		log.Printf("Deleted backup directory: %s", backupDir)
+	}
+
+	// Return success
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"success": true, "message": "User backup deleted", "deleted_directories": %d}`, deletedCount)
+
+	log.Printf("Deleted %d backup director(ies) for user %d from source %s", deletedCount, userID, sourceServer)
 }
 
 // handleSettings shows the user settings page

@@ -239,3 +239,53 @@ func copyFile(src, dst string) error {
 	}
 	return os.Chmod(dst, sourceInfo.Mode())
 }
+
+// CleanupOldTrashItems deletes trash items older than the specified number of days
+// Returns number of items deleted and any error encountered
+func CleanupOldTrashItems(sharePath, username string, retentionDays int) (int, error) {
+	trashPath := filepath.Join(sharePath, ".trash", username)
+
+	// Check if trash directory exists
+	if _, err := os.Stat(trashPath); os.IsNotExist(err) {
+		return 0, nil // No trash directory, nothing to clean
+	}
+
+	now := time.Now()
+	cutoffTime := now.AddDate(0, 0, -retentionDays)
+	deletedCount := 0
+
+	// Read directory entries (only first level)
+	entries, err := os.ReadDir(trashPath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read trash directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			continue // Skip entries we can't read
+		}
+
+		// Check if item is older than retention period
+		if info.ModTime().Before(cutoffTime) {
+			itemPath := filepath.Join(trashPath, entry.Name())
+
+			// Delete the item (using sudo for permission, -rf to handle directories)
+			cmd := exec.Command("sudo", "rm", "-rf", itemPath)
+			if err := cmd.Run(); err != nil {
+				// Log error but continue with other items
+				fmt.Printf("Warning: failed to delete old trash item %s: %v\n", entry.Name(), err)
+				continue
+			}
+
+			deletedCount++
+		}
+	}
+
+	// Clean up empty directories
+	if deletedCount > 0 {
+		cleanupEmptyDirs(trashPath, filepath.Join(sharePath, ".trash"))
+	}
+
+	return deletedCount, nil
+}
