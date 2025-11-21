@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -487,7 +488,7 @@ func deleteUserBackupsOnPeers(db *sql.DB, userID int) {
 	var serverName string
 	err := db.QueryRow("SELECT value FROM system_config WHERE key = 'nas_name'").Scan(&serverName)
 	if err != nil {
-		fmt.Printf("Warning: failed to get server name: %v\n", err)
+		log.Printf("⚠️  Warning: failed to get server name: %v", err)
 		serverName = "unknown"
 	}
 
@@ -495,14 +496,14 @@ func deleteUserBackupsOnPeers(db *sql.DB, userID int) {
 	var masterKey string
 	err = db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
 	if err != nil {
-		fmt.Printf("Warning: failed to get master key, skipping peer backup deletion\n")
+		log.Printf("⚠️  Warning: failed to get master key, skipping peer backup deletion: %v", err)
 		return
 	}
 
 	// Get all enabled peers
 	rows, err := db.Query("SELECT id, name, address, port, password FROM peers WHERE enabled = 1")
 	if err != nil {
-		fmt.Printf("Warning: failed to query peers: %v\n", err)
+		log.Printf("⚠️  Warning: failed to query peers: %v", err)
 		return
 	}
 	defer rows.Close()
@@ -524,14 +525,14 @@ func deleteUserBackupsOnPeers(db *sql.DB, userID int) {
 		var encryptedPassword []byte
 
 		if err := rows.Scan(&peerID, &peerName, &peerAddress, &peerPort, &encryptedPassword); err != nil {
-			fmt.Printf("Warning: failed to scan peer: %v\n", err)
+			log.Printf("⚠️  Warning: failed to scan peer: %v", err)
 			continue
 		}
 
 		// Decrypt peer password
 		peerPassword, err := crypto.DecryptPassword(encryptedPassword, masterKey)
 		if err != nil {
-			fmt.Printf("Warning: failed to decrypt password for peer %s: %v\n", peerName, err)
+			log.Printf("⚠️  Warning: failed to decrypt password for peer %s: %v", peerName, err)
 			continue
 		}
 
@@ -541,7 +542,7 @@ func deleteUserBackupsOnPeers(db *sql.DB, userID int) {
 
 		req, err := http.NewRequest(http.MethodDelete, deleteURL, nil)
 		if err != nil {
-			fmt.Printf("Warning: failed to create delete request for peer %s: %v\n", peerName, err)
+			log.Printf("⚠️  Warning: failed to create delete request for peer %s: %v", peerName, err)
 			continue
 		}
 
@@ -551,17 +552,17 @@ func deleteUserBackupsOnPeers(db *sql.DB, userID int) {
 		// Send request
 		resp, err := client.Do(req)
 		if err != nil {
-			fmt.Printf("Warning: failed to delete user %d backup on peer %s: %v\n", userID, peerName, err)
+			log.Printf("⚠️  Warning: failed to delete user %d backup on peer %s: %v", userID, peerName, err)
 			continue
 		}
 		resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			fmt.Printf("Warning: failed to delete user %d backup on peer %s: status %d\n", userID, peerName, resp.StatusCode)
+			log.Printf("⚠️  Warning: failed to delete user %d backup on peer %s: status %d", userID, peerName, resp.StatusCode)
 			continue
 		}
 
-		fmt.Printf("Successfully deleted user %d backup on peer %s\n", userID, peerName)
+		log.Printf("✅ Successfully deleted user %d backup on peer %s", userID, peerName)
 	}
 }
 
