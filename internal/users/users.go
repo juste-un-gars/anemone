@@ -492,14 +492,6 @@ func deleteUserBackupsOnPeers(db *sql.DB, userID int) {
 		serverName = "unknown"
 	}
 
-	// Get master key for decrypting peer passwords
-	var masterKey string
-	err = db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
-	if err != nil {
-		log.Printf("⚠️  Warning: failed to get master key, skipping peer backup deletion: %v", err)
-		return
-	}
-
 	// Get all enabled peers
 	rows, err := db.Query("SELECT id, name, address, port, password FROM peers WHERE enabled = 1")
 	if err != nil {
@@ -522,17 +514,10 @@ func deleteUserBackupsOnPeers(db *sql.DB, userID int) {
 		var peerID int
 		var peerName, peerAddress string
 		var peerPort int
-		var encryptedPassword []byte
+		var peerPassword sql.NullString
 
-		if err := rows.Scan(&peerID, &peerName, &peerAddress, &peerPort, &encryptedPassword); err != nil {
+		if err := rows.Scan(&peerID, &peerName, &peerAddress, &peerPort, &peerPassword); err != nil {
 			log.Printf("⚠️  Warning: failed to scan peer: %v", err)
-			continue
-		}
-
-		// Decrypt peer password
-		peerPassword, err := crypto.DecryptPassword(encryptedPassword, masterKey)
-		if err != nil {
-			log.Printf("⚠️  Warning: failed to decrypt password for peer %s: %v", peerName, err)
 			continue
 		}
 
@@ -546,8 +531,10 @@ func deleteUserBackupsOnPeers(db *sql.DB, userID int) {
 			continue
 		}
 
-		// Add sync authentication header with the PEER's password (not FR1's)
-		req.Header.Set("X-Sync-Password", peerPassword)
+		// Add sync authentication header with the PEER's password
+		if peerPassword.Valid && peerPassword.String != "" {
+			req.Header.Set("X-Sync-Password", peerPassword.String)
+		}
 
 		// Send request
 		resp, err := client.Do(req)
