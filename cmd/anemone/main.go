@@ -14,7 +14,9 @@ import (
 	"github.com/juste-un-gars/anemone/internal/database"
 	"github.com/juste-un-gars/anemone/internal/scheduler"
 	"github.com/juste-un-gars/anemone/internal/serverbackup"
+	"github.com/juste-un-gars/anemone/internal/sysconfig"
 	"github.com/juste-un-gars/anemone/internal/tls"
+	"github.com/juste-un-gars/anemone/internal/trash"
 	"github.com/juste-un-gars/anemone/internal/web"
 )
 
@@ -44,6 +46,11 @@ func main() {
 
 	// Start automatic server backup scheduler (daily at 4 AM)
 	serverbackup.StartScheduler(db, cfg.DataDir)
+
+	// Start automatic trash cleanup scheduler (daily at 3 AM)
+	trash.StartCleanupScheduler(db, func() (int, error) {
+		return sysconfig.GetTrashRetentionDays(db)
+	})
 
 	// Initialize web server
 	router := web.NewRouter(db, cfg)

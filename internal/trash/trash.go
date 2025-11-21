@@ -5,6 +5,7 @@
 package trash
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"os"
@@ -238,6 +239,58 @@ func copyFile(src, dst string) error {
 		return err
 	}
 	return os.Chmod(dst, sourceInfo.Mode())
+}
+
+// CleanupAllUserTrash runs trash cleanup for all users and their shares
+// This should be called periodically (e.g., daily) to enforce retention policy
+func CleanupAllUserTrash(db interface{}, retentionDays int) (int, error) {
+	if retentionDays == 0 {
+		// Retention disabled (infinite retention)
+		return 0, nil
+	}
+
+	// Type assert to *sql.DB
+	database, ok := db.(interface {
+		Query(query string, args ...interface{}) (*sql.Rows, error)
+	})
+	if !ok {
+		return 0, fmt.Errorf("invalid database type")
+	}
+
+	// Get all users and their shares
+	rows, err := database.Query("SELECT u.username, s.path FROM users u JOIN shares s ON u.id = s.user_id")
+	if err != nil {
+		return 0, fmt.Errorf("failed to query users and shares: %w", err)
+	}
+	defer rows.Close()
+
+	totalDeleted := 0
+
+	for rows.Next() {
+		var username, sharePath string
+		if err := rows.Scan(&username, &sharePath); err != nil {
+			fmt.Printf("Warning: failed to scan user/share: %v\n", err)
+			continue
+		}
+
+		// Cleanup trash for this user's share
+		deleted, err := CleanupOldTrashItems(sharePath, username, retentionDays)
+		if err != nil {
+			fmt.Printf("Warning: failed to cleanup trash for %s in %s: %v\n", username, sharePath, err)
+			continue
+		}
+
+		if deleted > 0 {
+			fmt.Printf("Cleaned up %d old item(s) from %s's trash in share %s\n", deleted, username, sharePath)
+			totalDeleted += deleted
+		}
+	}
+
+	if totalDeleted > 0 {
+		fmt.Printf("Total: cleaned up %d old item(s) from trash across all users\n", totalDeleted)
+	}
+
+	return totalDeleted, nil
 }
 
 // CleanupOldTrashItems deletes trash items older than the specified number of days
