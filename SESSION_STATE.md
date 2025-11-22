@@ -1,3 +1,195 @@
+# Session 31 - Correction bug restauration et amélioration UX ✅ COMPLETED
+
+**Date**: 22 Nov 2025
+**Durée**: ~2h
+**Statut**: ✅ Terminée - Restauration fonctionnelle + sélection peer
+**Commits**: c958d78 → 64f978d (3 commits pushed to GitHub)
+
+## 🎯 Objectif
+
+Corriger le problème de restauration sur FR4 : impossible de lister les backups depuis FR2/FR3 après disaster recovery.
+
+## 🐛 Problèmes découverts et corrigés
+
+### 1. Restauration manuelle bloquée pour peers désactivés ⚠️
+
+**Symptôme** :
+- FR4 restauré depuis FR1 avec `restore_server.sh`
+- Peers FR2/FR3 automatiquement désactivés (`sync_enabled = 0`) pour sécurité
+- Page "Restaurer les utilisateurs" affichait "No backups available"
+- FR4 ne contactait jamais FR2/FR3
+
+**Cause racine** :
+Dans `handleAPIRestoreBackups` (router.go:3992), le code ignorait les peers désactivés :
+```go
+if !peer.SyncEnabled {
+    continue  // ❌ Bloquait aussi la restauration manuelle
+}
+```
+
+**Confusion conceptuelle** :
+Le flag `sync_enabled` contrôlait deux choses différentes :
+- ✅ Synchronisation automatique (push FR4→peers) : doit être bloquée
+- ❌ Restauration manuelle (pull peers→FR4) : devrait être autorisée
+
+**Solution** (commit `c958d78`) :
+- Suppression du check `sync_enabled` dans `handleAPIRestoreBackups`
+- Ajout d'un commentaire explicatif
+- Cohérence avec `handleAdminRestoreUsers` qui ne vérifie pas `sync_enabled`
+
+### 2. Double chiffrement des mots de passe peers 🔐
+
+**Symptôme** :
+Après le fix #1, FR4 contactait bien FR2/FR3 mais les requêtes échouaient silencieusement.
+
+**Cause racine** (rappel Session 29) :
+Le backup de FR1 contenait des **mots de passe corrompus** :
+
+1. **Sur FR1** : Mots de passe peers stockés **chiffrés** (BLOB) dans la DB ✅
+2. **Lors du backup** : Code lisait le BLOB comme `sql.NullString` → corruption
+3. **Dans le backup JSON** : Données corrompues (ni chiffrées ni en clair)
+4. **Lors de la restauration** : Script re-chiffrait les données corrompues
+5. **Sur FR4** : Double corruption → impossible à déchiffrer
+
+**Solution** (commit `3cdbff8`) :
+
+Modification de `internal/backup/backup.go` :
+
+```go
+// AVANT (CASSÉ)
+var publicKey, password sql.NullString  // ❌ Lit le BLOB comme string
+err := peerRows.Scan(..., &password, ...)
+if password.Valid {
+    peer.Password = password.String  // ❌ Corrompu
+}
+
+// APRÈS (CORRIGÉ)
+var encryptedPassword []byte  // ✅ Lit le BLOB correctement
+err := peerRows.Scan(..., &encryptedPassword, ...)
+if len(encryptedPassword) > 0 {
+    decrypted, err := crypto.DecryptPassword(encryptedPassword, masterKey)
+    peer.Password = decrypted  // ✅ Texte clair dans le backup JSON
+}
+```
+
+**Impact** :
+- Le backup exporte maintenant les mots de passe peers **en clair** dans le JSON
+- Le script de restauration les **re-chiffre** avec la nouvelle master key
+- Identique au traitement des encryption keys des utilisateurs
+
+### 3. UX - Restauration en double depuis plusieurs peers 🔄
+
+**Symptôme** :
+Sur `/admin/restore-users`, john apparaissait deux fois :
+- Une ligne depuis FR2
+- Une ligne depuis FR3
+
+Le bouton "Restore All Users" aurait restauré john **deux fois** → conflit !
+
+**Solution** (commit `64f978d`) :
+
+Ajout d'un **sélecteur de peer obligatoire** :
+
+1. **Dropdown** : Sélection d'un peer spécifique (FR2, FR3, etc.)
+2. **Filtrage** : Table affiche uniquement les backups du peer sélectionné
+3. **Bouton dynamique** : "📦 Restaurer tous les utilisateurs depuis FR2"
+4. **Pas d'option "Tous"** : Évite les conflits
+
+**Fichiers modifiés** :
+- `web/templates/admin_restore_users.html` - Interface avec dropdown
+- `internal/i18n/locales/fr.json` - Traductions FR
+- `internal/i18n/locales/en.json` - Traductions EN
+
+## ✅ Résultat final
+
+**Sur FR4** :
+- ✅ Les peers FR2/FR3 sont bien listés (même désactivés)
+- ✅ Les mots de passe sont correctement déchiffrés
+- ✅ Les backups sont visibles depuis les deux peers
+- ✅ L'admin peut sélectionner un peer spécifique
+- ✅ La restauration groupée évite les doublons
+
+**Tests de validation** :
+1. Page `/admin/restore-users` accessible ✅
+2. Dropdown affiche FR2 et FR3 ✅
+3. Table filtrée selon le peer sélectionné ✅
+4. Bouton indique clairement "depuis [peer]" ✅
+5. Restauration individuelle fonctionne ✅
+6. Restauration groupée évite les doublons ✅
+
+## 📊 Statistiques
+
+- **Commits** : 3
+- **Bugs critiques corrigés** : 2 (restauration bloquée + mots de passe corrompus)
+- **Améliorations UX** : 1 (sélection peer)
+- **Fichiers modifiés** : 5
+- **Lignes de code ajoutées** : ~100
+- **Lignes de code modifiées** : ~30
+
+## 📦 Fichiers modifiés
+
+```
+internal/web/router.go                   (suppression check sync_enabled)
+internal/backup/backup.go                (déchiffrement mots de passe peers)
+web/templates/admin_restore_users.html   (dropdown + filtrage)
+internal/i18n/locales/fr.json            (traductions FR)
+internal/i18n/locales/en.json            (traductions EN)
+```
+
+## 📝 Notes importantes
+
+### Déploiement sur serveurs restaurés
+
+Après disaster recovery, il faut copier les templates mis à jour :
+```bash
+sudo cp -r /home/franck/anemone/web/templates/* /srv/anemone/web/templates/
+sudo systemctl restart anemone
+```
+
+Les templates ne sont **pas embarqués** dans le binaire, ils sont chargés depuis `web/templates/` relatif au `WorkingDirectory` du service (`/srv/anemone`).
+
+### Backups existants invalides
+
+⚠️ **Les backups créés avant ce fix sont corrompus** (mots de passe peers double-chiffrés).
+
+**Solution** : Créer de **nouveaux backups** sur tous les serveurs actifs après déploiement du fix.
+
+### Architecture de sécurité validée
+
+```
+┌─────────────────────────────────────────────┐
+│   BACKUP (JSON en clair, chiffré AES-256)   │
+├─────────────────────────────────────────────┤
+│ users.encryption_key   → déchiffré          │
+│ users.password         → déchiffré          │
+│ peers.password         → déchiffré          │ ← NOUVEAU
+└─────────────────────────────────────────────┘
+            ↓ Export avec master_key
+┌─────────────────────────────────────────────┐
+│         BASE DE DONNÉES (chiffrée)          │
+├─────────────────────────────────────────────┤
+│ users.encryption_key   → BLOB chiffré       │
+│ users.password         → BLOB chiffré       │
+│ peers.password         → BLOB chiffré       │ ← Session 29
+└─────────────────────────────────────────────┘
+```
+
+**Flux disaster recovery** :
+1. Backup : Déchiffre avec **ancienne master key**
+2. Export : JSON avec données **en clair**
+3. Import : Re-chiffre avec **nouvelle master key**
+
+## 🔒 Prochaines étapes recommandées
+
+1. **Créer nouveaux backups** sur FR1, FR2, FR3 avec le code corrigé
+2. **Tester disaster recovery complet** avec un nouveau backup
+3. **Valider Phase 12** des tests (restore avec bon mot de passe)
+4. **Documenter procédure** de déploiement après restauration
+
+**Status** : 🟢 **RESTAURATION FONCTIONNELLE** - Prêt pour tests disaster recovery
+
+---
+
 # Session 30 - Correction bug restauration (mots de passe peers) ✅ COMPLETED
 
 **Date**: 22 Nov 2025
