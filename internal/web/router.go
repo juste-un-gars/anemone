@@ -2096,8 +2096,8 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 		}
 		// If password is empty and clear_password is not checked, keep existing password (already encrypted)
 
-		// Update enabled status
-		peer.Enabled = r.FormValue("enabled") == "1"
+		// Always keep peer enabled (the only control is sync_enabled for automatic sync)
+		peer.Enabled = true
 
 		// Update sync configuration
 		peer.SyncEnabled = r.FormValue("sync_enabled") == "on"
