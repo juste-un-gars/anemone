@@ -1,3 +1,165 @@
+# Session 32 - Simplification gestion des pairs ✅ COMPLETED
+
+**Date**: 22 Nov 2025
+**Durée**: ~1h
+**Statut**: ✅ Terminée - Interface simplifiée et cohérente
+**Commits**: 50b781b (1 commit pushed to GitHub)
+
+## 🎯 Objectif
+
+Simplifier la gestion des pairs en supprimant le flag `enabled` redondant de l'interface utilisateur.
+
+## 🐛 Problème découvert
+
+### Confusion avec deux checkboxes redondantes
+
+**Symptôme initial** :
+- Sur FR4 (serveur restauré depuis FR1), la checkbox "Enable Synchronization" était cochée
+- L'utilisateur s'attendait à ce qu'elle soit décochée après restauration
+- Confusion entre les deux checkboxes présentes dans le formulaire d'édition de pair
+
+**Interface problématique** :
+L'interface présentait **deux checkboxes** pour contrôler les pairs :
+
+1. **"Enable automatic sync"** (`sync_enabled`) - Dans section "⏰ Automatic Sync Configuration"
+2. **"Enable Synchronization"** (`enabled`) - En bas du formulaire
+
+**Investigation** :
+Analyse du code révèle que les deux flags ont des utilisations différentes :
+
+```go
+// internal/peers/peers.go:239-243
+func ShouldSyncPeer(peer *Peer) bool {
+    if !peer.SyncEnabled || !peer.Enabled {
+        return false
+    }
+}
+```
+
+**Utilisation réelle** :
+- `enabled` : Filtre global (peers actifs vs désactivés) - utilisé dans router.go:2742
+- `sync_enabled` : Contrôle la synchronisation automatique programmée
+
+**Mais en pratique** :
+- `enabled` est toujours à `1` après création d'un pair
+- Jamais modifié en production
+- Redondant avec la simple suppression du pair si on ne veut plus l'utiliser
+- Crée de la confusion pour l'utilisateur
+
+## ✅ Solution implémentée
+
+### Simplification radicale de l'interface
+
+**Décision** : Garder uniquement le flag `sync_enabled` qui est le seul vraiment utile.
+
+**Changements** (commit `50b781b`) :
+
+1. **Suppression de la checkbox "Enable Synchronization"** :
+   - Retrait complet du template `admin_peers_edit.html` (lignes 227-238)
+   - L'interface ne présente plus qu'une seule checkbox claire
+
+2. **Backend force `enabled=true`** :
+   ```go
+   // internal/web/router.go:2102-2103
+   // AVANT:
+   peer.Enabled = r.FormValue("enabled") == "1"
+   
+   // APRÈS:
+   // Always keep peer enabled (the only control is sync_enabled for automatic sync)
+   peer.Enabled = true
+   ```
+
+3. **Mise à jour base de données FR4** :
+   ```sql
+   UPDATE peers SET enabled = 1 WHERE enabled = 0;
+   ```
+
+**Résultat** :
+- ✅ Interface simplifiée : une seule checkbox "Enable automatic sync"
+- ✅ Pas de confusion possible
+- ✅ Comportement clair : désactiver sync_enabled = pas de sync auto, mais restauration manuelle possible
+- ✅ Champ `enabled` toujours à `1` en base, maintenu pour compatibilité
+
+## 📋 Cas d'usage clarifiés
+
+Après simplification, le comportement est limpide :
+
+| sync_enabled | Comportement |
+|--------------|--------------|
+| 0 | Peer existe, restauration manuelle possible, PAS de sync automatique (défaut après restore) |
+| 1 | Peer existe, restauration manuelle possible, sync automatique ACTIVÉE |
+
+**Cas d'usage typique après disaster recovery** :
+1. Serveur restauré → `sync_enabled=0` pour tous les pairs
+2. Admin restaure manuellement les fichiers utilisateurs (possible car `enabled=1`)
+3. Une fois restauration terminée → admin active `sync_enabled=1`
+
+## 📊 Statistiques
+
+- **Commits** : 1
+- **Fichiers modifiés** : 2
+- **Lignes supprimées** : 13 (checkbox + logique redondante)
+- **Lignes ajoutées** : 2 (commentaire explicatif)
+- **Simplification UX** : 1 checkbox au lieu de 2
+
+## 📦 Fichiers modifiés
+
+```
+web/templates/admin_peers_edit.html  (suppression checkbox "enabled")
+internal/web/router.go               (force peer.Enabled = true)
+```
+
+## 📝 Notes importantes
+
+### Impact sur le code existant
+
+**Code utilisant `peer.Enabled`** :
+- `internal/web/router.go:2742` - Filtre des pairs actifs (toujours vrai maintenant)
+- `internal/peers/peers.go:241` - Check `ShouldSyncPeer()` (toujours vrai pour enabled)
+
+**Pas de breaking change** :
+- Le champ `enabled` reste en base de données
+- Toujours présent dans la struct `Peer`
+- Compatible avec le code existant
+- Simplement forcé à `true` partout
+
+### Rétrocompatibilité
+
+**Serveurs existants** (FR1, FR2, FR3) :
+- Pas besoin de migration
+- Le prochain déploiement forcera `enabled=1` automatiquement
+- Aucun impact sur le fonctionnement
+
+**Serveurs restaurés** (FR4) :
+- Base de données mise à jour manuellement (UPDATE peers SET enabled=1)
+- Template déployé avec le nouveau binaire
+- Fonctionne immédiatement
+
+### Amélioration UX
+
+**Avant** : Confusion totale
+- "Enable Synchronization" ? C'est quoi ?
+- "Enable automatic sync" ? C'est différent ?
+- Quelle checkbox pour quoi ?
+
+**Après** : Clarté absolue
+- Une seule checkbox : "Enable automatic sync"
+- Comportement évident : cocher = sync auto, décocher = pas de sync auto
+- Restauration manuelle toujours possible (pairs toujours "enabled")
+
+## ✅ Résultat final
+
+**Tests de validation** :
+1. Accès à `/admin/peers/2/edit` ✅
+2. Une seule checkbox visible ✅
+3. Modification du peer → `enabled` reste à `1` ✅
+4. Pas de régression fonctionnelle ✅
+5. Déployé et testé sur FR4 ✅
+
+**Status** : 🟢 **INTERFACE SIMPLIFIÉE** - Meilleure expérience utilisateur
+
+---
+
 # Session 31 - Correction bug restauration et amélioration UX ✅ COMPLETED
 
 **Date**: 22 Nov 2025
