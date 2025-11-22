@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"io"
 	"time"
+
+	"github.com/juste-un-gars/anemone/internal/crypto"
 )
 
 // ServerBackup represents the complete server configuration
@@ -102,6 +104,13 @@ func ExportConfiguration(db *sql.DB, serverName string) (*ServerBackup, error) {
 		ServerName: serverName,
 	}
 
+	// Get master key for decrypting peer passwords
+	var masterKey string
+	err := db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get master key: %w", err)
+	}
+
 	// Export system_config
 	configRows, err := db.Query("SELECT key, value, updated_at FROM system_config")
 	if err != nil {
@@ -182,10 +191,11 @@ func ExportConfiguration(db *sql.DB, serverName string) (*ServerBackup, error) {
 
 	for peerRows.Next() {
 		var peer PeerBackup
-		var publicKey, password sql.NullString
+		var publicKey sql.NullString
+		var encryptedPassword []byte
 		var dayOfWeek, dayOfMonth sql.NullInt64
 		var lastSeen, lastSync sql.NullTime
-		if err := peerRows.Scan(&peer.ID, &peer.Name, &peer.Address, &peer.Port, &publicKey, &password,
+		if err := peerRows.Scan(&peer.ID, &peer.Name, &peer.Address, &peer.Port, &publicKey, &encryptedPassword,
 			&peer.Enabled, &peer.Status, &peer.SyncEnabled, &peer.SyncFrequency, &peer.SyncTime,
 			&dayOfWeek, &dayOfMonth, &peer.SyncIntervalMinutes, &lastSeen, &lastSync, &peer.CreatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan peer row: %w", err)
@@ -193,8 +203,13 @@ func ExportConfiguration(db *sql.DB, serverName string) (*ServerBackup, error) {
 		if publicKey.Valid {
 			peer.PublicKey = publicKey.String
 		}
-		if password.Valid {
-			peer.Password = password.String
+		// Decrypt peer password if present
+		if len(encryptedPassword) > 0 {
+			decrypted, err := crypto.DecryptPassword(encryptedPassword, masterKey)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decrypt password for peer %s: %w", peer.Name, err)
+			}
+			peer.Password = decrypted
 		}
 		if dayOfWeek.Valid {
 			day := int(dayOfWeek.Int64)
