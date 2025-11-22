@@ -493,5 +493,7 @@
   "users.quota.total_label": "📊 Total (backup + data)",
   "admin.restore_users.info": "Click \"Restore\" to recover a user's files",
   "admin.restore_users.empty.message": "No backups available. Make sure peer servers are online and users have backed up files.",
-  "admin.restore_users.restore_all_button": "📦 Restore All Users"
+  "admin.restore_users.restore_all_button": "📦 Restore All Users",
+  "admin.restore_users.select_peer": "Select peer server",
+  "admin.restore_users.restore_all_from": "📦 Restore all users from"
 }

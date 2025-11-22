@@ -56,6 +56,16 @@
 
         <!-- Backups List -->
         {{if .Backups}}
+        <!-- Peer Selection -->
+        <div class="mb-6 bg-white shadow sm:rounded-lg p-6">
+            <label for="peer-select" class="block text-sm font-medium text-gray-700 mb-2">
+                {{T .Lang "admin.restore_users.select_peer"}}
+            </label>
+            <select id="peer-select" onchange="filterByPeer()"
+                    class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md">
+            </select>
+        </div>
+
         <div class="bg-white shadow overflow-hidden sm:rounded-lg">
             <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
                 <h3 class="text-lg leading-6 font-medium text-gray-900">
@@ -92,9 +102,9 @@
                             </th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody class="bg-white divide-y divide-gray-200" id="backups-table">
                         {{range .Backups}}
-                        <tr>
+                        <tr data-peer-id="{{.PeerID}}" data-peer-name="{{.PeerName}}">
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 {{.Username}}
                             </td>
@@ -128,7 +138,7 @@
 
         <!-- Restore All Button -->
         <div class="mt-6">
-            <button onclick="restoreAll()"
+            <button onclick="restoreAll()" id="restore-all-btn"
                     class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white anemone-gradient hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
                 {{T .Lang "admin.restore_users.restore_all_button"}}
             </button>
@@ -169,8 +179,63 @@ const t = {
     errorConnection: '{{T .Lang "admin.restore_users.error_connection"}}',
     confirmAll: '{{T .Lang "admin.restore_users.confirm_all"}}',
     restoringAll: '{{T .Lang "admin.restore_users.restoring_all"}}',
-    successAll: '{{T .Lang "admin.restore_users.success_all"}}'
+    successAll: '{{T .Lang "admin.restore_users.success_all"}}',
+    restoreAllFrom: '{{T .Lang "admin.restore_users.restore_all_from"}}'
 };
+
+// Current selected peer
+let selectedPeerID = null;
+let selectedPeerName = '';
+
+// Initialize peer selector
+document.addEventListener('DOMContentLoaded', function() {
+    const peerSelect = document.getElementById('peer-select');
+    const rows = document.querySelectorAll('#backups-table tr[data-peer-id]');
+
+    // Get unique peers
+    const peers = new Map();
+    rows.forEach(row => {
+        const peerID = row.getAttribute('data-peer-id');
+        const peerName = row.getAttribute('data-peer-name');
+        if (!peers.has(peerID)) {
+            peers.set(peerID, peerName);
+        }
+    });
+
+    // Populate dropdown
+    peers.forEach((name, id) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = name;
+        peerSelect.appendChild(option);
+    });
+
+    // Select first peer by default
+    if (peers.size > 0) {
+        const firstPeerID = peers.keys().next().value;
+        peerSelect.value = firstPeerID;
+        filterByPeer();
+    }
+});
+
+function filterByPeer() {
+    const peerSelect = document.getElementById('peer-select');
+    selectedPeerID = peerSelect.value;
+    selectedPeerName = peerSelect.options[peerSelect.selectedIndex].text;
+
+    const rows = document.querySelectorAll('#backups-table tr[data-peer-id]');
+    rows.forEach(row => {
+        if (row.getAttribute('data-peer-id') === selectedPeerID) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    // Update button text
+    const restoreBtn = document.getElementById('restore-all-btn');
+    restoreBtn.textContent = t.restoreAllFrom + ' ' + selectedPeerName;
+}
 
 function restoreUser(userID, peerID, shareName, sourceServer, username) {
     if (!confirm(t.confirmRestore + ' ' + username + ' ?')) {
@@ -209,16 +274,19 @@ function restoreUser(userID, peerID, shareName, sourceServer, username) {
 }
 
 function restoreAll() {
-    if (!confirm(t.confirmAll)) {
+    if (!confirm(t.confirmAll + ' ' + selectedPeerName + ' ?')) {
         return;
     }
 
-    // Array of backups to restore
-    const backupsToRestore = [
+    // Array of all backups
+    const allBackups = [
         {{range $index, $backup := .Backups}}
         {{if $index}},{{end}}{userID: {{$backup.UserID}}, peerID: {{$backup.PeerID}}, shareName: '{{$backup.ShareName}}', sourceServer: '{{$backup.SourceServer}}'}
         {{end}}
     ];
+
+    // Filter backups for selected peer only
+    const backupsToRestore = allBackups.filter(b => b.peerID == selectedPeerID);
 
     let completed = 0;
     const total = backupsToRestore.length;

@@ -493,5 +493,7 @@
   "users.quota.total_label": "📊 Total (backup + data)",
   "admin.restore_users.info": "Cliquez sur \"Restaurer\" pour récupérer les fichiers d'un utilisateur",
   "admin.restore_users.empty.message": "Aucune sauvegarde disponible. Assurez-vous que les serveurs pairs sont en ligne et que les utilisateurs ont des fichiers sauvegardés.",
-  "admin.restore_users.restore_all_button": "📦 Restaurer tous les utilisateurs"
+  "admin.restore_users.restore_all_button": "📦 Restaurer tous les utilisateurs",
+  "admin.restore_users.select_peer": "Sélectionner un serveur pair",
+  "admin.restore_users.restore_all_from": "📦 Restaurer tous les utilisateurs depuis"
 }
