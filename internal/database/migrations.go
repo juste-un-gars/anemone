@@ -335,13 +335,13 @@ func migratePeersPasswordToBlob(db *sql.DB) error {
 		return fmt.Errorf("failed to create peers_temp table: %w", err)
 	}
 
-	// Copy data from old table, setting password to NULL
-	// (old TEXT passwords are incompatible with new encrypted BLOB format)
+	// Copy data from old table, preserving password as BLOB
+	// (SQLite allows BLOBs in TEXT columns, so existing encrypted passwords will be preserved)
 	_, err = db.Exec(`
 		INSERT INTO peers_temp (id, name, address, port, public_key, password, enabled, status,
 			last_seen, last_sync, sync_enabled, sync_frequency, sync_time, sync_day_of_week,
 			sync_day_of_month, sync_interval_minutes, created_at, updated_at)
-		SELECT id, name, address, port, public_key, NULL, enabled, status,
+		SELECT id, name, address, port, public_key, password, enabled, status,
 			last_seen, last_sync, sync_enabled, sync_frequency, sync_time, sync_day_of_week,
 			sync_day_of_month, sync_interval_minutes, created_at, updated_at
 		FROM peers
