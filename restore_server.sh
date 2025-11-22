@@ -213,7 +213,7 @@ CREATE TABLE IF NOT EXISTS peers (
     address TEXT NOT NULL,
     port INTEGER DEFAULT 8443,
     public_key TEXT,
-    password TEXT,
+    password BLOB,
     enabled BOOLEAN DEFAULT 1,
     status TEXT DEFAULT 'unknown',
     sync_enabled BOOLEAN DEFAULT 1,
@@ -342,6 +342,16 @@ done
 
 # Insert peers (if any exist)
 if echo "$DECRYPTED_JSON" | jq -e '.peers' > /dev/null 2>&1 && [ "$(echo "$DECRYPTED_JSON" | jq '.peers')" != "null" ]; then
+    # Compile peer password encryption tool
+    echo -e "${YELLOW}  Compiling peer password encryption tool...${NC}"
+    cd "$(dirname "$0")"
+    go build -o /tmp/anemone-encrypt-peer-password ./cmd/anemone-encrypt-peer-password </dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Error: Failed to compile peer password encryption tool${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}  ✓ Peer password encryption tool compiled${NC}"
+
     echo "$DECRYPTED_JSON" | jq -r '.peers[] | @json' | while read -r peer; do
     ID=$(echo "$peer" | jq -r '.id')
     NAME=$(echo "$peer" | jq -r '.name')
@@ -359,8 +369,26 @@ if echo "$DECRYPTED_JSON" | jq -e '.peers' > /dev/null 2>&1 && [ "$(echo "$DECRY
     SYNC_INTERVAL_MINUTES=$(echo "$peer" | jq -r '.sync_interval_minutes')
     CREATED_AT=$(echo "$peer" | jq -r '.created_at')
 
-    sqlite3 "$DB_FILE" "INSERT INTO peers (id, name, address, port, public_key, password, enabled, status, sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month, sync_interval_minutes, created_at) VALUES ($ID, '$NAME', '$ADDRESS', $PORT, $(if [ -z "$PUBLIC_KEY" ]; then echo "NULL"; else echo "'$PUBLIC_KEY'"; fi), $(if [ -z "$PASSWORD" ]; then echo "NULL"; else echo "'$PASSWORD'"; fi), $ENABLED, '$STATUS', $SYNC_ENABLED, '$SYNC_FREQUENCY', '$SYNC_TIME', $(if [ "$SYNC_DAY_OF_WEEK" = "NULL" ]; then echo "NULL"; else echo "$SYNC_DAY_OF_WEEK"; fi), $(if [ "$SYNC_DAY_OF_MONTH" = "NULL" ]; then echo "NULL"; else echo "$SYNC_DAY_OF_MONTH"; fi), $SYNC_INTERVAL_MINUTES, '$CREATED_AT');"
+    # Encrypt peer password with new master key (if exists)
+    if [ -n "$PASSWORD" ] && [ "$PASSWORD" != "null" ]; then
+        ENCRYPTED_PASSWORD=$(/tmp/anemone-encrypt-peer-password "$PASSWORD" "$NEW_MASTER_KEY" 2>&1)
+        if [ $? -ne 0 ]; then
+            echo -e "${RED}Error: Failed to encrypt password for peer $NAME${NC}"
+            echo -e "${RED}$ENCRYPTED_PASSWORD${NC}"
+            exit 1
+        fi
+        # Decode base64 and insert as BLOB
+        PASSWORD_ENC_HEX=$(echo "$ENCRYPTED_PASSWORD" | base64 -d | xxd -p | tr -d '\n')
+        PASSWORD_SQL="X'$PASSWORD_ENC_HEX'"
+    else
+        PASSWORD_SQL="NULL"
+    fi
+
+    sqlite3 "$DB_FILE" "INSERT INTO peers (id, name, address, port, public_key, password, enabled, status, sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month, sync_interval_minutes, created_at) VALUES ($ID, '$NAME', '$ADDRESS', $PORT, $(if [ -z "$PUBLIC_KEY" ]; then echo "NULL"; else echo "'$PUBLIC_KEY'"; fi), $PASSWORD_SQL, $ENABLED, '$STATUS', $SYNC_ENABLED, '$SYNC_FREQUENCY', '$SYNC_TIME', $(if [ "$SYNC_DAY_OF_WEEK" = "NULL" ]; then echo "NULL"; else echo "$SYNC_DAY_OF_WEEK"; fi), $(if [ "$SYNC_DAY_OF_MONTH" = "NULL" ]; then echo "NULL"; else echo "$SYNC_DAY_OF_MONTH"; fi), $SYNC_INTERVAL_MINUTES, '$CREATED_AT');"
     done
+
+    # Cleanup encryption tool
+    rm -f /tmp/anemone-encrypt-peer-password 2>/dev/null
 fi
 
 # Insert sync_config (if it exists in backup)
