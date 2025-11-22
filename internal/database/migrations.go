@@ -150,11 +150,6 @@ func Migrate(db *sql.DB) error {
 		return fmt.Errorf("peers table migration failed: %w", err)
 	}
 
-	// Migration pour changer le type de password de TEXT à BLOB dans peers
-	if err := migratePeersPasswordToBlob(db); err != nil {
-		return fmt.Errorf("peers password migration failed: %w", err)
-	}
-
 	// Migration pour ajouter la colonne language à la table users
 	if err := migrateUsersTable(db); err != nil {
 		return fmt.Errorf("users table migration failed: %w", err)
@@ -272,94 +267,6 @@ func migratePeersTable(db *sql.DB) error {
 		if err != nil {
 			return fmt.Errorf("failed to rename peers_new table: %w", err)
 		}
-	}
-
-	return nil
-}
-
-// migratePeersPasswordToBlob converts password column from TEXT to BLOB
-// This is required for encrypted peer passwords (Session 29+)
-func migratePeersPasswordToBlob(db *sql.DB) error {
-	// Check current type of password column
-	rows, err := db.Query("PRAGMA table_info(peers)")
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	passwordType := ""
-	for rows.Next() {
-		var cid int
-		var name, ctype string
-		var notnull, pk int
-		var dfltValue sql.NullString
-		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
-			return err
-		}
-		if name == "password" {
-			passwordType = ctype
-			break
-		}
-	}
-
-	// If password column is already BLOB, no migration needed
-	if passwordType == "BLOB" {
-		return nil
-	}
-
-	// Password column is TEXT, need to recreate table with BLOB type
-	// Create new table with password as BLOB
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS peers_temp (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT UNIQUE NOT NULL,
-			address TEXT NOT NULL,
-			port INTEGER DEFAULT 8443,
-			public_key TEXT,
-			password BLOB,
-			enabled BOOLEAN DEFAULT 1,
-			status TEXT DEFAULT 'unknown',
-			last_seen DATETIME,
-			last_sync DATETIME,
-			sync_enabled BOOLEAN DEFAULT 1,
-			sync_frequency TEXT DEFAULT 'daily',
-			sync_time TEXT DEFAULT '23:00',
-			sync_day_of_week INTEGER,
-			sync_day_of_month INTEGER,
-			sync_interval_minutes INTEGER DEFAULT 60,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to create peers_temp table: %w", err)
-	}
-
-	// Copy data from old table, preserving password as BLOB
-	// (SQLite allows BLOBs in TEXT columns, so existing encrypted passwords will be preserved)
-	_, err = db.Exec(`
-		INSERT INTO peers_temp (id, name, address, port, public_key, password, enabled, status,
-			last_seen, last_sync, sync_enabled, sync_frequency, sync_time, sync_day_of_week,
-			sync_day_of_month, sync_interval_minutes, created_at, updated_at)
-		SELECT id, name, address, port, public_key, password, enabled, status,
-			last_seen, last_sync, sync_enabled, sync_frequency, sync_time, sync_day_of_week,
-			sync_day_of_month, sync_interval_minutes, created_at, updated_at
-		FROM peers
-	`)
-	if err != nil {
-		return fmt.Errorf("failed to copy peers data: %w", err)
-	}
-
-	// Drop old table
-	_, err = db.Exec("DROP TABLE peers")
-	if err != nil {
-		return fmt.Errorf("failed to drop old peers table: %w", err)
-	}
-
-	// Rename temp table to peers
-	_, err = db.Exec("ALTER TABLE peers_temp RENAME TO peers")
-	if err != nil {
-		return fmt.Errorf("failed to rename peers_temp table: %w", err)
 	}
 
 	return nil
