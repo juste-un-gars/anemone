@@ -45,3 +45,12 @@ _old/
 # Data backups (but not source code in internal/backup/)
 /backup/
 /srv/anemone/backups/
+
+# Session archives and temporary markdown files
+SESSION_STATE.md
+SESSION_STATE_ARCHIVE*.md
+SESSIONS_ARCHIVE.md
+CHECKFILES.md
+TESTS_ANEMONE.md
+SECURITY_AUDIT.md
+_audit_temp/

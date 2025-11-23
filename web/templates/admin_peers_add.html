@@ -90,7 +90,7 @@
                     </label>
                     <input type="text" id="address" name="address" required
                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                           placeholder="192.168.1.100 ou nas.example.com">
+                           placeholder="{{T .Lang "peers.address.placeholder"}}">
                     <p class="mt-1 text-sm text-gray-500">{{T .Lang "peers.address.help"}}</p>
                 </div>
 
@@ -118,19 +118,19 @@
                 <!-- Password (optional) -->
                 <div>
                     <label for="password" class="block text-sm font-medium text-gray-700">
-                        🔐 Mot de passe de synchronisation
+                        {{T .Lang "peers.password.label"}}
                     </label>
                     <input type="password" id="password" name="password"
                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                           placeholder="Laisser vide si le pair n'a pas de mot de passe">
+                           placeholder="{{T .Lang "peers.password.placeholder"}}">
                     <p class="mt-1 text-sm text-gray-500">
-                        Mot de passe configuré sur le serveur distant pour protéger les endpoints de synchronisation.
+                        {{T .Lang "peers.password.help"}}
                     </p>
                 </div>
 
                 <!-- Automatic Sync Configuration -->
                 <div class="border-t border-gray-200 pt-6">
-                    <h3 class="text-lg font-medium text-gray-900 mb-4">⏰ Configuration de synchronisation automatique</h3>
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">{{T .Lang "peers.sync_config.title"}}</h3>
 
                     <!-- Enable Auto Sync -->
                     <div class="mb-4 flex items-start">
@@ -140,80 +140,80 @@
                         </div>
                         <div class="ml-3 text-sm">
                             <label for="sync_enabled" class="font-medium text-gray-700">
-                                Activer la synchronisation automatique
+                                {{T .Lang "peers.sync_config.enable"}}
                             </label>
-                            <p class="text-gray-500">Synchroniser automatiquement les partages vers ce pair</p>
+                            <p class="text-gray-500">{{T .Lang "peers.sync_config.enable_help"}}</p>
                         </div>
                     </div>
 
                     <!-- Sync Frequency -->
                     <div class="mb-4">
                         <label for="sync_frequency" class="block text-sm font-medium text-gray-700">
-                            Fréquence de synchronisation
+                            {{T .Lang "peers.sync_config.frequency"}}
                         </label>
                         <select id="sync_frequency" name="sync_frequency"
                                 class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                            <option value="interval">Intervalle (Interval)</option>
-                            <option value="daily" selected>Quotidien (Daily)</option>
-                            <option value="weekly">Hebdomadaire (Weekly)</option>
-                            <option value="monthly">Mensuel (Monthly)</option>
+                            <option value="interval">{{T .Lang "peers.sync_config.frequency.interval"}}</option>
+                            <option value="daily" selected>{{T .Lang "peers.sync_config.frequency.daily"}}</option>
+                            <option value="weekly">{{T .Lang "peers.sync_config.frequency.weekly"}}</option>
+                            <option value="monthly">{{T .Lang "peers.sync_config.frequency.monthly"}}</option>
                         </select>
-                        <p class="mt-1 text-sm text-gray-500">Fréquence des sauvegardes automatiques</p>
+                        <p class="mt-1 text-sm text-gray-500">{{T .Lang "peers.sync_config.frequency_help"}}</p>
                     </div>
 
                     <!-- Interval (for interval frequency) -->
                     <div id="interval_section" class="mb-4 hidden">
                         <label for="sync_interval_value" class="block text-sm font-medium text-gray-700">
-                            Intervalle de synchronisation
+                            {{T .Lang "peers.sync_config.interval"}}
                         </label>
                         <div class="mt-1 flex space-x-2">
                             <input type="number" id="sync_interval_value" name="sync_interval_value" value="1" min="1"
                                    class="block w-32 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                             <select id="sync_interval_unit" name="sync_interval_unit"
                                     class="block w-40 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                                <option value="minutes">minutes</option>
-                                <option value="hours" selected>heures</option>
+                                <option value="minutes">{{T .Lang "peers.sync_config.interval_unit.minutes"}}</option>
+                                <option value="hours" selected>{{T .Lang "peers.sync_config.interval_unit.hours"}}</option>
                             </select>
                         </div>
-                        <p class="mt-1 text-sm text-gray-500">Synchroniser toutes les X minutes/heures</p>
+                        <p class="mt-1 text-sm text-gray-500">{{T .Lang "peers.sync_config.interval_help"}}</p>
                     </div>
 
                     <!-- Sync Time (hidden for interval) -->
                     <div id="sync_time_section" class="mb-4">
                         <label for="sync_time" class="block text-sm font-medium text-gray-700">
-                            Heure de synchronisation
+                            {{T .Lang "peers.sync_config.time"}}
                         </label>
                         <input type="time" id="sync_time" name="sync_time" value="23:00"
                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                        <p class="mt-1 text-sm text-gray-500">Heure quotidienne de la synchronisation (format 24h)</p>
+                        <p class="mt-1 text-sm text-gray-500">{{T .Lang "peers.sync_config.time_help"}}</p>
                     </div>
 
                     <!-- Day of Week (for weekly) -->
                     <div id="day_of_week_section" class="mb-4 hidden">
                         <label for="sync_day_of_week" class="block text-sm font-medium text-gray-700">
-                            Jour de la semaine
+                            {{T .Lang "peers.sync_config.day_of_week"}}
                         </label>
                         <select id="sync_day_of_week" name="sync_day_of_week"
                                 class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                            <option value="0">Dimanche</option>
-                            <option value="1">Lundi</option>
-                            <option value="2">Mardi</option>
-                            <option value="3">Mercredi</option>
-                            <option value="4">Jeudi</option>
-                            <option value="5">Vendredi</option>
-                            <option value="6" selected>Samedi</option>
+                            <option value="0">{{T .Lang "peers.sync_config.day_of_week.sunday"}}</option>
+                            <option value="1">{{T .Lang "peers.sync_config.day_of_week.monday"}}</option>
+                            <option value="2">{{T .Lang "peers.sync_config.day_of_week.tuesday"}}</option>
+                            <option value="3">{{T .Lang "peers.sync_config.day_of_week.wednesday"}}</option>
+                            <option value="4">{{T .Lang "peers.sync_config.day_of_week.thursday"}}</option>
+                            <option value="5">{{T .Lang "peers.sync_config.day_of_week.friday"}}</option>
+                            <option value="6" selected>{{T .Lang "peers.sync_config.day_of_week.saturday"}}</option>
                         </select>
-                        <p class="mt-1 text-sm text-gray-500">Jour de la semaine pour la synchronisation hebdomadaire</p>
+                        <p class="mt-1 text-sm text-gray-500">{{T .Lang "peers.sync_config.day_of_week_help"}}</p>
                     </div>
 
                     <!-- Day of Month (for monthly) -->
                     <div id="day_of_month_section" class="mb-4 hidden">
                         <label for="sync_day_of_month" class="block text-sm font-medium text-gray-700">
-                            Jour du mois
+                            {{T .Lang "peers.sync_config.day_of_month"}}
                         </label>
                         <input type="number" id="sync_day_of_month" name="sync_day_of_month" value="1" min="1" max="31"
                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                        <p class="mt-1 text-sm text-gray-500">Jour du mois pour la synchronisation mensuelle (1-31)</p>
+                        <p class="mt-1 text-sm text-gray-500">{{T .Lang "peers.sync_config.day_of_month_help"}}</p>
                     </div>
                 </div>
 

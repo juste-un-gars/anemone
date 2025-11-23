@@ -52,7 +52,7 @@
                 {{T .Lang "users.token.title"}}
             </h2>
             <p class="mt-2 text-gray-600">
-                Pour l'utilisateur <strong>{{.Username}}</strong>
+                {{T .Lang "users.token.for_user"}} <strong>{{.Username}}</strong>
             </p>
         </div>
 
@@ -84,7 +84,7 @@
             <!-- Activation Link -->
             <div class="mb-6">
                 <label class="block text-sm font-medium text-gray-700 mb-2">
-                    Lien d'activation
+                    {{T .Lang "users.token.link_label"}}
                 </label>
                 <div class="relative">
                     <input type="text" readonly value="{{.ActivationURL}}" id="activation-link"
@@ -104,7 +104,7 @@
                     </svg>
                     <div class="ml-3">
                         <p class="text-sm text-gray-600">
-                            <strong>Expire le :</strong> {{.ExpiresAt.Format "02/01/2006 à 15:04"}}
+                            <strong>{{T .Lang "users.token.expires_on"}}</strong> {{.ExpiresAt.Format "02/01/2006 à 15:04"}}
                         </p>
                     </div>
                 </div>
@@ -112,15 +112,15 @@
 
             <!-- User Info -->
             <div class="border-t border-gray-200 pt-6">
-                <h3 class="text-sm font-medium text-gray-900 mb-4">Informations utilisateur</h3>
+                <h3 class="text-sm font-medium text-gray-900 mb-4">{{T .Lang "users.token.user_info"}}</h3>
                 <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                        <dt class="text-sm font-medium text-gray-500">Nom d'utilisateur</dt>
+                        <dt class="text-sm font-medium text-gray-500">{{T .Lang "users.token.username_label"}}</dt>
                         <dd class="mt-1 text-sm text-gray-900">{{.Username}}</dd>
                     </div>
                     {{if .Email}}
                     <div>
-                        <dt class="text-sm font-medium text-gray-500">Email</dt>
+                        <dt class="text-sm font-medium text-gray-500">{{T .Lang "users.token.email_label"}}</dt>
                         <dd class="mt-1 text-sm text-gray-900">{{.Email}}</dd>
                     </div>
                     {{end}}
