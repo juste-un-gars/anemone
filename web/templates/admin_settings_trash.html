@@ -97,9 +97,9 @@
                         </svg>
                     </div>
                     <div class="ml-3">
-                        <h4 class="text-sm font-medium text-blue-800">{{T .Lang "trash.settings.current_retention" (dict "days" .RetentionDays)}}</h4>
+                        <h4 class="text-sm font-medium text-blue-800">{{T .Lang "trash.settings.current_retention" "days" .RetentionDays}}</h4>
                         <p class="mt-1 text-sm text-blue-700">
-                            {{T .Lang "trash.settings.auto_delete_info" (dict "days" .RetentionDays)}}
+                            {{T .Lang "trash.settings.auto_delete_info" "days" .RetentionDays}}
                         </p>
                     </div>
                 </div>
