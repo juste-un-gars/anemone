@@ -31,6 +31,14 @@
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-sm text-gray-700">{{.Session.Username}}</span>
+                    <a href="/admin/system/update" class="text-sm text-gray-600 hover:text-gray-900 flex items-center">
+                        <span class="{{if and .UpdateInfo .UpdateInfo.Available}}relative{{end}}">
+                            ⚡ {{T .Lang "update.menu"}}
+                            {{if and .UpdateInfo .UpdateInfo.Available}}
+                            <span class="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-green-500"></span>
+                            {{end}}
+                        </span>
+                    </a>
                     <a href="/settings" class="text-sm text-gray-600 hover:text-gray-900">
                         ⚙️ {{T .Lang "settings.title"}}
                     </a>

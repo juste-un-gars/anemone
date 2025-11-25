@@ -565,6 +565,7 @@
   "update.version_info": "Current version: {{current}} → New version: {{latest}}",
   "update.view_release": "View Release",
   "update.view_details": "View Details",
+  "update.menu": "Updates",
   "update.page.title": "System Updates",
   "update.page.back": "Back to Dashboard",
   "update.page.description": "Check and install Anemone updates",

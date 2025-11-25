@@ -565,6 +565,7 @@
   "update.version_info": "Version actuelle : {{current}} → Nouvelle version : {{latest}}",
   "update.view_release": "Voir la release",
   "update.view_details": "Voir les détails",
+  "update.menu": "Mises à jour",
   "update.page.title": "Mises à jour système",
   "update.page.back": "Retour au tableau de bord",
   "update.page.description": "Vérifiez et installez les mises à jour d'Anemone",
