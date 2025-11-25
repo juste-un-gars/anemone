@@ -372,19 +372,22 @@ func (s *Server) getServerName() string {
 // getLang gets language from user preference (DB), query param, or config
 func (s *Server) getLang(r *http.Request) string {
 	lang := ""
+	session, isLoggedIn := auth.GetSessionFromContext(r)
 
-	// Priority 1: User language preference from database (if logged in)
-	if session, ok := auth.GetSessionFromContext(r); ok {
-		user, err := users.GetByID(s.db, session.UserID)
-		if err == nil && user.Language != "" {
-			lang = user.Language
+	// Priority 1: Query parameter (e.g., ?lang=en) - if user is logged in, save it to DB
+	if l := r.URL.Query().Get("lang"); l != "" {
+		lang = l
+		// If user is logged in and changes language via URL, persist it
+		if isLoggedIn && (l == "fr" || l == "en") {
+			users.UpdateUserLanguage(s.db, session.UserID, l)
 		}
 	}
 
-	// Priority 2: Query parameter (e.g., ?lang=en)
-	if lang == "" {
-		if l := r.URL.Query().Get("lang"); l != "" {
-			lang = l
+	// Priority 2: User language preference from database (if logged in)
+	if lang == "" && isLoggedIn {
+		user, err := users.GetByID(s.db, session.UserID)
+		if err == nil && user.Language != "" {
+			lang = user.Language
 		}
 	}
 

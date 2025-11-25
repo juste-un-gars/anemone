@@ -129,10 +129,17 @@ func (m *BtrfsQuotaManager) UpdateQuota(path string, limitGB int) error {
 		return fmt.Errorf("%s is not a Btrfs subvolume", path)
 	}
 
-	limitBytes := int64(limitGB) * 1024 * 1024 * 1024
+	var cmd *exec.Cmd
 
-	// Set exclusive limit (excl = data only, no metadata/snapshots)
-	cmd := exec.Command("sudo", "btrfs", "qgroup", "limit", fmt.Sprintf("%d", limitBytes), path)
+	// If limitGB is 0, remove quota (unlimited)
+	if limitGB == 0 {
+		cmd = exec.Command("sudo", "btrfs", "qgroup", "limit", "none", path)
+	} else {
+		limitBytes := int64(limitGB) * 1024 * 1024 * 1024
+		// Set exclusive limit (excl = data only, no metadata/snapshots)
+		cmd = exec.Command("sudo", "btrfs", "qgroup", "limit", fmt.Sprintf("%d", limitBytes), path)
+	}
+
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to set quota limit: %w\nOutput: %s", err, output)
 	}
