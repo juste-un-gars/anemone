@@ -68,6 +68,7 @@ type TemplateData struct {
 	Stats         *DashboardStats
 	Users         []*users.User
 	UpdateInfo    *updater.UpdateInfo // Update notification
+	Data          map[string]interface{} // Generic data for templates
 }
 
 // DashboardStats holds dashboard statistics
@@ -236,6 +237,10 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// Admin routes - Restore all users (after server restoration)
 	mux.HandleFunc("/admin/restore-users", auth.RequireAdmin(server.handleAdminRestoreUsers))
 	mux.HandleFunc("/admin/restore-users/restore", auth.RequireAdmin(server.handleAdminRestoreUsersRestore))
+
+	// Admin routes - System updates
+	mux.HandleFunc("/admin/system/update", auth.RequireAdmin(server.handleAdminSystemUpdate))
+	mux.HandleFunc("/admin/system/update/check", auth.RequireAdmin(server.handleAdminSystemUpdateCheck))
 
 	// User routes (with restore check)
 	mux.HandleFunc("/trash", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleTrash)))
@@ -5652,5 +5657,92 @@ func (s *Server) handleAdminRestoreUsersRestore(w http.ResponseWriter, r *http.R
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "Bulk restore started in background for user " + username,
+	})
+}
+
+// handleAdminSystemUpdate displays the system update page
+func (s *Server) handleAdminSystemUpdate(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	// Get update info
+	updateInfo, err := updater.GetUpdateInfo(s.db)
+	if err != nil {
+		log.Printf("Error getting update info: %v", err)
+		updateInfo = &updater.UpdateInfo{
+			CurrentVersion: updater.GetCurrentVersion(),
+			LatestVersion:  updater.GetCurrentVersion(),
+			Available:      false,
+		}
+	}
+
+	// Get last check time
+	lastCheck, err := updater.GetLastUpdateCheck(s.db)
+	if err != nil {
+		log.Printf("Error getting last update check: %v", err)
+	}
+
+	data := TemplateData{
+		Lang:       lang,
+		Title:      i18n.T(lang, "update.page.title"),
+		Session:    session,
+		UpdateInfo: updateInfo,
+		Data: map[string]interface{}{
+			"LastCheck": lastCheck,
+		},
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "admin_system_update.html", data); err != nil {
+		log.Printf("Error rendering system update template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}
+
+// handleAdminSystemUpdateCheck triggers a manual update check
+func (s *Server) handleAdminSystemUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	// Perform update check
+	log.Println("🔍 Manual update check triggered by admin")
+	info, err := updater.CheckUpdate()
+	if err != nil {
+		log.Printf("Error checking for updates: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   i18n.T(lang, "update.check.error"),
+		})
+		return
+	}
+
+	// Save to database
+	if err := updater.SaveUpdateInfo(s.db, info); err != nil {
+		log.Printf("Error saving update info: %v", err)
+	}
+
+	// Log result
+	if info.Available {
+		log.Printf("✨ Update available: %s → %s", info.CurrentVersion, info.LatestVersion)
+	} else {
+		log.Printf("✅ Up to date: %s", info.CurrentVersion)
+	}
+
+	// Return result
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        true,
+		"updateInfo":     info,
+		"updateMessage":  i18n.T(lang, "update.check.success"),
 	})
 }
