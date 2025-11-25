@@ -26,6 +26,13 @@
             <h2 class="text-xl text-gray-600">
                 {{T .Lang "activate.title"}}
             </h2>
+            <!-- Language Selector -->
+            <div class="mt-4 flex justify-center">
+                <select id="language-selector" onchange="changeLanguage()" class="block w-32 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                    <option value="fr" {{if eq .Lang "fr"}}selected{{end}}>🇫🇷 Français</option>
+                    <option value="en" {{if eq .Lang "en"}}selected{{end}}>🇬🇧 English</option>
+                </select>
+            </div>
         </div>
 
         <!-- Activation Form -->
@@ -118,6 +125,14 @@
 </div>
 
 <script>
+    // Language selector
+    function changeLanguage() {
+        const lang = document.getElementById('language-selector').value;
+        const url = new URL(window.location.href);
+        url.searchParams.set('lang', lang);
+        window.location.href = url.toString();
+    }
+
     // Client-side password validation
     document.getElementById('activation-form').addEventListener('submit', function(e) {
         const password = document.getElementById('password').value;

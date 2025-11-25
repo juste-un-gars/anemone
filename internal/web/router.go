@@ -519,7 +519,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	lang := s.getLang(r)
 
 	// Get stats
-	stats := s.getDashboardStats(session)
+	stats := s.getDashboardStats(session, lang)
 
 	data := TemplateData{
 		Lang:    lang,
@@ -541,13 +541,29 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// tWithParams translates a key with placeholder replacement
+func tWithParams(lang, key string, args ...interface{}) string {
+	translation := i18n.T(lang, key)
+	// Support for placeholder replacement (e.g., {{minutes}})
+	if len(args) > 0 {
+		for i := 0; i < len(args); i += 2 {
+			if i+1 < len(args) {
+				placeholder := fmt.Sprintf("{{%v}}", args[i])
+				value := fmt.Sprintf("%v", args[i+1])
+				translation = strings.ReplaceAll(translation, placeholder, value)
+			}
+		}
+	}
+	return translation
+}
+
 // getDashboardStats retrieves dashboard statistics
-func (s *Server) getDashboardStats(session *auth.Session) *DashboardStats {
+func (s *Server) getDashboardStats(session *auth.Session, lang string) *DashboardStats {
 	stats := &DashboardStats{
 		StorageUsed:    "0 B",
 		StorageQuota:   "∞",
 		StoragePercent: 0,
-		LastBackup:     "Jamais",
+		LastBackup:     i18n.T(lang, "dashboard.user.last_backup.never"),
 		UserCount:      0,
 		PeerCount:      0,
 		TrashCount:     0,
@@ -592,11 +608,11 @@ func (s *Server) getDashboardStats(session *auth.Session) *DashboardStats {
 		if err == nil && lastSync.Valid {
 			duration := time.Since(lastSync.Time)
 			if duration < time.Hour {
-				stats.LastBackup = fmt.Sprintf("Il y a %d minutes", int(duration.Minutes()))
+				stats.LastBackup = tWithParams(lang, "dashboard.user.last_backup.minutes_ago", "minutes", int(duration.Minutes()))
 			} else if duration < 24*time.Hour {
-				stats.LastBackup = fmt.Sprintf("Il y a %d heures", int(duration.Hours()))
+				stats.LastBackup = tWithParams(lang, "dashboard.user.last_backup.hours_ago", "hours", int(duration.Hours()))
 			} else {
-				stats.LastBackup = fmt.Sprintf("Il y a %d jours", int(duration.Hours()/24))
+				stats.LastBackup = tWithParams(lang, "dashboard.user.last_backup.days_ago", "days", int(duration.Hours()/24))
 			}
 		}
 	} else {
@@ -644,11 +660,11 @@ func (s *Server) getDashboardStats(session *auth.Session) *DashboardStats {
 		if err == nil && lastSync.Valid {
 			duration := time.Since(lastSync.Time)
 			if duration < time.Hour {
-				stats.LastBackup = fmt.Sprintf("Il y a %d minutes", int(duration.Minutes()))
+				stats.LastBackup = tWithParams(lang, "dashboard.user.last_backup.minutes_ago", "minutes", int(duration.Minutes()))
 			} else if duration < 24*time.Hour {
-				stats.LastBackup = fmt.Sprintf("Il y a %d heures", int(duration.Hours()))
+				stats.LastBackup = tWithParams(lang, "dashboard.user.last_backup.hours_ago", "hours", int(duration.Hours()))
 			} else {
-				stats.LastBackup = fmt.Sprintf("Il y a %d jours", int(duration.Hours()/24))
+				stats.LastBackup = tWithParams(lang, "dashboard.user.last_backup.days_ago", "days", int(duration.Hours()/24))
 			}
 		}
 	}

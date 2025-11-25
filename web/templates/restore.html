@@ -156,8 +156,20 @@
             downloadAction: '{{T .Lang "restore.action.download"}}',
             errorDownload: '{{T .Lang "restore.error.download"}}',
             selectionCount: '{{T .Lang "restore.selection.count"}}',
-            errorSelection: '{{T .Lang "restore.error.selection"}}'
+            errorSelection: '{{T .Lang "restore.error.selection"}}',
+            minutesAgo: '{{T .Lang "restore.time.minutes_ago"}}',
+            hoursAgo: '{{T .Lang "restore.time.hours_ago"}}',
+            daysAgo: '{{T .Lang "restore.time.days_ago"}}'
         };
+
+        // Helper function to replace placeholders in translations
+        function tr(template, values) {
+            let result = template;
+            for (const [key, value] of Object.entries(values)) {
+                result = result.replace(`{{${key}}}`, value);
+            }
+            return result;
+        }
         let backups = [];
         let currentBackup = null;
         let currentPath = '/';
@@ -461,12 +473,12 @@
                 const hours = Math.floor(diff / (1000 * 60 * 60));
                 if (hours === 0) {
                     const mins = Math.floor(diff / (1000 * 60));
-                    return lang === 'fr' ? `Il y a ${mins} min` : `${mins} min ago`;
+                    return tr(t.minutesAgo, {minutes: mins});
                 }
-                return lang === 'fr' ? `Il y a ${hours} h` : `${hours} h ago`;
+                return tr(t.hoursAgo, {hours: hours});
             }
             if (days < 30) {
-                return lang === 'fr' ? `Il y a ${days} j` : `${days} d ago`;
+                return tr(t.daysAgo, {days: days});
             }
             return date.toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-US');
         }
