@@ -166,7 +166,7 @@
         function tr(template, values) {
             let result = template;
             for (const [key, value] of Object.entries(values)) {
-                result = result.replace(`{{${key}}}`, value);
+                result = result.replace(`{{ "{{" }}${key}{{ "}}" }}`, value);
             }
             return result;
         }
