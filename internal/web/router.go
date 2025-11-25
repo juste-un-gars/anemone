@@ -46,6 +46,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/syncconfig"
 	"github.com/juste-un-gars/anemone/internal/sysconfig"
 	"github.com/juste-un-gars/anemone/internal/trash"
+	"github.com/juste-un-gars/anemone/internal/updater"
 	"github.com/juste-un-gars/anemone/internal/users"
 )
 
@@ -66,6 +67,7 @@ type TemplateData struct {
 	Session       *auth.Session
 	Stats         *DashboardStats
 	Users         []*users.User
+	UpdateInfo    *updater.UpdateInfo // Update notification
 }
 
 // DashboardStats holds dashboard statistics
@@ -524,11 +526,23 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	// Get stats
 	stats := s.getDashboardStats(session, lang)
 
+	// Get update info for admins
+	var updateInfo *updater.UpdateInfo
+	if session.IsAdmin {
+		var err error
+		updateInfo, err = updater.GetUpdateInfo(s.db)
+		if err != nil {
+			log.Printf("Warning: Failed to get update info: %v", err)
+			// Continue without update info rather than failing
+		}
+	}
+
 	data := TemplateData{
-		Lang:    lang,
-		Title:   i18n.T(lang, "dashboard.title"),
-		Session: session,
-		Stats:   stats,
+		Lang:       lang,
+		Title:      i18n.T(lang, "dashboard.title"),
+		Session:    session,
+		Stats:      stats,
+		UpdateInfo: updateInfo,
 	}
 
 	// Choose template based on role

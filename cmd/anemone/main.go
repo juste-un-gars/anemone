@@ -17,6 +17,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/sysconfig"
 	"github.com/juste-un-gars/anemone/internal/tls"
 	"github.com/juste-un-gars/anemone/internal/trash"
+	"github.com/juste-un-gars/anemone/internal/updater"
 	"github.com/juste-un-gars/anemone/internal/web"
 )
 
@@ -51,6 +52,9 @@ func main() {
 	trash.StartCleanupScheduler(db, func() (int, error) {
 		return sysconfig.GetTrashRetentionDays(db)
 	})
+
+	// Start automatic update checker (daily)
+	updater.StartUpdateChecker(db)
 
 	// Initialize web server
 	router := web.NewRouter(db, cfg)

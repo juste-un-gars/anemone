@@ -42,6 +42,33 @@
         </div>
     </nav>
 
+    <!-- Update Notification Banner -->
+    {{if and .UpdateInfo .UpdateInfo.Available}}
+    <div class="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <div>
+                        <p class="font-semibold">
+                            {{T .Lang "update.new_version_available"}}
+                        </p>
+                        <p class="text-sm text-blue-100">
+                            {{T .Lang "update.version_info" "current" .UpdateInfo.CurrentVersion "latest" .UpdateInfo.LatestVersion}}
+                        </p>
+                    </div>
+                </div>
+                <a href="{{.UpdateInfo.ReleaseURL}}" target="_blank"
+                   class="px-4 py-2 bg-white text-blue-600 rounded-lg font-medium hover:bg-blue-50 transition-colors">
+                    {{T .Lang "update.view_release"}}
+                </a>
+            </div>
+        </div>
+    </div>
+    {{end}}
+
     <!-- Main Content -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <!-- Welcome Message -->

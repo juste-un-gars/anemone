@@ -560,5 +560,8 @@
   "admin.restore_users.empty.message": "No backups available. Make sure peer servers are online and users have backed up files.",
   "admin.restore_users.restore_all_button": "📦 Restore All Users",
   "admin.restore_users.select_peer": "Select peer server",
-  "admin.restore_users.restore_all_from": "📦 Restore all users from"
+  "admin.restore_users.restore_all_from": "📦 Restore all users from",
+  "update.new_version_available": "🎉 New version available!",
+  "update.version_info": "Current version: {{current}} → New version: {{latest}}",
+  "update.view_release": "View Release"
 }

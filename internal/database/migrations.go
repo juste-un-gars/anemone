@@ -19,6 +19,19 @@ func Migrate(db *sql.DB) error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)`,
 
+		// System information (version, updates, etc.)
+		`CREATE TABLE IF NOT EXISTS system_info (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+
+		// Insert default system info
+		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('current_version', '0.9.0-beta')`,
+		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('latest_version', '0.9.0-beta')`,
+		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('update_available', 'false')`,
+		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('last_update_check', '')`,
+
 		// Users
 		`CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
