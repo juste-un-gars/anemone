@@ -66,6 +66,8 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 - 🏥 **Disaster recovery** - Server configuration export/import with encryption
 - 🌍 **Multilingual** (French & English)
 - 🔒 **End-to-end encryption** with user-specific keys and master key protection
+- ⚡ **Automatic update notifications** - Daily checks for new releases from GitHub
+- 🔄 **Manual update checks** - Force update verification via admin interface
 
 ## 🏗️ Architecture
 
@@ -98,6 +100,7 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 │   ├── crypto/                  # Encryption utilities
 │   ├── quota/                   # Quota enforcement
 │   ├── trash/                   # Trash management
+│   ├── updater/                 # Update notification system
 │   ├── i18n/                    # Internationalization (FR/EN)
 │   │   └── locales/             # JSON translation files (fr.json, en.json)
 │   └── web/                     # HTTP handlers
@@ -463,8 +466,8 @@ View and manage remote peers storing backups on your server:
 Anemone features a modern JSON-based internationalization system that makes it easy to add new languages.
 
 **Supported languages**:
-- 🇫🇷 French (Français) - 495 keys
-- 🇬🇧 English - 495 keys
+- 🇫🇷 French (Français) - 584 keys
+- 🇬🇧 English - 584 keys
 
 **Language Selection**:
 - Default language chosen during initial setup
@@ -481,7 +484,7 @@ Anemone features a modern JSON-based internationalization system that makes it e
 
 **Adding a new language**:
 1. Copy `internal/i18n/locales/fr.json` to `[language_code].json`
-2. Translate the 495 values
+2. Translate the 584 values
 3. Add 5 lines of code to `internal/i18n/i18n.go`
 4. Update `GetAvailableLanguages()`
 5. Compile and test
@@ -494,6 +497,7 @@ See `internal/database/migrations.go` for complete schema.
 
 Main tables:
 - `system_config` - System settings (including sync auth password hash)
+- `system_info` - System information (version tracking, update notifications)
 - `users` - User accounts (with language preference and encryption keys)
 - `activation_tokens` - Temporary activation links (24h validity)
 - `password_reset_tokens` - Password reset links (24h validity, single-use)
@@ -998,6 +1002,8 @@ echo "✓ Anemone removed (system users and SMB users NOT removed - see above)"
 - [x] **Server config export/import** - Disaster recovery with encrypted config backups
 - [x] **Admin bulk restore** - Restore all users' files from backup peers
 - [x] **Source server separation** - Support multiple source servers backing up to same peer
+- [x] **Automatic update system** - Daily GitHub release checks with admin notifications
+- [x] **Update management page** - Dedicated interface with manual check and release notes display
 
 **Next Features** 📅:
 - [ ] Per-peer sync frequency (daily/weekly/monthly snapshots)
