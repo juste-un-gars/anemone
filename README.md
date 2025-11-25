@@ -60,7 +60,7 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 - 🔒 **P2P authentication** - Password protection for sync endpoints
 - 📦 **SMB file sharing** (Windows/Mac/Linux compatible)
 - 🗑️ **Per-user trash** with configurable retention
-- 💾 **Quota management** per user (Btrfs only)
+- 💾 **Quota management** per user with unlimited quota support (Btrfs only)
 - 👥 **Incoming backups management** - View and manage remote peers storing backups on your server
 - 🔄 **Web restore interface** - Browse and download encrypted backups from peers
 - 🏥 **Disaster recovery** - Server configuration export/import with encryption
@@ -439,6 +439,7 @@ View and manage remote peers storing backups on your server:
   - **Total Quota**: Overall storage limit for the user
   - **Backup Quota**: Specific limit for backup share
 - Default: 100 GB total, 50 GB backup
+- **Unlimited quotas**: Set quota to 0 for unlimited storage
 - Kernel-level enforcement (quotas enforced by the filesystem)
 
 **Usage Monitoring**:
