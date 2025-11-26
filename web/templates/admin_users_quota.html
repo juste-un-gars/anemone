@@ -57,8 +57,12 @@
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm font-medium text-gray-700">Total</span>
                     <span class="text-sm text-gray-600">
+                        {{if eq .QuotaInfo.QuotaTotalGB 0}}
+                        {{.QuotaInfo.UsedTotalGB | printf "%.2f"}} GB / ∞ {{T .Lang "dashboard.user.quota.unlimited"}}
+                        {{else}}
                         {{.QuotaInfo.UsedTotalGB | printf "%.2f"}} GB / {{.QuotaInfo.QuotaTotalGB}} GB
                         ({{.QuotaInfo.PercentUsed | printf "%.1f"}}%)
+                        {{end}}
                     </span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-2.5">
@@ -79,8 +83,12 @@
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm font-medium text-gray-700">Backup</span>
                     <span class="text-sm text-gray-600">
+                        {{if eq .QuotaInfo.QuotaBackupGB 0}}
+                        {{.QuotaInfo.UsedBackupGB | printf "%.2f"}} GB / ∞ {{T .Lang "dashboard.user.quota.unlimited"}}
+                        {{else}}
                         {{.QuotaInfo.UsedBackupGB | printf "%.2f"}} GB / {{.QuotaInfo.QuotaBackupGB}} GB
                         ({{.QuotaInfo.PercentBackup | printf "%.1f"}}%)
+                        {{end}}
                     </span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-2.5">
@@ -101,8 +109,12 @@
                 <div class="flex justify-between items-center mb-2">
                     <span class="text-sm font-medium text-gray-700">Data</span>
                     <span class="text-sm text-gray-600">
+                        {{if eq .QuotaInfo.QuotaDataGB 0}}
+                        {{.QuotaInfo.UsedDataGB | printf "%.2f"}} GB / ∞ {{T .Lang "dashboard.user.quota.unlimited"}}
+                        {{else}}
                         {{.QuotaInfo.UsedDataGB | printf "%.2f"}} GB / {{.QuotaInfo.QuotaDataGB}} GB
                         ({{.QuotaInfo.PercentData | printf "%.1f"}}%)
+                        {{end}}
                     </span>
                 </div>
                 <div class="w-full bg-gray-200 rounded-full h-2.5">
@@ -154,11 +166,11 @@
                            id="quota_backup_gb"
                            name="quota_backup_gb"
                            value="{{.User.QuotaBackupGB}}"
-                           min="1"
+                           min="0"
                            required
                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
                     <p class="mt-1 text-sm text-gray-500">
-                        {{T .Lang "users.quota.backup_help"}}
+                        {{T .Lang "users.quota.backup_help"}} (0 = {{T .Lang "dashboard.user.quota.unlimited"}})
                     </p>
                 </div>
 
@@ -171,11 +183,11 @@
                            id="quota_data_gb"
                            name="quota_data_gb"
                            value="{{.QuotaInfo.QuotaDataGB}}"
-                           min="1"
+                           min="0"
                            required
                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
                     <p class="mt-1 text-sm text-gray-500">
-                        {{T .Lang "users.quota.data_help"}}
+                        {{T .Lang "users.quota.data_help"}} (0 = {{T .Lang "dashboard.user.quota.unlimited"}})
                     </p>
                 </div>
 

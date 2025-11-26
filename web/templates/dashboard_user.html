@@ -72,8 +72,12 @@
                                     {{.Stats.QuotaInfo.UsedBackupGB | printf "%.2f"}} GB
                                 </dd>
                                 <dd class="text-sm text-gray-500">
+                                    {{if eq .Stats.QuotaInfo.QuotaBackupGB 0}}
+                                    {{T .Lang "dashboard.user.quota.on"}} ∞ {{T .Lang "dashboard.user.quota.unlimited"}}
+                                    {{else}}
                                     {{T .Lang "dashboard.user.quota.on"}} {{.Stats.QuotaInfo.QuotaBackupGB}} GB
                                     ({{.Stats.QuotaInfo.PercentBackup | printf "%.1f"}}%)
+                                    {{end}}
                                 </dd>
                             </dl>
                         </div>
@@ -120,8 +124,12 @@
                                     {{.Stats.QuotaInfo.UsedDataGB | printf "%.2f"}} GB
                                 </dd>
                                 <dd class="text-sm text-gray-500">
+                                    {{if eq .Stats.QuotaInfo.QuotaDataGB 0}}
+                                    {{T .Lang "dashboard.user.quota.on"}} ∞ {{T .Lang "dashboard.user.quota.unlimited"}}
+                                    {{else}}
                                     {{T .Lang "dashboard.user.quota.on"}} {{.Stats.QuotaInfo.QuotaDataGB}} GB
                                     ({{.Stats.QuotaInfo.PercentData | printf "%.1f"}}%)
+                                    {{end}}
                                 </dd>
                             </dl>
                         </div>

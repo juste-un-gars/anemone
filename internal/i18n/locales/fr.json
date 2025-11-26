@@ -543,6 +543,7 @@
   "dashboard.user.quota.exceeded": "Quota dépassé",
   "dashboard.user.quota.almost_full": "Quota presque atteint",
   "dashboard.user.quota.warning": "75% utilisé",
+  "dashboard.user.quota.unlimited": "illimité",
   "dashboard.user.restore.title": "Restauration",
   "dashboard.user.restore.description": "Restaurez vos fichiers depuis les sauvegardes chiffrées.",
   "dashboard.user.restore.button": "Parcourir les backups",
