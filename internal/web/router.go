@@ -3616,13 +3616,13 @@ func (s *Server) handleAdminUserQuota(w http.ResponseWriter, r *http.Request, us
 		}
 
 		quotaBackupGB, err := strconv.Atoi(r.FormValue("quota_backup_gb"))
-		if err != nil || quotaBackupGB < 1 {
+		if err != nil || quotaBackupGB < 0 {
 			http.Error(w, "Invalid backup quota", http.StatusBadRequest)
 			return
 		}
 
 		quotaDataGB, err := strconv.Atoi(r.FormValue("quota_data_gb"))
-		if err != nil || quotaDataGB < 1 {
+		if err != nil || quotaDataGB < 0 {
 			http.Error(w, "Invalid data quota", http.StatusBadRequest)
 			return
 		}

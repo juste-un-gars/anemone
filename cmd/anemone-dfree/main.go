@@ -111,8 +111,15 @@ func main() {
 	usedBlocks := usedBytes / blockSize
 
 	// Calculate total and free blocks
-	totalBlocks := int64(quotaGB) * 1024 * 1024 // GB to KB blocks
-	freeBlocks := totalBlocks - usedBlocks
+	var totalBlocks, freeBlocks int64
+	if quotaGB == 0 {
+		// Unlimited quota: return very large value (10 TB)
+		totalBlocks = 10 * 1024 * 1024 * 1024 // 10 TB in KB blocks
+		freeBlocks = totalBlocks - usedBlocks
+	} else {
+		totalBlocks = int64(quotaGB) * 1024 * 1024 // GB to KB blocks
+		freeBlocks = totalBlocks - usedBlocks
+	}
 
 	// Ensure free blocks is not negative
 	if freeBlocks < 0 {
