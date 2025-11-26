@@ -41,11 +41,11 @@ For more details, see the AGPL v3.0 license (sections 15 and 16).
 
 ## 📥 Quick Installation
 
-### Latest Release (Recommended)
+### Latest Version (Recommended)
 
 ```bash
-# Clone latest release (v0.9.1-beta)
-git clone --branch v0.9.1-beta https://github.com/juste-un-gars/anemone.git
+# Clone repository (main branch = latest stable)
+git clone https://github.com/juste-un-gars/anemone.git
 cd anemone
 
 # Run installer (requires sudo)
@@ -57,6 +57,8 @@ sudo ./install.sh en  # For English
 open https://localhost:8443
 ```
 
+> 💡 **Tip**: The `main` branch always contains the latest stable version. No need to specify a version tag!
+
 **What the installer does**:
 - ✅ Compiles the binary
 - ✅ Creates `/srv/anemone` data directory
@@ -64,6 +66,21 @@ open https://localhost:8443
 - ✅ Sets up firewall rules (if needed)
 - ✅ Creates systemd service (auto-start)
 - ✅ Generates TLS certificates
+
+### Install Specific Version (Optional)
+
+If you need a specific release version:
+
+```bash
+# See available versions: https://github.com/juste-un-gars/anemone/releases
+
+# Clone specific version (example: v0.9.1-beta)
+git clone --branch v0.9.1-beta https://github.com/juste-un-gars/anemone.git
+cd anemone
+
+# Run installer
+sudo ./install.sh fr  # or 'en'
+```
 
 ### Prerequisites
 
@@ -79,22 +96,41 @@ Before installing, ensure you have:
 
 ## 🔄 Updating Anemone
 
-### Update to Latest Release
+### Update to Latest Version
 
 ```bash
 cd /path/to/anemone
 
-# Fetch latest tags
-git fetch --tags --force
-
-# Checkout latest version
-git checkout v0.9.1-beta
+# Pull latest changes from main branch
+git pull origin main
 
 # Rebuild binaries
 go build -o anemone cmd/anemone/main.go
 go build -o anemone-dfree cmd/anemone-dfree/main.go
 
 # Restart services
+sudo systemctl restart anemone
+sudo systemctl reload smbd
+```
+
+> 💡 **Tip**: If you're on `main` branch, a simple `git pull` always gets you the latest version!
+
+### Update to Specific Version (Optional)
+
+If you need to switch to a specific release:
+
+```bash
+cd /path/to/anemone
+
+# Fetch all tags
+git fetch --tags --force
+
+# Checkout specific version (example: v0.9.1-beta)
+git checkout v0.9.1-beta
+
+# Rebuild and restart
+go build -o anemone cmd/anemone/main.go
+go build -o anemone-dfree cmd/anemone-dfree/main.go
 sudo systemctl restart anemone
 sudo systemctl reload smbd
 ```
