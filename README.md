@@ -39,6 +39,85 @@ For more details, see the AGPL v3.0 license (sections 15 and 16).
 
 ---
 
+## 📥 Quick Installation
+
+### Latest Release (Recommended)
+
+```bash
+# Clone latest release (v0.9.1-beta)
+git clone --branch v0.9.1-beta https://github.com/juste-un-gars/anemone.git
+cd anemone
+
+# Run installer (requires sudo)
+sudo ./install.sh fr  # For French
+# OR
+sudo ./install.sh en  # For English
+
+# Access web interface
+open https://localhost:8443
+```
+
+**What the installer does**:
+- ✅ Compiles the binary
+- ✅ Creates `/srv/anemone` data directory
+- ✅ Installs and configures Samba
+- ✅ Sets up firewall rules (if needed)
+- ✅ Creates systemd service (auto-start)
+- ✅ Generates TLS certificates
+
+### Prerequisites
+
+Before installing, ensure you have:
+- **Go 1.21+** - [Installation guide](https://go.dev/doc/install)
+- **Samba** (for SMB file sharing)
+- **Sudo access** (for system configuration)
+- **Optional**: Btrfs filesystem (for quota enforcement)
+
+> ⚠️ **Note**: Anemone works on any filesystem (ext4, XFS, ZFS), but **quota enforcement requires Btrfs**. On other filesystems, quotas are displayed but not enforced.
+
+---
+
+## 🔄 Updating Anemone
+
+### Update to Latest Release
+
+```bash
+cd /path/to/anemone
+
+# Fetch latest tags
+git fetch --tags --force
+
+# Checkout latest version
+git checkout v0.9.1-beta
+
+# Rebuild binaries
+go build -o anemone cmd/anemone/main.go
+go build -o anemone-dfree cmd/anemone-dfree/main.go
+
+# Restart services
+sudo systemctl restart anemone
+sudo systemctl reload smbd
+```
+
+### Check for Updates
+
+Anemone includes an automatic update notification system:
+- **Automatic checks**: Daily verification of GitHub releases
+- **Manual check**: Admin interface → ⚡ Updates → "Check now" button
+- **Notifications**: Banner displayed when new version available
+
+### Update Notifications
+
+When a new version is available:
+1. Log in as admin
+2. You'll see a notification banner
+3. Click "⚡ Updates" in the navigation menu
+4. View release notes and changelog
+5. Follow update instructions above
+
+---
+
+
 ## 💖 Support the Project
 
 If you find this project useful and would like to support its development:
