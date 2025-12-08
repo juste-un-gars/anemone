@@ -77,22 +77,147 @@ detect_distro() {
     log_info "Detected distribution: $DISTRO"
 }
 
-check_prerequisites() {
-    log_info "Checking prerequisites..."
+install_gcc() {
+    log_info "Checking GCC installation..."
 
-    # Check Go
-    if ! command -v go &> /dev/null; then
-        log_error "Go is not installed. Please install Go 1.21+ from https://go.dev/doc/install"
+    if command -v gcc &> /dev/null; then
+        GCC_VERSION=$(gcc --version | head -n1)
+        log_info "GCC is already installed: $GCC_VERSION"
+        return
+    fi
+
+    log_info "GCC not found. Installing..."
+    if [ "$PKG_MANAGER" = "dnf" ]; then
+        dnf install -y gcc
+    elif [ "$PKG_MANAGER" = "apt" ]; then
+        apt update
+        apt install -y gcc build-essential
+    fi
+
+    if command -v gcc &> /dev/null; then
+        log_info "GCC installed successfully"
+    else
+        log_error "Failed to install GCC"
+        exit 1
+    fi
+}
+
+install_go() {
+    log_info "Checking Go installation..."
+
+    if command -v go &> /dev/null; then
+        GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+        log_info "Go is already installed: $GO_VERSION"
+        return
+    fi
+
+    log_info "Go not found. Installing latest version..."
+
+    # Detect architecture
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64)
+            GO_ARCH="amd64"
+            ;;
+        aarch64|arm64)
+            GO_ARCH="arm64"
+            ;;
+        armv6l)
+            GO_ARCH="armv6l"
+            ;;
+        *)
+            log_error "Unsupported architecture: $ARCH"
+            exit 1
+            ;;
+    esac
+
+    # Get latest Go version
+    log_info "Fetching latest Go version..."
+    LATEST_GO=$(curl -sL https://go.dev/VERSION?m=text | head -n1)
+
+    if [ -z "$LATEST_GO" ]; then
+        log_error "Failed to fetch latest Go version"
         exit 1
     fi
 
-    GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
-    log_info "Go version: $GO_VERSION"
+    log_info "Latest Go version: $LATEST_GO"
+
+    # Download Go
+    GO_TARBALL="$LATEST_GO.linux-$GO_ARCH.tar.gz"
+    GO_URL="https://go.dev/dl/$GO_TARBALL"
+
+    log_info "Downloading Go from $GO_URL..."
+    cd /tmp
+    curl -LO "$GO_URL"
+
+    if [ ! -f "$GO_TARBALL" ]; then
+        log_error "Failed to download Go"
+        exit 1
+    fi
+
+    # Remove old installation if exists
+    if [ -d /usr/local/go ]; then
+        log_info "Removing old Go installation..."
+        rm -rf /usr/local/go
+    fi
+
+    # Extract Go
+    log_info "Installing Go to /usr/local/go..."
+    tar -C /usr/local -xzf "$GO_TARBALL"
+    rm "$GO_TARBALL"
+
+    # Configure PATH for all users
+    log_info "Configuring Go PATH..."
+    cat > /etc/profile.d/go.sh <<'EOF'
+export PATH=$PATH:/usr/local/go/bin
+export GOPATH=$HOME/go
+export PATH=$PATH:$GOPATH/bin
+EOF
+    chmod +x /etc/profile.d/go.sh
+
+    # Also configure for current root session
+    export PATH=$PATH:/usr/local/go/bin
+    export GOPATH=$HOME/go
+    export PATH=$PATH:$GOPATH/bin
+
+    # Verify installation
+    if command -v go &> /dev/null; then
+        GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+        log_info "Go $GO_VERSION installed successfully"
+    else
+        log_error "Failed to install Go"
+        exit 1
+    fi
+
+    cd "$INSTALL_DIR"
+}
+
+check_prerequisites() {
+    log_info "Checking prerequisites..."
+
+    # Install GCC if needed (required for CGO)
+    install_gcc
+
+    # Install Go if needed
+    install_go
 
     # Check git
     if ! command -v git &> /dev/null; then
-        log_error "Git is not installed"
-        exit 1
+        log_info "Git not found. Installing..."
+        if [ "$PKG_MANAGER" = "dnf" ]; then
+            dnf install -y git
+        elif [ "$PKG_MANAGER" = "apt" ]; then
+            apt update
+            apt install -y git
+        fi
+
+        if ! command -v git &> /dev/null; then
+            log_error "Failed to install Git"
+            exit 1
+        fi
+        log_info "Git installed successfully"
+    else
+        log_info "Git is already installed"
     fi
 
     log_info "All prerequisites met"
