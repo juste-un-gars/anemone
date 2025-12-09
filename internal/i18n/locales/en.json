@@ -583,5 +583,17 @@
   "update.view_on_github": "View on GitHub",
   "update.info.auto_check": "Anemone automatically checks for updates once per day. You can force a manual check with the button above.",
   "update.check.success": "Check completed successfully",
-  "update.check.error": "Error checking for updates"
+  "update.check.error": "Error checking for updates",
+  "update.install.button": "Update Now",
+  "update.install.confirm_title": "Confirm Update",
+  "update.install.confirm_message": "Are you sure you want to update Anemone?",
+  "update.install.confirm_warning": "⚠️ The server will restart during the update. All users will be temporarily disconnected.",
+  "update.install.confirm_proceed": "Yes, Update",
+  "update.install.confirm_cancel": "Cancel",
+  "update.install.installing": "Installing...",
+  "update.install.success": "Update launched successfully. The server will restart in a few seconds...",
+  "update.install.error_check": "Unable to check update status",
+  "update.install.no_update": "No update available",
+  "update.install.error_start": "Unable to start the update",
+  "update.install.restarting": "Server is restarting. You will be redirected to the login page..."
 }

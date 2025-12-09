@@ -1,0 +1,16 @@
+# Sudoers configuration for Anemone auto-update
+# This file allows the anemone service to restart itself without requiring a password
+#
+# Installation:
+#   sudo cp scripts/anemone-sudoers /etc/sudoers.d/anemone
+#   sudo chmod 440 /etc/sudoers.d/anemone
+#
+# The anemone user (or the user running the service) can run systemctl restart without password
+
+# Replace 'anemone' with the actual user running the service if different
+anemone ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart anemone
+anemone ALL=(ALL) NOPASSWD: /bin/systemctl restart anemone
+
+# If running as a different user (e.g., franck), add:
+# franck ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart anemone
+# franck ALL=(ALL) NOPASSWD: /bin/systemctl restart anemone

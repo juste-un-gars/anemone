@@ -241,6 +241,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// Admin routes - System updates
 	mux.HandleFunc("/admin/system/update", auth.RequireAdmin(server.handleAdminSystemUpdate))
 	mux.HandleFunc("/admin/system/update/check", auth.RequireAdmin(server.handleAdminSystemUpdateCheck))
+	mux.HandleFunc("/admin/system/update/install", auth.RequireAdmin(server.handleAdminSystemUpdateInstall))
 
 	// User routes (with restore check)
 	mux.HandleFunc("/trash", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleTrash)))
@@ -5744,5 +5745,64 @@ func (s *Server) handleAdminSystemUpdateCheck(w http.ResponseWriter, r *http.Req
 		"success":        true,
 		"updateInfo":     info,
 		"updateMessage":  i18n.T(lang, "update.check.success"),
+	})
+}
+
+// handleAdminSystemUpdateInstall performs the automatic update
+func (s *Server) handleAdminSystemUpdateInstall(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	// Get update info from database
+	updateInfo, err := updater.GetUpdateInfo(s.db)
+	if err != nil {
+		log.Printf("Error getting update info: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   i18n.T(lang, "update.install.error_check"),
+		})
+		return
+	}
+
+	// Check if an update is actually available
+	if !updateInfo.Available {
+		log.Println("❌ Update installation requested but no update is available")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   i18n.T(lang, "update.install.no_update"),
+		})
+		return
+	}
+
+	// Launch the auto-update script
+	log.Printf("🚀 Starting automatic update: %s → %s", updateInfo.CurrentVersion, updateInfo.LatestVersion)
+
+	// No password needed - sudo NOPASSWD should be configured for systemctl restart
+	if err := updater.PerformAutoUpdate(updateInfo.LatestVersion); err != nil {
+		log.Printf("Error starting auto-update: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   i18n.T(lang, "update.install.error_start"),
+		})
+		return
+	}
+
+	// Return success response
+	// The update script will continue in the background
+	log.Println("✅ Auto-update script launched successfully")
+	log.Printf("📝 Update log: %s", updater.GetUpdateLogPath())
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": i18n.T(lang, "update.install.success"),
+		"logPath": updater.GetUpdateLogPath(),
 	})
 }

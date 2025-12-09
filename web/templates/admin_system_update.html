@@ -149,7 +149,15 @@
             <div id="releaseNotes" class="markdown-content text-gray-700 prose max-w-none">
                 {{.UpdateInfo.ReleaseNotes}}
             </div>
-            <div class="mt-6">
+            <div class="mt-6 flex items-center space-x-4">
+                <button onclick="confirmUpdate()"
+                        id="installButton"
+                        class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                    <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    {{T .Lang "update.install.button"}}
+                </button>
                 <a href="{{.UpdateInfo.ReleaseURL}}" target="_blank"
                    class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                     {{T .Lang "update.view_on_github"}}
@@ -287,6 +295,99 @@ async function checkForUpdates() {
         // Re-enable button
         button.disabled = false;
         button.innerHTML = '<svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg> {{T .Lang "update.check_now"}}';
+    }
+}
+
+function confirmUpdate() {
+    if (confirm('{{T .Lang "update.install.confirm_message"}}\n\n{{T .Lang "update.install.confirm_warning"}}')) {
+        installUpdate();
+    }
+}
+
+async function installUpdate() {
+    const button = document.getElementById('installButton');
+    const messageArea = document.getElementById('messageArea');
+
+    // Disable button and show installing state
+    button.disabled = true;
+    button.innerHTML = '<svg class="animate-spin h-5 w-5 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> {{T .Lang "update.install.installing"}}';
+
+    try {
+        const response = await fetch('/admin/system/update/install', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Show success message
+            messageArea.innerHTML = `
+                <div class="mb-6 bg-green-50 border-l-4 border-green-400 p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-green-700">${data.message}</p>
+                            <p class="text-xs text-green-600 mt-2">{{T .Lang "update.install.restarting"}}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Scroll to message
+            messageArea.scrollIntoView({ behavior: 'smooth' });
+
+            // Wait 30 seconds then try to reconnect
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 30000);
+
+        } else {
+            // Show error message
+            messageArea.innerHTML = `
+                <div class="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-red-700">${data.error}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Re-enable button
+            button.disabled = false;
+            button.innerHTML = '<svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> {{T .Lang "update.install.button"}}';
+        }
+    } catch (error) {
+        messageArea.innerHTML = `
+            <div class="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm text-red-700">Error: ${error.message}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Re-enable button
+        button.disabled = false;
+        button.innerHTML = '<svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> {{T .Lang "update.install.button"}}';
     }
 }
 </script>

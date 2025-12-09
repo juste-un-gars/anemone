@@ -274,13 +274,19 @@ create_data_directory() {
 }
 
 configure_sudoers() {
-    log_info "Configuring sudoers for SMB management..."
+    log_info "Configuring sudoers for SMB management and auto-update..."
 
-    SUDOERS_FILE="/etc/sudoers.d/anemone-smb"
+    SUDOERS_FILE="/etc/sudoers.d/anemone"
 
     cat > "$SUDOERS_FILE" <<EOF
-# Anemone NAS - SMB Management Permissions
-# Allow user to reload Samba service and manage SMB users
+# Anemone NAS - Sudo Permissions
+# Allow user to manage Samba, users, and auto-update
+
+# Auto-update permissions (restart anemone service)
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart anemone
+$CURRENT_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart anemone
+
+# SMB Management Permissions
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload $SMB_SERVICE
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload $SMB_SERVICE.service
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/useradd -M -s /usr/sbin/nologin *

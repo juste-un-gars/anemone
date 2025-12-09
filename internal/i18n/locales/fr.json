@@ -583,5 +583,17 @@
   "update.view_on_github": "Voir sur GitHub",
   "update.info.auto_check": "Anemone vérifie automatiquement les mises à jour une fois par jour. Vous pouvez forcer une vérification manuelle avec le bouton ci-dessus.",
   "update.check.success": "Vérification terminée avec succès",
-  "update.check.error": "Erreur lors de la vérification des mises à jour"
+  "update.check.error": "Erreur lors de la vérification des mises à jour",
+  "update.install.button": "Mettre à jour maintenant",
+  "update.install.confirm_title": "Confirmer la mise à jour",
+  "update.install.confirm_message": "Êtes-vous sûr de vouloir mettre à jour Anemone ?",
+  "update.install.confirm_warning": "⚠️ Le serveur va redémarrer pendant la mise à jour. Tous les utilisateurs seront déconnectés temporairement.",
+  "update.install.confirm_proceed": "Oui, mettre à jour",
+  "update.install.confirm_cancel": "Annuler",
+  "update.install.installing": "Installation en cours...",
+  "update.install.success": "Mise à jour lancée avec succès. Le serveur va redémarrer dans quelques secondes...",
+  "update.install.error_check": "Impossible de vérifier l'état de la mise à jour",
+  "update.install.no_update": "Aucune mise à jour disponible",
+  "update.install.error_start": "Impossible de démarrer la mise à jour",
+  "update.install.restarting": "Le serveur redémarre. Vous serez redirigé vers la page de connexion..."
 }
