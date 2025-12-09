@@ -217,12 +217,12 @@ async function checkForUpdates() {
 
             // Update page content
             if (data.updateInfo) {
-                document.getElementById('latestVersion').textContent = data.updateInfo.LatestVersion;
-                document.getElementById('latestVersion').style.color = data.updateInfo.Available ? '#10b981' : '#6b7280';
+                document.getElementById('latestVersion').textContent = data.updateInfo.latest_version;
+                document.getElementById('latestVersion').style.color = data.updateInfo.available ? '#10b981' : '#6b7280';
 
                 // Update status badge
                 const statusBadge = document.getElementById('statusBadge');
-                if (data.updateInfo.Available) {
+                if (data.updateInfo.available) {
                     statusBadge.innerHTML = `
                         <div class="inline-flex items-center px-4 py-2 rounded-full bg-green-100 text-green-800">
                             <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -247,7 +247,7 @@ async function checkForUpdates() {
                 document.getElementById('lastCheckText').textContent = '{{T .Lang "update.last_check"}}: ' + now.toLocaleString();
 
                 // Reload page if update is available to show release notes
-                if (data.updateInfo.Available) {
+                if (data.updateInfo.available) {
                     setTimeout(() => location.reload(), 2000);
                 }
             }
