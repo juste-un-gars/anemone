@@ -7,6 +7,7 @@ package updater
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -126,4 +127,32 @@ func GetLastUpdateCheck(db *sql.DB) (time.Time, error) {
 	}
 
 	return t, nil
+}
+
+// SyncVersionWithDB ensures the database current_version matches the code version
+// This is called at application startup to keep the DB in sync after updates
+func SyncVersionWithDB(db *sql.DB) error {
+	// Get current version from DB
+	var dbVersion string
+	err := db.QueryRow("SELECT value FROM system_info WHERE key = 'current_version'").Scan(&dbVersion)
+	if err != nil && err != sql.ErrNoRows {
+		return fmt.Errorf("failed to get current_version from DB: %w", err)
+	}
+
+	// If DB version differs from code version, update it
+	if dbVersion != Version {
+		log.Printf("📝 Syncing version: DB has '%s', code has '%s' - updating DB", dbVersion, Version)
+
+		_, err = db.Exec(`
+			INSERT OR REPLACE INTO system_info (key, value, updated_at)
+			VALUES ('current_version', ?, CURRENT_TIMESTAMP)
+		`, Version)
+		if err != nil {
+			return fmt.Errorf("failed to update current_version in DB: %w", err)
+		}
+
+		log.Printf("✅ Database version updated to %s", Version)
+	}
+
+	return nil
 }

@@ -12,6 +12,17 @@ BACKUP_DIR="/tmp/anemone-backup-$(date +%Y%m%d-%H%M%S)"
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TARGET_VERSION="$1"
 
+# Setup Go environment (required when running in background with nohup)
+if [ -f "/etc/profile.d/go.sh" ]; then
+    source /etc/profile.d/go.sh
+fi
+# Fallback: set PATH manually if go.sh doesn't exist
+if ! command -v go &> /dev/null; then
+    export PATH=$PATH:/usr/local/go/bin
+    export GOPATH=$HOME/go
+    export PATH=$PATH:$GOPATH/bin
+fi
+
 # Logging function
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"

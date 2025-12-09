@@ -42,6 +42,11 @@ func main() {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
+	// Sync current version in database with code version
+	if err := updater.SyncVersionWithDB(db); err != nil {
+		log.Printf("⚠️  Warning: Failed to sync version with DB: %v", err)
+	}
+
 	// Start automatic synchronization scheduler
 	scheduler.Start(db)
 
