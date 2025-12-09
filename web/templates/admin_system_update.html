@@ -127,7 +127,7 @@
                 </div>
 
                 <!-- Check Now Button -->
-                <div>
+                <div class="flex flex-col space-y-3">
                     <button onclick="checkForUpdates()"
                             id="checkButton"
                             class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
@@ -136,6 +136,16 @@
                         </svg>
                         {{T .Lang "update.check_now"}}
                     </button>
+                    {{if .UpdateInfo.Available}}
+                    <button onclick="confirmUpdate()"
+                            id="installButton"
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                        <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        {{T .Lang "update.install.button"}}
+                    </button>
+                    {{end}}
                 </div>
             </div>
         </div>
@@ -143,28 +153,20 @@
         <!-- Release Notes (if update available) -->
         {{if .UpdateInfo.Available}}
         <div class="bg-white shadow rounded-lg p-6 mb-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">
-                📋 {{T .Lang "update.release_notes"}}
-            </h3>
-            <div id="releaseNotes" class="markdown-content text-gray-700 prose max-w-none">
-                {{.UpdateInfo.ReleaseNotes}}
-            </div>
-            <div class="mt-6 flex items-center space-x-4">
-                <button onclick="confirmUpdate()"
-                        id="installButton"
-                        class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                    <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    {{T .Lang "update.install.button"}}
-                </button>
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    📋 {{T .Lang "update.release_notes"}}
+                </h3>
                 <a href="{{.UpdateInfo.ReleaseURL}}" target="_blank"
-                   class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                   class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                     {{T .Lang "update.view_on_github"}}
                     <svg class="ml-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                 </a>
+            </div>
+            <div id="releaseNotes" class="markdown-content text-gray-700 prose max-w-none">
+                {{.UpdateInfo.ReleaseNotes}}
             </div>
         </div>
         {{end}}
