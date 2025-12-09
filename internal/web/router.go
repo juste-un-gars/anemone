@@ -1767,26 +1767,41 @@ func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Check for running syncs for each peer
+	runningSyncs := make(map[int]bool)
+	for _, peer := range peersList {
+		hasRunning, err := sync.HasRunningSyncForPeer(s.db, peer.ID)
+		if err != nil {
+			log.Printf("Error checking running sync for peer %d: %v", peer.ID, err)
+			continue
+		}
+		if hasRunning {
+			runningSyncs[peer.ID] = true
+		}
+	}
+
 	// Get success/error messages from query params
 	successMsg := r.URL.Query().Get("success")
 	errorMsg := r.URL.Query().Get("error")
 
 	data := struct {
-		Lang        string
-		Title       string
-		Session     *auth.Session
-		Peers       []*peers.Peer
-		RecentSyncs []RecentSync
-		Success     string
-		Error       string
+		Lang         string
+		Title        string
+		Session      *auth.Session
+		Peers        []*peers.Peer
+		RecentSyncs  []RecentSync
+		RunningSyncs map[int]bool
+		Success      string
+		Error        string
 	}{
-		Lang:        lang,
-		Title:       i18n.T(lang, "peers.title"),
-		Session:     session,
-		Peers:       peersList,
-		RecentSyncs: recentSyncs,
-		Success:     successMsg,
-		Error:       errorMsg,
+		Lang:         lang,
+		Title:        i18n.T(lang, "peers.title"),
+		Session:      session,
+		Peers:        peersList,
+		RecentSyncs:  recentSyncs,
+		RunningSyncs: runningSyncs,
+		Success:      successMsg,
+		Error:        errorMsg,
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_peers.html", data); err != nil {

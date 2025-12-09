@@ -137,6 +137,19 @@ func GetSyncLogs(db *sql.DB, userID int, limit int) ([]*SyncLog, error) {
 	return logs, nil
 }
 
+// HasRunningSyncForPeer checks if there's a running sync for a specific peer
+func HasRunningSyncForPeer(db *sql.DB, peerID int) (bool, error) {
+	query := `SELECT COUNT(*) FROM sync_log WHERE peer_id = ? AND status = 'running'`
+
+	var count int
+	err := db.QueryRow(query, peerID).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check running sync: %w", err)
+	}
+
+	return count > 0, nil
+}
+
 // GetServerName retrieves the NAS name from system config
 func GetServerName(db *sql.DB) (string, error) {
 	var serverName string

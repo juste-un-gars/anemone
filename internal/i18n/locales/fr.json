@@ -155,6 +155,7 @@
   "peers.status.offline": "Hors ligne",
   "peers.status.error": "Erreur",
   "peers.status.unknown": "Inconnu",
+  "peers.sync.running": "Synchro en cours",
   "peers.last_seen": "Dernière connexion",
   "peers.last_sync": "Dernière synchronisation",
   "peers.created": "Créé le",

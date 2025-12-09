@@ -155,6 +155,7 @@
   "peers.status.offline": "Offline",
   "peers.status.error": "Error",
   "peers.status.unknown": "Unknown",
+  "peers.sync.running": "Sync in progress",
   "peers.last_seen": "Last Seen",
   "peers.last_sync": "Last Sync",
   "peers.created": "Created",
