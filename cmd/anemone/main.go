@@ -14,6 +14,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/database"
 	"github.com/juste-un-gars/anemone/internal/scheduler"
 	"github.com/juste-un-gars/anemone/internal/serverbackup"
+	syncpkg "github.com/juste-un-gars/anemone/internal/sync"
 	"github.com/juste-un-gars/anemone/internal/sysconfig"
 	"github.com/juste-un-gars/anemone/internal/tls"
 	"github.com/juste-un-gars/anemone/internal/trash"
@@ -45,6 +46,11 @@ func main() {
 	// Sync current version in database with code version
 	if err := updater.SyncVersionWithDB(db); err != nil {
 		log.Printf("⚠️  Warning: Failed to sync version with DB: %v", err)
+	}
+
+	// Cleanup zombie syncs (syncs stuck in "running" state)
+	if err := syncpkg.CleanupZombieSyncs(db); err != nil {
+		log.Printf("⚠️  Warning: Failed to cleanup zombie syncs: %v", err)
 	}
 
 	// Start automatic synchronization scheduler

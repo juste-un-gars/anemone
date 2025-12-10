@@ -8,6 +8,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/tls"
 	"database/sql"
 	"encoding/json"
@@ -148,6 +149,54 @@ func HasRunningSyncForPeer(db *sql.DB, peerID int) (bool, error) {
 	}
 
 	return count > 0, nil
+}
+
+// CleanupZombieSyncs marks stale "running" syncs as errors
+// A sync is considered zombie if it's been running for more than 2 hours
+func CleanupZombieSyncs(db *sql.DB) error {
+	// Find zombie syncs (running for more than 2 hours)
+	findQuery := `SELECT id, user_id, peer_id, started_at
+	              FROM sync_log
+	              WHERE status = 'running'
+	              AND datetime(started_at) < datetime('now', '-2 hours')`
+
+	rows, err := db.Query(findQuery)
+	if err != nil {
+		return fmt.Errorf("failed to query zombie syncs: %w", err)
+	}
+	defer rows.Close()
+
+	var zombieCount int
+	for rows.Next() {
+		var id, userID, peerID int
+		var startedAt string
+		if err := rows.Scan(&id, &userID, &peerID, &startedAt); err != nil {
+			log.Printf("⚠️  Failed to scan zombie sync: %v", err)
+			continue
+		}
+
+		// Mark as error
+		updateQuery := `UPDATE sync_log
+		                SET status = 'error',
+		                    completed_at = CURRENT_TIMESTAMP,
+		                    error_message = 'Sync timeout - automatically cleaned up (zombie sync)'
+		                WHERE id = ?`
+
+		_, err := db.Exec(updateQuery, id)
+		if err != nil {
+			log.Printf("⚠️  Failed to cleanup zombie sync ID %d: %v", id, err)
+			continue
+		}
+
+		log.Printf("🧹 Cleaned up zombie sync: ID=%d, User=%d, Peer=%d, Started=%s", id, userID, peerID, startedAt)
+		zombieCount++
+	}
+
+	if zombieCount > 0 {
+		log.Printf("✅ Cleaned up %d zombie sync(s)", zombieCount)
+	}
+
+	return nil
 }
 
 // GetServerName retrieves the NAS name from system config
@@ -291,10 +340,32 @@ func SyncShare(db *sql.DB, req *SyncRequest) error {
 // SyncShareIncremental performs incremental file-by-file sync with encryption
 // Uses manifest-based approach to only sync changed files
 func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
+	// Check if sync is already running for this peer
+	hasRunning, err := HasRunningSyncForPeer(db, req.PeerID)
+	if err != nil {
+		return fmt.Errorf("failed to check running sync: %w", err)
+	}
+	if hasRunning {
+		return fmt.Errorf("sync already in progress for peer ID %d", req.PeerID)
+	}
+
+	// Create context with 2-hour timeout to prevent zombie syncs
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
+	defer cancel()
+
 	// Create sync log entry
 	logID, err := CreateSyncLog(db, req.UserID, req.PeerID)
 	if err != nil {
 		return fmt.Errorf("failed to create sync log: %w", err)
+	}
+
+	// Check for context cancellation/timeout
+	select {
+	case <-ctx.Done():
+		errMsg := fmt.Sprintf("Sync timeout: %v", ctx.Err())
+		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+		return fmt.Errorf(errMsg)
+	default:
 	}
 
 	// Get user's encryption key
@@ -331,7 +402,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 
 	// Try to fetch remote manifest
 	var remoteManifest *SyncManifest
-	manifestReq, err := http.NewRequest(http.MethodGet, peerURL, nil)
+	manifestReq, err := http.NewRequestWithContext(ctx, http.MethodGet, peerURL, nil)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create manifest request: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
@@ -412,67 +483,20 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		fileMeta := localManifest.Files[relativePath]
 		sourcePath := filepath.Join(req.SharePath, relativePath)
 
-		// Read file
-		fileData, err := os.ReadFile(sourcePath)
+		// Open file for streaming (don't load entire file in RAM)
+		file, err := os.Open(sourcePath)
 		if err != nil {
-			errMsg := fmt.Sprintf("Failed to read file %s: %v", relativePath, err)
+			errMsg := fmt.Sprintf("Failed to open file %s: %v", relativePath, err)
 			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
 			return fmt.Errorf(errMsg)
 		}
 
-		// Encrypt file
-		var encryptedBuf bytes.Buffer
-		if err := crypto.EncryptStream(bytes.NewReader(fileData), &encryptedBuf, encryptionKey); err != nil {
-			errMsg := fmt.Sprintf("Failed to encrypt file %s: %v", relativePath, err)
-			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-			return fmt.Errorf(errMsg)
-		}
+		// Stream encrypt and upload file (memory-efficient)
+		err = streamEncryptAndUpload(ctx, client, file, req, shareName, fileMeta.EncryptedPath, encryptionKey, req.UserID)
+		file.Close()
 
-		// Upload encrypted file
-		uploadURL := fmt.Sprintf("https://%s:%d/api/sync/file?source_server=%s", req.PeerAddress, req.PeerPort, req.SourceServer)
-
-		var requestBody bytes.Buffer
-		writer := multipart.NewWriter(&requestBody)
-
-		// Add metadata
-		writer.WriteField("user_id", fmt.Sprintf("%d", req.UserID))
-		writer.WriteField("share_name", shareName)
-		writer.WriteField("relative_path", fileMeta.EncryptedPath) // Use .enc path
-
-		// Add file
-		part, err := writer.CreateFormFile("file", filepath.Base(fileMeta.EncryptedPath))
-		if err != nil {
-			errMsg := fmt.Sprintf("Failed to create form file for %s: %v", relativePath, err)
-			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-			return fmt.Errorf(errMsg)
-		}
-		io.Copy(part, &encryptedBuf)
-		writer.Close()
-
-		// Send POST request
-		uploadReq, err := http.NewRequest(http.MethodPost, uploadURL, &requestBody)
-		if err != nil {
-			errMsg := fmt.Sprintf("Failed to create upload request for %s: %v", relativePath, err)
-			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-			return fmt.Errorf(errMsg)
-		}
-		uploadReq.Header.Set("Content-Type", writer.FormDataContentType())
-
-		// Add authentication header if password is provided
-		if req.PeerPassword != "" {
-			uploadReq.Header.Set("X-Sync-Password", req.PeerPassword)
-		}
-
-		resp, err := client.Do(uploadReq)
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to upload file %s: %v", relativePath, err)
-			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-			return fmt.Errorf(errMsg)
-		}
-		resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			errMsg := fmt.Sprintf("Failed to upload file %s: status %d", relativePath, resp.StatusCode)
 			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
 			return fmt.Errorf(errMsg)
 		}
@@ -486,7 +510,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		deleteURL := fmt.Sprintf("https://%s:%d/api/sync/file?source_server=%s&user_id=%d&share_name=%s&path=%s",
 			req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName, remoteMeta.EncryptedPath)
 
-		deleteReq, err := http.NewRequest(http.MethodDelete, deleteURL, nil)
+		deleteReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, deleteURL, nil)
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to create delete request for %s: %v", relativePath, err)
 			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
@@ -534,7 +558,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	manifestURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?source_server=%s&user_id=%d&share_name=%s",
 		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
 
-	manifestPutReq, err := http.NewRequest(http.MethodPut, manifestURL, &encryptedManifest)
+	manifestPutReq, err := http.NewRequestWithContext(ctx, http.MethodPut, manifestURL, &encryptedManifest)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create manifest upload request: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
@@ -562,7 +586,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	}
 
 	// Cleanup orphaned files on peer (files that exist physically but not in manifest)
-	if err := cleanupOrphanedFiles(client, req, localManifest, shareName); err != nil {
+	if err := cleanupOrphanedFiles(ctx, client, req, localManifest, shareName); err != nil {
 		// Log error but don't fail the sync - cleanup is best-effort
 		log.Printf("⚠️  Warning: Failed to cleanup orphaned files: %v", err)
 	}
@@ -577,7 +601,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	sourceInfoURL := fmt.Sprintf("https://%s:%d/api/sync/source-info?source_server=%s&user_id=%d&share_name=%s",
 		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
 
-	sourceInfoReq, err := http.NewRequest(http.MethodPut, sourceInfoURL, bytes.NewReader(sourceInfoJSON))
+	sourceInfoReq, err := http.NewRequestWithContext(ctx, http.MethodPut, sourceInfoURL, bytes.NewReader(sourceInfoJSON))
 	if err == nil {
 		sourceInfoReq.Header.Set("Content-Type", "application/json")
 		if req.PeerPassword != "" {
@@ -937,12 +961,12 @@ func SyncPeer(db *sql.DB, peerID int, peerName, peerAddress string, peerPort int
 
 // cleanupOrphanedFiles removes files on peer that don't exist in the local manifest
 // This handles orphaned files that were left behind (e.g., from trash deletion)
-func cleanupOrphanedFiles(client *http.Client, req *SyncRequest, localManifest *SyncManifest, shareName string) error {
+func cleanupOrphanedFiles(ctx context.Context, client *http.Client, req *SyncRequest, localManifest *SyncManifest, shareName string) error {
 	// Fetch list of physical files from peer
 	listURL := fmt.Sprintf("https://%s:%d/api/sync/list-physical-files?source_server=%s&user_id=%d&share_name=%s",
 		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
 
-	listReq, err := http.NewRequest(http.MethodGet, listURL, nil)
+	listReq, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create list request: %w", err)
 	}
@@ -992,7 +1016,7 @@ func cleanupOrphanedFiles(client *http.Client, req *SyncRequest, localManifest *
 			deleteURL := fmt.Sprintf("https://%s:%d/api/sync/file?source_server=%s&user_id=%d&share_name=%s&path=%s",
 				req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName, orphanedFile)
 
-			deleteReq, err := http.NewRequest(http.MethodDelete, deleteURL, nil)
+			deleteReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, deleteURL, nil)
 			if err != nil {
 				log.Printf("⚠️  Failed to create delete request for orphaned file %s: %v", orphanedFile, err)
 				continue
@@ -1016,6 +1040,91 @@ func cleanupOrphanedFiles(client *http.Client, req *SyncRequest, localManifest *
 
 			log.Printf("✅ Deleted orphaned file: %s", orphanedFile)
 		}
+	}
+
+	return nil
+}
+
+// streamEncryptAndUpload encrypts and uploads a file using streaming to avoid loading entire file in RAM
+// This prevents OOM (Out Of Memory) issues when syncing large files
+func streamEncryptAndUpload(ctx context.Context, client *http.Client, file *os.File, req *SyncRequest, shareName, encryptedPath, encryptionKey string, userID int) error {
+	// Create a pipe for streaming the complete multipart request
+	pipeReader, pipeWriter := io.Pipe()
+
+	// Create multipart writer
+	mw := multipart.NewWriter(pipeWriter)
+	contentType := mw.FormDataContentType()
+
+	// Channel to capture errors from goroutine
+	errChan := make(chan error, 1)
+
+	// Goroutine to build multipart form with streamed encrypted data
+	go func() {
+		defer pipeWriter.Close()
+		defer mw.Close()
+
+		// Add metadata fields
+		if err := mw.WriteField("user_id", fmt.Sprintf("%d", userID)); err != nil {
+			errChan <- fmt.Errorf("failed to write user_id field: %w", err)
+			return
+		}
+		if err := mw.WriteField("share_name", shareName); err != nil {
+			errChan <- fmt.Errorf("failed to write share_name field: %w", err)
+			return
+		}
+		if err := mw.WriteField("relative_path", encryptedPath); err != nil {
+			errChan <- fmt.Errorf("failed to write relative_path field: %w", err)
+			return
+		}
+
+		// Add file part
+		part, err := mw.CreateFormFile("file", filepath.Base(encryptedPath))
+		if err != nil {
+			errChan <- fmt.Errorf("failed to create form file part: %w", err)
+			return
+		}
+
+		// Encrypt and stream file directly into multipart (memory-efficient)
+		if err := crypto.EncryptStream(file, part, encryptionKey); err != nil {
+			errChan <- fmt.Errorf("encryption failed: %w", err)
+			return
+		}
+
+		errChan <- nil
+	}()
+
+	// Upload file
+	uploadURL := fmt.Sprintf("https://%s:%d/api/sync/file?source_server=%s", req.PeerAddress, req.PeerPort, req.SourceServer)
+
+	uploadReq, err := http.NewRequestWithContext(ctx, http.MethodPost, uploadURL, pipeReader)
+	if err != nil {
+		return fmt.Errorf("failed to create upload request: %w", err)
+	}
+
+	// Set correct content type with boundary
+	uploadReq.Header.Set("Content-Type", contentType)
+
+	// Add authentication header if password is provided
+	if req.PeerPassword != "" {
+		uploadReq.Header.Set("X-Sync-Password", req.PeerPassword)
+	}
+
+	// Send request
+	resp, err := client.Do(uploadReq)
+	if err != nil {
+		return fmt.Errorf("failed to send upload request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check for errors from goroutine
+	if goroutineErr := <-errChan; goroutineErr != nil {
+		return goroutineErr
+	}
+
+	// Check response status
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("upload failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	return nil
