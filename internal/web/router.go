@@ -83,6 +83,30 @@ type DashboardStats struct {
 	QuotaInfo      *quota.QuotaInfo
 }
 
+// isPathTraversal checks if a path contains actual path traversal attempts.
+// This is more accurate than simply checking for ".." anywhere in the string,
+// as it allows legitimate filenames like "file...txt" while blocking real
+// path traversal attacks like "../../../etc/passwd".
+func isPathTraversal(path string) bool {
+	// Clean the path to normalize it (removes redundant separators, resolves . and ..)
+	cleaned := filepath.Clean(path)
+
+	// Check if the cleaned path starts with .. (traverses up)
+	if strings.HasPrefix(cleaned, "..") {
+		return true
+	}
+
+	// Check if path contains /../ or \..\  (traversal segments)
+	if strings.Contains(cleaned, string(filepath.Separator)+".."+string(filepath.Separator)) {
+		return true
+	}
+	if strings.Contains(cleaned, "/..") || strings.Contains(cleaned, `\..`) {
+		return true
+	}
+
+	return false
+}
+
 // NewRouter creates and configures the HTTP router
 func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// Load language from database if setup is completed
@@ -3032,7 +3056,7 @@ func (s *Server) handleAPISyncManifestPut(w http.ResponseWriter, r *http.Request
 	}
 
 	// Security check: prevent path traversal
-	if strings.Contains(sourceServer, "..") {
+	if isPathTraversal(sourceServer) {
 		http.Error(w, "Invalid source_server (path traversal detected)", http.StatusBadRequest)
 		return
 	}
@@ -3177,7 +3201,7 @@ func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Security check: prevent path traversal
-	if strings.Contains(relativePath, "..") || strings.Contains(sourceServer, "..") {
+	if isPathTraversal(relativePath) || isPathTraversal(sourceServer) {
 		http.Error(w, "Invalid relative_path (path traversal detected)", http.StatusBadRequest)
 		return
 	}
@@ -3250,7 +3274,7 @@ func (s *Server) handleAPISyncFileDelete(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Security check: prevent path traversal
-	if strings.Contains(relativePath, "..") || strings.Contains(sourceServer, "..") {
+	if isPathTraversal(relativePath) || isPathTraversal(sourceServer) {
 		http.Error(w, "Invalid path (path traversal detected)", http.StatusBadRequest)
 		return
 	}
@@ -3303,7 +3327,7 @@ func (s *Server) handleAPISyncListPhysicalFiles(w http.ResponseWriter, r *http.R
 	}
 
 	// Security check: prevent path traversal
-	if strings.Contains(sourceServer, "..") {
+	if isPathTraversal(sourceServer) {
 		http.Error(w, "Invalid source_server (path traversal detected)", http.StatusBadRequest)
 		return
 	}
@@ -3402,7 +3426,7 @@ func (s *Server) handleAPISyncDeleteUserBackup(w http.ResponseWriter, r *http.Re
 	}
 
 	// Security check: prevent path traversal
-	if strings.Contains(sourceServer, "..") {
+	if isPathTraversal(sourceServer) {
 		http.Error(w, "Invalid source_server (path traversal detected)", http.StatusBadRequest)
 		return
 	}
@@ -5210,8 +5234,9 @@ func (s *Server) handleAdminBackupDelete(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Security: prevent path traversal
-	if strings.Contains(filename, "..") || strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
+	// Security: prevent path traversal - filename must not contain directory separators
+	// Note: we allow dots in filenames (e.g., "backup...sql") since separators are blocked
+	if strings.Contains(filename, "/") || strings.Contains(filename, "\\") {
 		http.Error(w, "Invalid filename", http.StatusBadRequest)
 		return
 	}
