@@ -108,10 +108,13 @@ func CheckPassword(password, hash string) bool {
 	return err == nil
 }
 
-// EncryptStream encrypts data from reader and writes to writer using AES-256-GCM
+// EncryptStream encrypts data from reader and writes to writer using AES-256-GCM with chunking
 // The encryption key must be base64-encoded 32-byte key
-// Format: [nonce (12 bytes)][encrypted data with auth tag]
+// Format: [magic "AECG" 4B][version 4B][chunk_size 4B][nonce 12B][encrypted_chunk + tag][...]
+// Uses 128MB chunks to prevent OOM on systems with limited RAM (2GB)
 func EncryptStream(reader io.Reader, writer io.Writer, encryptionKey string) error {
+	const chunkSize = 128 * 1024 * 1024 // 128MB chunks
+
 	// Decode the base64 key
 	key, err := base64.StdEncoding.DecodeString(encryptionKey)
 	if err != nil {
@@ -134,29 +137,67 @@ func EncryptStream(reader io.Reader, writer io.Writer, encryptionKey string) err
 		return fmt.Errorf("failed to create GCM: %w", err)
 	}
 
-	// Generate random nonce
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return fmt.Errorf("failed to generate nonce: %w", err)
+	// Write magic header and version
+	magic := []byte("AECG") // Anemone Encrypted Chunked GCM
+	if _, err := writer.Write(magic); err != nil {
+		return fmt.Errorf("failed to write magic header: %w", err)
 	}
 
-	// Write nonce first (needed for decryption)
-	if _, err := writer.Write(nonce); err != nil {
-		return fmt.Errorf("failed to write nonce: %w", err)
+	version := uint32(1)
+	versionBytes := make([]byte, 4)
+	versionBytes[0] = byte(version >> 24)
+	versionBytes[1] = byte(version >> 16)
+	versionBytes[2] = byte(version >> 8)
+	versionBytes[3] = byte(version)
+	if _, err := writer.Write(versionBytes); err != nil {
+		return fmt.Errorf("failed to write version: %w", err)
 	}
 
-	// Read all data (for GCM we need the full plaintext)
-	plaintext, err := io.ReadAll(reader)
-	if err != nil {
-		return fmt.Errorf("failed to read data: %w", err)
-	}
+	// Process file in chunks
+	buffer := make([]byte, chunkSize)
+	for {
+		// Read chunk
+		n, err := io.ReadFull(reader, buffer)
+		if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+			return fmt.Errorf("failed to read chunk: %w", err)
+		}
+		if n == 0 {
+			break // End of file
+		}
 
-	// Encrypt data
-	ciphertext := gcm.Seal(nil, nonce, plaintext, nil)
+		// Generate random nonce for this chunk
+		nonce := make([]byte, gcm.NonceSize())
+		if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+			return fmt.Errorf("failed to generate nonce: %w", err)
+		}
 
-	// Write encrypted data
-	if _, err := writer.Write(ciphertext); err != nil {
-		return fmt.Errorf("failed to write encrypted data: %w", err)
+		// Encrypt chunk
+		ciphertext := gcm.Seal(nil, nonce, buffer[:n], nil)
+
+		// Write chunk size (4 bytes)
+		chunkSizeBytes := make([]byte, 4)
+		chunkLen := uint32(len(ciphertext))
+		chunkSizeBytes[0] = byte(chunkLen >> 24)
+		chunkSizeBytes[1] = byte(chunkLen >> 16)
+		chunkSizeBytes[2] = byte(chunkLen >> 8)
+		chunkSizeBytes[3] = byte(chunkLen)
+		if _, err := writer.Write(chunkSizeBytes); err != nil {
+			return fmt.Errorf("failed to write chunk size: %w", err)
+		}
+
+		// Write nonce
+		if _, err := writer.Write(nonce); err != nil {
+			return fmt.Errorf("failed to write nonce: %w", err)
+		}
+
+		// Write encrypted chunk
+		if _, err := writer.Write(ciphertext); err != nil {
+			return fmt.Errorf("failed to write encrypted chunk: %w", err)
+		}
+
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
+			break
+		}
 	}
 
 	return nil
@@ -164,7 +205,9 @@ func EncryptStream(reader io.Reader, writer io.Writer, encryptionKey string) err
 
 // DecryptStream decrypts data from reader and writes to writer using AES-256-GCM
 // The encryption key must be base64-encoded 32-byte key
-// Expected format: [nonce (12 bytes)][encrypted data with auth tag]
+// Supports both chunked format (new) and legacy format (old) for backward compatibility
+// New format: [magic "AECG" 4B][version 4B][chunk_size 4B][nonce 12B][encrypted_chunk + tag][...]
+// Legacy format: [nonce (12 bytes)][encrypted data with auth tag]
 func DecryptStream(reader io.Reader, writer io.Writer, encryptionKey string) error {
 	// Decode the base64 key
 	key, err := base64.StdEncoding.DecodeString(encryptionKey)
@@ -188,11 +231,81 @@ func DecryptStream(reader io.Reader, writer io.Writer, encryptionKey string) err
 		return fmt.Errorf("failed to create GCM: %w", err)
 	}
 
-	// Read nonce
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err := io.ReadFull(reader, nonce); err != nil {
+	// Peek at first 4 bytes to detect format
+	magic := make([]byte, 4)
+	if _, err := io.ReadFull(reader, magic); err != nil {
+		return fmt.Errorf("failed to read magic/nonce header: %w", err)
+	}
+
+	// Check if this is the new chunked format
+	if string(magic) == "AECG" {
+		return decryptStreamChunked(reader, writer, gcm)
+	}
+
+	// Legacy format - magic bytes are actually first 4 bytes of nonce
+	return decryptStreamLegacy(reader, writer, gcm, magic)
+}
+
+// decryptStreamChunked handles the new chunked format
+func decryptStreamChunked(reader io.Reader, writer io.Writer, gcm cipher.AEAD) error {
+	// Read version
+	versionBytes := make([]byte, 4)
+	if _, err := io.ReadFull(reader, versionBytes); err != nil {
+		return fmt.Errorf("failed to read version: %w", err)
+	}
+	version := uint32(versionBytes[0])<<24 | uint32(versionBytes[1])<<16 | uint32(versionBytes[2])<<8 | uint32(versionBytes[3])
+	if version != 1 {
+		return fmt.Errorf("unsupported encryption version: %d", version)
+	}
+
+	// Process chunks
+	for {
+		// Read chunk size
+		chunkSizeBytes := make([]byte, 4)
+		_, err := io.ReadFull(reader, chunkSizeBytes)
+		if err == io.EOF {
+			break // End of file
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read chunk size: %w", err)
+		}
+		chunkSize := uint32(chunkSizeBytes[0])<<24 | uint32(chunkSizeBytes[1])<<16 | uint32(chunkSizeBytes[2])<<8 | uint32(chunkSizeBytes[3])
+
+		// Read nonce
+		nonce := make([]byte, gcm.NonceSize())
+		if _, err := io.ReadFull(reader, nonce); err != nil {
+			return fmt.Errorf("failed to read nonce: %w", err)
+		}
+
+		// Read encrypted chunk
+		ciphertext := make([]byte, chunkSize)
+		if _, err := io.ReadFull(reader, ciphertext); err != nil {
+			return fmt.Errorf("failed to read encrypted chunk: %w", err)
+		}
+
+		// Decrypt chunk
+		plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt chunk: %w (invalid key or corrupted data)", err)
+		}
+
+		// Write decrypted chunk
+		if _, err := writer.Write(plaintext); err != nil {
+			return fmt.Errorf("failed to write decrypted chunk: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// decryptStreamLegacy handles the old non-chunked format (backward compatibility)
+func decryptStreamLegacy(reader io.Reader, writer io.Writer, gcm cipher.AEAD, noncePrefix []byte) error {
+	// Read rest of nonce (we already read first 4 bytes)
+	nonceRest := make([]byte, gcm.NonceSize()-4)
+	if _, err := io.ReadFull(reader, nonceRest); err != nil {
 		return fmt.Errorf("failed to read nonce: %w", err)
 	}
+	nonce := append(noncePrefix, nonceRest...)
 
 	// Read all encrypted data
 	ciphertext, err := io.ReadAll(reader)

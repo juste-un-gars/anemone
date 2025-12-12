@@ -27,8 +27,8 @@ func Migrate(db *sql.DB) error {
 		)`,
 
 		// Insert default system info
-		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('current_version', '0.9.7-beta')`,
-		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('latest_version', '0.9.7-beta')`,
+		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('current_version', '0.9.8-beta')`,
+		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('latest_version', '0.9.8-beta')`,
 		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('update_available', 'false')`,
 		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('last_update_check', '')`,
 

@@ -15,7 +15,7 @@ import (
 
 const (
 	// Current version of Anemone
-	Version = "0.9.7-beta"
+	Version = "0.9.8-beta"
 
 	// GitHub API endpoint for releases (includes pre-releases)
 	GitHubAPIURL = "https://api.github.com/repos/juste-un-gars/anemone/releases"
