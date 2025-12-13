@@ -479,6 +479,13 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 
 	// Upload new and modified files
 	filesToUpload := append(delta.ToAdd, delta.ToUpdate...)
+	uploadedCount := 0
+	lastLoggedCount := 0
+
+	if totalFiles > 0 {
+		log.Printf("📤 Starting upload: %d files to sync", totalFiles)
+	}
+
 	for _, relativePath := range filesToUpload {
 		fileMeta := localManifest.Files[relativePath]
 		sourcePath := filepath.Join(req.SharePath, relativePath)
@@ -502,6 +509,14 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		}
 
 		totalBytes += fileMeta.Size
+		uploadedCount++
+
+		// Log progress every 100 files
+		if uploadedCount-lastLoggedCount >= 100 {
+			percentage := (uploadedCount * 100) / totalFiles
+			log.Printf("   📊 Upload progress: %d/%d files (%d%%)", uploadedCount, totalFiles, percentage)
+			lastLoggedCount = uploadedCount
+		}
 	}
 
 	// Delete obsolete files on peer
@@ -609,6 +624,14 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		}
 		// Send source info (ignore errors - it's just metadata)
 		client.Do(sourceInfoReq)
+	}
+
+	// Log final upload stats
+	if totalFiles > 0 {
+		gbSynced := float64(totalBytes) / 1024.0 / 1024.0 / 1024.0
+		log.Printf("✅ Upload complete: %d files, %.2f GB synced", totalFiles, gbSynced)
+	} else {
+		log.Printf("✅ Sync complete: No changes detected")
 	}
 
 	// Update log with success

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,6 +53,10 @@ func BuildManifest(sourceDir string, userID int, shareName string, sourceServer 
 		SourceServer: sourceServer,
 		Files:        make(map[string]FileMetadata),
 	}
+
+	fileCount := 0
+	lastLoggedCount := 0
+	log.Printf("🔍 Building manifest for share '%s' (user %d)...", shareName, userID)
 
 	err := filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -104,12 +109,22 @@ func BuildManifest(sourceDir string, userID int, shareName string, sourceServer 
 			EncryptedPath: relPath + ".enc",
 		}
 
+		fileCount++
+
+		// Log progress every 1000 files
+		if fileCount-lastLoggedCount >= 1000 {
+			log.Printf("   📊 Manifest progress: %d files scanned...", fileCount)
+			lastLoggedCount = fileCount
+		}
+
 		return nil
 	})
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan directory: %w", err)
 	}
+
+	log.Printf("✅ Manifest built: %d files indexed", fileCount)
 
 	return manifest, nil
 }
