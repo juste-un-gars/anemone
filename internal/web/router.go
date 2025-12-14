@@ -2225,6 +2225,19 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 			}
 		}
 
+		// Parse sync timeout
+		syncTimeoutHoursStr := r.FormValue("sync_timeout_hours")
+		if syncTimeoutHoursStr != "" {
+			timeout, err := strconv.Atoi(syncTimeoutHoursStr)
+			if err == nil && timeout >= 0 && timeout <= 72 {
+				peer.SyncTimeoutHours = timeout
+			} else {
+				peer.SyncTimeoutHours = 2 // Default: 2 hours
+			}
+		} else {
+			peer.SyncTimeoutHours = 2 // Default: 2 hours
+		}
+
 		// Save to database
 		if err := peers.Update(s.db, peer); err != nil {
 			log.Printf("Error updating peer: %v", err)
@@ -2841,13 +2854,14 @@ func (s *Server) handleSyncShare(w http.ResponseWriter, r *http.Request) {
 
 	for _, peer := range enabledPeers {
 		req := &sync.SyncRequest{
-			ShareID:      shareID,
-			PeerID:       peer.ID,
-			UserID:       share.UserID,
-			SharePath:    share.Path,
-			PeerAddress:  peer.Address,
-			PeerPort:     peer.Port,
-			SourceServer: serverName,
+			ShareID:          shareID,
+			PeerID:           peer.ID,
+			UserID:           share.UserID,
+			SharePath:        share.Path,
+			PeerAddress:      peer.Address,
+			PeerPort:         peer.Port,
+			SourceServer:     serverName,
+			PeerTimeoutHours: peer.SyncTimeoutHours,
 		}
 
 		// Use incremental sync (manifest-based)

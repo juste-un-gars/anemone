@@ -40,14 +40,15 @@ type SyncLog struct {
 
 // SyncRequest represents a synchronization request
 type SyncRequest struct {
-	ShareID      int
-	PeerID       int
-	UserID       int
-	SharePath    string
-	PeerAddress  string
-	PeerPort     int
-	PeerPassword string // Optional password for peer authentication
-	SourceServer string // Name of the source server (for manifest identification)
+	ShareID          int
+	PeerID           int
+	UserID           int
+	SharePath        string
+	PeerAddress      string
+	PeerPort         int
+	PeerPassword     string // Optional password for peer authentication
+	SourceServer     string // Name of the source server (for manifest identification)
+	PeerTimeoutHours int    // Sync timeout in hours (0 = disabled)
 }
 
 // CreateSyncLog creates a new sync log entry and returns its ID
@@ -349,8 +350,19 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		return fmt.Errorf("sync already in progress for peer ID %d", req.PeerID)
 	}
 
-	// Create context with 2-hour timeout to prevent zombie syncs
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
+	// Create context with configurable timeout (or no timeout if disabled)
+	var ctx context.Context
+	var cancel context.CancelFunc
+	if req.PeerTimeoutHours > 0 {
+		// Use configured timeout
+		timeoutDuration := time.Duration(req.PeerTimeoutHours) * time.Hour
+		ctx, cancel = context.WithTimeout(context.Background(), timeoutDuration)
+		log.Printf("⏱️  Sync timeout: %d hours", req.PeerTimeoutHours)
+	} else {
+		// No timeout (0 = disabled)
+		ctx, cancel = context.WithCancel(context.Background())
+		log.Printf("⏱️  Sync timeout: disabled")
+	}
 	defer cancel()
 
 	// Create sync log entry
@@ -359,11 +371,15 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		return fmt.Errorf("failed to create sync log: %w", err)
 	}
 
+	// Track actual upload progress (for stats even if error occurs)
+	var uploadedCount int = 0
+	var totalBytes int64 = 0
+
 	// Check for context cancellation/timeout
 	select {
 	case <-ctx.Done():
 		errMsg := fmt.Sprintf("Sync timeout: %v", ctx.Err())
-		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+		UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
 		return fmt.Errorf(errMsg)
 	default:
 	}
@@ -474,12 +490,11 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		log.Printf("🗑️  Files to delete: %v", delta.ToDelete)
 	}
 
-	var totalBytes int64 = 0
+	// Calculate total files to sync
 	totalFiles := len(delta.ToAdd) + len(delta.ToUpdate)
 
 	// Upload new and modified files
 	filesToUpload := append(delta.ToAdd, delta.ToUpdate...)
-	uploadedCount := 0
 	lastLoggedCount := 0
 
 	if totalFiles > 0 {
@@ -494,7 +509,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		file, err := os.Open(sourcePath)
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to open file %s: %v", relativePath, err)
-			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
 			return fmt.Errorf(errMsg)
 		}
 
@@ -504,7 +519,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to upload file %s: %v", relativePath, err)
-			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
 			return fmt.Errorf(errMsg)
 		}
 
@@ -528,7 +543,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		deleteReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, deleteURL, nil)
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to create delete request for %s: %v", relativePath, err)
-			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
 			return fmt.Errorf(errMsg)
 		}
 
@@ -540,14 +555,14 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		resp, err := client.Do(deleteReq)
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to delete file %s: %v", relativePath, err)
-			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
 			return fmt.Errorf(errMsg)
 		}
 		resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			errMsg := fmt.Sprintf("Failed to delete file %s: status %d", relativePath, resp.StatusCode)
-			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
 			return fmt.Errorf(errMsg)
 		}
 
@@ -558,14 +573,14 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	manifestJSON, err := MarshalManifest(localManifest)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to marshal manifest: %v", err)
-		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+		UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
 		return fmt.Errorf(errMsg)
 	}
 
 	var encryptedManifest bytes.Buffer
 	if err := crypto.EncryptStream(bytes.NewReader(manifestJSON), &encryptedManifest, encryptionKey); err != nil {
 		errMsg := fmt.Sprintf("Failed to encrypt manifest: %v", err)
-		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+		UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
 		return fmt.Errorf(errMsg)
 	}
 
@@ -576,7 +591,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	manifestPutReq, err := http.NewRequestWithContext(ctx, http.MethodPut, manifestURL, &encryptedManifest)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create manifest upload request: %v", err)
-		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+		UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
 		return fmt.Errorf(errMsg)
 	}
 	manifestPutReq.Header.Set("Content-Type", "application/octet-stream")
@@ -589,14 +604,14 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	resp, err = client.Do(manifestPutReq)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to upload manifest: %v", err)
-		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+		UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
 		return fmt.Errorf(errMsg)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		errMsg := fmt.Sprintf("Failed to upload manifest: status %d", resp.StatusCode)
-		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
+		UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
 		return fmt.Errorf(errMsg)
 	}
 
@@ -682,7 +697,7 @@ func SyncAllUsers(db *sql.DB) (int, int, string) {
 	}
 
 	// Get all enabled peers
-	peersQuery := `SELECT id, name, address, port, password FROM peers WHERE enabled = 1`
+	peersQuery := `SELECT id, name, address, port, password, sync_timeout_hours FROM peers WHERE enabled = 1`
 	peerRows, err := db.Query(peersQuery)
 	if err != nil {
 		return 0, 1, fmt.Sprintf("Failed to query peers: %v", err)
@@ -690,17 +705,18 @@ func SyncAllUsers(db *sql.DB) (int, int, string) {
 	defer peerRows.Close()
 
 	type PeerInfo struct {
-		ID       int
-		Name     string
-		Address  string
-		Port     int
-		Password *[]byte
+		ID           int
+		Name         string
+		Address      string
+		Port         int
+		Password     *[]byte
+		TimeoutHours int
 	}
 
 	var peersList []PeerInfo
 	for peerRows.Next() {
 		var p PeerInfo
-		if err := peerRows.Scan(&p.ID, &p.Name, &p.Address, &p.Port, &p.Password); err != nil {
+		if err := peerRows.Scan(&p.ID, &p.Name, &p.Address, &p.Port, &p.Password, &p.TimeoutHours); err != nil {
 			return 0, 1, fmt.Sprintf("Failed to scan peer: %v", err)
 		}
 		peersList = append(peersList, p)
@@ -742,14 +758,15 @@ func SyncAllUsers(db *sql.DB) (int, int, string) {
 			}
 
 			req := &SyncRequest{
-				ShareID:      share.ID,
-				PeerID:       peer.ID,
-				UserID:       share.UserID,
-				SharePath:    share.Path,
-				PeerAddress:  peer.Address,
-				PeerPort:     peer.Port,
-				PeerPassword: peerPassword,
-				SourceServer: serverName,
+				ShareID:          share.ID,
+				PeerID:           peer.ID,
+				UserID:           share.UserID,
+				SharePath:        share.Path,
+				PeerAddress:      peer.Address,
+				PeerPort:         peer.Port,
+				PeerPassword:     peerPassword,
+				SourceServer:     serverName,
+				PeerTimeoutHours: peer.TimeoutHours,
 			}
 
 			if err := SyncShareIncremental(db, req); err != nil {
@@ -903,7 +920,7 @@ func ExtractTarGz(reader io.Reader, destDir string) error {
 
 // SyncPeer synchronizes all enabled shares to a specific peer
 // Returns: successCount, errorCount, lastError
-func SyncPeer(db *sql.DB, peerID int, peerName, peerAddress string, peerPort int, peerPassword *[]byte) (int, int, string) {
+func SyncPeer(db *sql.DB, peerID int, peerName, peerAddress string, peerPort int, peerPassword *[]byte, peerTimeoutHours int) (int, int, string) {
 	// Get all shares with sync enabled
 	sharesQuery := `SELECT id, user_id, name, path FROM shares WHERE sync_enabled = 1`
 	shareRows, err := db.Query(sharesQuery)
@@ -961,14 +978,15 @@ func SyncPeer(db *sql.DB, peerID int, peerName, peerAddress string, peerPort int
 
 	for _, share := range sharesList {
 		req := &SyncRequest{
-			ShareID:      share.ID,
-			PeerID:       peerID,
-			UserID:       share.UserID,
-			SharePath:    share.Path,
-			PeerAddress:  peerAddress,
-			PeerPort:     peerPort,
-			PeerPassword: password,
-			SourceServer: serverName,
+			ShareID:          share.ID,
+			PeerID:           peerID,
+			UserID:           share.UserID,
+			SharePath:        share.Path,
+			PeerAddress:      peerAddress,
+			PeerPort:         peerPort,
+			PeerPassword:     password,
+			SourceServer:     serverName,
+			PeerTimeoutHours: peerTimeoutHours,
 		}
 
 		if err := SyncShareIncremental(db, req); err != nil {

@@ -16,36 +16,37 @@ import (
 
 // Peer represents a remote Anemone instance for P2P synchronization
 type Peer struct {
-	ID                 int
-	Name               string
-	Address            string
-	Port               int
-	PublicKey          *string // Can be NULL
-	Password           *[]byte // Can be NULL - encrypted password for peer authentication
-	Enabled            bool
-	Status             string // "online", "offline", "error", "unknown"
-	LastSeen           *time.Time
-	LastSync           *time.Time
-	SyncEnabled        bool
-	SyncFrequency      string // "daily", "weekly", "monthly", "interval"
-	SyncTime           string // "HH:MM" format
-	SyncDayOfWeek      *int   // 0-6 (0=Sunday), NULL if not weekly
-	SyncDayOfMonth     *int   // 1-31, NULL if not monthly
+	ID                  int
+	Name                string
+	Address             string
+	Port                int
+	PublicKey           *string // Can be NULL
+	Password            *[]byte // Can be NULL - encrypted password for peer authentication
+	Enabled             bool
+	Status              string // "online", "offline", "error", "unknown"
+	LastSeen            *time.Time
+	LastSync            *time.Time
+	SyncEnabled         bool
+	SyncFrequency       string // "daily", "weekly", "monthly", "interval"
+	SyncTime            string // "HH:MM" format
+	SyncDayOfWeek       *int   // 0-6 (0=Sunday), NULL if not weekly
+	SyncDayOfMonth      *int   // 1-31, NULL if not monthly
 	SyncIntervalMinutes int    // Interval in minutes for "interval" frequency
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	SyncTimeoutHours    int    // Sync timeout in hours (0 = disabled)
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 // Create creates a new peer
 func Create(db *sql.DB, peer *Peer) error {
 	query := `INSERT INTO peers (name, address, port, public_key, password, enabled, status,
 	          sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month,
-	          sync_interval_minutes, created_at, updated_at)
-	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+	          sync_interval_minutes, sync_timeout_hours, created_at, updated_at)
+	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
 
 	result, err := db.Exec(query, peer.Name, peer.Address, peer.Port, peer.PublicKey, peer.Password,
 		peer.Enabled, peer.Status, peer.SyncEnabled, peer.SyncFrequency, peer.SyncTime,
-		peer.SyncDayOfWeek, peer.SyncDayOfMonth, peer.SyncIntervalMinutes)
+		peer.SyncDayOfWeek, peer.SyncDayOfMonth, peer.SyncIntervalMinutes, peer.SyncTimeoutHours)
 	if err != nil {
 		return fmt.Errorf("failed to create peer: %w", err)
 	}
@@ -64,14 +65,14 @@ func GetByID(db *sql.DB, id int) (*Peer, error) {
 	peer := &Peer{}
 	query := `SELECT id, name, address, port, public_key, password, enabled, status, last_seen, last_sync,
 	          sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month,
-	          sync_interval_minutes, created_at, updated_at
+	          sync_interval_minutes, sync_timeout_hours, created_at, updated_at
 	          FROM peers WHERE id = ?`
 
 	err := db.QueryRow(query, id).Scan(
 		&peer.ID, &peer.Name, &peer.Address, &peer.Port, &peer.PublicKey, &peer.Password,
 		&peer.Enabled, &peer.Status, &peer.LastSeen, &peer.LastSync,
 		&peer.SyncEnabled, &peer.SyncFrequency, &peer.SyncTime, &peer.SyncDayOfWeek, &peer.SyncDayOfMonth,
-		&peer.SyncIntervalMinutes, &peer.CreatedAt, &peer.UpdatedAt,
+		&peer.SyncIntervalMinutes, &peer.SyncTimeoutHours, &peer.CreatedAt, &peer.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -87,7 +88,7 @@ func GetByID(db *sql.DB, id int) (*Peer, error) {
 func GetAll(db *sql.DB) ([]*Peer, error) {
 	query := `SELECT id, name, address, port, public_key, password, enabled, status, last_seen, last_sync,
 	          sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month,
-	          sync_interval_minutes, created_at, updated_at
+	          sync_interval_minutes, sync_timeout_hours, created_at, updated_at
 	          FROM peers ORDER BY created_at DESC`
 
 	rows, err := db.Query(query)
@@ -103,7 +104,7 @@ func GetAll(db *sql.DB) ([]*Peer, error) {
 			&peer.ID, &peer.Name, &peer.Address, &peer.Port, &peer.PublicKey, &peer.Password,
 			&peer.Enabled, &peer.Status, &peer.LastSeen, &peer.LastSync,
 			&peer.SyncEnabled, &peer.SyncFrequency, &peer.SyncTime, &peer.SyncDayOfWeek, &peer.SyncDayOfMonth,
-			&peer.SyncIntervalMinutes, &peer.CreatedAt, &peer.UpdatedAt,
+			&peer.SyncIntervalMinutes, &peer.SyncTimeoutHours, &peer.CreatedAt, &peer.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan peer: %w", err)
@@ -118,13 +119,13 @@ func GetAll(db *sql.DB) ([]*Peer, error) {
 func Update(db *sql.DB, peer *Peer) error {
 	query := `UPDATE peers SET name = ?, address = ?, port = ?, public_key = ?, password = ?,
 	          enabled = ?, status = ?, sync_enabled = ?, sync_frequency = ?, sync_time = ?,
-	          sync_day_of_week = ?, sync_day_of_month = ?, sync_interval_minutes = ?,
+	          sync_day_of_week = ?, sync_day_of_month = ?, sync_interval_minutes = ?, sync_timeout_hours = ?,
 	          updated_at = CURRENT_TIMESTAMP
 	          WHERE id = ?`
 
 	_, err := db.Exec(query, peer.Name, peer.Address, peer.Port, peer.PublicKey, peer.Password,
 		peer.Enabled, peer.Status, peer.SyncEnabled, peer.SyncFrequency, peer.SyncTime,
-		peer.SyncDayOfWeek, peer.SyncDayOfMonth, peer.SyncIntervalMinutes, peer.ID)
+		peer.SyncDayOfWeek, peer.SyncDayOfMonth, peer.SyncIntervalMinutes, peer.SyncTimeoutHours, peer.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update peer: %w", err)
 	}

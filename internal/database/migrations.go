@@ -27,8 +27,8 @@ func Migrate(db *sql.DB) error {
 		)`,
 
 		// Insert default system info
-		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('current_version', '0.9.9-beta')`,
-		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('latest_version', '0.9.9-beta')`,
+		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('current_version', '0.9.10-beta')`,
+		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('latest_version', '0.9.10-beta')`,
 		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('update_available', 'false')`,
 		`INSERT OR IGNORE INTO system_info (key, value) VALUES ('last_update_check', '')`,
 
@@ -213,6 +213,7 @@ func migratePeersTable(db *sql.DB) error {
 		"sync_day_of_week":     "ALTER TABLE peers ADD COLUMN sync_day_of_week INTEGER",
 		"sync_day_of_month":    "ALTER TABLE peers ADD COLUMN sync_day_of_month INTEGER",
 		"sync_interval_minutes": "ALTER TABLE peers ADD COLUMN sync_interval_minutes INTEGER DEFAULT 60",
+		"sync_timeout_hours":   "ALTER TABLE peers ADD COLUMN sync_timeout_hours INTEGER DEFAULT 2",
 	}
 
 	for column, query := range columnsToAdd {
@@ -245,6 +246,7 @@ func migratePeersTable(db *sql.DB) error {
 				sync_day_of_week INTEGER,
 				sync_day_of_month INTEGER,
 				sync_interval_minutes INTEGER DEFAULT 60,
+				sync_timeout_hours INTEGER DEFAULT 2,
 				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 			)
@@ -256,13 +258,13 @@ func migratePeersTable(db *sql.DB) error {
 		// Copy data from old table, using address and port from url if needed
 		_, err = db.Exec(`
 			INSERT INTO peers_new (id, name, address, port, public_key, password, enabled, status, last_seen, last_sync,
-				sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month, sync_interval_minutes,
+				sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month, sync_interval_minutes, sync_timeout_hours,
 				created_at, updated_at)
 			SELECT id, name,
 				CASE WHEN address = '' OR address IS NULL THEN '' ELSE address END,
 				CASE WHEN port IS NULL THEN 8443 ELSE port END,
 				public_key, password, enabled, status, last_seen, last_sync,
-				1, 'daily', '23:00', NULL, NULL, 60,
+				1, 'daily', '23:00', NULL, NULL, 60, 2,
 				created_at, updated_at
 			FROM peers
 		`)

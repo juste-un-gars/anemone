@@ -43,7 +43,7 @@ func Start(db *sql.DB) {
 				log.Printf("🔄 Scheduler: Triggering sync to peer '%s' (frequency: %s)...", peer.Name, peer.SyncFrequency)
 
 				// Perform sync for this peer
-				successCount, errorCount, lastError := sync.SyncPeer(db, peer.ID, peer.Name, peer.Address, peer.Port, peer.Password)
+				successCount, errorCount, lastError := sync.SyncPeer(db, peer.ID, peer.Name, peer.Address, peer.Port, peer.Password, peer.SyncTimeoutHours)
 
 				// Update last sync timestamp for this peer
 				if err := peers.UpdateLastSync(db, peer.ID); err != nil {
