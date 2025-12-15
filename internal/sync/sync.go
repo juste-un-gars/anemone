@@ -338,6 +338,48 @@ func SyncShare(db *sql.DB, req *SyncRequest) error {
 	return nil
 }
 
+// uploadManifestToRemote uploads an encrypted manifest to the remote peer
+// This is a helper function to allow progressive manifest saves during sync
+func uploadManifestToRemote(ctx context.Context, client *http.Client, req *SyncRequest, manifest *SyncManifest, shareName string, encryptionKey string) error {
+	// Marshal and encrypt manifest
+	manifestJSON, err := MarshalManifest(manifest)
+	if err != nil {
+		return fmt.Errorf("failed to marshal manifest: %w", err)
+	}
+
+	var encryptedManifest bytes.Buffer
+	if err := crypto.EncryptStream(bytes.NewReader(manifestJSON), &encryptedManifest, encryptionKey); err != nil {
+		return fmt.Errorf("failed to encrypt manifest: %w", err)
+	}
+
+	// Upload encrypted manifest
+	manifestURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?source_server=%s&user_id=%d&share_name=%s",
+		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
+
+	manifestPutReq, err := http.NewRequestWithContext(ctx, http.MethodPut, manifestURL, &encryptedManifest)
+	if err != nil {
+		return fmt.Errorf("failed to create manifest upload request: %w", err)
+	}
+	manifestPutReq.Header.Set("Content-Type", "application/octet-stream")
+
+	// Add authentication header if password is provided
+	if req.PeerPassword != "" {
+		manifestPutReq.Header.Set("X-Sync-Password", req.PeerPassword)
+	}
+
+	resp, err := client.Do(manifestPutReq)
+	if err != nil {
+		return fmt.Errorf("failed to upload manifest: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("manifest upload returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 // SyncShareIncremental performs incremental file-by-file sync with encryption
 // Uses manifest-based approach to only sync changed files
 func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
@@ -490,6 +532,37 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		log.Printf("🗑️  Files to delete: %v", delta.ToDelete)
 	}
 
+	// Create progress manifest - starts as copy of remote (or new if remote is nil)
+	// This manifest will be updated incrementally and saved in batches to enable resumable sync
+	progressManifest := &SyncManifest{
+		Version:      1,
+		LastSync:     time.Now(),
+		UserID:       req.UserID,
+		ShareName:    shareName,
+		SourceServer: req.SourceServer,
+		Files:        make(map[string]FileMetadata),
+	}
+	// Copy existing remote files if available
+	if remoteManifest != nil && remoteManifest.Files != nil {
+		for k, v := range remoteManifest.Files {
+			progressManifest.Files[k] = v
+		}
+	}
+
+	// Setup defer to save progress manifest on error/timeout (allows resumable sync)
+	var syncErr error
+	defer func() {
+		if syncErr != nil && uploadedCount > 0 {
+			// Save progress manifest to enable resumable sync
+			log.Printf("⚠️  Sync error occurred after uploading %d files - saving progress manifest for resumable sync", uploadedCount)
+			if manifestErr := uploadManifestToRemote(ctx, client, req, progressManifest, shareName, encryptionKey); manifestErr != nil {
+				log.Printf("❌ Failed to save progress manifest: %v", manifestErr)
+			} else {
+				log.Printf("✅ Progress manifest saved successfully - next sync will resume from here")
+			}
+		}
+	}()
+
 	// Calculate total files to sync
 	totalFiles := len(delta.ToAdd) + len(delta.ToUpdate)
 
@@ -510,7 +583,8 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to open file %s: %v", relativePath, err)
 			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-			return fmt.Errorf(errMsg)
+			syncErr = fmt.Errorf(errMsg)
+			return syncErr
 		}
 
 		// Stream encrypt and upload file (memory-efficient)
@@ -520,11 +594,26 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to upload file %s: %v", relativePath, err)
 			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-			return fmt.Errorf(errMsg)
+			syncErr = fmt.Errorf(errMsg)
+			return syncErr
 		}
 
 		totalBytes += fileMeta.Size
 		uploadedCount++
+
+		// Update progress manifest with successfully uploaded file
+		progressManifest.Files[relativePath] = fileMeta
+		progressManifest.LastSync = time.Now()
+
+		// Save progress manifest every 500 files (checkpoint for resumable sync)
+		if uploadedCount%500 == 0 {
+			log.Printf("💾 Checkpoint: saving progress manifest after %d files...", uploadedCount)
+			if manifestErr := uploadManifestToRemote(ctx, client, req, progressManifest, shareName, encryptionKey); manifestErr != nil {
+				log.Printf("⚠️  Warning: failed to save progress manifest checkpoint: %v", manifestErr)
+			} else {
+				log.Printf("✅ Progress manifest checkpoint saved successfully")
+			}
+		}
 
 		// Log progress every 100 files
 		if uploadedCount-lastLoggedCount >= 100 {
@@ -544,7 +633,8 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to create delete request for %s: %v", relativePath, err)
 			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-			return fmt.Errorf(errMsg)
+			syncErr = fmt.Errorf(errMsg)
+			return syncErr
 		}
 
 		// Add authentication header if password is provided
@@ -556,64 +646,33 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to delete file %s: %v", relativePath, err)
 			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-			return fmt.Errorf(errMsg)
+			syncErr = fmt.Errorf(errMsg)
+			return syncErr
 		}
 		resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			errMsg := fmt.Sprintf("Failed to delete file %s: status %d", relativePath, resp.StatusCode)
 			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-			return fmt.Errorf(errMsg)
+			syncErr = fmt.Errorf(errMsg)
+			return syncErr
 		}
+
+		// Remove deleted file from progress manifest
+		delete(progressManifest.Files, relativePath)
 
 		log.Printf("✅ Deleted obsolete file on peer: %s (encrypted: %s)", relativePath, remoteMeta.EncryptedPath)
 	}
 
-	// Marshal and encrypt updated manifest
-	manifestJSON, err := MarshalManifest(localManifest)
-	if err != nil {
-		errMsg := fmt.Sprintf("Failed to marshal manifest: %v", err)
+	// Save final progress manifest (reflects actual state on peer)
+	log.Printf("💾 Saving final manifest...")
+	if err := uploadManifestToRemote(ctx, client, req, progressManifest, shareName, encryptionKey); err != nil {
+		errMsg := fmt.Sprintf("Failed to upload final manifest: %v", err)
 		UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-		return fmt.Errorf(errMsg)
+		syncErr = fmt.Errorf(errMsg)
+		return syncErr
 	}
-
-	var encryptedManifest bytes.Buffer
-	if err := crypto.EncryptStream(bytes.NewReader(manifestJSON), &encryptedManifest, encryptionKey); err != nil {
-		errMsg := fmt.Sprintf("Failed to encrypt manifest: %v", err)
-		UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-		return fmt.Errorf(errMsg)
-	}
-
-	// Upload encrypted manifest
-	manifestURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?source_server=%s&user_id=%d&share_name=%s",
-		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
-
-	manifestPutReq, err := http.NewRequestWithContext(ctx, http.MethodPut, manifestURL, &encryptedManifest)
-	if err != nil {
-		errMsg := fmt.Sprintf("Failed to create manifest upload request: %v", err)
-		UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-		return fmt.Errorf(errMsg)
-	}
-	manifestPutReq.Header.Set("Content-Type", "application/octet-stream")
-
-	// Add authentication header if password is provided
-	if req.PeerPassword != "" {
-		manifestPutReq.Header.Set("X-Sync-Password", req.PeerPassword)
-	}
-
-	resp, err = client.Do(manifestPutReq)
-	if err != nil {
-		errMsg := fmt.Sprintf("Failed to upload manifest: %v", err)
-		UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-		return fmt.Errorf(errMsg)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		errMsg := fmt.Sprintf("Failed to upload manifest: status %d", resp.StatusCode)
-		UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-		return fmt.Errorf(errMsg)
-	}
+	log.Printf("✅ Final manifest saved successfully")
 
 	// Cleanup orphaned files on peer (files that exist physically but not in manifest)
 	if err := cleanupOrphanedFiles(ctx, client, req, localManifest, shareName); err != nil {

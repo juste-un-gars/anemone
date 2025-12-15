@@ -15,7 +15,7 @@ import (
 
 const (
 	SessionCookieName = "anemone_session"
-	SessionDuration   = 24 * time.Hour // 24 hours
+	SessionDuration   = 2 * time.Hour // 2 hours for better security
 )
 
 // Session represents a user session
