@@ -215,6 +215,22 @@
                                class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
                         <p class="mt-1 text-sm text-gray-500">{{T .Lang "peers.sync_config.day_of_month_help"}}</p>
                     </div>
+
+                    <!-- Sync Timeout -->
+                    <div class="mb-4">
+                        <label for="sync_timeout_hours" class="block text-sm font-medium text-gray-700">
+                            ⏱️  {{if eq .Lang "fr"}}Délai d'expiration de synchronisation (heures){{else}}Sync Timeout (hours){{end}}
+                        </label>
+                        <input type="number" id="sync_timeout_hours" name="sync_timeout_hours" value="2" min="0" max="72"
+                               class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <p class="mt-1 text-sm text-gray-500">
+                            {{if eq .Lang "fr"}}
+                                Durée maximale autorisée pour une synchronisation (0 = désactivé, pas de limite)
+                            {{else}}
+                                Maximum allowed duration for a sync (0 = disabled, no limit)
+                            {{end}}
+                        </p>
+                    </div>
                 </div>
 
                 <!-- Enable Peer -->

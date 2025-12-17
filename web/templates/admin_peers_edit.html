@@ -201,7 +201,7 @@
                         </label>
                         <select id="sync_day_of_week" name="sync_day_of_week"
                                 class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                            {{$dayOfWeek := 0}}{{if .Peer.SyncDayOfWeek}}{{$dayOfWeek = .Peer.SyncDayOfWeek}}{{end}}
+                            {{$dayOfWeek := derefInt .Peer.SyncDayOfWeek}}
                             <option value="0" {{if eq $dayOfWeek 0}}selected{{end}}>{{if eq .Lang "fr"}}Dimanche{{else}}Sunday{{end}}</option>
                             <option value="1" {{if eq $dayOfWeek 1}}selected{{end}}>{{if eq .Lang "fr"}}Lundi{{else}}Monday{{end}}</option>
                             <option value="2" {{if eq $dayOfWeek 2}}selected{{end}}>{{if eq .Lang "fr"}}Mardi{{else}}Tuesday{{end}}</option>

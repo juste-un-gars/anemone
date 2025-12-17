@@ -184,6 +184,12 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		}
 		return fmt.Sprintf("%d d ago", days)
 	}
+	funcMap["derefInt"] = func(ptr *int) int {
+		if ptr == nil {
+			return 0
+		}
+		return *ptr
+	}
 
 	templates := template.Must(template.New("").Funcs(funcMap).ParseGlob(filepath.Join("web", "templates", "*.html")))
 
@@ -1959,6 +1965,16 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Parse sync timeout
+		syncTimeoutHours := 2 // Default: 2 hours
+		syncTimeoutHoursStr := r.FormValue("sync_timeout_hours")
+		if syncTimeoutHoursStr != "" {
+			timeout, err := strconv.Atoi(syncTimeoutHoursStr)
+			if err == nil && timeout >= 0 && timeout <= 72 {
+				syncTimeoutHours = timeout
+			}
+		}
+
 		// Get master key for password encryption
 		var masterKey string
 		if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
@@ -2012,19 +2028,20 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 			pwPtr = encrypted
 		}
 		peer := &peers.Peer{
-			Name:               name,
-			Address:            address,
-			Port:               port,
-			PublicKey:          pkPtr,
-			Password:           pwPtr,
-			Enabled:            enabled,
-			Status:             "unknown",
-			SyncEnabled:        syncEnabled,
-			SyncFrequency:      syncFrequency,
-			SyncTime:           syncTime,
-			SyncDayOfWeek:      syncDayOfWeekPtr,
-			SyncDayOfMonth:     syncDayOfMonthPtr,
+			Name:                name,
+			Address:             address,
+			Port:                port,
+			PublicKey:           pkPtr,
+			Password:            pwPtr,
+			Enabled:             enabled,
+			Status:              "unknown",
+			SyncEnabled:         syncEnabled,
+			SyncFrequency:       syncFrequency,
+			SyncTime:            syncTime,
+			SyncDayOfWeek:       syncDayOfWeekPtr,
+			SyncDayOfMonth:      syncDayOfMonthPtr,
 			SyncIntervalMinutes: syncIntervalMinutes,
+			SyncTimeoutHours:    syncTimeoutHours,
 		}
 
 		if err := peers.Create(s.db, peer); err != nil {
