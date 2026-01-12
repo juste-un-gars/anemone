@@ -214,7 +214,7 @@
                                 {{.Path}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {{.Size}}
+                                {{FormatBytes .SizeBytes}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {{.Type}}
@@ -314,7 +314,7 @@
                             <input type="checkbox" name="device" value="{{.Path}}" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
                             <span class="ml-3 text-sm">
                                 <span class="font-medium text-gray-900">{{.Path}}</span>
-                                <span class="text-gray-500"> - {{.Size}}</span>
+                                <span class="text-gray-500"> - {{FormatBytes .SizeBytes}}</span>
                             </span>
                         </label>
                         {{end}}

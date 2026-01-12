@@ -143,17 +143,29 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	funcMap["divf"] = func(a, b int64) float64 {
 		return float64(a) / float64(b)
 	}
-	funcMap["FormatBytes"] = func(bytes int64) string {
+	funcMap["FormatBytes"] = func(bytes interface{}) string {
+		var b int64
+		switch v := bytes.(type) {
+		case int64:
+			b = v
+		case uint64:
+			b = int64(v)
+		case int:
+			b = int64(v)
+		default:
+			return "0 B"
+		}
+
 		const unit = 1024
-		if bytes < unit {
-			return fmt.Sprintf("%d B", bytes)
+		if b < unit {
+			return fmt.Sprintf("%d B", b)
 		}
 		div, exp := int64(unit), 0
-		for n := bytes / unit; n >= unit; n /= unit {
+		for n := b / unit; n >= unit; n /= unit {
 			div *= unit
 			exp++
 		}
-		return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+		return fmt.Sprintf("%.1f %cB", float64(b)/float64(div), "KMGTPE"[exp])
 	}
 	funcMap["FormatTime"] = func(t time.Time, lang string) string {
 		now := time.Now()

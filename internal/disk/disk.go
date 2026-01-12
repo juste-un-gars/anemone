@@ -12,19 +12,41 @@ import (
 	"syscall"
 )
 
+// FlexibleSize is a type that can unmarshal both string and number from JSON
+type FlexibleSize string
+
+// UnmarshalJSON implements custom unmarshaling for FlexibleSize
+func (fs *FlexibleSize) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as string first
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*fs = FlexibleSize(s)
+		return nil
+	}
+
+	// Try to unmarshal as number
+	var n uint64
+	if err := json.Unmarshal(data, &n); err == nil {
+		*fs = FlexibleSize(fmt.Sprintf("%d", n))
+		return nil
+	}
+
+	return fmt.Errorf("size must be either string or number")
+}
+
 // DeviceInfo represents a block device
 type DeviceInfo struct {
-	Name       string `json:"name"`        // Device name (e.g., "sda")
-	Path       string `json:"path"`        // Device path (e.g., "/dev/sda")
-	Size       string `json:"size"`        // Human-readable size
-	SizeBytes  uint64 `json:"size_bytes"`  // Size in bytes
-	Type       string `json:"type"`        // Device type (disk, part, lvm, etc.)
-	FSType     string `json:"fstype"`      // Filesystem type
-	MountPoint string `json:"mountpoint"`  // Mount point (if mounted)
-	Label      string `json:"label"`       // Filesystem label
-	UUID       string `json:"uuid"`        // Filesystem UUID
-	Model      string `json:"model"`       // Disk model
-	Serial     string `json:"serial"`      // Disk serial number
+	Name       string       `json:"name"`        // Device name (e.g., "sda")
+	Path       string       `json:"path"`        // Device path (e.g., "/dev/sda")
+	Size       FlexibleSize `json:"size"`        // Size in bytes (flexible: string or number)
+	SizeBytes  uint64       `json:"size_bytes"`  // Size in bytes
+	Type       string       `json:"type"`        // Device type (disk, part, lvm, etc.)
+	FSType     string       `json:"fstype"`      // Filesystem type
+	MountPoint string       `json:"mountpoint"`  // Mount point (if mounted)
+	Label      string       `json:"label"`       // Filesystem label
+	UUID       string       `json:"uuid"`        // Filesystem UUID
+	Model      string       `json:"model"`       // Disk model
+	Serial     string       `json:"serial"`      // Disk serial number
 	Children   []DeviceInfo `json:"children,omitempty"` // Child devices (partitions)
 }
 
@@ -90,10 +112,10 @@ func populateDevicePaths(dev *DeviceInfo) {
 	}
 }
 
-// parseSizeToBytes converts size string to bytes (lsblk -b outputs bytes as string)
-func parseSizeToBytes(size string) uint64 {
+// parseSizeToBytes converts size string to bytes (lsblk -b outputs bytes as string or number)
+func parseSizeToBytes(size FlexibleSize) uint64 {
 	var bytes uint64
-	fmt.Sscanf(size, "%d", &bytes)
+	fmt.Sscanf(string(size), "%d", &bytes)
 	return bytes
 }
 
