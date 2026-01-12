@@ -77,6 +77,57 @@ detect_distro() {
     log_info "Detected distribution: $DISTRO"
 }
 
+check_storage_setup() {
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo -e "${YELLOW}⚠️  IMPORTANT : Configuration du stockage${NC}"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Anemone stocke les données dans : $DATA_DIR"
+    echo ""
+    echo -e "${YELLOW}Pour de meilleures performances et redondance, il est FORTEMENT recommandé${NC}"
+    echo -e "${YELLOW}de monter un pool ZFS/Btrfs RAID sur $DATA_DIR AVANT l'installation.${NC}"
+    echo ""
+    echo "📚 Documentation complète : https://github.com/juste-un-gars/anemone/blob/main/docs/STORAGE_SETUP.md"
+    echo ""
+    echo "Options recommandées :"
+    echo "  • ZFS Mirror/RaidZ : Protection contre la perte de données + snapshots"
+    echo "  • Btrfs RAID1/RAID10 : Redondance native + compression"
+    echo "  • Cockpit + ZFS Manager : Interface graphique pour gérer ZFS facilement"
+    echo ""
+    echo "Avez-vous :"
+    echo "  1) Créé et monté votre pool de stockage sur $DATA_DIR"
+    echo "  2) OU acceptez-vous d'utiliser le stockage système actuel (non recommandé)"
+    echo ""
+
+    # Check if DATA_DIR already has something mounted
+    if mountpoint -q "$DATA_DIR" 2>/dev/null; then
+        FS_TYPE=$(df -T "$DATA_DIR" | tail -1 | awk '{print $2}')
+        echo -e "${GREEN}✓ Détecté : $DATA_DIR est déjà monté (type: $FS_TYPE)${NC}"
+        echo ""
+    else
+        echo -e "${YELLOW}⚠️  Attention : $DATA_DIR n'est pas un point de montage séparé${NC}"
+        echo ""
+    fi
+
+    read -p "Continuer l'installation ? (oui/non) : " CONFIRM
+    echo ""
+
+    if [[ ! "$CONFIRM" =~ ^(oui|yes|o|y|OUI|YES|O|Y)$ ]]; then
+        echo -e "${YELLOW}Installation annulée.${NC}"
+        echo ""
+        echo "Pour configurer votre stockage :"
+        echo "  1. Installez Cockpit + ZFS Manager (voir documentation)"
+        echo "  2. Créez votre pool de stockage"
+        echo "  3. Montez-le sur $DATA_DIR"
+        echo "  4. Relancez ce script d'installation"
+        echo ""
+        exit 0
+    fi
+
+    log_info "Poursuite de l'installation..."
+}
+
 install_gcc() {
     log_info "Checking GCC installation..."
 
@@ -457,6 +508,7 @@ main() {
     check_root
     validate_language
     detect_distro
+    check_storage_setup
     check_prerequisites
     install_samba
     build_binary

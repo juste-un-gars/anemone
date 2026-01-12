@@ -39,6 +39,49 @@ For more details, see the AGPL v3.0 license (sections 15 and 16).
 
 ---
 
+## 💾 Storage Configuration (IMPORTANT)
+
+**⚠️ BEFORE INSTALLING**: It is **STRONGLY RECOMMENDED** to configure a RAID storage pool (ZFS or Btrfs) mounted on `/srv/anemone` before running the installer.
+
+### Why use RAID storage?
+
+- ✅ **Data protection**: Redundancy protects against disk failures
+- ✅ **Snapshots**: Instant backups without downtime
+- ✅ **Compression**: Automatic space savings
+- ✅ **Checksums**: Detect and repair corruption
+- ✅ **Performance**: Striping for faster access
+
+### Quick setup with Cockpit (GUI)
+
+```bash
+# Install Cockpit + ZFS Manager
+sudo apt install git zfsutils-linux cockpit -y
+git clone https://github.com/45drives/cockpit-zfs-manager.git
+sudo cp -r cockpit-zfs-manager/zfs /usr/share/cockpit
+
+# Access Cockpit
+open https://your-server:9090
+# Navigate to ZFS → Create Pool → Mount on /srv/anemone
+```
+
+### Quick setup (command line)
+
+**ZFS Mirror** (2 disks):
+```bash
+sudo zpool create -m /srv/anemone anemone-pool mirror /dev/sdb /dev/sdc
+```
+
+**Btrfs RAID1** (2 disks):
+```bash
+sudo mkfs.btrfs -L anemone-pool -m raid1 -d raid1 /dev/sdb /dev/sdc
+sudo mkdir -p /srv/anemone
+sudo mount /dev/sdb /srv/anemone
+```
+
+📚 **Full documentation**: [docs/STORAGE_SETUP.md](docs/STORAGE_SETUP.md)
+
+---
+
 ## 📥 Quick Installation
 
 ### Latest Version (Recommended)
