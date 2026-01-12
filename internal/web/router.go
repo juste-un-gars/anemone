@@ -295,6 +295,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/admin/disk", auth.RequireAdmin(server.handleAdminDisk))
 	mux.HandleFunc("/admin/disk/devices", auth.RequireAdmin(server.handleAdminDiskDevices))
 	mux.HandleFunc("/admin/disk/raid", auth.RequireAdmin(server.handleAdminDiskRAID))
+	mux.HandleFunc("/admin/disk/smart", auth.RequireAdmin(server.handleAdminDiskSMART))
 	mux.HandleFunc("/admin/disk/create-raid", auth.RequireAdmin(server.handleAdminDiskCreateRAID))
 
 	// Sync routes
@@ -6085,5 +6086,26 @@ func (s *Server) handleAdminDiskCreateRAID(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": i18n.T(lang, "disk.create.success"),
+	})
+}
+
+// handleAdminDiskSMART returns SMART information for all disks as JSON
+func (s *Server) handleAdminDiskSMART(w http.ResponseWriter, r *http.Request) {
+	smartInfo, err := disk.GetAllDisksSMARTInfo()
+	if err != nil {
+		log.Printf("Error getting SMART info: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to get SMART info: " + err.Error(),
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":    true,
+		"smart_info": smartInfo,
 	})
 }

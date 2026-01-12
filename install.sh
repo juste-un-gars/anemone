@@ -281,6 +281,19 @@ install_disk_tools() {
     else
         log_info "ZFS utilities already installed"
     fi
+
+    # Install smartmontools for SMART info
+    if ! command -v smartctl &> /dev/null; then
+        log_info "Installing smartmontools..."
+        if [ "$PKG_MANAGER" = "dnf" ]; then
+            dnf install -y smartmontools
+        elif [ "$PKG_MANAGER" = "apt" ]; then
+            apt install -y smartmontools
+        fi
+        log_info "smartmontools installed"
+    else
+        log_info "smartmontools already installed"
+    fi
 }
 
 build_binary() {
@@ -351,6 +364,7 @@ $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/zpool *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/zfs *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/mount *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/umount *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/smartctl *
 EOF
 
     chmod 440 "$SUDOERS_FILE"

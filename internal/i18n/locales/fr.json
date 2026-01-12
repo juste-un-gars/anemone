@@ -647,5 +647,14 @@
     "disk.raid_level.mirror": "Mirror - Mirroring ZFS (tolère N-1 pannes)",
     "disk.raid_level.raidz": "RAIDZ - Parité simple (comme RAID5)",
     "disk.raid_level.raidz2": "RAIDZ2 - Double parité (comme RAID6)",
-    "disk.raid_level.raidz3": "RAIDZ3 - Triple parité (tolère 3 pannes)"
+    "disk.raid_level.raidz3": "RAIDZ3 - Triple parité (tolère 3 pannes)",
+    "disk.refresh_smart": "🔬 État SMART",
+    "disk.refreshing": "Actualisation...",
+    "disk.smart_info": "Informations SMART des disques",
+    "disk.smart_refreshed": "Informations SMART actualisées",
+    "disk.no_smart_data": "Aucune donnée SMART disponible",
+    "disk.smart_capacity": "Capacité",
+    "disk.smart_temperature": "Température",
+    "disk.smart_power_on": "Heures d'utilisation",
+    "disk.smart_power_cycles": "Cycles d'alimentation"
 }

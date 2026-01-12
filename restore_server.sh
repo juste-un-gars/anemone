@@ -53,12 +53,13 @@ fi
 echo -e "${BLUE}Checking system dependencies...${NC}"
 MISSING_DEPS=()
 
-for cmd in jq sqlite3 openssl go smbpasswd useradd btrfs; do
+for cmd in jq sqlite3 openssl go smbpasswd useradd btrfs smartctl; do
     if ! command -v $cmd &> /dev/null; then
         case $cmd in
             go) MISSING_DEPS+=("golang-go") ;;
             smbpasswd) MISSING_DEPS+=("samba") ;;
             btrfs) MISSING_DEPS+=("btrfs-progs") ;;
+            smartctl) MISSING_DEPS+=("smartmontools") ;;
             *) MISSING_DEPS+=("$cmd") ;;
         esac
     fi
@@ -71,12 +72,12 @@ if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
     case $DISTRO in
         ubuntu|debian|linuxmint)
             apt-get update -qq
-            apt-get install -y -qq jq sqlite3 openssl golang-go samba passwd btrfs-progs
+            apt-get install -y -qq jq sqlite3 openssl golang-go samba passwd btrfs-progs smartmontools
             # Install ZFS if available (optional)
             apt-get install -y -qq zfsutils-linux 2>/dev/null || echo -e "${YELLOW}  ZFS not available (optional)${NC}"
             ;;
         fedora|rhel|centos)
-            dnf install -y -q jq sqlite openssl golang samba passwd btrfs-progs
+            dnf install -y -q jq sqlite openssl golang samba passwd btrfs-progs smartmontools
             # ZFS requires external repo on RHEL-based systems
             echo -e "${YELLOW}  ZFS not installed (optional - requires manual setup)${NC}"
             ;;

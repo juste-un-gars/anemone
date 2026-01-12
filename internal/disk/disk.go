@@ -233,3 +233,192 @@ func FormatBytes(bytes uint64) string {
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
+
+// DiskSMARTInfo represents SMART information for a disk
+type DiskSMARTInfo struct {
+	DevicePath       string            `json:"device_path"`
+	DeviceModel      string            `json:"device_model"`
+	SerialNumber     string            `json:"serial_number"`
+	FirmwareVersion  string            `json:"firmware_version"`
+	Capacity         string            `json:"capacity"`
+	RotationRate     string            `json:"rotation_rate"`
+	SMARTSupport     bool              `json:"smart_support"`
+	SMARTEnabled     bool              `json:"smart_enabled"`
+	OverallHealth    string            `json:"overall_health"`
+	Temperature      int               `json:"temperature"`
+	PowerOnHours     int               `json:"power_on_hours"`
+	PowerCycleCount  int               `json:"power_cycle_count"`
+	Attributes       []SMARTAttribute  `json:"attributes,omitempty"`
+	Error            string            `json:"error,omitempty"`
+}
+
+// SMARTAttribute represents a single SMART attribute
+type SMARTAttribute struct {
+	ID          int    `json:"id"`
+	Name        string `json:"name"`
+	Value       int    `json:"value"`
+	Worst       int    `json:"worst"`
+	Threshold   int    `json:"threshold"`
+	RawValue    string `json:"raw_value"`
+	Status      string `json:"status"` // "OK" or "FAILING"
+}
+
+// CheckSMARTInstalled checks if smartctl is available
+func CheckSMARTInstalled() bool {
+	cmd := exec.Command("which", "smartctl")
+	return cmd.Run() == nil
+}
+
+// GetDiskSMARTInfo retrieves SMART information for a disk
+func GetDiskSMARTInfo(devicePath string) (*DiskSMARTInfo, error) {
+	if !CheckSMARTInstalled() {
+		return nil, fmt.Errorf("smartctl not installed (install smartmontools package)")
+	}
+
+	// Run smartctl with JSON output
+	cmd := exec.Command("sudo", "smartctl", "-a", "-j", devicePath)
+	output, err := cmd.Output()
+	if err != nil {
+		// smartctl returns non-zero exit code even on success sometimes
+		// Check if we got any output
+		if len(output) == 0 {
+			return nil, fmt.Errorf("failed to get SMART info: %w", err)
+		}
+	}
+
+	// Parse JSON output
+	var smartData struct {
+		Device struct {
+			Name     string `json:"name"`
+			Type     string `json:"type"`
+			Protocol string `json:"protocol"`
+		} `json:"device"`
+		ModelName       string `json:"model_name"`
+		SerialNumber    string `json:"serial_number"`
+		FirmwareVersion string `json:"firmware_version"`
+		UserCapacity    struct {
+			Bytes int64 `json:"bytes"`
+		} `json:"user_capacity"`
+		RotationRate int `json:"rotation_rate"`
+		SmartStatus  struct {
+			Passed bool `json:"passed"`
+		} `json:"smart_status"`
+		Temperature struct {
+			Current int `json:"current"`
+		} `json:"temperature"`
+		PowerOnTime struct {
+			Hours int `json:"hours"`
+		} `json:"power_on_time"`
+		PowerCycleCount int `json:"power_cycle_count"`
+		AtaSmartData    struct {
+			OfflineDataCollection struct {
+				Status struct {
+					Value int `json:"value"`
+				} `json:"status"`
+			} `json:"offline_data_collection"`
+			SelfTest struct {
+				Status struct {
+					Value int `json:"value"`
+				} `json:"status"`
+			} `json:"self_test"`
+		} `json:"ata_smart_data"`
+		AtaSmartAttributes struct {
+			Table []struct {
+				ID        int    `json:"id"`
+				Name      string `json:"name"`
+				Value     int    `json:"value"`
+				Worst     int    `json:"worst"`
+				Thresh    int    `json:"thresh"`
+				WhenFailed string `json:"when_failed"`
+				Raw       struct {
+					Value  int64  `json:"value"`
+					String string `json:"string"`
+				} `json:"raw"`
+			} `json:"table"`
+		} `json:"ata_smart_attributes"`
+	}
+
+	if err := json.Unmarshal(output, &smartData); err != nil {
+		return nil, fmt.Errorf("failed to parse SMART data: %w", err)
+	}
+
+	// Build SMART info structure
+	info := &DiskSMARTInfo{
+		DevicePath:      devicePath,
+		DeviceModel:     smartData.ModelName,
+		SerialNumber:    smartData.SerialNumber,
+		FirmwareVersion: smartData.FirmwareVersion,
+		Capacity:        FormatBytes(uint64(smartData.UserCapacity.Bytes)),
+		SMARTSupport:    true,
+		SMARTEnabled:    true,
+		Temperature:     smartData.Temperature.Current,
+		PowerOnHours:    smartData.PowerOnTime.Hours,
+		PowerCycleCount: smartData.PowerCycleCount,
+	}
+
+	// Rotation rate
+	if smartData.RotationRate > 0 {
+		info.RotationRate = fmt.Sprintf("%d RPM", smartData.RotationRate)
+	} else {
+		info.RotationRate = "SSD"
+	}
+
+	// Overall health
+	if smartData.SmartStatus.Passed {
+		info.OverallHealth = "PASSED"
+	} else {
+		info.OverallHealth = "FAILED"
+	}
+
+	// Parse SMART attributes
+	for _, attr := range smartData.AtaSmartAttributes.Table {
+		status := "OK"
+		if attr.WhenFailed != "" && attr.WhenFailed != "-" {
+			status = "FAILING"
+		}
+
+		info.Attributes = append(info.Attributes, SMARTAttribute{
+			ID:        attr.ID,
+			Name:      attr.Name,
+			Value:     attr.Value,
+			Worst:     attr.Worst,
+			Threshold: attr.Thresh,
+			RawValue:  attr.Raw.String,
+			Status:    status,
+		})
+	}
+
+	return info, nil
+}
+
+// GetAllDisksSMARTInfo retrieves SMART information for all available disks
+func GetAllDisksSMARTInfo() (map[string]*DiskSMARTInfo, error) {
+	if !CheckSMARTInstalled() {
+		return nil, fmt.Errorf("smartctl not installed")
+	}
+
+	devices, err := ListDevices()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]*DiskSMARTInfo)
+
+	// Get SMART info for each disk (not partitions)
+	for _, dev := range devices {
+		if dev.Type == "disk" {
+			info, err := GetDiskSMARTInfo(dev.Path)
+			if err != nil {
+				// Store error but continue with other disks
+				result[dev.Path] = &DiskSMARTInfo{
+					DevicePath: dev.Path,
+					Error:      err.Error(),
+				}
+			} else {
+				result[dev.Path] = info
+			}
+		}
+	}
+
+	return result, nil
+}

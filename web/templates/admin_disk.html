@@ -54,9 +54,17 @@
                         {{T .Lang "disk.subtitle"}}
                     </p>
                 </div>
-                <a href="/dashboard" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-                    ← {{T .Lang "disk.back_dashboard"}}
-                </a>
+                <div class="flex space-x-3">
+                    <button id="refresh-smart-btn" onclick="refreshSMARTInfo()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                        <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        {{T .Lang "disk.refresh_smart"}}
+                    </button>
+                    <a href="/dashboard" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                        ← {{T .Lang "disk.back_dashboard"}}
+                    </a>
+                </div>
             </div>
 
             <!-- RAID Capabilities -->
@@ -85,6 +93,16 @@
 
         <!-- Success/Error Messages -->
         <div id="message-container" class="hidden mb-6"></div>
+
+        <!-- SMART Info Section (hidden by default) -->
+        <div id="smart-info-container" class="hidden mb-8">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">
+                🔬 {{T .Lang "disk.smart_info"}}
+            </h3>
+            <div id="smart-info-content" class="space-y-4">
+                <!-- SMART info will be populated here -->
+            </div>
+        </div>
 
         <!-- RAID Arrays -->
         <div class="mb-8">
@@ -435,6 +453,90 @@
         setTimeout(() => {
             container.classList.add('hidden');
         }, 5000);
+    }
+
+    // Refresh SMART information for all disks
+    async function refreshSMARTInfo() {
+        const button = document.getElementById('refresh-smart-btn');
+        const container = document.getElementById('smart-info-container');
+        const content = document.getElementById('smart-info-content');
+
+        // Disable button and show loading
+        button.disabled = true;
+        button.innerHTML = '<svg class="animate-spin h-5 w-5 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>{{T .Lang "disk.refreshing"}}';
+
+        try {
+            const response = await fetch('/admin/disk/smart');
+            const data = await response.json();
+
+            if (data.success && data.smart_info) {
+                // Show container
+                container.classList.remove('hidden');
+
+                // Build SMART info HTML
+                let html = '';
+                const smartInfo = data.smart_info;
+
+                if (Object.keys(smartInfo).length === 0) {
+                    html = '<p class="text-gray-500">{{T .Lang "disk.no_smart_data"}}</p>';
+                } else {
+                    for (const [devicePath, info] of Object.entries(smartInfo)) {
+                        const healthColor = info.overall_health === 'PASSED' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                        const tempColor = info.temperature > 50 ? 'text-red-600' : 'text-blue-600';
+
+                        html += `
+                            <div class="bg-white shadow rounded-lg p-6">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h4 class="text-lg font-medium text-gray-900">${devicePath}</h4>
+                                        <p class="text-sm text-gray-500">${info.device_model || 'Unknown Model'}</p>
+                                    </div>
+                                    <span class="px-3 py-1 text-xs font-medium rounded-full ${healthColor}">
+                                        ${info.overall_health || 'UNKNOWN'}
+                                    </span>
+                                </div>
+
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                    <div>
+                                        <p class="text-xs text-gray-500">{{T .Lang "disk.smart_capacity"}}</p>
+                                        <p class="text-sm font-medium">${info.capacity || '-'}</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-gray-500">{{T .Lang "disk.smart_temperature"}}</p>
+                                        <p class="text-sm font-medium ${tempColor}">${info.temperature}°C</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-gray-500">{{T .Lang "disk.smart_power_on"}}</p>
+                                        <p class="text-sm font-medium">${info.power_on_hours.toLocaleString()}h</p>
+                                    </div>
+                                    <div>
+                                        <p class="text-xs text-gray-500">{{T .Lang "disk.smart_power_cycles"}}</p>
+                                        <p class="text-sm font-medium">${info.power_cycle_count.toLocaleString()}</p>
+                                    </div>
+                                </div>
+
+                                <div class="text-xs text-gray-500">
+                                    <p><strong>S/N:</strong> ${info.serial_number || '-'} | <strong>FW:</strong> ${info.firmware_version || '-'} | <strong>Type:</strong> ${info.rotation_rate || '-'}</p>
+                                </div>
+
+                                ${info.error ? `<p class="mt-2 text-sm text-red-600">⚠️ ${info.error}</p>` : ''}
+                            </div>
+                        `;
+                    }
+                }
+
+                content.innerHTML = html;
+                showMessage('success', '{{T .Lang "disk.smart_refreshed"}}');
+            } else {
+                showMessage('error', data.error || 'Failed to fetch SMART info');
+            }
+        } catch (error) {
+            showMessage('error', 'Network error: ' + error.message);
+        } finally {
+            // Re-enable button
+            button.disabled = false;
+            button.innerHTML = '<svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>{{T .Lang "disk.refresh_smart"}}';
+        }
     }
 </script>
 </body>
