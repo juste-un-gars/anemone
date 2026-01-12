@@ -32,6 +32,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/bulkrestore"
 	"github.com/juste-un-gars/anemone/internal/config"
 	"github.com/juste-un-gars/anemone/internal/crypto"
+	"github.com/juste-un-gars/anemone/internal/disk"
 	"github.com/juste-un-gars/anemone/internal/i18n"
 	"github.com/juste-un-gars/anemone/internal/incoming"
 	"github.com/juste-un-gars/anemone/internal/peers"
@@ -289,6 +290,12 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 
 	// Admin routes - Shares
 	mux.HandleFunc("/admin/shares", auth.RequireAdmin(server.handleAdminShares))
+
+	// Admin routes - Disk Management
+	mux.HandleFunc("/admin/disk", auth.RequireAdmin(server.handleAdminDisk))
+	mux.HandleFunc("/admin/disk/devices", auth.RequireAdmin(server.handleAdminDiskDevices))
+	mux.HandleFunc("/admin/disk/raid", auth.RequireAdmin(server.handleAdminDiskRAID))
+	mux.HandleFunc("/admin/disk/create-raid", auth.RequireAdmin(server.handleAdminDiskCreateRAID))
 
 	// Sync routes
 	mux.HandleFunc("/sync/share/", auth.RequireAuth(server.handleSyncShare))
@@ -5875,5 +5882,208 @@ func (s *Server) handleAdminSystemUpdateInstall(w http.ResponseWriter, r *http.R
 		"success": true,
 		"message": i18n.T(lang, "update.install.success"),
 		"logPath": updater.GetUpdateLogPath(),
+	})
+}
+
+// ============================================================================
+// DISK MANAGEMENT HANDLERS
+// ============================================================================
+
+// handleAdminDisk displays the disk management page
+func (s *Server) handleAdminDisk(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	lang := s.getLang(r)
+
+	// Get RAID capabilities
+	capabilities := disk.GetSystemRAIDCapabilities()
+
+	// Get all RAID arrays
+	raidArrays, err := disk.GetAllRAIDArrays()
+	if err != nil {
+		log.Printf("Error getting RAID arrays: %v", err)
+		raidArrays = []disk.RAIDArrayInfo{}
+	}
+
+	// Get available disks
+	availableDisks, err := disk.GetAvailableDisks()
+	if err != nil {
+		log.Printf("Error getting available disks: %v", err)
+		availableDisks = []disk.DeviceInfo{}
+	}
+
+	data := struct {
+		Lang            string
+		Title           string
+		Session         *auth.Session
+		Capabilities    map[disk.RAIDSystemType]bool
+		RAIDArrays      []disk.RAIDArrayInfo
+		AvailableDisks  []disk.DeviceInfo
+		BtrfsAvailable  bool
+		ZFSAvailable    bool
+	}{
+		Lang:            lang,
+		Title:           i18n.T(lang, "disk.title"),
+		Session:         session,
+		Capabilities:    capabilities,
+		RAIDArrays:      raidArrays,
+		AvailableDisks:  availableDisks,
+		BtrfsAvailable:  capabilities[disk.RAIDTypeBtrfs],
+		ZFSAvailable:    capabilities[disk.RAIDTypeZFS],
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "admin_disk.html", data); err != nil {
+		log.Printf("Error rendering disk template: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+}
+
+// handleAdminDiskDevices returns all block devices as JSON
+func (s *Server) handleAdminDiskDevices(w http.ResponseWriter, r *http.Request) {
+	devices, err := disk.ListDevices()
+	if err != nil {
+		log.Printf("Error listing devices: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to list devices",
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"devices": devices,
+	})
+}
+
+// handleAdminDiskRAID returns all RAID arrays as JSON
+func (s *Server) handleAdminDiskRAID(w http.ResponseWriter, r *http.Request) {
+	arrays, err := disk.GetAllRAIDArrays()
+	if err != nil {
+		log.Printf("Error getting RAID arrays: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to get RAID arrays",
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"arrays":  arrays,
+	})
+}
+
+// handleAdminDiskCreateRAID creates a new RAID array
+func (s *Server) handleAdminDiskCreateRAID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	// Parse form data
+	if err := r.ParseForm(); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid form data",
+		})
+		return
+	}
+
+	// Extract parameters
+	raidTypeStr := r.FormValue("raid_type")
+	raidLevel := r.FormValue("raid_level")
+	label := r.FormValue("label")
+	mountPoint := r.FormValue("mount_point")
+	devicesStr := r.FormValue("devices") // Comma-separated device paths
+
+	// Validate inputs
+	if raidTypeStr == "" || raidLevel == "" || devicesStr == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   i18n.T(lang, "disk.create.missing_fields"),
+		})
+		return
+	}
+
+	// Parse devices
+	devices := strings.Split(devicesStr, ",")
+	for i := range devices {
+		devices[i] = strings.TrimSpace(devices[i])
+	}
+
+	// Convert RAID type string to type
+	var raidType disk.RAIDSystemType
+	switch raidTypeStr {
+	case "btrfs":
+		raidType = disk.RAIDTypeBtrfs
+	case "zfs":
+		raidType = disk.RAIDTypeZFS
+	default:
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   i18n.T(lang, "disk.create.invalid_type"),
+		})
+		return
+	}
+
+	// Validate RAID configuration
+	if err := disk.ValidateRAIDConfiguration(raidType, raidLevel, devices); err != nil {
+		log.Printf("RAID validation error: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	// Create RAID based on type
+	var err error
+	switch raidType {
+	case disk.RAIDTypeBtrfs:
+		err = disk.CreateBtrfsRAID(label, disk.BtrfsRAIDLevel(raidLevel), devices, mountPoint)
+	case disk.RAIDTypeZFS:
+		err = disk.CreateZFSPool(label, disk.ZFSVdevType(raidLevel), devices, mountPoint)
+	default:
+		err = fmt.Errorf("unsupported RAID type")
+	}
+
+	if err != nil {
+		log.Printf("Error creating RAID: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   fmt.Sprintf("%s: %v", i18n.T(lang, "disk.create.error"), err),
+		})
+		return
+	}
+
+	// Success
+	log.Printf("Successfully created %s RAID array: %s (level=%s, devices=%v)", raidType, label, raidLevel, devices)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": i18n.T(lang, "disk.create.success"),
 	})
 }

@@ -242,6 +242,47 @@ install_samba() {
     log_info "Samba installed successfully"
 }
 
+install_disk_tools() {
+    log_info "Checking disk management tools..."
+
+    # Check if btrfs-progs is installed
+    if ! command -v btrfs &> /dev/null; then
+        log_info "Installing btrfs-progs..."
+        if [ "$PKG_MANAGER" = "dnf" ]; then
+            dnf install -y btrfs-progs
+        elif [ "$PKG_MANAGER" = "apt" ]; then
+            apt install -y btrfs-progs
+        fi
+        log_info "btrfs-progs installed"
+    else
+        log_info "btrfs-progs already installed"
+    fi
+
+    # Install ZFS (optional - may not be available on all systems)
+    if ! command -v zpool &> /dev/null; then
+        log_info "Installing ZFS utilities (optional)..."
+        if [ "$PKG_MANAGER" = "dnf" ]; then
+            # ZFS on Fedora/RHEL requires external repository
+            log_warn "ZFS not available by default on Fedora/RHEL. Skipping."
+            log_warn "To install ZFS manually, see: https://openzfs.github.io/openzfs-docs/Getting%20Started/RHEL-based%20distro/index.html"
+        elif [ "$PKG_MANAGER" = "apt" ]; then
+            # ZFS is available in Debian/Ubuntu repositories
+            if apt-cache search --names-only '^zfsutils-linux$' | grep -q zfsutils-linux; then
+                apt install -y zfsutils-linux 2>/dev/null || log_warn "ZFS installation failed (optional feature)"
+                if command -v zpool &> /dev/null; then
+                    log_info "ZFS utilities installed"
+                else
+                    log_warn "ZFS not installed (optional - only needed for ZFS RAID)"
+                fi
+            else
+                log_warn "ZFS not available in repositories (optional feature)"
+            fi
+        fi
+    else
+        log_info "ZFS utilities already installed"
+    fi
+}
+
 build_binary() {
     log_info "Building Anemone binary..."
 
@@ -274,13 +315,13 @@ create_data_directory() {
 }
 
 configure_sudoers() {
-    log_info "Configuring sudoers for SMB management and auto-update..."
+    log_info "Configuring sudoers for SMB management, disk management, and auto-update..."
 
     SUDOERS_FILE="/etc/sudoers.d/anemone"
 
     cat > "$SUDOERS_FILE" <<EOF
 # Anemone NAS - Sudo Permissions
-# Allow user to manage Samba, users, and auto-update
+# Allow user to manage Samba, users, disks, and auto-update
 
 # Auto-update permissions (restart anemone service)
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart anemone
@@ -302,7 +343,14 @@ $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/mkdir *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/semanage fcontext *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/restorecon *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/setsebool *
+
+# Disk Management Permissions
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/btrfs *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/zpool *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/zfs *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/mount *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/umount *
 EOF
 
     chmod 440 "$SUDOERS_FILE"
@@ -459,6 +507,7 @@ main() {
     detect_distro
     check_prerequisites
     install_samba
+    install_disk_tools
     build_binary
     create_data_directory
     configure_sudoers

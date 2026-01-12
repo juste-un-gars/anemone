@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/dashboard" class="text-2xl font-bold text-gray-900">
+                        🪸 Anemone - {{ServerName}}
+                    </a>
+                    {{if .Session.IsAdmin}}
+                    <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                        {{T .Lang "common.admin"}}
+                    </span>
+                    {{end}}
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700">{{.Session.Username}}</span>
+                    <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
+                        {{T .Lang "nav.logout"}}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-900">
+                        💾 {{T .Lang "disk.title"}}
+                    </h2>
+                    <p class="mt-2 text-gray-600">
+                        {{T .Lang "disk.subtitle"}}
+                    </p>
+                </div>
+                <a href="/dashboard" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    ← {{T .Lang "disk.back_dashboard"}}
+                </a>
+            </div>
+
+            <!-- RAID Capabilities -->
+            <div class="mt-4 flex items-center space-x-4">
+                {{if .BtrfsAvailable}}
+                <span class="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                    ✓ {{T .Lang "disk.btrfs_available"}}
+                </span>
+                {{else}}
+                <span class="px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+                    ✗ {{T .Lang "disk.btrfs_not_available"}}
+                </span>
+                {{end}}
+
+                {{if .ZFSAvailable}}
+                <span class="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                    ✓ {{T .Lang "disk.zfs_available"}}
+                </span>
+                {{else}}
+                <span class="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                    ⚠ {{T .Lang "disk.zfs_not_available"}}
+                </span>
+                {{end}}
+            </div>
+        </div>
+
+        <!-- Success/Error Messages -->
+        <div id="message-container" class="hidden mb-6"></div>
+
+        <!-- RAID Arrays -->
+        <div class="mb-8">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">
+                📦 {{T .Lang "disk.raid_arrays"}}
+            </h3>
+
+            {{if .RAIDArrays}}
+            <div class="bg-white shadow rounded-lg overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "disk.array_name"}}
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "disk.array_type"}}
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "disk.array_level"}}
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "disk.array_devices"}}
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "disk.array_size"}}
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "disk.array_health"}}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {{range .RAIDArrays}}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{.Name}}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{.Type}}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{.Level}}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{.ActiveDevices}}/{{.TotalDevices}}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{FormatBytes .Size}}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                {{if eq .Health "healthy"}}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    ✓ Healthy
+                                </span>
+                                {{else if eq .Health "degraded"}}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    ⚠ Degraded
+                                </span>
+                                {{else}}
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    ✗ Failed
+                                </span>
+                                {{end}}
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+            {{else}}
+            <div class="bg-white shadow rounded-lg p-6">
+                <p class="text-gray-500 text-center">
+                    {{T .Lang "disk.no_arrays"}}
+                </p>
+            </div>
+            {{end}}
+        </div>
+
+        <!-- Available Disks -->
+        <div class="mb-8">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">
+                💿 {{T .Lang "disk.available_disks"}}
+            </h3>
+
+            {{if .AvailableDisks}}
+            <div class="bg-white shadow rounded-lg overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "disk.device_name"}}
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "disk.device_size"}}
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "disk.device_type"}}
+                            </th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "disk.device_fstype"}}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {{range .AvailableDisks}}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{.Path}}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{.Size}}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{.Type}}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{if .FSType}}{{.FSType}}{{else}}-{{end}}
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+            {{else}}
+            <div class="bg-white shadow rounded-lg p-6">
+                <p class="text-gray-500 text-center">
+                    {{T .Lang "disk.no_disks"}}
+                </p>
+            </div>
+            {{end}}
+        </div>
+
+        <!-- Create RAID Form -->
+        {{if or .BtrfsAvailable .ZFSAvailable}}
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">
+                {{T .Lang "disk.create_raid"}}
+            </h3>
+
+            <!-- Warning -->
+            <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+                <p class="text-sm text-red-800">
+                    {{T .Lang "disk.info.warning"}}
+                </p>
+            </div>
+
+            <form id="create-raid-form" class="space-y-6">
+                <!-- RAID Type -->
+                <div>
+                    <label for="raid_type" class="block text-sm font-medium text-gray-700">
+                        {{T .Lang "disk.raid_type"}}
+                    </label>
+                    <select id="raid_type" name="raid_type" required
+                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        {{if .BtrfsAvailable}}
+                        <option value="btrfs" selected>Btrfs</option>
+                        {{end}}
+                        {{if .ZFSAvailable}}
+                        <option value="zfs">ZFS</option>
+                        {{end}}
+                    </select>
+                    <p class="mt-1 text-sm text-gray-500" id="raid-type-help">
+                        {{T .Lang "disk.info.btrfs"}}
+                    </p>
+                </div>
+
+                <!-- RAID Level -->
+                <div>
+                    <label for="raid_level" class="block text-sm font-medium text-gray-700">
+                        {{T .Lang "disk.raid_level"}}
+                    </label>
+                    <select id="raid_level" name="raid_level" required
+                            class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                        <!-- Options populated by JavaScript -->
+                    </select>
+                    <p class="mt-1 text-sm text-gray-500" id="raid-level-help"></p>
+                </div>
+
+                <!-- Label -->
+                <div>
+                    <label for="label" class="block text-sm font-medium text-gray-700">
+                        {{T .Lang "disk.label"}}
+                    </label>
+                    <input type="text" id="label" name="label" required
+                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                           placeholder="my-raid-array">
+                </div>
+
+                <!-- Mount Point -->
+                <div>
+                    <label for="mount_point" class="block text-sm font-medium text-gray-700">
+                        {{T .Lang "disk.mount_point"}}
+                    </label>
+                    <input type="text" id="mount_point" name="mount_point"
+                           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                           placeholder="/mnt/my-raid">
+                </div>
+
+                <!-- Devices Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        {{T .Lang "disk.select_devices"}}
+                    </label>
+                    <div class="space-y-2" id="devices-list">
+                        {{if .AvailableDisks}}
+                        {{range .AvailableDisks}}
+                        <label class="flex items-center p-3 bg-gray-50 rounded-md hover:bg-gray-100 cursor-pointer">
+                            <input type="checkbox" name="device" value="{{.Path}}" class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                            <span class="ml-3 text-sm">
+                                <span class="font-medium text-gray-900">{{.Path}}</span>
+                                <span class="text-gray-500"> - {{.Size}}</span>
+                            </span>
+                        </label>
+                        {{end}}
+                        {{else}}
+                        <p class="text-sm text-gray-500">{{T .Lang "disk.no_disks"}}</p>
+                        {{end}}
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="flex justify-end">
+                    <button type="submit" id="create-button"
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
+                        <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                        </svg>
+                        {{T .Lang "disk.create_button"}}
+                    </button>
+                </div>
+            </form>
+        </div>
+        {{end}}
+    </div>
+</div>
+
+<script>
+    // RAID levels configuration
+    const raidLevels = {
+        btrfs: [
+            { value: 'single', label: '{{T .Lang "disk.raid_level.single"}}' },
+            { value: 'raid0', label: '{{T .Lang "disk.raid_level.raid0"}}' },
+            { value: 'raid1', label: '{{T .Lang "disk.raid_level.raid1"}}' },
+            { value: 'raid1c3', label: '{{T .Lang "disk.raid_level.raid1c3"}}' },
+            { value: 'raid1c4', label: '{{T .Lang "disk.raid_level.raid1c4"}}' },
+            { value: 'raid10', label: '{{T .Lang "disk.raid_level.raid10"}}' },
+            { value: 'raid5', label: '{{T .Lang "disk.raid_level.raid5"}}' },
+            { value: 'raid6', label: '{{T .Lang "disk.raid_level.raid6"}}' }
+        ],
+        zfs: [
+            { value: '', label: '{{T .Lang "disk.raid_level.single"}}' },
+            { value: 'mirror', label: '{{T .Lang "disk.raid_level.mirror"}}' },
+            { value: 'raidz', label: '{{T .Lang "disk.raid_level.raidz"}}' },
+            { value: 'raidz2', label: '{{T .Lang "disk.raid_level.raidz2"}}' },
+            { value: 'raidz3', label: '{{T .Lang "disk.raid_level.raidz3"}}' }
+        ]
+    };
+
+    // Update RAID level options when type changes
+    document.getElementById('raid_type')?.addEventListener('change', function() {
+        const raidType = this.value;
+        const raidLevelSelect = document.getElementById('raid_level');
+        const helpText = document.getElementById('raid-type-help');
+
+        // Update options
+        raidLevelSelect.innerHTML = '';
+        raidLevels[raidType].forEach(level => {
+            const option = document.createElement('option');
+            option.value = level.value;
+            option.textContent = level.label;
+            raidLevelSelect.appendChild(option);
+        });
+
+        // Update help text
+        if (raidType === 'btrfs') {
+            helpText.textContent = '{{T .Lang "disk.info.btrfs"}}';
+        } else {
+            helpText.textContent = '{{T .Lang "disk.info.zfs"}}';
+        }
+    });
+
+    // Initialize RAID levels on page load
+    if (document.getElementById('raid_type')) {
+        document.getElementById('raid_type').dispatchEvent(new Event('change'));
+    }
+
+    // Handle form submission
+    document.getElementById('create-raid-form')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const form = e.target;
+        const button = document.getElementById('create-button');
+        const messageContainer = document.getElementById('message-container');
+
+        // Get selected devices
+        const selectedDevices = Array.from(form.querySelectorAll('input[name="device"]:checked'))
+            .map(input => input.value);
+
+        if (selectedDevices.length === 0) {
+            showMessage('error', 'Please select at least one device');
+            return;
+        }
+
+        // Disable button
+        button.disabled = true;
+        button.innerHTML = '<svg class="animate-spin h-5 w-5 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>{{T .Lang "disk.creating"}}';
+
+        try {
+            const formData = new FormData();
+            formData.append('raid_type', form.raid_type.value);
+            formData.append('raid_level', form.raid_level.value);
+            formData.append('label', form.label.value);
+            formData.append('mount_point', form.mount_point.value);
+            formData.append('devices', selectedDevices.join(','));
+
+            const response = await fetch('/admin/disk/create-raid', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                showMessage('success', data.message);
+                setTimeout(() => window.location.reload(), 2000);
+            } else {
+                showMessage('error', data.error || 'Failed to create RAID array');
+            }
+        } catch (error) {
+            showMessage('error', 'Network error: ' + error.message);
+        } finally {
+            // Re-enable button
+            button.disabled = false;
+            button.innerHTML = '<svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>{{T .Lang "disk.create_button"}}';
+        }
+    });
+
+    function showMessage(type, message) {
+        const container = document.getElementById('message-container');
+        const bgColor = type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800';
+        const icon = type === 'success' ? '✓' : '✗';
+
+        container.className = `mb-6 p-4 ${bgColor} border rounded-md`;
+        container.innerHTML = `<p class="text-sm">${icon} ${message}</p>`;
+        container.classList.remove('hidden');
+
+        setTimeout(() => {
+            container.classList.add('hidden');
+        }, 5000);
+    }
+</script>
+</body>
+</html>
