@@ -83,7 +83,7 @@ func TestBuildManifest(t *testing.T) {
 	}
 
 	// Build manifest
-	manifest, err := BuildManifest(tmpDir, 5, "backup")
+	manifest, err := BuildManifest(tmpDir, 5, "backup", "test-server")
 	if err != nil {
 		t.Fatalf("BuildManifest failed: %v", err)
 	}

@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/juste-un-gars/anemone/internal/crypto"
@@ -932,8 +933,18 @@ func ExtractTarGz(reader io.Reader, destDir string) error {
 		targetPath := filepath.Join(destDir, header.Name)
 
 		// Check for path traversal attacks
-		if !filepath.HasPrefix(targetPath, filepath.Clean(destDir)+string(os.PathSeparator)) {
-			return fmt.Errorf("illegal file path: %s", header.Name)
+		// Use filepath.Rel instead of deprecated filepath.HasPrefix
+		absDestDir, err := filepath.Abs(destDir)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path: %w", err)
+		}
+		absTargetPath, err := filepath.Abs(targetPath)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute target path: %w", err)
+		}
+		relPath, err := filepath.Rel(absDestDir, absTargetPath)
+		if err != nil || strings.HasPrefix(relPath, "..") || filepath.IsAbs(relPath) {
+			return fmt.Errorf("illegal file path (path traversal detected): %s", header.Name)
 		}
 
 		// Handle different file types

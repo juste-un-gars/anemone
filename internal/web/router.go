@@ -4010,7 +4010,19 @@ func (s *Server) handleAdminIncomingDelete(w http.ResponseWriter, r *http.Reques
 
 	// Security check: ensure path is within data directory
 	dataDir := s.cfg.DataDir
-	if !strings.HasPrefix(backupPath, dataDir) {
+	absDataDir, err := filepath.Abs(dataDir)
+	if err != nil {
+		http.Redirect(w, r, "/admin/incoming?error=Invalid+data+directory", http.StatusSeeOther)
+		return
+	}
+	absBackupPath, err := filepath.Abs(backupPath)
+	if err != nil {
+		http.Redirect(w, r, "/admin/incoming?error=Invalid+backup+path", http.StatusSeeOther)
+		return
+	}
+	// Use filepath.Rel to properly check if path is within directory
+	relPath, err := filepath.Rel(absDataDir, absBackupPath)
+	if err != nil || strings.HasPrefix(relPath, "..") || filepath.IsAbs(relPath) {
 		log.Printf("Security: Attempted to delete path outside data directory: %s", backupPath)
 		http.Redirect(w, r, "/admin/incoming?error=Invalid+backup+path", http.StatusSeeOther)
 		return
@@ -4993,8 +5005,11 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 		http.Error(w, "Invalid file path", http.StatusBadRequest)
 		return
 	}
-	if !strings.HasPrefix(absFilePath, absBackupPath) {
-		log.Printf("Security: Attempted path traversal: %s", filePath)
+	// Use filepath.Rel to properly check if path is within directory
+	// This prevents path traversal attacks like /srv/anemone/backups_evil/../etc/passwd
+	relPath, err := filepath.Rel(absBackupPath, absFilePath)
+	if err != nil || strings.HasPrefix(relPath, "..") || filepath.IsAbs(relPath) {
+		log.Printf("Security: Attempted path traversal: %s (relative: %s)", filePath, relPath)
 		http.Error(w, "Invalid file path", http.StatusForbidden)
 		return
 	}
