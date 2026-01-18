@@ -448,6 +448,7 @@
   "admin.sync.report.status": "Statut",
   "admin.sync.report.files": "Fichiers",
   "admin.sync.report.size": "Taille",
+  "admin.sync.report.speed": "Vitesse",
   "admin.sync.report.status.success": "Réussi",
   "admin.sync.report.status.error": "Erreur",
   "admin.sync.report.status.pending": "En cours",

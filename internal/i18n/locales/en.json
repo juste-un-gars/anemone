@@ -448,6 +448,7 @@
   "admin.sync.report.status": "Status",
   "admin.sync.report.files": "Files",
   "admin.sync.report.size": "Size",
+  "admin.sync.report.speed": "Speed",
   "admin.sync.report.status.success": "Success",
   "admin.sync.report.status.error": "Error",
   "admin.sync.report.status.pending": "In progress",

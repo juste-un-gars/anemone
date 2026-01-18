@@ -41,13 +41,15 @@ func (s *Server) handleAdminSync(w http.ResponseWriter, r *http.Request) {
 		Username    string
 		PeerName    string
 		StartedAt   time.Time
+		CompletedAt *time.Time
 		Status      string
 		FilesSynced int
 		BytesSynced int64
+		Speed       string // Calculated transfer speed (e.g., "25.3 MB/s")
 	}
 
 	query := `
-		SELECT u.username, p.name, sl.started_at, sl.status, sl.files_synced, sl.bytes_synced
+		SELECT u.username, p.name, sl.started_at, sl.completed_at, sl.status, sl.files_synced, sl.bytes_synced
 		FROM sync_log sl
 		JOIN users u ON sl.user_id = u.id
 		JOIN peers p ON sl.peer_id = p.id
@@ -66,9 +68,23 @@ func (s *Server) handleAdminSync(w http.ResponseWriter, r *http.Request) {
 		defer rows.Close()
 		for rows.Next() {
 			var rs RecentSync
-			if err := rows.Scan(&rs.Username, &rs.PeerName, &rs.StartedAt, &rs.Status, &rs.FilesSynced, &rs.BytesSynced); err != nil {
+			if err := rows.Scan(&rs.Username, &rs.PeerName, &rs.StartedAt, &rs.CompletedAt, &rs.Status, &rs.FilesSynced, &rs.BytesSynced); err != nil {
 				log.Printf("Error scanning sync log: %v", err)
 				continue
+			}
+			// Calculate transfer speed if sync completed and has data
+			if rs.CompletedAt != nil && rs.BytesSynced > 0 {
+				duration := rs.CompletedAt.Sub(rs.StartedAt)
+				if duration.Seconds() > 0 {
+					speedBps := float64(rs.BytesSynced) / duration.Seconds()
+					if speedBps >= 1024*1024 {
+						rs.Speed = fmt.Sprintf("%.1f MB/s", speedBps/1024/1024)
+					} else if speedBps >= 1024 {
+						rs.Speed = fmt.Sprintf("%.1f KB/s", speedBps/1024)
+					} else {
+						rs.Speed = fmt.Sprintf("%.0f B/s", speedBps)
+					}
+				}
 			}
 			recentSyncs = append(recentSyncs, rs)
 		}
