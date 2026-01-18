@@ -5,6 +5,7 @@
 package web
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -68,9 +69,21 @@ func (s *Server) handleAdminSync(w http.ResponseWriter, r *http.Request) {
 		defer rows.Close()
 		for rows.Next() {
 			var rs RecentSync
-			if err := rows.Scan(&rs.Username, &rs.PeerName, &rs.StartedAt, &rs.CompletedAt, &rs.Status, &rs.FilesSynced, &rs.BytesSynced); err != nil {
+			var startedAtStr, completedAtStr sql.NullString
+			if err := rows.Scan(&rs.Username, &rs.PeerName, &startedAtStr, &completedAtStr, &rs.Status, &rs.FilesSynced, &rs.BytesSynced); err != nil {
 				log.Printf("Error scanning sync log: %v", err)
 				continue
+			}
+			// Parse SQLite datetime strings
+			if startedAtStr.Valid {
+				if t, err := time.Parse("2006-01-02 15:04:05", startedAtStr.String); err == nil {
+					rs.StartedAt = t
+				}
+			}
+			if completedAtStr.Valid {
+				if t, err := time.Parse("2006-01-02 15:04:05", completedAtStr.String); err == nil {
+					rs.CompletedAt = &t
+				}
 			}
 			// Calculate transfer speed if sync completed and has data
 			if rs.CompletedAt != nil && rs.BytesSynced > 0 {
