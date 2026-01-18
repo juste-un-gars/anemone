@@ -48,8 +48,7 @@ _old/
 
 # Session archives and temporary markdown files
 SESSION_STATE.md
-SESSION_STATE_ARCHIVE*.md
-SESSIONS_ARCHIVE.md
+.claude/sessions/
 CHECKFILES.md
 TESTS_ANEMONE.md
 SECURITY_AUDIT.md

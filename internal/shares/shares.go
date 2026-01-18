@@ -2,6 +2,7 @@
 // Copyright (C) 2025 juste-un-gars
 // Licensed under the GNU Affero General Public License v3.0
 
+// Package shares manages user file shares including creation, deletion, and disk usage.
 package shares
 
 import (

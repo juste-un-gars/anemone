@@ -2,6 +2,7 @@
 // Copyright (C) 2025 juste-un-gars
 // Licensed under the GNU Affero General Public License v3.0
 
+// Package backup handles server configuration export and import with AES-256-GCM encryption.
 package backup
 
 import (

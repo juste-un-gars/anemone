@@ -2,6 +2,7 @@
 // Copyright (C) 2025 juste-un-gars
 // Licensed under the GNU Affero General Public License v3.0
 
+// Package syncconfig handles automatic synchronization scheduler configuration.
 package syncconfig
 
 import (

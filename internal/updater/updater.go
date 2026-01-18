@@ -2,6 +2,7 @@
 // Copyright (C) 2025 juste-un-gars
 // Licensed under the GNU Affero General Public License v3.0
 
+// Package updater handles version checking and update notifications from GitHub releases.
 package updater
 
 import (
@@ -15,7 +16,7 @@ import (
 
 const (
 	// Current version of Anemone
-	Version = "0.9.16-beta"
+	Version = "0.9.17-beta"
 
 	// GitHub API endpoint for releases (includes pre-releases)
 	GitHubAPIURL = "https://api.github.com/repos/juste-un-gars/anemone/releases"

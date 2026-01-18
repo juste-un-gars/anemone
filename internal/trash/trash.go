@@ -2,6 +2,7 @@
 // Copyright (C) 2025 juste-un-gars
 // Licensed under the GNU Affero General Public License v3.0
 
+// Package trash manages deleted files with configurable retention and recovery support.
 package trash
 
 import (

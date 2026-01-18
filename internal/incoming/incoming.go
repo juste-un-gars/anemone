@@ -2,6 +2,7 @@
 // Copyright (C) 2025 juste-un-gars
 // Licensed under the GNU Affero General Public License v3.0
 
+// Package incoming manages incoming backups received from remote P2P peers.
 package incoming
 
 import (
@@ -86,7 +87,7 @@ func ScanIncomingBackups(db *sql.DB, backupsDir string) ([]*IncomingBackup, erro
 
 			// Scan directory for files and stats
 			backupPath := filepath.Join(serverDir, entry.Name())
-			fileCount, totalSize, lastModified, hasManifest, err := scanBackupDirectory(backupPath)
+			fileCount, totalSize, lastModified, hasManifest, err := scanBackupDir(backupPath)
 			if err != nil {
 				return nil, fmt.Errorf("failed to scan backup %s: %w", entry.Name(), err)
 			}
@@ -110,9 +111,9 @@ func ScanIncomingBackups(db *sql.DB, backupsDir string) ([]*IncomingBackup, erro
 	return backups, nil
 }
 
-// scanBackupDirectory scans a backup directory and returns statistics
+// scanBackupDir scans a backup directory and returns statistics
 // Returns: fileCount, totalSize, lastModified, hasManifest, error
-func scanBackupDirectory(path string) (int, int64, time.Time, bool, error) {
+func scanBackupDir(path string) (int, int64, time.Time, bool, error) {
 	var fileCount int
 	var totalSize int64
 	var lastModified time.Time

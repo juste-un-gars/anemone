@@ -16,6 +16,7 @@ import (
 
 	_ "github.com/mattn/go-sqlite3"
 
+	"github.com/juste-un-gars/anemone/internal/btrfs"
 	"github.com/juste-un-gars/anemone/internal/quota"
 	"github.com/juste-un-gars/anemone/internal/shares"
 	"github.com/juste-un-gars/anemone/internal/users"
@@ -118,7 +119,7 @@ func main() {
 		}
 
 		// Check if already a subvolume
-		isSubvol := isSubvolume(share.Path)
+		isSubvol := btrfs.IsSubvolume(share.Path)
 		if isSubvol && !*force {
 			log.Printf("  ⏭️  SKIP: Already a subvolume")
 			skipCount++
@@ -215,8 +216,3 @@ func main() {
 	}
 }
 
-// isSubvolume checks if a path is a Btrfs subvolume
-func isSubvolume(path string) bool {
-	cmd := exec.Command("btrfs", "subvolume", "show", path)
-	return cmd.Run() == nil
-}

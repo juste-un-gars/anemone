@@ -1,3 +1,8 @@
+// Anemone - Multi-user NAS with P2P encrypted synchronization
+// Copyright (C) 2025 juste-un-gars
+// Licensed under the GNU Affero General Public License v3.0
+
+// Package i18n provides internationalization support for French and English translations.
 package i18n
 
 import (

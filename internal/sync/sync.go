@@ -2,6 +2,7 @@
 // Copyright (C) 2025 juste-un-gars
 // Licensed under the GNU Affero General Public License v3.0
 
+// Package sync implements P2P encrypted file synchronization between Anemone instances.
 package sync
 
 import (
@@ -363,9 +364,10 @@ func uploadManifestToRemote(ctx context.Context, client *http.Client, req *SyncR
 	}
 	manifestPutReq.Header.Set("Content-Type", "application/octet-stream")
 
-	// Add authentication header if password is provided
+	// Add authentication headers if password is provided
 	if req.PeerPassword != "" {
 		manifestPutReq.Header.Set("X-Sync-Password", req.PeerPassword)
+		manifestPutReq.Header.Set("X-Source-Server", req.SourceServer)
 	}
 
 	resp, err := client.Do(manifestPutReq)
@@ -468,9 +470,10 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		return fmt.Errorf(errMsg)
 	}
 
-	// Add authentication header if password is provided
+	// Add authentication headers if password is provided
 	if req.PeerPassword != "" {
 		manifestReq.Header.Set("X-Sync-Password", req.PeerPassword)
+		manifestReq.Header.Set("X-Source-Server", req.SourceServer)
 	}
 
 	resp, err := client.Do(manifestReq)
@@ -638,9 +641,10 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 			return syncErr
 		}
 
-		// Add authentication header if password is provided
+		// Add authentication headers if password is provided
 		if req.PeerPassword != "" {
 			deleteReq.Header.Set("X-Sync-Password", req.PeerPassword)
+			deleteReq.Header.Set("X-Source-Server", req.SourceServer)
 		}
 
 		resp, err := client.Do(deleteReq)
@@ -696,6 +700,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		sourceInfoReq.Header.Set("Content-Type", "application/json")
 		if req.PeerPassword != "" {
 			sourceInfoReq.Header.Set("X-Sync-Password", req.PeerPassword)
+			sourceInfoReq.Header.Set("X-Source-Server", req.SourceServer)
 		}
 		// Send source info (ignore errors - it's just metadata)
 		client.Do(sourceInfoReq)
@@ -1082,9 +1087,10 @@ func cleanupOrphanedFiles(ctx context.Context, client *http.Client, req *SyncReq
 		return fmt.Errorf("failed to create list request: %w", err)
 	}
 
-	// Add authentication header if password is provided
+	// Add authentication headers if password is provided
 	if req.PeerPassword != "" {
 		listReq.Header.Set("X-Sync-Password", req.PeerPassword)
+		listReq.Header.Set("X-Source-Server", req.SourceServer)
 	}
 
 	resp, err := client.Do(listReq)
@@ -1135,6 +1141,7 @@ func cleanupOrphanedFiles(ctx context.Context, client *http.Client, req *SyncReq
 
 			if req.PeerPassword != "" {
 				deleteReq.Header.Set("X-Sync-Password", req.PeerPassword)
+				deleteReq.Header.Set("X-Source-Server", req.SourceServer)
 			}
 
 			resp, err := client.Do(deleteReq)
@@ -1215,9 +1222,10 @@ func streamEncryptAndUpload(ctx context.Context, client *http.Client, file *os.F
 	// Set correct content type with boundary
 	uploadReq.Header.Set("Content-Type", contentType)
 
-	// Add authentication header if password is provided
+	// Add authentication headers if password is provided
 	if req.PeerPassword != "" {
 		uploadReq.Header.Set("X-Sync-Password", req.PeerPassword)
+		uploadReq.Header.Set("X-Source-Server", req.SourceServer)
 	}
 
 	// Send request

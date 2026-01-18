@@ -2,6 +2,8 @@
 // Copyright (C) 2025 juste-un-gars
 // Licensed under the GNU Affero General Public License v3.0
 
+// Package users handles user account management including creation, authentication,
+// and Linux system user integration.
 package users
 
 import (
@@ -16,6 +18,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/juste-un-gars/anemone/internal/btrfs"
 	"github.com/juste-un-gars/anemone/internal/crypto"
 	"github.com/juste-un-gars/anemone/internal/smb"
 )
@@ -346,20 +349,13 @@ func GetAllUsers(db *sql.DB) ([]*User, error) {
 	return users, nil
 }
 
-// isSubvolume checks if a path is a Btrfs subvolume
-func isSubvolume(path string) bool {
-	cmd := exec.Command("btrfs", "subvolume", "show", path)
-	err := cmd.Run()
-	return err == nil
-}
 
 // removeShareDirectory removes a share directory, handling Btrfs subvolumes properly
 func removeShareDirectory(path string) error {
 	// Check if it's a Btrfs subvolume
-	if isSubvolume(path) {
+	if btrfs.IsSubvolume(path) {
 		// Use btrfs subvolume delete for proper cleanup
-		cmd := exec.Command("sudo", "btrfs", "subvolume", "delete", path)
-		if output, err := cmd.CombinedOutput(); err != nil {
+		if output, err := btrfs.DeleteSubvolume(path); err != nil {
 			return fmt.Errorf("failed to delete subvolume: %w\nOutput: %s", err, output)
 		}
 		return nil

@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.17-beta] - 2026-01-18
+
+### Security
+- **Fixed critical cross-user API vulnerability**: P2P sync API now validates user ownership before allowing file operations
+- **Rate limiting**: Added rate limiting on login (5 attempts/15min) and password reset endpoints
+
+### Added
+- **API documentation**: Complete `docs/API.md` documenting all 55+ HTTP endpoints
+- **Security documentation**: Comprehensive `docs/SECURITY.md` with architecture and best practices
+- **Package documentation**: Added godoc comments to all 28 internal packages
+
+### Changed
+- **Refactored router.go**: Extracted 13 sync API handlers to `handlers_sync_api.go` (-18% code, 6,136 → 5,047 lines)
+- **New btrfs package**: Centralized Btrfs utilities in `internal/btrfs/` (eliminates code duplication)
+- **Standardized naming**: Renamed `scanBackupDirectory` functions to `scanBackupDir` for consistency
+
+### Tests
+- **37 new tests**: Added comprehensive test suites
+  - `crypto_test.go`: 14 tests for encryption/hashing
+  - `auth_test.go`: 14 tests for authentication/sessions
+  - `users_test.go`: 5 tests for user management
+  - `btrfs_test.go`: 4 tests for Btrfs utilities
+- **Total test count**: 83 tests (up from ~46)
+
 ## [0.9.16-beta] - 2026-01-18
 
 ### Added

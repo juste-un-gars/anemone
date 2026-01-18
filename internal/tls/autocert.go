@@ -2,6 +2,7 @@
 // Copyright (C) 2025 juste-un-gars
 // Licensed under the GNU Affero General Public License v3.0
 
+// Package tls handles TLS certificate generation and management for HTTPS.
 package tls
 
 import (

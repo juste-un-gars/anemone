@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/juste-un-gars/anemone/internal/btrfs"
 )
 
 // QuotaManager is the universal interface for filesystem quota enforcement
@@ -90,7 +92,7 @@ func (m *BtrfsQuotaManager) CreateQuotaDir(path string, limitGB int) error {
 	}
 
 	// Check if subvolume already exists
-	if isSubvolume(path) {
+	if btrfs.IsSubvolumeSudo(path) {
 		fmt.Printf("Subvolume already exists: %s\n", path)
 		return m.UpdateQuota(path, limitGB)
 	}
@@ -125,7 +127,7 @@ func (m *BtrfsQuotaManager) CreateQuotaDir(path string, limitGB int) error {
 
 // UpdateQuota updates the quota limit for a Btrfs subvolume
 func (m *BtrfsQuotaManager) UpdateQuota(path string, limitGB int) error {
-	if !isSubvolume(path) {
+	if !btrfs.IsSubvolumeSudo(path) {
 		return fmt.Errorf("%s is not a Btrfs subvolume", path)
 	}
 
@@ -149,7 +151,7 @@ func (m *BtrfsQuotaManager) UpdateQuota(path string, limitGB int) error {
 
 // GetUsage returns current usage for a Btrfs subvolume
 func (m *BtrfsQuotaManager) GetUsage(path string) (usedBytes, limitBytes int64, err error) {
-	if !isSubvolume(path) {
+	if !btrfs.IsSubvolumeSudo(path) {
 		return 0, 0, fmt.Errorf("%s is not a Btrfs subvolume", path)
 	}
 
@@ -208,7 +210,7 @@ func (m *BtrfsQuotaManager) GetUsage(path string) (usedBytes, limitBytes int64, 
 
 // RemoveQuotaDir removes a Btrfs subvolume
 func (m *BtrfsQuotaManager) RemoveQuotaDir(path string) error {
-	if !isSubvolume(path) {
+	if !btrfs.IsSubvolumeSudo(path) {
 		// Not a subvolume, just remove as regular directory
 		return os.RemoveAll(path)
 	}
@@ -256,11 +258,6 @@ func (m *BtrfsQuotaManager) enableQuotaOnFS(path string) error {
 	return nil
 }
 
-// isSubvolume checks if a path is a Btrfs subvolume
-func isSubvolume(path string) bool {
-	cmd := exec.Command("sudo", "btrfs", "subvolume", "show", path)
-	return cmd.Run() == nil
-}
 
 // ============================================================================
 // Fallback Implementation (for non-Btrfs filesystems)
