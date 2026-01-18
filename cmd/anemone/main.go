@@ -19,6 +19,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/tls"
 	"github.com/juste-un-gars/anemone/internal/trash"
 	"github.com/juste-un-gars/anemone/internal/updater"
+	"github.com/juste-un-gars/anemone/internal/usermanifest"
 	"github.com/juste-un-gars/anemone/internal/web"
 )
 
@@ -66,6 +67,10 @@ func main() {
 
 	// Start automatic update checker (daily)
 	updater.StartUpdateChecker(db)
+
+	// Start user manifest scheduler (every 5 minutes)
+	// Generates .anemone/manifest.json in each user share for AnemoneSync
+	usermanifest.StartScheduler(db, cfg.SharesDir, usermanifest.DefaultIntervalMinutes)
 
 	// Initialize web server
 	router := web.NewRouter(db, cfg)

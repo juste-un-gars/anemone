@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.16-beta] - 2026-01-18
+
+### Added
+
+#### AnemoneSync Support
+- **User share manifests**: Automatic generation of `.anemone/manifest.json` files in each user share (data and backup)
+- **Manifest scheduler**: Background job generates manifests every 5 minutes with checksum caching for performance
+- **AnemoneSync compatibility**: Manifest format designed for efficient file synchronization with AnemoneSync client
+- **Atomic manifest writes**: Prevents partial reads during manifest updates
+
+#### Manifest Features
+- **SHA-256 checksums**: Each file entry includes a SHA-256 hash for integrity verification
+- **Checksum caching**: Unchanged files (same size and mtime) reuse cached checksums for faster generation
+- **Hidden file exclusion**: Automatically excludes hidden files, `.anemone/`, and `.trash/` directories
+- **Progress logging**: Detailed logs showing manifest generation progress and statistics
+
+### Documentation
+- **USER_MANIFESTS.md**: Comprehensive documentation for the manifest system and AnemoneSync integration
+
+## [0.9.15-beta] - 2026-01-13
+
+### Security
+- **Critical path traversal fixes**: Fixed 3 path traversal vulnerabilities in file download and extraction functions
+- **Secure path validation**: Replaced `strings.HasPrefix()` with `filepath.Rel()` for proper path validation
+- **Deprecated API removal**: Removed usage of deprecated `filepath.HasPrefix()` function
+
+### Fixed
+- **BuildManifest test**: Fixed test arguments for BuildManifest function
+
 ## [0.9.0-beta] - 2025-11-25
 
 ### Added
@@ -92,5 +121,7 @@ https://github.com/juste-un-gars/anemone
 
 ---
 
-[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.9.0-beta...HEAD
+[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.9.16-beta...HEAD
+[0.9.16-beta]: https://github.com/juste-un-gars/anemone/releases/tag/v0.9.16-beta
+[0.9.15-beta]: https://github.com/juste-un-gars/anemone/releases/tag/v0.9.15-beta
 [0.9.0-beta]: https://github.com/juste-un-gars/anemone/releases/tag/v0.9.0-beta
