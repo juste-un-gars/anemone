@@ -18,6 +18,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -362,7 +363,7 @@ func uploadManifestToRemote(ctx context.Context, client *http.Client, req *SyncR
 
 	// Upload encrypted manifest
 	manifestURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?source_server=%s&user_id=%d&share_name=%s",
-		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
+		req.PeerAddress, req.PeerPort, url.QueryEscape(req.SourceServer), req.UserID, url.QueryEscape(shareName))
 
 	manifestPutReq, err := http.NewRequestWithContext(ctx, http.MethodPut, manifestURL, &encryptedManifest)
 	if err != nil {
@@ -456,7 +457,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 
 	// Fetch remote manifest from peer
 	peerURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?source_server=%s&user_id=%d&share_name=%s",
-		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
+		req.PeerAddress, req.PeerPort, url.QueryEscape(req.SourceServer), req.UserID, url.QueryEscape(shareName))
 
 	// Create HTTP client with optimized connection pooling for many small files
 	// Keep-alive is enabled by default, but we optimize the pool settings
@@ -653,7 +654,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	for _, relativePath := range delta.ToDelete {
 		remoteMeta := remoteManifest.Files[relativePath]
 		deleteURL := fmt.Sprintf("https://%s:%d/api/sync/file?source_server=%s&user_id=%d&share_name=%s&path=%s",
-			req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName, remoteMeta.EncryptedPath)
+			req.PeerAddress, req.PeerPort, url.QueryEscape(req.SourceServer), req.UserID, url.QueryEscape(shareName), url.QueryEscape(remoteMeta.EncryptedPath))
 
 		deleteReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, deleteURL, nil)
 		if err != nil {
@@ -715,7 +716,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	sourceInfoJSON, _ := json.Marshal(sourceInfo)
 
 	sourceInfoURL := fmt.Sprintf("https://%s:%d/api/sync/source-info?source_server=%s&user_id=%d&share_name=%s",
-		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
+		req.PeerAddress, req.PeerPort, url.QueryEscape(req.SourceServer), req.UserID, url.QueryEscape(shareName))
 
 	sourceInfoReq, err := http.NewRequestWithContext(ctx, http.MethodPut, sourceInfoURL, bytes.NewReader(sourceInfoJSON))
 	if err == nil {
@@ -1102,7 +1103,7 @@ func SyncPeer(db *sql.DB, peerID int, peerName, peerAddress string, peerPort int
 func cleanupOrphanedFiles(ctx context.Context, client *http.Client, req *SyncRequest, localManifest *SyncManifest, shareName string) error {
 	// Fetch list of physical files from peer
 	listURL := fmt.Sprintf("https://%s:%d/api/sync/list-physical-files?source_server=%s&user_id=%d&share_name=%s",
-		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
+		req.PeerAddress, req.PeerPort, url.QueryEscape(req.SourceServer), req.UserID, url.QueryEscape(shareName))
 
 	listReq, err := http.NewRequestWithContext(ctx, http.MethodGet, listURL, nil)
 	if err != nil {
@@ -1153,7 +1154,7 @@ func cleanupOrphanedFiles(ctx context.Context, client *http.Client, req *SyncReq
 
 		for _, orphanedFile := range orphanedFiles {
 			deleteURL := fmt.Sprintf("https://%s:%d/api/sync/file?source_server=%s&user_id=%d&share_name=%s&path=%s",
-				req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName, orphanedFile)
+				req.PeerAddress, req.PeerPort, url.QueryEscape(req.SourceServer), req.UserID, url.QueryEscape(shareName), url.QueryEscape(orphanedFile))
 
 			deleteReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, deleteURL, nil)
 			if err != nil {
@@ -1234,7 +1235,7 @@ func streamEncryptAndUpload(ctx context.Context, client *http.Client, file *os.F
 	}()
 
 	// Upload file
-	uploadURL := fmt.Sprintf("https://%s:%d/api/sync/file?source_server=%s", req.PeerAddress, req.PeerPort, req.SourceServer)
+	uploadURL := fmt.Sprintf("https://%s:%d/api/sync/file?source_server=%s", req.PeerAddress, req.PeerPort, url.QueryEscape(req.SourceServer))
 
 	uploadReq, err := http.NewRequestWithContext(ctx, http.MethodPost, uploadURL, pipeReader)
 	if err != nil {
