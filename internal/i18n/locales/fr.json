@@ -51,6 +51,7 @@
   "dashboard.settings": "Paramètres",
   "dashboard.stats.users": "Utilisateurs",
   "dashboard.stats.storage": "Stockage utilisé",
+  "dashboard.stats.peer_storage": "Stockage pairs",
   "dashboard.stats.backups": "Dernière sauvegarde",
   "dashboard.stats.peers": "Pairs actifs",
   "dashboard.support": "Supporter le projet",

@@ -51,6 +51,7 @@
   "dashboard.settings": "Settings",
   "dashboard.stats.users": "Users",
   "dashboard.stats.storage": "Storage Used",
+  "dashboard.stats.peer_storage": "Peer Storage",
   "dashboard.stats.backups": "Last Backup",
   "dashboard.stats.peers": "Active Peers",
   "dashboard.support": "Support the project",

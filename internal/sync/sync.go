@@ -299,13 +299,19 @@ func SyncShare(db *sql.DB, req *SyncRequest) error {
 	io.Copy(part, &encryptedBuf)
 	writer.Close()
 
-	// Create HTTP client that accepts self-signed certs
+	// Create HTTP client with optimized settings
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			ClientSessionCache: tls.NewLRUClientSessionCache(32),
+		},
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     120 * time.Second,
+		DisableCompression:  true,
 	}
 	client := &http.Client{
 		Transport: tr,
-		Timeout:   5 * time.Minute, // 5 min timeout for large transfers
+		Timeout:   10 * time.Minute, // 10 min timeout for large transfers
 	}
 
 	// Send POST request
@@ -452,13 +458,29 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	peerURL := fmt.Sprintf("https://%s:%d/api/sync/manifest?source_server=%s&user_id=%d&share_name=%s",
 		req.PeerAddress, req.PeerPort, req.SourceServer, req.UserID, shareName)
 
-	// Create HTTP client that accepts self-signed certs
+	// Create HTTP client with optimized connection pooling for many small files
+	// Keep-alive is enabled by default, but we optimize the pool settings
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+			// Enable TLS session resumption for faster subsequent handshakes
+			ClientSessionCache: tls.NewLRUClientSessionCache(32),
+		},
+		// Connection pool optimization for sequential uploads
+		MaxIdleConns:        10,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     120 * time.Second,
+		// Disable compression (files are already encrypted, compression won't help)
+		DisableCompression: true,
+		// Force HTTP/1.1 keep-alive
+		ForceAttemptHTTP2:     false,
+		MaxConnsPerHost:       10,
+		ResponseHeaderTimeout: 30 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
 	}
 	client := &http.Client{
 		Transport: tr,
-		Timeout:   5 * time.Minute,
+		// No global timeout - each request manages its own via context
 	}
 
 	// Try to fetch remote manifest

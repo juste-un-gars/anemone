@@ -19,6 +19,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/auth"
 	"github.com/juste-un-gars/anemone/internal/config"
 	"github.com/juste-un-gars/anemone/internal/i18n"
+	"github.com/juste-un-gars/anemone/internal/incoming"
 	"github.com/juste-un-gars/anemone/internal/quota"
 	"github.com/juste-un-gars/anemone/internal/shares"
 	"github.com/juste-un-gars/anemone/internal/sync"
@@ -51,14 +52,15 @@ type TemplateData struct {
 
 // DashboardStats holds dashboard statistics
 type DashboardStats struct {
-	UserCount      int
-	StorageUsed    string
-	StorageQuota   string
-	StoragePercent int
-	LastBackup     string
-	PeerCount      int
-	TrashCount     int
-	QuotaInfo      *quota.QuotaInfo
+	UserCount       int
+	StorageUsed     string
+	PeerStorageUsed string
+	StorageQuota    string
+	StoragePercent  int
+	LastBackup      string
+	PeerCount       int
+	TrashCount      int
+	QuotaInfo       *quota.QuotaInfo
 }
 
 // isPathTraversal checks if a path contains actual path traversal attempts.
@@ -445,13 +447,14 @@ func tWithParams(lang, key string, args ...interface{}) string {
 // getDashboardStats retrieves dashboard statistics
 func (s *Server) getDashboardStats(session *auth.Session, lang string) *DashboardStats {
 	stats := &DashboardStats{
-		StorageUsed:    "0 B",
-		StorageQuota:   "∞",
-		StoragePercent: 0,
-		LastBackup:     i18n.T(lang, "dashboard.user.last_backup.never"),
-		UserCount:      0,
-		PeerCount:      0,
-		TrashCount:     0,
+		StorageUsed:     "0 B",
+		PeerStorageUsed: "0 B",
+		StorageQuota:    "∞",
+		StoragePercent:  0,
+		LastBackup:      i18n.T(lang, "dashboard.user.last_backup.never"),
+		UserCount:       0,
+		PeerCount:       0,
+		TrashCount:      0,
 	}
 
 	// Admin stats: all users
@@ -478,6 +481,17 @@ func (s *Server) getDashboardStats(session *auth.Session, lang string) *Dashboar
 				totalUsedGB += quotaInfo.UsedTotalGB
 			}
 			stats.StorageUsed = fmt.Sprintf("%.2f GB", totalUsedGB)
+		}
+
+		// Calculate storage used by peers (incoming backups)
+		incomingDir := filepath.Join(s.cfg.DataDir, "backups", "incoming")
+		incomingBackups, err := incoming.ScanIncomingBackups(s.db, incomingDir)
+		if err == nil {
+			var totalPeerBytes int64
+			for _, backup := range incomingBackups {
+				totalPeerBytes += backup.TotalSize
+			}
+			stats.PeerStorageUsed = incoming.FormatBytes(totalPeerBytes)
 		}
 
 		// Get last backup time from any user

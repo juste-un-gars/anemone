@@ -68,9 +68,22 @@ func main() {
 	// Start automatic update checker (daily)
 	updater.StartUpdateChecker(db)
 
-	// Start user manifest scheduler (every 5 minutes)
-	// Generates .anemone/manifest.json in each user share for AnemoneSync
-	usermanifest.StartScheduler(db, cfg.SharesDir, usermanifest.DefaultIntervalMinutes)
+	// Start user manifest watcher (real-time updates via inotify)
+	// Monitors share directories and regenerates manifests when files change
+	manifestWatcher, err := usermanifest.NewWatcher(db)
+	if err != nil {
+		log.Printf("⚠️  Failed to create manifest watcher: %v", err)
+		log.Println("   Falling back to scheduled manifest generation only")
+	} else {
+		if err := manifestWatcher.Start(); err != nil {
+			log.Printf("⚠️  Failed to start manifest watcher: %v", err)
+		}
+		defer manifestWatcher.Stop()
+	}
+
+	// Start user manifest scheduler as backup (every 30 minutes)
+	// Catches any changes that might be missed by the watcher
+	usermanifest.StartScheduler(db, cfg.SharesDir, 30)
 
 	// Initialize web server
 	router := web.NewRouter(db, cfg)
