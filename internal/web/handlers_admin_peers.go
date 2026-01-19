@@ -5,6 +5,7 @@
 package web
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -39,13 +40,15 @@ func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
 		Username    string
 		PeerName    string
 		StartedAt   time.Time
+		CompletedAt *time.Time
 		Status      string
 		FilesSynced int
 		BytesSynced int64
+		Speed       string // Calculated transfer speed (e.g., "25.3 MB/s")
 	}
 
 	query := `
-		SELECT u.username, p.name, sl.started_at, sl.status, sl.files_synced, sl.bytes_synced
+		SELECT u.username, p.name, sl.started_at, sl.completed_at, sl.status, sl.files_synced, sl.bytes_synced
 		FROM sync_log sl
 		JOIN users u ON sl.user_id = u.id
 		JOIN peers p ON sl.peer_id = p.id
@@ -64,9 +67,35 @@ func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
 		defer rows.Close()
 		for rows.Next() {
 			var rs RecentSync
-			if err := rows.Scan(&rs.Username, &rs.PeerName, &rs.StartedAt, &rs.Status, &rs.FilesSynced, &rs.BytesSynced); err != nil {
+			var startedAtStr, completedAtStr sql.NullString
+			if err := rows.Scan(&rs.Username, &rs.PeerName, &startedAtStr, &completedAtStr, &rs.Status, &rs.FilesSynced, &rs.BytesSynced); err != nil {
 				log.Printf("Error scanning sync log: %v", err)
 				continue
+			}
+			// Parse SQLite datetime strings
+			if startedAtStr.Valid {
+				if t, err := time.Parse("2006-01-02 15:04:05", startedAtStr.String); err == nil {
+					rs.StartedAt = t
+				}
+			}
+			if completedAtStr.Valid {
+				if t, err := time.Parse("2006-01-02 15:04:05", completedAtStr.String); err == nil {
+					rs.CompletedAt = &t
+				}
+			}
+			// Calculate transfer speed if sync completed and has data
+			if rs.CompletedAt != nil && rs.BytesSynced > 0 {
+				duration := rs.CompletedAt.Sub(rs.StartedAt)
+				if duration.Seconds() > 0 {
+					speedBps := float64(rs.BytesSynced) / duration.Seconds()
+					if speedBps >= 1024*1024 {
+						rs.Speed = fmt.Sprintf("%.1f MB/s", speedBps/1024/1024)
+					} else if speedBps >= 1024 {
+						rs.Speed = fmt.Sprintf("%.1f KB/s", speedBps/1024)
+					} else {
+						rs.Speed = fmt.Sprintf("%.0f B/s", speedBps)
+					}
+				}
 			}
 			recentSyncs = append(recentSyncs, rs)
 		}
