@@ -74,14 +74,13 @@ func (s *Server) handleAdminSync(w http.ResponseWriter, r *http.Request) {
 				log.Printf("Error scanning sync log: %v", err)
 				continue
 			}
-			// Parse SQLite datetime strings
+			// Parse SQLite datetime strings (try multiple formats)
 			if startedAtStr.Valid {
-				if t, err := time.Parse("2006-01-02 15:04:05", startedAtStr.String); err == nil {
-					rs.StartedAt = t
-				}
+				rs.StartedAt = parseSQLiteDateTimeSync(startedAtStr.String)
 			}
 			if completedAtStr.Valid {
-				if t, err := time.Parse("2006-01-02 15:04:05", completedAtStr.String); err == nil {
+				t := parseSQLiteDateTimeSync(completedAtStr.String)
+				if !t.IsZero() {
 					rs.CompletedAt = &t
 				}
 			}
@@ -340,4 +339,30 @@ func (s *Server) handleAdminIncomingDelete(w http.ResponseWriter, r *http.Reques
 	http.Redirect(w, r, "/admin/incoming?success=Backup+deleted+successfully", http.StatusSeeOther)
 }
 
-// handleRestore displays the restore page
+// parseSQLiteDateTimeSync parses a datetime string from SQLite, trying multiple formats.
+// SQLite can return datetimes in various formats depending on how they were stored.
+func parseSQLiteDateTimeSync(s string) time.Time {
+	// List of formats to try (most common first)
+	formats := []string{
+		"2006-01-02 15:04:05",           // Standard SQLite format
+		"2006-01-02T15:04:05",           // ISO 8601 with T
+		"2006-01-02 15:04:05.000",       // With milliseconds
+		"2006-01-02T15:04:05.000",       // ISO with T and milliseconds
+		"2006-01-02 15:04:05Z",          // With Z timezone
+		"2006-01-02T15:04:05Z",          // ISO with T and Z
+		"2006-01-02 15:04:05-07:00",     // With timezone offset
+		"2006-01-02T15:04:05-07:00",     // ISO with timezone offset
+		time.RFC3339,                    // Full RFC3339
+		time.RFC3339Nano,                // RFC3339 with nanoseconds
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, s); err == nil {
+			return t
+		}
+	}
+
+	// Log error if no format worked
+	log.Printf("Warning: Could not parse datetime string: %q", s)
+	return time.Time{}
+}
