@@ -447,6 +447,9 @@ func (s *Server) handleAPISyncFileDelete(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
+	// Clean up empty parent directories
+	cleanEmptyParentDirs(filepath.Dir(targetPath), backupDir)
+
 	log.Printf("Successfully deleted file: %s (user %d, share %s)", relativePath, userID, shareName)
 
 	// Return success
@@ -871,3 +874,42 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 	log.Printf("Sent encrypted file %s for user %d share %s", filePath, userID, shareName)
 }
 
+// cleanEmptyParentDirs removes empty parent directories up to (but not including) the stopDir.
+// This is called after deleting a file to clean up any empty directories left behind.
+func cleanEmptyParentDirs(dir, stopDir string) {
+	// Normalize paths for comparison
+	stopDir = filepath.Clean(stopDir)
+
+	for {
+		dir = filepath.Clean(dir)
+
+		// Stop if we've reached or passed the stop directory
+		if dir == stopDir || len(dir) <= len(stopDir) {
+			return
+		}
+
+		// Check if directory is empty
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			// Can't read directory, stop
+			return
+		}
+
+		if len(entries) > 0 {
+			// Directory is not empty, stop
+			return
+		}
+
+		// Try to remove empty directory
+		if err := os.Remove(dir); err != nil {
+			// Failed to remove (permissions, etc.), stop
+			log.Printf("Could not remove empty directory %s: %v", dir, err)
+			return
+		}
+
+		log.Printf("Removed empty directory: %s", dir)
+
+		// Move up to parent directory
+		dir = filepath.Dir(dir)
+	}
+}
