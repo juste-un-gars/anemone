@@ -304,22 +304,21 @@ func (s *SetupWizardServer) handleFinalize(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Mark as finalized
+	// Mark as finalized (keep state file so step-6 shows restart message)
 	if err := s.manager.Finalize(); err != nil {
 		log.Printf("Error finalizing setup: %v", err)
 		http.Error(w, "Failed to finalize setup", http.StatusInternalServerError)
 		return
 	}
 
-	// Clean up setup state file
-	if err := s.manager.Cleanup(); err != nil {
-		log.Printf("Warning: Failed to cleanup setup state: %v", err)
-	}
+	// Don't cleanup state file - we need it to show "restart required" page
+	// The state file will be ignored after restart since DB exists
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":  true,
-		"redirect": "/login",
+		"message":  "Setup complete. Please restart the service.",
+		"redirect": "/setup/wizard", // Stay in wizard to show restart message
 	})
 }
 
@@ -463,15 +462,12 @@ func (s *SetupWizardServer) handleRestoreExecute(w http.ResponseWriter, r *http.
 	s.pendingRestoreBackup = nil
 	s.pendingRestoreMu.Unlock()
 
-	// Mark setup as finalized
+	// Mark setup as finalized (keep state file so step-6 shows restart message)
 	if err := s.manager.Finalize(); err != nil {
 		log.Printf("Warning: Failed to finalize setup after restore: %v", err)
 	}
 
-	// Clean up setup state file
-	if err := s.manager.Cleanup(); err != nil {
-		log.Printf("Warning: Failed to cleanup setup state: %v", err)
-	}
+	// Don't cleanup state file - we need it to show "restart required" page
 
 	log.Printf("Server restored successfully from backup: %s", serverBackup.ServerName)
 
@@ -481,7 +477,7 @@ func (s *SetupWizardServer) handleRestoreExecute(w http.ResponseWriter, r *http.
 		"server_name": serverBackup.ServerName,
 		"users_count": len(serverBackup.Users),
 		"peers_count": len(serverBackup.Peers),
-		"redirect":    "/login",
+		"redirect":    "/setup/wizard", // Stay in wizard to show restart message
 	})
 }
 
