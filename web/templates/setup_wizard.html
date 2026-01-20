@@ -444,9 +444,9 @@
                     </label>
                 </div>
 
-                <a href="/login" id="btn-goto-login" class="inline-block px-8 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 opacity-50 pointer-events-none">
+                <button onclick="showRestartStep()" id="btn-goto-login" class="px-8 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 opacity-50 pointer-events-none">
                     {{T .Lang "setup.success.button"}}
-                </a>
+                </button>
             </div>
         </div>
 
@@ -472,25 +472,6 @@
                 <div class="text-gray-500 text-sm">
                     <span id="checking-status">{{T .Lang "setup_wizard.complete.checking"}}...</span>
                 </div>
-
-                {{if eq .CurrentStep 6}}
-                <script>
-                    // Auto-check if the server has restarted and normal mode is available
-                    (function checkServerStatus() {
-                        fetch('/login', { method: 'HEAD' })
-                            .then(response => {
-                                if (response.ok || response.status === 200) {
-                                    window.location.href = '/login';
-                                } else {
-                                    setTimeout(checkServerStatus, 3000);
-                                }
-                            })
-                            .catch(() => {
-                                setTimeout(checkServerStatus, 3000);
-                            });
-                    })();
-                </script>
-                {{end}}
             </div>
         </div>
 
@@ -1127,9 +1108,33 @@ function checkConfirmations() {
 
     if (keySaved && understand) {
         btn.classList.remove('opacity-50', 'pointer-events-none');
+        btn.disabled = false;
     } else {
         btn.classList.add('opacity-50', 'pointer-events-none');
+        btn.disabled = true;
     }
+}
+
+function showRestartStep() {
+    // Show step 6 with restart instructions
+    currentStep = 6;
+    showStep(6);
+    // Start checking if service restarted
+    checkServerRestart();
+}
+
+function checkServerRestart() {
+    fetch('/login', { method: 'HEAD' })
+        .then(response => {
+            if (response.ok || response.status === 200) {
+                window.location.href = '/login';
+            } else {
+                setTimeout(checkServerRestart, 3000);
+            }
+        })
+        .catch(() => {
+            setTimeout(checkServerRestart, 3000);
+        });
 }
 
 // Add event listeners for ZFS form inputs
