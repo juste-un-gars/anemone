@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{T .Lang "storage.title"}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .health-ok { color: #10b981; }
+        .health-warning { color: #f59e0b; }
+        .health-critical { color: #ef4444; }
+        .health-unknown { color: #6b7280; }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/dashboard" class="text-2xl font-bold text-gray-900">
+                        🪸 Anemone - {{ServerName}}
+                    </a>
+                    <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                        {{T .Lang "users.role.admin"}}
+                    </span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700">{{.Session.Username}}</span>
+                    <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
+                        {{T .Lang "dashboard.logout"}}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h2 class="text-3xl font-bold text-gray-900">
+                    {{T .Lang "storage.title"}}
+                </h2>
+                <p class="mt-2 text-gray-600">
+                    {{T .Lang "storage.info"}}
+                </p>
+            </div>
+            <a href="/dashboard" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                {{T .Lang "common.back"}}
+            </a>
+        </div>
+
+        <!-- Overview Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <!-- Total Disks -->
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+                            </svg>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">{{T .Lang "storage.total_disks"}}</dt>
+                                <dd class="text-lg font-medium text-gray-900">{{.Overview.TotalDisks}}</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Disk Health -->
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            {{if gt .Overview.CriticalDisks 0}}
+                            <svg class="h-6 w-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            {{else if gt .Overview.WarningDisks 0}}
+                            <svg class="h-6 w-6 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            {{else}}
+                            <svg class="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {{end}}
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">{{T .Lang "storage.disk_health"}}</dt>
+                                <dd class="text-lg font-medium text-gray-900">
+                                    <span class="text-green-600">{{.Overview.HealthyDisks}}</span>
+                                    {{if gt .Overview.WarningDisks 0}}/ <span class="text-yellow-600">{{.Overview.WarningDisks}}</span>{{end}}
+                                    {{if gt .Overview.CriticalDisks 0}}/ <span class="text-red-600">{{.Overview.CriticalDisks}}</span>{{end}}
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ZFS Pools -->
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">{{T .Lang "storage.zfs_pools"}}</dt>
+                                <dd class="text-lg font-medium text-gray-900">
+                                    {{if .ZFSAvailable}}
+                                    {{.Overview.TotalPools}}
+                                    {{if gt .Overview.DegradedPools 0}}
+                                    <span class="text-sm text-yellow-600">({{.Overview.DegradedPools}} {{T .Lang "storage.degraded"}})</span>
+                                    {{end}}
+                                    {{else}}
+                                    <span class="text-gray-400">{{T .Lang "storage.not_available"}}</span>
+                                    {{end}}
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Total Capacity -->
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="p-5">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">{{T .Lang "storage.total_capacity"}}</dt>
+                                <dd class="text-lg font-medium text-gray-900">
+                                    {{if .Overview.TotalCapacity}}
+                                    {{.Overview.UsedCapHuman}} / {{.Overview.TotalCapHuman}}
+                                    {{else}}
+                                    -
+                                    {{end}}
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Physical Disks Section -->
+        <div class="bg-white shadow rounded-lg mb-8">
+            <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">
+                    {{T .Lang "storage.physical_disks"}}
+                </h3>
+                <p class="mt-1 text-sm text-gray-500">
+                    {{if .SMARTAvailable}}
+                    {{T .Lang "storage.smart_enabled"}}
+                    {{else}}
+                    {{T .Lang "storage.smart_disabled"}}
+                    {{end}}
+                </p>
+            </div>
+            {{if .Disks}}
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.disk"}}</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.model"}}</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.size"}}</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.type"}}</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.health"}}</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.temp"}}</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.power_on"}}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {{range .Disks}}
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="text-sm font-medium text-gray-900">{{.Name}}</div>
+                                    <div class="text-sm text-gray-500 ml-2">{{.Path}}</div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{if .Model}}{{.Model}}{{else}}-{{end}}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{.SizeHuman}}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                    {{if eq .Type "NVMe"}}bg-purple-100 text-purple-800
+                                    {{else if eq .Type "SSD"}}bg-blue-100 text-blue-800
+                                    {{else}}bg-gray-100 text-gray-800{{end}}">
+                                    {{.Type}}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                    {{if eq .Health "OK"}}bg-green-100 text-green-800
+                                    {{else if eq .Health "WARNING"}}bg-yellow-100 text-yellow-800
+                                    {{else if eq .Health "CRITICAL"}}bg-red-100 text-red-800
+                                    {{else}}bg-gray-100 text-gray-800{{end}}">
+                                    {{.Health}}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{if ge .Temperature 0}}
+                                <span class="{{if gt .Temperature 55}}text-red-600{{else if gt .Temperature 45}}text-yellow-600{{else}}text-gray-500{{end}}">
+                                    {{.Temperature}}°C
+                                </span>
+                                {{else}}-{{end}}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{if ge .PowerOnHours 0}}
+                                {{.PowerOnHours}}h
+                                {{else}}-{{end}}
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+            {{else}}
+            <div class="text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">{{T .Lang "storage.no_disks"}}</h3>
+            </div>
+            {{end}}
+        </div>
+
+        <!-- ZFS Pools Section -->
+        {{if .ZFSAvailable}}
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">
+                    {{T .Lang "storage.zfs_pools"}}
+                </h3>
+            </div>
+            {{if .Pools}}
+            <div class="divide-y divide-gray-200">
+                {{range .Pools}}
+                <div class="p-6">
+                    <!-- Pool Header -->
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center">
+                            <h4 class="text-lg font-medium text-gray-900">{{.Name}}</h4>
+                            <span class="ml-3 px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                {{if eq .State "ONLINE"}}bg-green-100 text-green-800
+                                {{else if eq .State "DEGRADED"}}bg-yellow-100 text-yellow-800
+                                {{else}}bg-red-100 text-red-800{{end}}">
+                                {{.State}}
+                            </span>
+                        </div>
+                        <div class="text-sm text-gray-500">
+                            {{.AllocHuman}} / {{.SizeHuman}} ({{printf "%.1f" .UsedPercent}}%)
+                        </div>
+                    </div>
+
+                    <!-- Capacity Bar -->
+                    <div class="w-full bg-gray-200 rounded-full h-2.5 mb-4">
+                        <div class="h-2.5 rounded-full {{if gt .UsedPercent 90.0}}bg-red-600{{else if gt .UsedPercent 80.0}}bg-yellow-600{{else}}bg-green-600{{end}}" style="width: {{printf "%.1f" .UsedPercent}}%"></div>
+                    </div>
+
+                    <!-- Pool Details -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                        <div>
+                            <span class="text-gray-500">{{T .Lang "storage.free"}}:</span>
+                            <span class="ml-1 text-gray-900">{{.FreeHuman}}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">{{T .Lang "storage.fragmentation"}}:</span>
+                            <span class="ml-1 text-gray-900">{{.Fragmentation}}%</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">{{T .Lang "storage.dedup"}}:</span>
+                            <span class="ml-1 text-gray-900">{{printf "%.2f" .Dedup}}x</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">{{T .Lang "storage.errors"}}:</span>
+                            <span class="ml-1 {{if ne .Errors "No known data errors"}}text-red-600{{else}}text-gray-900{{end}}">{{.Errors}}</span>
+                        </div>
+                    </div>
+
+                    <!-- Scan Status -->
+                    <div class="text-sm text-gray-500 mb-4">
+                        <span class="font-medium">{{T .Lang "storage.scan"}}:</span> {{.ScanStatus}}
+                    </div>
+
+                    <!-- VDevs -->
+                    {{if .VDevs}}
+                    <div class="mt-4">
+                        <h5 class="text-sm font-medium text-gray-700 mb-2">{{T .Lang "storage.vdevs"}}</h5>
+                        <div class="space-y-2">
+                            {{range .VDevs}}
+                            <div class="bg-gray-50 rounded-lg p-3">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex items-center">
+                                        <span class="font-medium text-gray-900">{{.Name}}</span>
+                                        <span class="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                            {{.Type}}
+                                        </span>
+                                        <span class="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                            {{if eq .State "ONLINE"}}bg-green-100 text-green-800
+                                            {{else if eq .State "DEGRADED"}}bg-yellow-100 text-yellow-800
+                                            {{else}}bg-red-100 text-red-800{{end}}">
+                                            {{.State}}
+                                        </span>
+                                    </div>
+                                </div>
+                                <!-- Disks in VDev -->
+                                {{if .Disks}}
+                                <div class="ml-4 space-y-1">
+                                    {{range .Disks}}
+                                    <div class="flex items-center text-sm">
+                                        <span class="text-gray-600">{{.Name}}</span>
+                                        <span class="ml-2 px-1.5 text-xs rounded
+                                            {{if eq .State "ONLINE"}}bg-green-50 text-green-700
+                                            {{else if eq .State "DEGRADED"}}bg-yellow-50 text-yellow-700
+                                            {{else}}bg-red-50 text-red-700{{end}}">
+                                            {{.State}}
+                                        </span>
+                                        {{if or (gt .Read 0) (gt .Write 0) (gt .Cksum 0)}}
+                                        <span class="ml-2 text-xs text-red-600">
+                                            R:{{.Read}} W:{{.Write}} C:{{.Cksum}}
+                                        </span>
+                                        {{end}}
+                                    </div>
+                                    {{end}}
+                                </div>
+                                {{end}}
+                            </div>
+                            {{end}}
+                        </div>
+                    </div>
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+            {{else}}
+            <div class="text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">{{T .Lang "storage.no_pools"}}</h3>
+                <p class="mt-1 text-sm text-gray-500">{{T .Lang "storage.no_pools_info"}}</p>
+            </div>
+            {{end}}
+        </div>
+        {{else}}
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">
+                    {{T .Lang "storage.zfs_pools"}}
+                </h3>
+            </div>
+            <div class="text-center py-12">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">{{T .Lang "storage.zfs_not_installed"}}</h3>
+                <p class="mt-1 text-sm text-gray-500">{{T .Lang "storage.zfs_install_info"}}</p>
+            </div>
+        </div>
+        {{end}}
+    </div>
+</div>
+</body>
+</html>

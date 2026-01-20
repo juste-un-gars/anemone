@@ -293,6 +293,61 @@ install_samba() {
     log_info "Samba installed successfully"
 }
 
+install_storage_tools() {
+    log_info "Installing storage management tools..."
+
+    # Install smartmontools for disk health monitoring
+    if ! command -v smartctl &> /dev/null; then
+        log_info "Installing smartmontools..."
+        if [ "$PKG_MANAGER" = "dnf" ]; then
+            dnf install -y smartmontools
+        elif [ "$PKG_MANAGER" = "apt" ]; then
+            apt install -y smartmontools
+        fi
+        log_info "smartmontools installed"
+    else
+        log_info "smartmontools already installed"
+    fi
+
+    # Install ZFS utilities if available
+    if ! command -v zpool &> /dev/null; then
+        log_info "Checking ZFS availability..."
+        if [ "$PKG_MANAGER" = "dnf" ]; then
+            # Check if ZFS repo is available (ZFS on Linux)
+            if dnf list available zfs 2>/dev/null | grep -q zfs; then
+                log_info "Installing ZFS from repository..."
+                dnf install -y zfs
+            else
+                log_warn "ZFS not available in repositories. To enable ZFS:"
+                log_warn "  Visit: https://openzfs.github.io/openzfs-docs/Getting%20Started/Fedora.html"
+            fi
+        elif [ "$PKG_MANAGER" = "apt" ]; then
+            # On Debian/Ubuntu, zfsutils-linux is usually available
+            if apt-cache show zfsutils-linux &>/dev/null; then
+                log_info "Installing ZFS utilities..."
+                apt install -y zfsutils-linux
+                log_info "ZFS utilities installed"
+            else
+                log_warn "ZFS not available. Install manually if needed."
+            fi
+        fi
+    else
+        log_info "ZFS already installed"
+    fi
+
+    # Install lsblk/util-linux (usually pre-installed)
+    if ! command -v lsblk &> /dev/null; then
+        log_info "Installing util-linux..."
+        if [ "$PKG_MANAGER" = "dnf" ]; then
+            dnf install -y util-linux
+        elif [ "$PKG_MANAGER" = "apt" ]; then
+            apt install -y util-linux
+        fi
+    fi
+
+    log_info "Storage tools installation complete"
+}
+
 build_binary() {
     log_info "Building Anemone binary..."
 
@@ -354,6 +409,13 @@ $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/semanage fcontext *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/restorecon *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/setsebool *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs *
+
+# Storage Management Permissions (SMART, ZFS)
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/smartctl *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/zpool *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/zpool *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/zfs *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/zfs *
 EOF
 
     chmod 440 "$SUDOERS_FILE"
@@ -511,6 +573,7 @@ main() {
     check_storage_setup
     check_prerequisites
     install_samba
+    install_storage_tools
     build_binary
     create_data_directory
     configure_sudoers

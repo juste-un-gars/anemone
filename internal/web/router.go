@@ -244,6 +244,10 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/admin/backup/download", auth.RequireAdmin(server.handleAdminBackupDownload))
 	mux.HandleFunc("/admin/backup/delete", auth.RequireAdmin(server.handleAdminBackupDelete))
 
+	// Admin routes - Storage management
+	mux.HandleFunc("/admin/storage", auth.RequireAdmin(server.handleAdminStorage))
+	mux.HandleFunc("/admin/storage/api", auth.RequireAdmin(server.handleAdminStorageAPI))
+
 	// Admin routes - Restore all users (after server restoration)
 	mux.HandleFunc("/admin/restore-users", auth.RequireAdmin(server.handleAdminRestoreUsers))
 	mux.HandleFunc("/admin/restore-users/restore", auth.RequireAdmin(server.handleAdminRestoreUsersRestore))
