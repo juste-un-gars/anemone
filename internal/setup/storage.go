@@ -293,9 +293,18 @@ func SetupCustomStorage(dataDir, sharesDir, incomingDir, owner string) error {
 func ValidateStorageConfig(config SetupConfig) error {
 	switch config.StorageType {
 	case "default":
-		// Check if /srv/anemone is writable or can be created
-		if err := checkWritable("/srv"); err != nil {
-			return fmt.Errorf("cannot write to /srv: %w", err)
+		// Check if /srv/anemone exists and is writable, or if /srv is writable
+		defaultDir := "/srv/anemone"
+		if _, err := os.Stat(defaultDir); err == nil {
+			// Directory exists, check if writable
+			if err := checkWritable(defaultDir); err != nil {
+				return fmt.Errorf("cannot write to %s: %w", defaultDir, err)
+			}
+		} else {
+			// Directory doesn't exist, check if parent is writable
+			if err := checkWritable("/srv"); err != nil {
+				return fmt.Errorf("cannot write to /srv (need to create %s): %w", defaultDir, err)
+			}
 		}
 	case "zfs_existing":
 		if config.ZFSPoolName == "" {
