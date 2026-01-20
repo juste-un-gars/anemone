@@ -7,6 +7,59 @@
 
 ## Current Session
 
+**Session 67** - Tests VM & Bug Fixes Setup Wizard
+- **Status:** In Progress (tests à continuer)
+- **Date:** 2026-01-20
+
+### Completed (Session 67)
+
+#### Bug Fixes - Setup Wizard
+- [x] Fix template panic `ServerName not defined` - ParseFiles au lieu de ParseGlob
+- [x] Fix validation stockage `/srv` → vérifie `/srv/anemone` si existe
+- [x] Fix boucle de redirection après finalize - garde state file, redirect vers wizard
+- [x] Fix script inline step-6 exécuté sur toutes les pages
+- [x] Fix nom template dans ParseFiles (`setup_wizard.html`)
+- [x] Fix bouton "Accéder au tableau de bord" → montre step 6 au lieu de /login
+- [x] Fix step 0 visible quand Finalized=true → caché maintenant
+- [x] Fix step 6 non affiché quand Finalized=true → visible automatiquement
+- [x] Fix `/setup` route accessible après setup → ajout `setup_completed` à system_config
+- [x] Ajout auto-check restart quand page charge en état finalisé
+- [x] Ajout `setup_completed` dans restore pour anciens backups
+
+#### Traductions ajoutées
+- [x] `setup_wizard.complete.title` - FR/EN
+- [x] `setup_wizard.complete.description` - FR/EN
+- [x] `setup_wizard.complete.restart_hint` - FR/EN
+- [x] `setup_wizard.complete.checking` - FR/EN
+
+### Files Modified (Session 67)
+- `internal/web/handlers_setup_wizard.go` - ParseFiles, template name, no cleanup
+- `internal/setup/storage.go` - Validation /srv/anemone
+- `internal/setup/finalize.go` - Ajout setup_completed
+- `internal/setup/restore.go` - Ajout setup_completed après restore
+- `web/templates/setup_wizard.html` - Step 6, bouton restart, conditions Finalized
+- `internal/i18n/locales/fr.json` - Traductions step 6
+- `internal/i18n/locales/en.json` - Traductions step 6
+
+### Tests restants
+- [ ] Test complet sur VM Fedora
+- [ ] Test complet sur VM Debian/Ubuntu
+- [ ] Vérifier flux restauration
+
+### Commits (Session 67)
+- `a005939` - fix: Load only setup_wizard.html template in setup mode
+- `d2539c3` - fix: Check /srv/anemone directly if it exists
+- `3018a5c` - fix: Prevent redirect loop when setup is finalized
+- `b6ccba4` - fix: Only render restart-check script when on step 6
+- `13c0eac` - fix: Name template explicitly in ParseFiles
+- `75717ff` - fix: Keep setup state after finalize to show restart message
+- `1cf0288` - fix: Replace login link with button that shows restart step
+- `c1be6a2` - fix: Multiple setup wizard improvements
+
+---
+
+## Previous Session
+
 **Session 66** - Tests d'intégration Setup Wizard
 - **Status:** Completed
 - **Date:** 2026-01-20
@@ -457,6 +510,7 @@ Ensuite, question optionnelle pour le stockage séparé des backups entrants (si
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 67 | Tests VM & Bug Fixes Setup Wizard | 2026-01-20 | In Progress |
 | 66 | Tests d'intégration Setup Wizard | 2026-01-20 | Completed |
 | 65 | Mode Restauration Serveur | 2026-01-20 | Completed |
 | 64 | Nouveau install.sh simplifié | 2026-01-20 | Completed |
@@ -517,12 +571,17 @@ All detailed session files are in `.claude/sessions/`:
 
 ## Next Steps
 
-**Prochaine session : Session 67** - Tests VM
+**Session en cours : Session 67** - Tests VM & Bug Fixes Setup Wizard
 
-Objectif : Tester l'installation complète sur des VM propres (Fedora et Debian).
+Objectif : Continuer les tests d'installation sur VM (Linux Mint/Ubuntu).
+
+**Tests restants :**
+- Vérifier le flux complet après les derniers bug fixes
+- Tester sur VM Fedora
+- Tester le flux de restauration
 
 **Sessions planifiées :**
-- Session 67 : Tests VM (Fedora + Debian)
+- Session 67 : Terminer tests VM
 - Session 68 : Mode Import Pool ZFS (récupération après réinstallation)
 - Session 69 : Documentation mise à jour
 
