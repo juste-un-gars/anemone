@@ -242,8 +242,7 @@ func (s *Server) handleAdminIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Scan incoming backups directory
-	backupsDir := filepath.Join(s.cfg.DataDir, "backups", "incoming")
-	backups, err := incoming.ScanIncomingBackups(s.db, backupsDir)
+	backups, err := incoming.ScanIncomingBackups(s.db, s.cfg.IncomingDir)
 	if err != nil {
 		log.Printf("Error scanning incoming backups: %v", err)
 		http.Error(w, "Failed to scan incoming backups", http.StatusInternalServerError)
@@ -329,7 +328,7 @@ func (s *Server) handleAdminIncomingDelete(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Delete the backup
-	if err := incoming.DeleteIncomingBackup(backupPath); err != nil {
+	if err := incoming.DeleteIncomingBackup(backupPath, s.cfg.IncomingDir); err != nil {
 		log.Printf("Error deleting backup %s: %v", backupPath, err)
 		http.Redirect(w, r, "/admin/incoming?error=Failed+to+delete+backup", http.StatusSeeOther)
 		return

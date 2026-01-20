@@ -93,3 +93,46 @@ func getBoolEnv(key string, defaultValue bool) bool {
 	}
 	return value == "true" || value == "1" || value == "yes"
 }
+
+// ValidateDirs ensures that required directories exist and are writable.
+// Creates directories if they don't exist.
+// Returns warnings for any issues found (doesn't fail - setup wizard may handle later).
+func (c *Config) ValidateDirs() []string {
+	var warnings []string
+
+	dirs := map[string]string{
+		"DataDir":     c.DataDir,
+		"SharesDir":   c.SharesDir,
+		"IncomingDir": c.IncomingDir,
+	}
+
+	for name, path := range dirs {
+		// Check if directory exists
+		info, err := os.Stat(path)
+		if os.IsNotExist(err) {
+			// Try to create it
+			if err := os.MkdirAll(path, 0755); err != nil {
+				warnings = append(warnings, name+": cannot create directory: "+err.Error())
+				continue
+			}
+		} else if err != nil {
+			warnings = append(warnings, name+": cannot access directory: "+err.Error())
+			continue
+		} else if !info.IsDir() {
+			warnings = append(warnings, name+": path exists but is not a directory")
+			continue
+		}
+
+		// Check write permissions by creating a temp file
+		testFile := filepath.Join(path, ".anemone-write-test")
+		f, err := os.Create(testFile)
+		if err != nil {
+			warnings = append(warnings, name+": directory not writable: "+err.Error())
+		} else {
+			f.Close()
+			os.Remove(testFile)
+		}
+	}
+
+	return warnings
+}

@@ -519,8 +519,7 @@ func (s *Server) getDashboardStats(session *auth.Session, lang string) *Dashboar
 		}
 
 		// Calculate storage used by peers (incoming backups)
-		incomingDir := filepath.Join(s.cfg.DataDir, "backups", "incoming")
-		incomingBackups, err := incoming.ScanIncomingBackups(s.db, incomingDir)
+		incomingBackups, err := incoming.ScanIncomingBackups(s.db, s.cfg.IncomingDir)
 		if err == nil {
 			var totalPeerBytes int64
 			for _, backup := range incomingBackups {

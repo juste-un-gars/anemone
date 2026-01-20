@@ -152,11 +152,24 @@ func scanBackupDir(path string) (int, int64, time.Time, bool, error) {
 	return fileCount, totalSize, lastModified, hasManifest, nil
 }
 
-// DeleteIncomingBackup deletes a backup directory from disk
-func DeleteIncomingBackup(backupPath string) error {
-	// Security check: ensure path is within backups/incoming/
-	if !strings.Contains(backupPath, "backups/incoming/") {
-		return fmt.Errorf("invalid backup path: must be in backups/incoming/")
+// DeleteIncomingBackup deletes a backup directory from disk.
+// incomingDir is the base incoming directory (e.g., /srv/anemone/backups/incoming)
+// backupPath must be within incomingDir for security.
+func DeleteIncomingBackup(backupPath, incomingDir string) error {
+	// Security check: ensure path is within incomingDir
+	absBackupPath, err := filepath.Abs(backupPath)
+	if err != nil {
+		return fmt.Errorf("invalid backup path: %w", err)
+	}
+	absIncomingDir, err := filepath.Abs(incomingDir)
+	if err != nil {
+		return fmt.Errorf("invalid incoming directory: %w", err)
+	}
+
+	// Use filepath.Rel to properly check if path is within directory
+	relPath, err := filepath.Rel(absIncomingDir, absBackupPath)
+	if err != nil || strings.HasPrefix(relPath, "..") || filepath.IsAbs(relPath) {
+		return fmt.Errorf("invalid backup path: must be within incoming directory")
 	}
 
 	// Delete the entire directory

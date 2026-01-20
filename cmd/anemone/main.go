@@ -32,6 +32,13 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
+	// Validate directories exist and are writable
+	if warnings := cfg.ValidateDirs(); len(warnings) > 0 {
+		for _, w := range warnings {
+			log.Printf("⚠️  %s", w)
+		}
+	}
+
 	// Initialize database
 	db, err := database.Init(cfg.DatabasePath)
 	if err != nil {

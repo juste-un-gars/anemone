@@ -367,7 +367,7 @@ func removeShareDirectory(path string) error {
 
 // DeleteUser deletes a user and their associated data
 // This includes: database entries, SMB shares, system user, and all files on disk
-func DeleteUser(db *sql.DB, userID int, dataDir string) error {
+func DeleteUser(db *sql.DB, userID int, dataDir, sharesDir string) error {
 	// Get user info before deleting
 	user, err := GetByID(db, userID)
 	if err != nil {
@@ -417,7 +417,6 @@ func DeleteUser(db *sql.DB, userID int, dataDir string) error {
 	}
 
 	// Delete files from disk for each share (handles Btrfs subvolumes properly)
-	sharesDir := filepath.Join(dataDir, "shares")
 	for _, share := range shares {
 		if err := removeShareDirectory(share.Path); err != nil {
 			fmt.Printf("Warning: failed to delete share directory %s: %v\n", share.Path, err)
