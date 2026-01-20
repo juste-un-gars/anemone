@@ -250,6 +250,35 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/api/admin/storage/pool/", auth.RequireAdmin(server.handleAdminStoragePoolScrub))
 	mux.HandleFunc("/api/admin/storage/disk/", auth.RequireAdmin(server.handleAdminStorageDiskSMART))
 
+	// Admin routes - Password verification for destructive operations
+	mux.HandleFunc("/api/admin/verify-password", auth.RequireAdmin(server.handleAdminVerifyPassword))
+
+	// Admin routes - ZFS Pool management
+	mux.HandleFunc("/api/admin/storage/pool", auth.RequireAdmin(server.handleAdminStoragePoolCreate))
+	mux.HandleFunc("/api/admin/storage/pool-destroy/", auth.RequireAdmin(server.handleAdminStoragePoolDestroy))
+	mux.HandleFunc("/api/admin/storage/pool-export/", auth.RequireAdmin(server.handleAdminStoragePoolExport))
+	mux.HandleFunc("/api/admin/storage/pool-vdev/", auth.RequireAdmin(server.handleAdminStoragePoolAddVDev))
+	mux.HandleFunc("/api/admin/storage/pool-replace/", auth.RequireAdmin(server.handleAdminStoragePoolReplace))
+	mux.HandleFunc("/api/admin/storage/pools/importable", auth.RequireAdmin(server.handleAdminStoragePoolsImportable))
+	mux.HandleFunc("/api/admin/storage/pools/import", auth.RequireAdmin(server.handleAdminStoragePoolImport))
+
+	// Admin routes - ZFS Dataset management
+	mux.HandleFunc("/api/admin/storage/dataset", auth.RequireAdmin(server.handleAdminStorageDatasetCreate))
+	mux.HandleFunc("/api/admin/storage/dataset-delete", auth.RequireAdmin(server.handleAdminStorageDatasetDelete))
+	mux.HandleFunc("/api/admin/storage/dataset-update", auth.RequireAdmin(server.handleAdminStorageDatasetUpdate))
+	mux.HandleFunc("/api/admin/storage/datasets", auth.RequireAdmin(server.handleAdminStorageDatasetList))
+
+	// Admin routes - ZFS Snapshot management
+	mux.HandleFunc("/api/admin/storage/snapshot", auth.RequireAdmin(server.handleAdminStorageSnapshotCreate))
+	mux.HandleFunc("/api/admin/storage/snapshot-delete", auth.RequireAdmin(server.handleAdminStorageSnapshotDelete))
+	mux.HandleFunc("/api/admin/storage/snapshot-rollback", auth.RequireAdmin(server.handleAdminStorageSnapshotRollback))
+	mux.HandleFunc("/api/admin/storage/snapshots", auth.RequireAdmin(server.handleAdminStorageSnapshotList))
+
+	// Admin routes - Disk management
+	mux.HandleFunc("/api/admin/storage/disks/available", auth.RequireAdmin(server.handleAdminStorageDisksAvailable))
+	mux.HandleFunc("/api/admin/storage/disk/format", auth.RequireAdmin(server.handleAdminStorageDiskFormat))
+	mux.HandleFunc("/api/admin/storage/disk/wipe", auth.RequireAdmin(server.handleAdminStorageDiskWipe))
+
 	// Admin routes - Restore all users (after server restoration)
 	mux.HandleFunc("/admin/restore-users", auth.RequireAdmin(server.handleAdminRestoreUsers))
 	mux.HandleFunc("/admin/restore-users/restore", auth.RequireAdmin(server.handleAdminRestoreUsersRestore))

@@ -1,0 +1,477 @@
+// Package storage provides disk formatting and wiping operations.
+package storage
+
+import (
+	"bufio"
+	"fmt"
+	"os/exec"
+	"regexp"
+	"strings"
+)
+
+// FormatOptions contains options for formatting a disk
+type FormatOptions struct {
+	Device     string `json:"device"`     // Device path (e.g., /dev/sdb)
+	Filesystem string `json:"filesystem"` // ext4, xfs
+	Label      string `json:"label"`      // Volume label (optional)
+	Force      bool   `json:"force"`      // Force format even if device has data
+}
+
+// WipeOptions contains options for wiping a disk
+type WipeOptions struct {
+	Device string `json:"device"` // Device path
+	Quick  bool   `json:"quick"`  // Quick wipe (just first MB) vs full wipe
+}
+
+// AvailableDisk represents a disk that can be used for operations
+type AvailableDisk struct {
+	Name      string `json:"name"`       // e.g., sdb
+	Path      string `json:"path"`       // e.g., /dev/sdb
+	Model     string `json:"model"`      // Disk model
+	Size      uint64 `json:"size"`       // Size in bytes
+	SizeHuman string `json:"size_human"` // Human-readable size
+	InUse     bool   `json:"in_use"`     // Whether disk is in use
+	InUseBy   string `json:"in_use_by"`  // What is using it (zfs, mount, etc.)
+}
+
+// ValidateDevicePath validates a block device path
+func ValidateDevicePath(path string) error {
+	if path == "" {
+		return fmt.Errorf("device path cannot be empty")
+	}
+	if !strings.HasPrefix(path, "/dev/") {
+		return fmt.Errorf("device path must start with /dev/")
+	}
+	// Prevent command injection - only allow specific patterns
+	validPath := regexp.MustCompile(`^/dev/(sd[a-z]+|nvme\d+n\d+|vd[a-z]+|loop\d+)$`)
+	if !validPath.MatchString(path) {
+		return fmt.Errorf("invalid device path format: must be a whole disk (e.g., /dev/sdb, /dev/nvme0n1)")
+	}
+	return nil
+}
+
+// IsDiskInUse checks if a disk is currently in use
+func IsDiskInUse(device string) (bool, string, error) {
+	if err := ValidateDevicePath(device); err != nil {
+		return false, "", err
+	}
+
+	// Extract device name from path
+	name := strings.TrimPrefix(device, "/dev/")
+
+	// Check if device is part of a ZFS pool
+	if IsZFSAvailable() {
+		cmd := exec.Command("sudo", "zpool", "status")
+		output, err := cmd.Output()
+		if err == nil && strings.Contains(string(output), name) {
+			return true, "ZFS pool", nil
+		}
+	}
+
+	// Check if device or partitions are mounted
+	cmd := exec.Command("mount")
+	output, err := cmd.Output()
+	if err == nil {
+		scanner := bufio.NewScanner(strings.NewReader(string(output)))
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.Contains(line, device) || strings.Contains(line, name) {
+				fields := strings.Fields(line)
+				if len(fields) >= 3 {
+					return true, fmt.Sprintf("mounted at %s", fields[2]), nil
+				}
+				return true, "mounted", nil
+			}
+		}
+	}
+
+	// Check if device has partitions that are in use
+	cmd = exec.Command("lsblk", "-n", "-o", "NAME,MOUNTPOINT", device)
+	output, err = cmd.Output()
+	if err == nil {
+		scanner := bufio.NewScanner(strings.NewReader(string(output)))
+		for scanner.Scan() {
+			fields := strings.Fields(scanner.Text())
+			if len(fields) >= 2 && fields[1] != "" {
+				return true, fmt.Sprintf("partition mounted at %s", fields[1]), nil
+			}
+		}
+	}
+
+	// Check if device is part of MD RAID
+	cmd = exec.Command("cat", "/proc/mdstat")
+	output, err = cmd.Output()
+	if err == nil && strings.Contains(string(output), name) {
+		return true, "MD RAID array", nil
+	}
+
+	return false, "", nil
+}
+
+// GetAvailableDisks returns disks that can be used for operations
+func GetAvailableDisks() ([]AvailableDisk, error) {
+	// Get all block devices
+	cmd := exec.Command("lsblk", "-d", "-n", "-b", "-o", "NAME,SIZE,MODEL,TYPE")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list disks: %w", err)
+	}
+
+	var disks []AvailableDisk
+
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 4 {
+			continue
+		}
+
+		name := fields[0]
+		deviceType := fields[len(fields)-1]
+
+		// Only include whole disks
+		if deviceType != "disk" {
+			continue
+		}
+
+		// Skip loop devices unless they look like test disks
+		if strings.HasPrefix(name, "loop") {
+			// Check if it's a significant size (> 10MB) - likely a test disk
+			if len(fields) >= 2 {
+				if size, err := parseNumeric(fields[1]); err == nil && size < 10*1024*1024 {
+					continue
+				}
+			}
+		}
+
+		disk := AvailableDisk{
+			Name: name,
+			Path: "/dev/" + name,
+		}
+
+		// Parse size
+		if len(fields) >= 2 {
+			if size, err := parseNumeric(fields[1]); err == nil {
+				disk.Size = uint64(size)
+				disk.SizeHuman = FormatBytes(uint64(size))
+			}
+		}
+
+		// Parse model (everything between size and type)
+		if len(fields) > 4 {
+			disk.Model = strings.Join(fields[2:len(fields)-1], " ")
+		} else if len(fields) >= 3 && fields[2] != deviceType {
+			disk.Model = fields[2]
+		}
+
+		// Check if in use
+		inUse, usedBy, _ := IsDiskInUse(disk.Path)
+		disk.InUse = inUse
+		disk.InUseBy = usedBy
+
+		disks = append(disks, disk)
+	}
+
+	return disks, nil
+}
+
+// parseNumeric parses a numeric string
+func parseNumeric(s string) (int64, error) {
+	s = strings.TrimSpace(s)
+	var val int64
+	_, err := fmt.Sscanf(s, "%d", &val)
+	return val, err
+}
+
+// FormatDisk formats a disk with the specified filesystem
+func FormatDisk(opts FormatOptions) error {
+	if err := ValidateDevicePath(opts.Device); err != nil {
+		return err
+	}
+
+	// Validate filesystem
+	switch opts.Filesystem {
+	case "ext4", "xfs":
+		// OK
+	default:
+		return fmt.Errorf("unsupported filesystem: %s (use ext4 or xfs)", opts.Filesystem)
+	}
+
+	// Check if disk is in use
+	if !opts.Force {
+		inUse, usedBy, err := IsDiskInUse(opts.Device)
+		if err != nil {
+			return fmt.Errorf("failed to check if disk is in use: %w", err)
+		}
+		if inUse {
+			return fmt.Errorf("disk is in use by %s - use force option to override", usedBy)
+		}
+	}
+
+	// Wipe partition table first
+	cmd := exec.Command("sudo", "wipefs", "-a", opts.Device)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to wipe partition table: %s - %w", strings.TrimSpace(string(output)), err)
+	}
+
+	// Build format command
+	var args []string
+	switch opts.Filesystem {
+	case "ext4":
+		args = []string{"mkfs.ext4"}
+		if opts.Force {
+			args = append(args, "-F")
+		}
+		if opts.Label != "" && len(opts.Label) <= 16 {
+			args = append(args, "-L", opts.Label)
+		}
+		args = append(args, opts.Device)
+	case "xfs":
+		args = []string{"mkfs.xfs"}
+		if opts.Force {
+			args = append(args, "-f")
+		}
+		if opts.Label != "" && len(opts.Label) <= 12 {
+			args = append(args, "-L", opts.Label)
+		}
+		args = append(args, opts.Device)
+	}
+
+	cmd = exec.Command("sudo", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to format disk: %s - %w", strings.TrimSpace(string(output)), err)
+	}
+
+	return nil
+}
+
+// WipeDisk wipes a disk
+func WipeDisk(opts WipeOptions) error {
+	if err := ValidateDevicePath(opts.Device); err != nil {
+		return err
+	}
+
+	// Check if disk is in use
+	inUse, usedBy, err := IsDiskInUse(opts.Device)
+	if err != nil {
+		return fmt.Errorf("failed to check if disk is in use: %w", err)
+	}
+	if inUse {
+		return fmt.Errorf("disk is in use by %s - cannot wipe", usedBy)
+	}
+
+	if opts.Quick {
+		// Quick wipe - just the first MB (destroys partition table and filesystem headers)
+		cmd := exec.Command("sudo", "dd", "if=/dev/zero", "of="+opts.Device, "bs=1M", "count=1", "conv=fsync")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to wipe disk: %s - %w", strings.TrimSpace(string(output)), err)
+		}
+
+		// Also wipe the last MB (GPT backup)
+		// Get disk size first
+		sizeCmd := exec.Command("blockdev", "--getsize64", opts.Device)
+		sizeOutput, err := sizeCmd.Output()
+		if err == nil {
+			if size, err := parseNumeric(string(sizeOutput)); err == nil && size > 1024*1024 {
+				skipMB := (size / (1024 * 1024)) - 1
+				cmd = exec.Command("sudo", "dd", "if=/dev/zero", "of="+opts.Device,
+					"bs=1M", "count=1", fmt.Sprintf("seek=%d", skipMB), "conv=fsync")
+				cmd.CombinedOutput() // Best effort
+			}
+		}
+	} else {
+		// Full wipe using wipefs
+		cmd := exec.Command("sudo", "wipefs", "-a", opts.Device)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to wipe disk: %s - %w", strings.TrimSpace(string(output)), err)
+		}
+
+		// Zero out partition table area
+		cmd = exec.Command("sudo", "dd", "if=/dev/zero", "of="+opts.Device, "bs=1M", "count=1", "conv=fsync")
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to zero disk start: %s - %w", strings.TrimSpace(string(output)), err)
+		}
+	}
+
+	return nil
+}
+
+// CreatePartition creates a partition table and single partition on a disk
+type CreatePartitionOptions struct {
+	Device     string `json:"device"`      // Device path
+	TableType  string `json:"table_type"`  // gpt or msdos
+	Filesystem string `json:"filesystem"`  // ext4, xfs (optional - format partition)
+	Label      string `json:"label"`       // Partition label (optional)
+}
+
+// CreatePartition creates a partition on a disk
+func CreatePartition(opts CreatePartitionOptions) error {
+	if err := ValidateDevicePath(opts.Device); err != nil {
+		return err
+	}
+
+	// Validate table type
+	if opts.TableType != "gpt" && opts.TableType != "msdos" {
+		opts.TableType = "gpt" // Default to GPT
+	}
+
+	// Check if disk is in use
+	inUse, usedBy, err := IsDiskInUse(opts.Device)
+	if err != nil {
+		return fmt.Errorf("failed to check if disk is in use: %w", err)
+	}
+	if inUse {
+		return fmt.Errorf("disk is in use by %s", usedBy)
+	}
+
+	// Create partition table
+	cmd := exec.Command("sudo", "parted", "-s", opts.Device, "mklabel", opts.TableType)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to create partition table: %s - %w", strings.TrimSpace(string(output)), err)
+	}
+
+	// Create single partition using all space
+	cmd = exec.Command("sudo", "parted", "-s", "-a", "optimal", opts.Device, "mkpart", "primary", "0%", "100%")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to create partition: %s - %w", strings.TrimSpace(string(output)), err)
+	}
+
+	// Determine partition path
+	partPath := opts.Device + "1"
+	if strings.Contains(opts.Device, "nvme") || strings.Contains(opts.Device, "loop") {
+		partPath = opts.Device + "p1"
+	}
+
+	// Wait for partition to appear
+	cmd = exec.Command("sudo", "partprobe", opts.Device)
+	cmd.Run()
+
+	// Format partition if filesystem specified
+	if opts.Filesystem != "" {
+		formatOpts := FormatOptions{
+			Device:     partPath,
+			Filesystem: opts.Filesystem,
+			Label:      opts.Label,
+			Force:      true,
+		}
+		// Use mkfs directly for partition
+		switch formatOpts.Filesystem {
+		case "ext4":
+			args := []string{"mkfs.ext4", "-F"}
+			if formatOpts.Label != "" {
+				args = append(args, "-L", formatOpts.Label)
+			}
+			args = append(args, partPath)
+			cmd = exec.Command("sudo", args...)
+		case "xfs":
+			args := []string{"mkfs.xfs", "-f"}
+			if formatOpts.Label != "" {
+				args = append(args, "-L", formatOpts.Label)
+			}
+			args = append(args, partPath)
+			cmd = exec.Command("sudo", args...)
+		default:
+			return fmt.Errorf("unsupported filesystem: %s", formatOpts.Filesystem)
+		}
+
+		if output, err := cmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to format partition: %s - %w", strings.TrimSpace(string(output)), err)
+		}
+	}
+
+	return nil
+}
+
+// GetDiskInfo returns detailed information about a disk
+func GetDiskInfo(device string) (*Disk, error) {
+	if err := ValidateDevicePath(device); err != nil {
+		return nil, err
+	}
+
+	name := strings.TrimPrefix(device, "/dev/")
+
+	// Get disk info from lsblk
+	cmd := exec.Command("lsblk", "-d", "-b", "-o", "NAME,SIZE,MODEL,ROTA,TYPE", device)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get disk info: %w", err)
+	}
+
+	disk := &Disk{
+		Name:        name,
+		Path:        device,
+		Temperature: -1,
+		PowerOnHours: -1,
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	// Skip header
+	scanner.Scan()
+	if scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) >= 2 {
+			if size, err := parseNumeric(fields[1]); err == nil {
+				disk.Size = uint64(size)
+				disk.SizeHuman = FormatBytes(uint64(size))
+			}
+		}
+		if len(fields) >= 3 {
+			disk.Model = fields[2]
+		}
+		if len(fields) >= 4 {
+			disk.Rotational = fields[3] == "1"
+			if disk.Rotational {
+				disk.Type = DiskTypeHDD
+			} else if strings.HasPrefix(name, "nvme") {
+				disk.Type = DiskTypeNVMe
+			} else {
+				disk.Type = DiskTypeSSD
+			}
+		}
+	}
+
+	// Get partitions
+	cmd = exec.Command("lsblk", "-b", "-o", "NAME,SIZE,FSTYPE,MOUNTPOINT,LABEL", device)
+	output, err = cmd.Output()
+	if err == nil {
+		scanner := bufio.NewScanner(strings.NewReader(string(output)))
+		scanner.Scan() // Skip header
+		scanner.Scan() // Skip disk line
+		for scanner.Scan() {
+			fields := strings.Fields(scanner.Text())
+			if len(fields) >= 1 {
+				partName := strings.TrimPrefix(fields[0], "├─")
+				partName = strings.TrimPrefix(partName, "└─")
+				partName = strings.TrimPrefix(partName, "|-")
+				partName = strings.TrimPrefix(partName, "`-")
+				partName = strings.TrimSpace(partName)
+
+				part := Partition{
+					Name: partName,
+					Path: "/dev/" + partName,
+				}
+				if len(fields) >= 2 {
+					if size, err := parseNumeric(fields[1]); err == nil {
+						part.Size = uint64(size)
+						part.SizeHuman = FormatBytes(uint64(size))
+					}
+				}
+				if len(fields) >= 3 {
+					part.Filesystem = fields[2]
+				}
+				if len(fields) >= 4 {
+					part.Mountpoint = fields[3]
+				}
+				if len(fields) >= 5 {
+					part.Label = fields[4]
+				}
+				disk.Partitions = append(disk.Partitions, part)
+			}
+		}
+	}
+
+	return disk, nil
+}

@@ -416,6 +416,30 @@ $CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/zpool *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/zpool *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/zfs *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/zfs *
+
+# Disk Formatting and Partition Management
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/mkfs.ext4 *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/mkfs.ext4 *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/mkfs.xfs *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/mkfs.xfs *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/wipefs *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/wipefs *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/parted *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/parted *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/partprobe *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/partprobe *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/blockdev *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/blockdev *
+
+# Disk Wiping (dd with zero input only, for specific device paths)
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/sd* bs=1M count=1 *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/nvme* bs=1M count=1 *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/vd* bs=1M count=1 *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/loop* bs=1M count=1 *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/sd* bs=1M count=1 *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/nvme* bs=1M count=1 *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/vd* bs=1M count=1 *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/loop* bs=1M count=1 *
 EOF
 
     chmod 440 "$SUDOERS_FILE"
