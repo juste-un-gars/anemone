@@ -709,7 +709,7 @@ function showImportPoolModal() {
 
 // Dataset operations
 async function loadDatasets() {
-    const pools = {{if .Pools}}{{range .Pools}}'{{.Name}}',{{end}}{{end}}'';
+    const pools = '{{range .Pools}}{{.Name}},{{end}}';
     const poolList = pools.split(',').filter(p => p);
     if (poolList.length === 0) {
         document.getElementById('datasets-list').innerHTML = '<p class="text-gray-500 text-center">{{T .Lang "storage.no_pools"}}</p>';
@@ -786,7 +786,7 @@ async function loadSnapshots() {
         }
         document.getElementById('snapshots-list').innerHTML = html;
         // Populate snapshot dataset dropdown
-        const pools = {{if .Pools}}{{range .Pools}}'{{.Name}}',{{end}}{{end}}'';
+        const pools = '{{range .Pools}}{{.Name}},{{end}}';
         const select = document.getElementById('snapshotDataset');
         select.innerHTML = '';
         for (const pool of pools.split(',').filter(p => p)) {
