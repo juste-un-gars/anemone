@@ -23,7 +23,8 @@ type QuotaManager interface {
 	// For Btrfs: creates a subvolume
 	// For ext4/xfs: creates a regular dir with project quota
 	// For ZFS: creates a dataset
-	CreateQuotaDir(path string, limitGB int) error
+	// owner is optional (e.g., "username:username") - if set, ownership is applied atomically
+	CreateQuotaDir(path string, limitGB int, owner string) error
 
 	// UpdateQuota updates the quota limit for an existing directory
 	UpdateQuota(path string, limitGB int) error
@@ -84,7 +85,8 @@ func detectFilesystem(path string) (string, error) {
 type BtrfsQuotaManager struct{}
 
 // CreateQuotaDir creates a Btrfs subvolume with quota enabled
-func (m *BtrfsQuotaManager) CreateQuotaDir(path string, limitGB int) error {
+// owner is optional (e.g., "username:username") - if set, ownership is applied atomically
+func (m *BtrfsQuotaManager) CreateQuotaDir(path string, limitGB int, owner string) error {
 	// Ensure parent directory exists
 	parent := filepath.Dir(path)
 	if err := os.MkdirAll(parent, 0755); err != nil {
@@ -110,6 +112,14 @@ func (m *BtrfsQuotaManager) CreateQuotaDir(path string, limitGB int) error {
 	cmd := exec.Command("sudo", "btrfs", "subvolume", "create", path)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to create subvolume: %w\nOutput: %s", err, output)
+	}
+
+	// Set ownership atomically if owner is specified
+	if owner != "" {
+		chownCmd := exec.Command("sudo", "chown", owner, path)
+		if output, err := chownCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to set subvolume ownership: %w\nOutput: %s", err, output)
+		}
 	}
 
 	// Enable quota on the filesystem (if not already enabled)
@@ -268,10 +278,19 @@ func (m *BtrfsQuotaManager) enableQuotaOnFS(path string) error {
 type FallbackQuotaManager struct{}
 
 // CreateQuotaDir creates a regular directory (no quota enforcement)
-func (m *FallbackQuotaManager) CreateQuotaDir(path string, limitGB int) error {
+// owner is optional (e.g., "username:username") - if set, ownership is applied
+func (m *FallbackQuotaManager) CreateQuotaDir(path string, limitGB int, owner string) error {
 	// Just create a regular directory
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Set ownership if specified
+	if owner != "" {
+		chownCmd := exec.Command("sudo", "chown", owner, path)
+		if output, err := chownCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("failed to set directory ownership: %w\nOutput: %s", err, output)
+		}
 	}
 
 	fmt.Printf("ℹ️  Created directory %s (quota limit: %dGB, not enforced by kernel)\n", path, limitGB)

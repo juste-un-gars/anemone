@@ -398,17 +398,33 @@ $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload $SMB_SERVICE.service
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/useradd -M -s /usr/sbin/nologin *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/userdel *
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/smbpasswd
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/chown -R *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/chmod *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/cp * /etc/samba/smb.conf
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/mv *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/rm *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/rmdir *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/mkdir *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/semanage fcontext *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/restorecon *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/setsebool *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs *
+
+# File operations restricted to Anemone data directory
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/chown * $DATA_DIR/*
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/chown -R * $DATA_DIR/*
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/chmod * $DATA_DIR/*
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/chmod -R * $DATA_DIR/*
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p $DATA_DIR/*
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/rm -rf $DATA_DIR/shares/*
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/rm -rf $DATA_DIR/backups/*
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/rmdir $DATA_DIR/*
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/mv $DATA_DIR/* $DATA_DIR/*
+
+# SMB configuration
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/cp $DATA_DIR/smb/smb.conf /etc/samba/smb.conf
+
+# SELinux (RHEL/Fedora)
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/semanage fcontext -a -t samba_share_t $DATA_DIR/*
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/restorecon -Rv $DATA_DIR/*
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/setsebool -P samba_enable_home_dirs on
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/setsebool -P samba_export_all_rw on
+
+# Btrfs quota management
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs subvolume create $DATA_DIR/*
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs subvolume delete $DATA_DIR/*
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs subvolume show $DATA_DIR/*
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs qgroup *
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs quota enable *
 
 # Storage Management Permissions (SMART, ZFS)
 $CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/smartctl *

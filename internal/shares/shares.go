@@ -42,6 +42,7 @@ func Create(db *sql.DB, share *Share, username string) error {
 	// Pre-create .trash directory with correct permissions (755)
 	// This prevents Samba VFS recycle from creating it with restrictive permissions (700)
 	// The VFS module ignores force_directory_mode for internally-created directories
+	// Note: ownership is set later with the final chown -R on share.Path
 	if username != "" {
 		trashDir := filepath.Join(share.Path, ".trash", username)
 		// Use sudo mkdir because share.Path may already be owned by username
@@ -55,12 +56,6 @@ func Create(db *sql.DB, share *Share, username string) error {
 		chmodCmd := exec.Command("sudo", "/usr/bin/chmod", "-R", "755", trashRoot)
 		if err := chmodCmd.Run(); err != nil {
 			return fmt.Errorf("failed to set trash directory permissions: %w", err)
-		}
-
-		// Set ownership of .trash to the share user
-		chownCmd := exec.Command("sudo", "/usr/bin/chown", "-R", fmt.Sprintf("%s:%s", username, username), trashRoot)
-		if err := chownCmd.Run(); err != nil {
-			return fmt.Errorf("failed to set trash directory ownership: %w", err)
 		}
 	}
 

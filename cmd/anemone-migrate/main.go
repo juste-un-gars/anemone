@@ -159,8 +159,8 @@ func main() {
 				continue
 			}
 
-			// Step 2: Create subvolume with quota
-			if err := qm.CreateQuotaDir(share.Path, quotaGB); err != nil {
+			// Step 2: Create subvolume with quota (no owner - will be set by cp -a)
+			if err := qm.CreateQuotaDir(share.Path, quotaGB, ""); err != nil {
 				log.Printf("  ❌ ERROR: Failed to create subvolume: %v", err)
 				// Rollback
 				os.Rename(backupPath, share.Path)

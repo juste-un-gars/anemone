@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -276,18 +275,14 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Create default shares: backup and data with quota enforcement
+		// Owner is set atomically during creation to avoid separate chown
+		owner := fmt.Sprintf("%s:%s", token.Username, token.Username)
 		backupPath := filepath.Join(s.cfg.SharesDir, token.Username, "backup")
 		if qm != nil {
-			if err := qm.CreateQuotaDir(backupPath, user.QuotaBackupGB); err != nil {
+			if err := qm.CreateQuotaDir(backupPath, user.QuotaBackupGB, owner); err != nil {
 				log.Printf("Warning: Failed to create backup quota directory: %v", err)
 			} else {
-				log.Printf("Created backup subvolume with %dGB quota", user.QuotaBackupGB)
-
-				// Set ownership of subvolume to user (needed for .trash creation)
-				chownCmd := exec.Command("sudo", "/usr/bin/chown", "-R", fmt.Sprintf("%s:%s", token.Username, token.Username), backupPath)
-				if err := chownCmd.Run(); err != nil {
-					log.Printf("Warning: Failed to set backup subvolume ownership: %v", err)
-				}
+				log.Printf("Created backup subvolume with %dGB quota (owner: %s)", user.QuotaBackupGB, token.Username)
 			}
 		}
 
@@ -306,16 +301,10 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 
 		dataPath := filepath.Join(s.cfg.SharesDir, token.Username, "data")
 		if qm != nil {
-			if err := qm.CreateQuotaDir(dataPath, dataQuotaGB); err != nil {
+			if err := qm.CreateQuotaDir(dataPath, dataQuotaGB, owner); err != nil {
 				log.Printf("Warning: Failed to create data quota directory: %v", err)
 			} else {
-				log.Printf("Created data subvolume with %dGB quota", dataQuotaGB)
-
-				// Set ownership of subvolume to user (needed for .trash creation)
-				chownCmd := exec.Command("sudo", "/usr/bin/chown", "-R", fmt.Sprintf("%s:%s", token.Username, token.Username), dataPath)
-				if err := chownCmd.Run(); err != nil {
-					log.Printf("Warning: Failed to set data subvolume ownership: %v", err)
-				}
+				log.Printf("Created data subvolume with %dGB quota (owner: %s)", dataQuotaGB, token.Username)
 			}
 		}
 
