@@ -558,8 +558,9 @@ async function submitPasswordVerification(e) {
         const data = await resp.json();
         if (data.success && data.token) {
             verificationToken = data.token;
+            const action = pendingAction;
             closePasswordModal();
-            if (pendingAction) pendingAction();
+            if (action) action();
         } else {
             alert(data.error || '{{T .Lang "login.error"}}');
         }
