@@ -130,6 +130,11 @@ func DeleteDataset(name string, recursive bool, force bool) error {
 		return err
 	}
 
+	// Prevent deleting root datasets (pools) - they must be destroyed with zpool destroy
+	if !strings.Contains(name, "/") {
+		return fmt.Errorf("cannot delete root dataset '%s': use 'Destroy Pool' to remove the entire pool", name)
+	}
+
 	args := []string{"zfs", "destroy"}
 	if recursive {
 		args = append(args, "-r")

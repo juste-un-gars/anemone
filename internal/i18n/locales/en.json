@@ -667,6 +667,8 @@
   "storage.raidz2_desc": "4+ disks, 2 parity",
   "storage.raidz3_desc": "5+ disks, 3 parity",
   "storage.select_disks": "Select Disks",
+  "storage.mountpoint": "Mount Point",
+  "storage.mountpoint_help": "Path where the pool will be mounted (e.g., /mnt/data). Empty = /<pool_name>",
   "storage.compression": "Compression",
   "storage.recommended": "Recommended",
   "storage.off": "Off",

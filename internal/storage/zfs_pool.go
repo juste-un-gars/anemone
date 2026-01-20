@@ -68,6 +68,30 @@ func ValidateDiskPath(path string) error {
 	return nil
 }
 
+// ValidateMountpoint checks if a mountpoint path is valid
+func ValidateMountpoint(path string) error {
+	if path == "" {
+		return nil // Empty is allowed (uses default)
+	}
+	// Must be an absolute path
+	if !strings.HasPrefix(path, "/") {
+		return fmt.Errorf("mountpoint must be an absolute path starting with /")
+	}
+	// Basic path validation - no command injection
+	validPath := regexp.MustCompile(`^/[a-zA-Z0-9/_\-]*$`)
+	if !validPath.MatchString(path) {
+		return fmt.Errorf("invalid mountpoint format: only alphanumerics, underscore, hyphen, and slash are allowed")
+	}
+	// Prevent dangerous paths
+	dangerousPaths := []string{"/", "/bin", "/boot", "/dev", "/etc", "/lib", "/lib64", "/proc", "/root", "/sbin", "/sys", "/usr", "/var"}
+	for _, dp := range dangerousPaths {
+		if path == dp {
+			return fmt.Errorf("cannot use system path '%s' as mountpoint", path)
+		}
+	}
+	return nil
+}
+
 // CreatePool creates a new ZFS pool
 func CreatePool(opts PoolCreateOptions) error {
 	if !IsZFSAvailable() {
@@ -76,6 +100,11 @@ func CreatePool(opts PoolCreateOptions) error {
 
 	// Validate pool name
 	if err := ValidatePoolName(opts.Name); err != nil {
+		return err
+	}
+
+	// Validate mountpoint
+	if err := ValidateMountpoint(opts.Mountpoint); err != nil {
 		return err
 	}
 

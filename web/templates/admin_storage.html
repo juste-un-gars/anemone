@@ -392,6 +392,11 @@
                     <div id="poolDisksList" class="mt-2 space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-2"></div>
                 </div>
                 <div>
+                    <label class="block text-sm font-medium text-gray-700">{{T .Lang "storage.mountpoint"}}</label>
+                    <input type="text" id="poolMountpoint" placeholder="/mnt/pool" pattern="^/[a-zA-Z0-9/_\-]*$" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    <p class="mt-1 text-xs text-gray-500">{{T .Lang "storage.mountpoint_help"}}</p>
+                </div>
+                <div>
                     <label class="block text-sm font-medium text-gray-700">{{T .Lang "storage.compression"}}</label>
                     <select id="poolCompression" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md">
                         <option value="lz4">LZ4 ({{T .Lang "storage.recommended"}})</option>
@@ -642,6 +647,7 @@ async function createPool(e) {
     const name = document.getElementById('poolName').value;
     const vdevType = document.getElementById('poolVdevType').value;
     const compression = document.getElementById('poolCompression').value;
+    const mountpoint = document.getElementById('poolMountpoint').value;
     const disks = Array.from(document.querySelectorAll('input[name="poolDisks"]:checked')).map(el => el.value);
     if (disks.length === 0) { alert('{{T .Lang "storage.select_at_least_one_disk"}}'); return; }
     closeCreatePoolModal();
@@ -650,7 +656,7 @@ async function createPool(e) {
             const resp = await fetch('/api/admin/storage/pool', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
-                body: JSON.stringify({name, vdev_type: vdevType, disks, compression, force: true})
+                body: JSON.stringify({name, vdev_type: vdevType, disks, compression, mountpoint, force: true})
             });
             const data = await resp.json();
             if (data.success) { alert('{{T .Lang "storage.pool_created"}}'); location.reload(); }
