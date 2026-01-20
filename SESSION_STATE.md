@@ -7,30 +7,45 @@
 
 ## Current Session
 
-**Session 59** - Corrections urgentes (pré-refactoring)
-- **Status:** Completed (non commité)
+**Session 60** - Refactoring chemins configurables
+- **Status:** Completed
 - **Date:** 2026-01-20
+- **Commits:** `ae62041` (S59), `7f5607a` (S59 docs), `f589264` (S60)
 
-### À faire au prochain démarrage
-1. **Commiter les changements de Session 59** (5 fichiers modifiés)
-2. **Continuer avec Session 60** - Propager SharesDir/IncomingDir dans les autres packages
+### Completed (Session 60)
+
+#### Configurable Paths Refactoring
+- [x] Fix router.go - utilise `cfg.IncomingDir` au lieu de chemin hardcodé
+- [x] Fix handlers_admin_sync.go - utilise `cfg.IncomingDir`
+- [x] Refactor `DeleteIncomingBackup()` - accepte `incomingDir` pour sécurité configurable
+- [x] Refactor `DeleteUser()` - accepte `sharesDir` comme paramètre
+- [x] Ajout `ValidateDirs()` - validation répertoires au démarrage
+- [x] Tests unitaires passent
+
+### Files Modified (Session 60)
+- `cmd/anemone/main.go` - Appel ValidateDirs() au démarrage
+- `internal/config/config.go` - Ajout ValidateDirs() function
+- `internal/incoming/incoming.go` - DeleteIncomingBackup() accepte incomingDir
+- `internal/users/users.go` - DeleteUser() accepte sharesDir
+- `internal/web/handlers_admin_sync.go` - Utilise cfg.IncomingDir
+- `internal/web/handlers_admin_users.go` - Passe sharesDir à DeleteUser()
+- `internal/web/router.go` - Utilise cfg.IncomingDir
+
+---
+
+## Previous Session
+
+**Session 59** - Corrections urgentes (pré-refactoring)
+- **Status:** Completed
+- **Date:** 2026-01-20
+- **Commit:** `ae62041`
 
 ### Completed (Session 59)
-
-#### Bug Fixes & Refactoring
-- [x] Fix 7 chemins hardcodés dans `handlers_sync_api.go` (utilisent maintenant `s.cfg.IncomingDir`)
-- [x] Fix permissions ZFS après création pool/dataset (nouveau champ `Owner` + `FixMountpointOwnership()`)
-- [x] Unifier valeur par défaut DataDir (`/srv/anemone` au lieu de `/app/data`)
-- [x] Ajout `IncomingDir` dans config.Config avec support `ANEMONE_INCOMING_DIR`
-- [x] Ajout `ANEMONE_SHARES_DIR` pour configuration séparée
-- [x] Tests unitaires passent (non-régression vérifiée)
-
-### Files Modified (Session 59)
-- `internal/config/config.go` - Ajout IncomingDir, SharesDir configurables, fix default DataDir
-- `internal/web/handlers_sync_api.go` - Utilise s.cfg.IncomingDir au lieu de chemin hardcodé
-- `internal/storage/zfs_pool.go` - Ajout Owner option + FixMountpointOwnership()
-- `internal/storage/zfs_dataset.go` - Ajout Owner option pour fix permissions
-- `internal/incoming/incoming.go` - Mise à jour commentaires documentation
+- [x] Fix 7 chemins hardcodés dans `handlers_sync_api.go`
+- [x] Fix permissions ZFS après création pool/dataset
+- [x] Unifier valeur par défaut DataDir (`/srv/anemone`)
+- [x] Ajout `IncomingDir` et `ANEMONE_INCOMING_DIR`
+- [x] Ajout `ANEMONE_SHARES_DIR`
 
 ---
 
@@ -121,27 +136,26 @@ Ensuite, question optionnelle pour le stockage séparé des backups entrants (si
 
 ---
 
-### Session 60 : Refactoring chemins configurables
+### Session 60 : Refactoring chemins configurables ✅ COMPLETED
 **Objectif :** Propager l'utilisation de SharesDir et IncomingDir dans tous les packages
-
-*Note: SharesDir/IncomingDir ont été ajoutés à config.Config en Session 59*
 
 - [x] Ajouter `SharesDir`, `IncomingDir` dans `config.Config` ✅ (S59)
 - [x] Variables d'environnement : `ANEMONE_SHARES_DIR`, `ANEMONE_INCOMING_DIR` ✅ (S59)
 - [x] Valeurs par défaut : `{DataDir}/shares`, `{DataDir}/backups/incoming` ✅ (S59)
-- [ ] Validation mountpoint : existence, permissions d'écriture au démarrage
-- [ ] Mettre à jour `incoming.go` pour utiliser `cfg.IncomingDir`
-- [ ] Mettre à jour `shares.go` pour utiliser `cfg.SharesDir`
-- [ ] Vérifier `handlers_admin_sync.go` utilise bien les chemins config
-- [ ] Vérifier impact sur sync P2P (syncauth utilise-t-il des chemins hardcodés?)
+- [x] Validation mountpoint : existence, permissions d'écriture au démarrage
+- [x] Mettre à jour `incoming.go` - sécurité configurable avec incomingDir
+- [x] Mettre à jour `users.go` - utilise sharesDir paramètre
+- [x] Vérifier `handlers_admin_sync.go` utilise bien les chemins config
+- [x] Vérifier impact sur sync P2P (syncauth/sync/ propres - pas de chemins hardcodés)
 
-**Fichiers concernés :**
-- `internal/config/config.go`
-- `internal/shares/shares.go`
-- `internal/incoming/incoming.go`
-- `internal/web/handlers_sync_api.go`
-- `internal/web/handlers_admin_sync.go`
-- `internal/sync/` (tout le package)
+**Fichiers modifiés :**
+- `cmd/anemone/main.go` - ValidateDirs() au démarrage
+- `internal/config/config.go` - ValidateDirs() function
+- `internal/incoming/incoming.go` - DeleteIncomingBackup() avec incomingDir
+- `internal/users/users.go` - DeleteUser() avec sharesDir
+- `internal/web/handlers_admin_sync.go` - cfg.IncomingDir
+- `internal/web/handlers_admin_users.go` - sharesDir à DeleteUser()
+- `internal/web/router.go` - cfg.IncomingDir
 
 ---
 
@@ -248,6 +262,7 @@ Ensuite, question optionnelle pour le stockage séparé des backups entrants (si
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 60 | Refactoring chemins configurables | 2026-01-20 | Completed |
 | 59 | Corrections urgentes (pré-refactoring) | 2026-01-20 | Completed |
 | 58.5 | Architecture Audit & Planning | 2026-01-20 | Completed |
 | 58 | Storage Bug Fixes & Mountpoint | 2026-01-20 | Completed |
@@ -301,8 +316,8 @@ All detailed session files are in `.claude/sessions/`:
 
 ## Next Steps
 
-**Prochaine session : Session 60** - Refactoring chemins configurables
+**Prochaine session : Session 61** - Refactoring permissions et utilisateur système
 
-Propager l'utilisation de `cfg.SharesDir` et `cfg.IncomingDir` dans tous les packages.
+Objectif : Sécuriser les permissions et créer un utilisateur système dédié `anemone`.
 
-Commencer par `"continue"` ou `"session 60"`.
+Commencer par `"continue"` ou `"session 61"`.
