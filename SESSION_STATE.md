@@ -7,29 +7,40 @@
 
 ## Current Session
 
+**Session 61** - Refactoring permissions et utilisateur système
+- **Status:** Completed
+- **Date:** 2026-01-20
+- **Commit:** `2174635`
+
+### Completed (Session 61)
+
+#### Permissions Refactoring
+- [x] Ajout paramètre `owner` à `QuotaManager.CreateQuotaDir()` - ownership atomique
+- [x] Suppression chown redondants dans handlers_auth.go
+- [x] Simplification shares.Create() - suppression double chown sur .trash
+- [x] Sécurisation sudoers dans install.sh - chemins restreints à DATA_DIR
+- [x] Vérification sync P2P peut écrire dans incoming/
+
+### Files Modified (Session 61)
+- `internal/quota/enforcement.go` - CreateQuotaDir() avec owner atomique
+- `internal/web/handlers_auth.go` - Suppression chown redondants
+- `internal/shares/shares.go` - Simplification (un seul chown final)
+- `install.sh` - Sudoers sécurisés (chemins restreints)
+- `cmd/anemone-migrate/main.go` - Adaptation à la nouvelle signature
+
+---
+
+## Previous Session
+
 **Session 60** - Refactoring chemins configurables
 - **Status:** Completed
 - **Date:** 2026-01-20
-- **Commits:** `ae62041` (S59), `7f5607a` (S59 docs), `f589264` (S60)
+- **Commit:** `f589264`
 
 ### Completed (Session 60)
-
-#### Configurable Paths Refactoring
-- [x] Fix router.go - utilise `cfg.IncomingDir` au lieu de chemin hardcodé
-- [x] Fix handlers_admin_sync.go - utilise `cfg.IncomingDir`
-- [x] Refactor `DeleteIncomingBackup()` - accepte `incomingDir` pour sécurité configurable
-- [x] Refactor `DeleteUser()` - accepte `sharesDir` comme paramètre
-- [x] Ajout `ValidateDirs()` - validation répertoires au démarrage
-- [x] Tests unitaires passent
-
-### Files Modified (Session 60)
-- `cmd/anemone/main.go` - Appel ValidateDirs() au démarrage
-- `internal/config/config.go` - Ajout ValidateDirs() function
-- `internal/incoming/incoming.go` - DeleteIncomingBackup() accepte incomingDir
-- `internal/users/users.go` - DeleteUser() accepte sharesDir
-- `internal/web/handlers_admin_sync.go` - Utilise cfg.IncomingDir
-- `internal/web/handlers_admin_users.go` - Passe sharesDir à DeleteUser()
-- `internal/web/router.go` - Utilise cfg.IncomingDir
+- [x] Fix router.go et handlers_admin_sync.go - cfg.IncomingDir
+- [x] Refactor DeleteIncomingBackup() et DeleteUser() - paramètres configurables
+- [x] Ajout ValidateDirs() - validation répertoires au démarrage
 
 ---
 
@@ -159,20 +170,21 @@ Ensuite, question optionnelle pour le stockage séparé des backups entrants (si
 
 ---
 
-### Session 61 : Refactoring permissions et utilisateur système
+### Session 61 : Refactoring permissions et utilisateur système ✅ COMPLETED
 **Objectif :** Sécuriser les permissions et créer un utilisateur dédié
 
-- [ ] Option : Créer utilisateur système `anemone` dédié dans `install.sh`
-- [ ] Refactorer création subvolumes (ownership atomique, pas de double chown)
-- [ ] Sécuriser sudoers (arguments explicites, pas de wildcards)
-- [ ] Fix double chown/chmod dans `shares.go`
-- [ ] Vérifier que sync P2P peut toujours écrire dans incoming/
+- [x] Refactorer création subvolumes (ownership atomique via paramètre `owner`)
+- [x] Sécuriser sudoers (chemins restreints à DATA_DIR, pas de wildcards dangereuses)
+- [x] Fix double chown/chmod dans `shares.go` et `handlers_auth.go`
+- [x] Vérifier que sync P2P peut toujours écrire dans incoming/ ✅
+- [ ] *Option reportée: Créer utilisateur système `anemone` dédié (Session 64)*
 
-**Fichiers concernés :**
-- `install.sh`
-- `internal/quota/enforcement.go`
-- `internal/shares/shares.go`
-- `internal/web/handlers_auth.go`
+**Fichiers modifiés :**
+- `install.sh` - Sudoers sécurisés
+- `internal/quota/enforcement.go` - CreateQuotaDir() avec owner
+- `internal/shares/shares.go` - Simplification chown
+- `internal/web/handlers_auth.go` - Suppression chown redondants
+- `cmd/anemone-migrate/main.go` - Adaptation signature
 
 ---
 
@@ -262,6 +274,7 @@ Ensuite, question optionnelle pour le stockage séparé des backups entrants (si
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 61 | Refactoring permissions | 2026-01-20 | Completed |
 | 60 | Refactoring chemins configurables | 2026-01-20 | Completed |
 | 59 | Corrections urgentes (pré-refactoring) | 2026-01-20 | Completed |
 | 58.5 | Architecture Audit & Planning | 2026-01-20 | Completed |
@@ -316,8 +329,8 @@ All detailed session files are in `.claude/sessions/`:
 
 ## Next Steps
 
-**Prochaine session : Session 61** - Refactoring permissions et utilisateur système
+**Prochaine session : Session 62** - Mode Setup - Backend
 
-Objectif : Sécuriser les permissions et créer un utilisateur système dédié `anemone`.
+Objectif : Créer la logique backend du wizard d'installation.
 
-Commencer par `"continue"` ou `"session 61"`.
+Commencer par `"continue"` ou `"session 62"`.
