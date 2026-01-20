@@ -122,10 +122,11 @@ func saveSystemConfig(db *sql.DB, masterKey, language string) error {
 	defer tx.Rollback()
 
 	configs := map[string]string{
-		"master_key": masterKey,
-		"language":   language,
-		"nas_name":   "Anemone NAS",
-		"timezone":   "Europe/Paris",
+		"master_key":      masterKey,
+		"language":        language,
+		"nas_name":        "Anemone NAS",
+		"timezone":        "Europe/Paris",
+		"setup_completed": "true",
 	}
 
 	for key, value := range configs {

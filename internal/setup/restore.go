@@ -133,6 +133,14 @@ func ExecuteRestore(serverBackup *backup.ServerBackup, opts RestoreOptions) erro
 		return fmt.Errorf("failed to restore system config: %w", err)
 	}
 
+	// Ensure setup_completed is set (in case backup was from old version)
+	_, err = tx.Exec(
+		`INSERT OR REPLACE INTO system_config (key, value, updated_at) VALUES ('setup_completed', 'true', CURRENT_TIMESTAMP)`,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to set setup_completed: %w", err)
+	}
+
 	// Get master key for encrypting peer passwords
 	var masterKey string
 	for _, cfg := range serverBackup.SystemConfig {
