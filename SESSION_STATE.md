@@ -7,6 +7,39 @@
 
 ## Current Session
 
+**Session 58** - Storage Management Bug Fixes & Mountpoint
+- **Status:** Completed
+- **Date:** 2026-01-20
+- **Commits:** `5ac947f`, `7fb3afc`, `5456134`, `8964835`
+
+### Completed (Session 58)
+
+#### Bug Fix: ZFS Pool Creation Modal Issues
+- [x] Fixed password modal appearing behind form modal (same z-index)
+- [x] Close form modals before showing password verification modal
+- [x] Fixed pendingAction being nullified before callback execution
+- [x] Fixed JavaScript syntax error in pool name template generation
+
+#### Feature: Mountpoint Option for Pool Creation
+- [x] Added mountpoint field in pool creation form
+- [x] Added mountpoint validation to prevent system path usage (/etc, /var, etc.)
+- [x] Prevent deletion of root datasets (must use "Destroy Pool" instead)
+- [x] Added FR/EN translations for mountpoint
+
+### Files Modified (Session 58)
+- `web/templates/admin_storage.html` - Fixed modals, added mountpoint field
+- `internal/storage/zfs_pool.go` - Added ValidateMountpoint function
+- `internal/storage/zfs_dataset.go` - Prevent deletion of root datasets
+- `internal/i18n/locales/fr.json` - Added mountpoint translations
+- `internal/i18n/locales/en.json` - Added mountpoint translations
+
+### Known Issues / TODO
+- [ ] Add mount/unmount buttons in datasets UI (functions exist in backend)
+
+---
+
+## Previous Session
+
 **Session 57** - Storage Management (Phase 2-3 - Full ZFS & Disk Operations)
 - **Status:** Completed
 - **Date:** 2026-01-20
@@ -78,40 +111,11 @@
 
 ---
 
-## Previous Session
-
-**Session 55** - Bug Fixes (Speed, Empty Dirs, Datetime Parsing)
-- **Status:** Completed
-- **Date:** 2026-01-19
-- **Commits:** `785a909`, `535cbbd`, `ca9c968`
-
-### Completed (Session 55)
-
-#### Bug Fix: Robust Datetime Parsing for SQLite (v0.9.23-beta)
-- [x] SQLite driver returns RFC3339 format (`2006-01-02T15:04:05Z`), not expected `2006-01-02 15:04:05`
-- [x] Added multi-format parsing function trying 10 different datetime formats
-- [x] Dates and speed now display correctly in sync reports
-
-#### Bug Fix: Sync Speed Display on Peers Page (v0.9.21-beta)
-- [x] Added speed column to sync report table on `/admin/peers` page
-- [x] Speed calculation was in `handlers_admin_sync.go` but missing from `handlers_admin_peers.go`
-- [x] Added `CompletedAt` and `Speed` fields to `RecentSync` struct
-- [x] Parse SQLite datetime strings using `sql.NullString`
-- [x] Calculate speed from `bytes_synced / duration`
-- [x] Display speed in MB/s, KB/s, or B/s (or "-" if unavailable)
-
-#### Bug Fix: Empty Directories Not Cleaned After Sync Delete (v0.9.22-beta)
-- [x] When files deleted on AN1, directories left empty on AN2 after sync
-- [x] Added `cleanEmptyParentDirs()` function in `handlers_sync_api.go`
-- [x] Called after file deletion to walk up and remove empty parent dirs
-- [x] Stops at backup root directory or when directory is not empty
-
----
-
 ## Recent Sessions
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 58 | Storage Bug Fixes & Mountpoint | 2026-01-20 | Completed |
 | 57 | Storage Management (Phase 2-3) | 2026-01-20 | Completed |
 | 56 | Storage Management (Phase 1) | 2026-01-20 | Completed |
 | 55 | Bug Fixes (Speed, Empty Dirs, Datetime) | 2026-01-19 | Completed |
@@ -163,6 +167,7 @@ All detailed session files are in `.claude/sessions/`:
 ## Next Steps
 
 ### Storage Management - Future Enhancements
+- [ ] Add mount/unmount buttons in datasets UI
 - [ ] Add disk SMART test scheduling
 - [ ] ZFS pool auto-import on boot
 - [ ] Email alerts for disk health warnings
