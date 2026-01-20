@@ -643,6 +643,7 @@ async function createPool(e) {
     const compression = document.getElementById('poolCompression').value;
     const disks = Array.from(document.querySelectorAll('input[name="poolDisks"]:checked')).map(el => el.value);
     if (disks.length === 0) { alert('{{T .Lang "storage.select_at_least_one_disk"}}'); return; }
+    closeCreatePoolModal();
     requirePassword('{{T .Lang "storage.create_pool"}}', '{{T .Lang "storage.create_pool_warning"}}', async () => {
         try {
             const resp = await fetch('/api/admin/storage/pool', {
@@ -738,6 +739,7 @@ async function createDataset(e) {
     const name = document.getElementById('datasetName').value;
     const compression = document.getElementById('datasetCompression').value;
     const quota = document.getElementById('datasetQuota').value;
+    closeCreateDatasetModal();
     requirePassword('{{T .Lang "storage.create_dataset"}}', '{{T .Lang "storage.create_dataset_warning"}}', async () => {
         try {
             const resp = await fetch('/api/admin/storage/dataset', {
@@ -864,6 +866,7 @@ async function formatDisk(e) {
     const device = document.getElementById('formatDiskDevice').value;
     const filesystem = document.getElementById('formatFilesystem').value;
     const label = document.getElementById('formatLabel').value;
+    closeFormatDiskModal();
     requirePassword('{{T .Lang "storage.format_disk"}}: ' + device, '{{T .Lang "storage.format_disk_warning"}}', async () => {
         try {
             const resp = await fetch('/api/admin/storage/disk/format', {
