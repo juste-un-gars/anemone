@@ -473,6 +473,7 @@
                     <span id="checking-status">{{T .Lang "setup_wizard.complete.checking"}}...</span>
                 </div>
 
+                {{if eq .CurrentStep 6}}
                 <script>
                     // Auto-check if the server has restarted and normal mode is available
                     (function checkServerStatus() {
@@ -489,6 +490,7 @@
                             });
                     })();
                 </script>
+                {{end}}
             </div>
         </div>
 
