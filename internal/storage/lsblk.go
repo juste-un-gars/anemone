@@ -3,18 +3,63 @@ package storage
 import (
 	"encoding/json"
 	"os/exec"
+	"strconv"
 	"strings"
 )
+
+// flexInt handles JSON numbers that may be int or string
+type flexInt uint64
+
+func (f *flexInt) UnmarshalJSON(data []byte) error {
+	// Try as number first
+	var n uint64
+	if err := json.Unmarshal(data, &n); err == nil {
+		*f = flexInt(n)
+		return nil
+	}
+	// Try as string
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		n, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			return err
+		}
+		*f = flexInt(n)
+		return nil
+	}
+	*f = 0
+	return nil
+}
+
+// flexBool handles JSON booleans that may be bool or string ("0"/"1")
+type flexBool bool
+
+func (f *flexBool) UnmarshalJSON(data []byte) error {
+	// Try as boolean first
+	var b bool
+	if err := json.Unmarshal(data, &b); err == nil {
+		*f = flexBool(b)
+		return nil
+	}
+	// Try as string "0" or "1"
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*f = flexBool(s == "1" || s == "true")
+		return nil
+	}
+	*f = false
+	return nil
+}
 
 // lsblkDevice represents the JSON output from lsblk
 type lsblkDevice struct {
 	Name       string        `json:"name"`
 	Path       string        `json:"path"`
-	Size       uint64        `json:"size"`       // Size in bytes as integer
+	Size       flexInt       `json:"size"`       // Size in bytes (int or string)
 	Type       string        `json:"type"`       // disk, part, rom, etc.
 	Model      string        `json:"model"`
 	Serial     string        `json:"serial"`
-	Rota       bool          `json:"rota"`       // true for rotational (HDD), false for SSD
+	Rota       flexBool      `json:"rota"`       // true for rotational (HDD)
 	Tran       string        `json:"tran"`       // Transport: sata, nvme, usb, etc.
 	Fstype     string        `json:"fstype"`     // Filesystem type
 	Mountpoint string        `json:"mountpoint"`
@@ -60,9 +105,9 @@ func ListDisks() ([]Disk, error) {
 			Path:         dev.Path,
 			Model:        strings.TrimSpace(dev.Model),
 			Serial:       strings.TrimSpace(dev.Serial),
-			Size:         dev.Size,
-			SizeHuman:    FormatBytes(dev.Size),
-			Rotational:   dev.Rota,
+			Size:         uint64(dev.Size),
+			SizeHuman:    FormatBytes(uint64(dev.Size)),
+			Rotational:   bool(dev.Rota),
 			Health:       HealthUnknown, // Will be updated by SMART
 			Temperature:  -1,
 			PowerOnHours: -1,
@@ -77,8 +122,8 @@ func ListDisks() ([]Disk, error) {
 				part := Partition{
 					Name:       child.Name,
 					Path:       child.Path,
-					Size:       child.Size,
-					SizeHuman:  FormatBytes(child.Size),
+					Size:       uint64(child.Size),
+					SizeHuman:  FormatBytes(uint64(child.Size)),
 					Filesystem: child.Fstype,
 					Mountpoint: child.Mountpoint,
 					Label:      child.Label,
@@ -101,7 +146,7 @@ func determineDiskType(dev lsblkDevice) DiskType {
 	}
 
 	// Check if rotational (true = HDD, false = SSD)
-	if !dev.Rota {
+	if !bool(dev.Rota) {
 		return DiskTypeSSD
 	}
 
