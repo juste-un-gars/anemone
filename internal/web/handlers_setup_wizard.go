@@ -42,9 +42,9 @@ func NewSetupWizardServer(dataDir, lang string) *SetupWizardServer {
 		log.Printf("Warning: Failed to create translator: %v", err)
 	}
 
-	// Load templates with i18n support
+	// Load only setup wizard template with i18n support
 	funcMap := translator.FuncMap()
-	templates := template.Must(template.New("").Funcs(funcMap).ParseGlob(filepath.Join("web", "templates", "*.html")))
+	templates := template.Must(template.New("").Funcs(funcMap).ParseFiles(filepath.Join("web", "templates", "setup_wizard.html")))
 
 	return &SetupWizardServer{
 		manager:   manager,
