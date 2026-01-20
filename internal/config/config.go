@@ -15,6 +15,7 @@ type Config struct {
 	DatabasePath string
 	DataDir      string
 	SharesDir    string
+	IncomingDir  string // Directory for incoming backups from peers (can be on separate disk)
 	Port         string
 	HTTPSPort    string
 	Language     string // "fr" or "en"
@@ -30,7 +31,7 @@ type Config struct {
 func Load() (*Config, error) {
 	dataDir := os.Getenv("ANEMONE_DATA_DIR")
 	if dataDir == "" {
-		dataDir = "/app/data"
+		dataDir = "/srv/anemone"
 	}
 
 	// TLS is enabled by default, HTTP is disabled by default for security
@@ -42,10 +43,22 @@ func Load() (*Config, error) {
 		enableHTTPS = true
 	}
 
+	// SharesDir and IncomingDir can be on separate disks
+	// IncomingDir is for backups from peers (doesn't need ZFS redundancy)
+	sharesDir := os.Getenv("ANEMONE_SHARES_DIR")
+	if sharesDir == "" {
+		sharesDir = filepath.Join(dataDir, "shares")
+	}
+	incomingDir := os.Getenv("ANEMONE_INCOMING_DIR")
+	if incomingDir == "" {
+		incomingDir = filepath.Join(dataDir, "backups", "incoming")
+	}
+
 	cfg := &Config{
 		DatabasePath: filepath.Join(dataDir, "db", "anemone.db"),
 		DataDir:      dataDir,
-		SharesDir:    filepath.Join(dataDir, "shares"),
+		SharesDir:    sharesDir,
+		IncomingDir:  incomingDir,
 		Port:         getEnv("PORT", "8080"),
 		HTTPSPort:    getEnv("HTTPS_PORT", "8443"),
 		Language:     getEnv("LANGUAGE", "fr"),

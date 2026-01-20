@@ -156,9 +156,9 @@ func (s *Server) handleAPISyncManifestGet(w http.ResponseWriter, r *http.Request
 	}
 
 	// Build backup directory path with source server separation
-	// Format: /srv/anemone/backups/incoming/{source_server}/{user_id}_{share_name}/
+	// Format: {IncomingDir}/{source_server}/{user_id}_{share_name}/
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
-	backupDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer, backupDirName)
+	backupDir := filepath.Join(s.cfg.IncomingDir, sourceServer, backupDirName)
 	manifestPath := filepath.Join(backupDir, ".anemone-manifest.json.enc")
 
 	// Check if manifest file exists
@@ -222,7 +222,7 @@ func (s *Server) handleAPISyncManifestPut(w http.ResponseWriter, r *http.Request
 
 	// Build backup directory path with source server separation
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
-	backupDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer, backupDirName)
+	backupDir := filepath.Join(s.cfg.IncomingDir, sourceServer, backupDirName)
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		log.Printf("Error creating backup directory: %v", err)
 		http.Error(w, "Failed to create backup directory", http.StatusInternalServerError)
@@ -283,7 +283,7 @@ func (s *Server) handleAPISyncSourceInfo(w http.ResponseWriter, r *http.Request)
 
 	// Build backup directory path with source server separation
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
-	backupDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer, backupDirName)
+	backupDir := filepath.Join(s.cfg.IncomingDir, sourceServer, backupDirName)
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		log.Printf("Error creating backup directory: %v", err)
 		http.Error(w, "Failed to create backup directory", http.StatusInternalServerError)
@@ -368,7 +368,7 @@ func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request)
 
 	// Build backup directory path with source server separation
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
-	backupDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer, backupDirName)
+	backupDir := filepath.Join(s.cfg.IncomingDir, sourceServer, backupDirName)
 	targetPath := filepath.Join(backupDir, relativePath)
 
 	// Create parent directory if needed
@@ -432,7 +432,7 @@ func (s *Server) handleAPISyncFileDelete(w http.ResponseWriter, r *http.Request)
 
 	// Build backup directory path with source server separation
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
-	backupDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer, backupDirName)
+	backupDir := filepath.Join(s.cfg.IncomingDir, sourceServer, backupDirName)
 	targetPath := filepath.Join(backupDir, relativePath)
 
 	// Delete file
@@ -488,7 +488,7 @@ func (s *Server) handleAPISyncListPhysicalFiles(w http.ResponseWriter, r *http.R
 
 	// Build backup directory path with source server separation
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
-	backupDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer, backupDirName)
+	backupDir := filepath.Join(s.cfg.IncomingDir, sourceServer, backupDirName)
 
 	// Check if backup directory exists
 	if _, err := os.Stat(backupDir); os.IsNotExist(err) {
@@ -586,8 +586,8 @@ func (s *Server) handleAPISyncDeleteUserBackup(w http.ResponseWriter, r *http.Re
 	}
 
 	// Build backup directory path for this user from this source server
-	// Format: /srv/anemone/backups/incoming/{source_server}/{user_id}_*
-	incomingDir := filepath.Join("/srv/anemone/backups/incoming", sourceServer)
+	// Format: {IncomingDir}/{source_server}/{user_id}_*
+	incomingDir := filepath.Join(s.cfg.IncomingDir, sourceServer)
 
 	// Check if incoming directory for this source server exists
 	if _, err := os.Stat(incomingDir); os.IsNotExist(err) {

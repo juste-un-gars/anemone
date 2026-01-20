@@ -18,6 +18,7 @@ type PoolCreateOptions struct {
 	Mountpoint  string   `json:"mountpoint"`  // Custom mountpoint (optional)
 	Compression string   `json:"compression"` // Compression type: off, lz4, zstd, gzip (optional)
 	Ashift      int      `json:"ashift"`      // Sector size alignment (optional, 0 for auto)
+	Owner       string   `json:"owner"`       // Owner user:group for mountpoint (optional, e.g., "anemone:anemone")
 }
 
 // ImportablePool represents a pool that can be imported
@@ -184,6 +185,36 @@ func CreatePool(opts PoolCreateOptions) error {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to create pool: %s - %w", strings.TrimSpace(string(output)), err)
+	}
+
+	// Fix mountpoint permissions if owner is specified
+	if opts.Owner != "" {
+		mountpoint := opts.Mountpoint
+		if mountpoint == "" {
+			// Default ZFS mountpoint is /{poolname}
+			mountpoint = "/" + opts.Name
+		}
+		if err := FixMountpointOwnership(mountpoint, opts.Owner); err != nil {
+			// Pool was created but ownership failed - log warning but don't fail
+			return fmt.Errorf("pool created but failed to set ownership: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// FixMountpointOwnership sets the owner of a mountpoint
+func FixMountpointOwnership(mountpoint, owner string) error {
+	// Validate owner format (user:group or just user)
+	validOwner := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]*(:([a-zA-Z_][a-zA-Z0-9_-]*))?$`)
+	if !validOwner.MatchString(owner) {
+		return fmt.Errorf("invalid owner format: %s (expected user or user:group)", owner)
+	}
+
+	cmd := exec.Command("sudo", "chown", owner, mountpoint)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("chown failed: %s - %w", strings.TrimSpace(string(output)), err)
 	}
 
 	return nil

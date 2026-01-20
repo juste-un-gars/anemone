@@ -19,6 +19,7 @@ type DatasetCreateOptions struct {
 	RecordSize  string `json:"recordsize"`  // Record size (e.g., "128K")
 	Atime       string `json:"atime"`       // on, off
 	Sync        string `json:"sync"`        // standard, always, disabled
+	Owner       string `json:"owner"`       // Owner user:group for mountpoint (optional, e.g., "anemone:anemone")
 }
 
 // DatasetInfo contains detailed dataset information
@@ -115,6 +116,25 @@ func CreateDataset(opts DatasetCreateOptions) error {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to create dataset: %s - %w", strings.TrimSpace(string(output)), err)
+	}
+
+	// Fix mountpoint permissions if owner is specified
+	if opts.Owner != "" {
+		// Get the actual mountpoint
+		mountpoint := opts.Mountpoint
+		if mountpoint == "" {
+			// Get mountpoint from ZFS (it inherits from parent or uses default)
+			mp, err := GetDatasetProperty(opts.Name, "mountpoint")
+			if err != nil {
+				return fmt.Errorf("dataset created but failed to get mountpoint: %w", err)
+			}
+			mountpoint = mp
+		}
+		if mountpoint != "" && mountpoint != "none" && mountpoint != "-" {
+			if err := FixMountpointOwnership(mountpoint, opts.Owner); err != nil {
+				return fmt.Errorf("dataset created but failed to set ownership: %w", err)
+			}
+		}
 	}
 
 	return nil

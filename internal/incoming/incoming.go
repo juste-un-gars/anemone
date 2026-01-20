@@ -27,9 +27,9 @@ type IncomingBackup struct {
 	HasManifest  bool      `json:"has_manifest"`
 }
 
-// ScanIncomingBackups scans the /srv/anemone/backups/incoming/ directory
-// and returns information about all backups stored on this server
-// Directory structure: /srv/anemone/backups/incoming/{source_server}/{user_id}_{share_name}/
+// ScanIncomingBackups scans the incoming backups directory (IncomingDir)
+// and returns information about all backups stored on this server.
+// Directory structure: {IncomingDir}/{source_server}/{user_id}_{share_name}/
 func ScanIncomingBackups(db *sql.DB, backupsDir string) ([]*IncomingBackup, error) {
 	// Check if backups directory exists
 	if _, err := os.Stat(backupsDir); os.IsNotExist(err) {
