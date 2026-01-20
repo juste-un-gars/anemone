@@ -44,7 +44,7 @@ func NewSetupWizardServer(dataDir, lang string) *SetupWizardServer {
 
 	// Load only setup wizard template with i18n support
 	funcMap := translator.FuncMap()
-	templates := template.Must(template.New("").Funcs(funcMap).ParseFiles(filepath.Join("web", "templates", "setup_wizard.html")))
+	templates := template.Must(template.New("setup_wizard.html").Funcs(funcMap).ParseFiles(filepath.Join("web", "templates", "setup_wizard.html")))
 
 	return &SetupWizardServer{
 		manager:   manager,
