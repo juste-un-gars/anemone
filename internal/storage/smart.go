@@ -19,6 +19,10 @@ type smartctlOutput struct {
 		Type     string `json:"type"`
 		Protocol string `json:"protocol"`
 	} `json:"device"`
+	SmartSupport struct {
+		Available bool `json:"available"`
+		Enabled   bool `json:"enabled"`
+	} `json:"smart_support"`
 	ModelName    string `json:"model_name"`
 	SerialNumber string `json:"serial_number"`
 	SmartStatus  struct {
@@ -108,6 +112,14 @@ func GetSMARTInfo(devicePath string) (*SMARTInfo, error) {
 
 	var smart smartctlOutput
 	if err := json.Unmarshal(output, &smart); err != nil {
+		return &SMARTInfo{Available: false}, nil
+	}
+
+	// Check if SMART is actually supported by this device
+	// exit_status bit 1 (value 2) = device open failed
+	// exit_status bit 2 (value 4) = SMART/ATA command failed
+	// Also check smart_support.available field
+	if !smart.SmartSupport.Available || (smart.SmartCtl.ExitStatus&6) != 0 {
 		return &SMARTInfo{Available: false}, nil
 	}
 
