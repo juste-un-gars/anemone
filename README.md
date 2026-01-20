@@ -92,23 +92,27 @@ git clone https://github.com/juste-un-gars/anemone.git
 cd anemone
 
 # Run installer (requires sudo)
-sudo ./install.sh fr  # For French
-# OR
-sudo ./install.sh en  # For English
+sudo ./install.sh
 
-# Access web interface
+# Access web interface to complete setup
 open https://localhost:8443
 ```
 
 > 💡 **Tip**: The `main` branch always contains the latest stable version. No need to specify a version tag!
 
 **What the installer does**:
+- ✅ Installs dependencies (Go, GCC, Samba, storage tools)
 - ✅ Compiles the binary
-- ✅ Creates `/srv/anemone` data directory
-- ✅ Installs and configures Samba
-- ✅ Sets up firewall rules (if needed)
+- ✅ Creates data directory
+- ✅ Configures sudoers and firewall
 - ✅ Creates systemd service (auto-start)
-- ✅ Generates TLS certificates
+- ✅ Starts Anemone in setup mode
+
+**Then the web wizard guides you through**:
+- 🔧 Storage configuration (default, ZFS, or custom path)
+- 💾 Backup storage location
+- 👤 Admin account creation
+- 🔐 Encryption key generation
 
 ### Install Specific Version (Optional)
 
@@ -122,16 +126,16 @@ git clone --branch v0.9.1-beta https://github.com/juste-un-gars/anemone.git
 cd anemone
 
 # Run installer
-sudo ./install.sh fr  # or 'en'
+sudo ./install.sh
 ```
 
 ### Prerequisites
 
-Before installing, ensure you have:
-- **Go 1.21+** - [Installation guide](https://go.dev/doc/install)
-- **Samba** (for SMB file sharing)
+The installer automatically installs all dependencies. You only need:
 - **Sudo access** (for system configuration)
-- **Optional**: Btrfs filesystem (for quota enforcement)
+- **Internet connection** (to download Go and dependencies)
+
+The installer will automatically install: Go, GCC, Git, Samba, and storage tools.
 
 > ⚠️ **Note**: Anemone works on any filesystem (ext4, XFS, ZFS), but **quota enforcement requires Btrfs**. On other filesystems, quotas are displayed but not enforced.
 
@@ -296,74 +300,55 @@ Anemone is a self-hosted Network Attached Storage (NAS) solution designed for fa
 
 ### One-Line Installation (Fresh Server)
 
-For a completely new server installation, you can install all dependencies and Anemone in one command:
+For a completely new server installation:
 
 ```bash
-# Update system and install dependencies + Anemone (Debian/Ubuntu) - French
-sudo apt update -y && \
-sudo apt upgrade -y && \
-sudo apt-get install -y golang-go samba git && \
+# Debian/Ubuntu
+sudo apt update -y && sudo apt upgrade -y && \
 git clone https://github.com/juste-un-gars/anemone.git && \
-cd anemone && \
-sudo ./install.sh fr
+cd anemone && sudo ./install.sh
 
-# English version
-sudo apt update -y && \
-sudo apt upgrade -y && \
-sudo apt-get install -y golang-go samba git && \
+# RHEL/Fedora
+sudo dnf update -y && \
 git clone https://github.com/juste-un-gars/anemone.git && \
-cd anemone && \
-sudo ./install.sh en
+cd anemone && sudo ./install.sh
 ```
 
-**For RHEL/Fedora:**
-```bash
-# Update system and install dependencies + Anemone (RHEL/Fedora) - French
-sudo dnf update -y && \
-sudo dnf install -y golang samba git && \
-git clone https://github.com/juste-un-gars/anemone.git && \
-cd anemone && \
-sudo ./install.sh fr
-
-# English version
-sudo dnf update -y && \
-sudo dnf install -y golang samba git && \
-git clone https://github.com/juste-un-gars/anemone.git && \
-cd anemone && \
-sudo ./install.sh en
-```
+The installer handles all dependencies automatically. After installation, open your browser to complete setup via the web wizard.
 
 ### Standard Installation
 
 ```bash
-# Install dependencies first
-sudo apt update -y                      # Update package lists
-sudo apt upgrade -y                     # Upgrade existing packages
-sudo apt-get install -y golang-go       # Install Go compiler
-sudo apt install -y samba               # Install Samba server
-
 # Clone repository
 git clone https://github.com/juste-un-gars/anemone.git
 cd anemone
 
-# Run installer with language (requires sudo)
-sudo ./install.sh fr       # For French
-# OR
-sudo ./install.sh en       # For English
-# OR
-sudo ./install.sh          # Defaults to French
+# Run installer (requires sudo)
+sudo ./install.sh
 
 # The installer will:
+# - Install all dependencies (Go, GCC, Git, Samba)
 # - Compile the binary
 # - Create /srv/anemone data directory
-# - Install and configure Samba
-# - Configure SELinux (Fedora/RHEL)
+# - Configure sudoers and SELinux (Fedora/RHEL)
 # - Set up firewall rules
 # - Create systemd service (auto-start)
-# - Generate TLS certificates
 
-# Access web interface
+# Access web interface to complete setup
 open https://localhost:8443
+```
+
+### Advanced Installation Options
+
+```bash
+# Custom data directory
+sudo ./install.sh --data-dir=/data/anemone
+
+# Specify service user
+sudo ./install.sh --user=anemone
+
+# Show help
+sudo ./install.sh --help
 ```
 
 ### Manual Installation
@@ -398,18 +383,25 @@ docker compose up -d
 open http://localhost:8080
 ```
 
-## 📋 Initial Setup
+## 📋 Initial Setup (Web Wizard)
 
-1. **Access web interface** at `https://localhost:8443`
-   - Accept self-signed certificate warning (normal for local use)
-2. **Choose language** (French or English)
-3. **Set NAS name** and timezone
-4. **Create first admin user**
-   - Username
-   - Password
-   - Email (optional)
-5. System generates encryption key automatically
-6. **Done!** Redirect to admin dashboard
+After installation, open `https://localhost:8443` to complete setup:
+
+1. **Accept certificate** - Self-signed certificate warning (normal for local use)
+2. **Choose installation mode**
+   - New installation (fresh start)
+   - Restore from backup (disaster recovery)
+   - Import existing pool (migration)
+3. **Configure storage**
+   - Default path (`/srv/anemone`)
+   - Existing ZFS pool
+   - New ZFS pool (select disks)
+   - Custom path
+4. **Backup storage** - Same location or separate disk
+5. **Create admin account**
+   - Username, password, email
+   - Choose language (French or English)
+6. **Complete!** Save your encryption key and sync password
 
 ## 👥 User Management
 

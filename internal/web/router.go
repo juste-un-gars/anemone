@@ -21,6 +21,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/i18n"
 	"github.com/juste-un-gars/anemone/internal/incoming"
 	"github.com/juste-un-gars/anemone/internal/quota"
+	"github.com/juste-un-gars/anemone/internal/setup"
 	"github.com/juste-un-gars/anemone/internal/shares"
 	"github.com/juste-un-gars/anemone/internal/sync"
 	"github.com/juste-un-gars/anemone/internal/syncauth"
@@ -638,4 +639,60 @@ func formatBytes(bytes int64) string {
 		exp++
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
+}
+
+// NewSetupRouter creates a minimal router for the setup wizard
+// This router only serves the setup wizard endpoints and static files
+func NewSetupRouter(cfg *config.Config) http.Handler {
+	// Initialize i18n with default language
+	if err := i18n.Init(cfg.Language); err != nil {
+		log.Printf("Warning: Failed to initialize i18n: %v", err)
+	}
+
+	// Create setup wizard server
+	wizardServer := NewSetupWizardServer(cfg.DataDir, cfg.Language)
+
+	// Start setup mode
+	if err := wizardServer.GetManager().Start(); err != nil {
+		log.Printf("Warning: Failed to start setup mode: %v", err)
+	}
+
+	mux := http.NewServeMux()
+
+	// Static files (needed for CSS/JS)
+	fs := http.FileServer(http.Dir("web/static"))
+	mux.Handle("/static/", http.StripPrefix("/static/", fs))
+
+	// Health check
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "OK - Setup Mode")
+	})
+
+	// Register setup wizard routes
+	wizardServer.RegisterWizardRoutes(mux)
+
+	// Redirect all other routes to setup wizard
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.Redirect(w, r, "/setup/wizard", http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, "/setup/wizard", http.StatusSeeOther)
+	})
+
+	// Apply security headers middleware
+	return securityHeadersMiddleware(mux)
+}
+
+// NewRouterWithSetupCheck creates the main router with setup wizard middleware
+// If setup is needed, redirects to setup wizard
+func NewRouterWithSetupCheck(db *sql.DB, cfg *config.Config) http.Handler {
+	// Check if setup is still active
+	if setup.IsSetupNeeded(cfg.DataDir) {
+		return NewSetupRouter(cfg)
+	}
+
+	// Normal router
+	return NewRouter(db, cfg)
 }

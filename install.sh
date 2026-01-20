@@ -1,35 +1,75 @@
 #!/bin/bash
 set -e
 
-# 🪸 Anemone NAS - Automated Installer
-# This script installs and configures Anemone on your system
+# Anemone NAS - Automated Installer
+# This script installs Anemone and its dependencies.
+# Configuration is done via the web-based setup wizard.
 #
 # Usage:
-#   sudo ./install.sh [language]
+#   sudo ./install.sh [options]
 #
-# Parameters:
-#   language: "fr" (French) or "en" (English) - defaults to "fr" if not specified
+# Options:
+#   --data-dir=PATH    Set data directory (default: /srv/anemone)
+#   --user=USERNAME    Set service user (default: current user)
+#   --help             Show this help message
 #
 # Examples:
-#   sudo ./install.sh fr      # Install with French language
-#   sudo ./install.sh en      # Install with English language
-#   sudo ./install.sh         # Install with default French language
+#   sudo ./install.sh                           # Install with defaults
+#   sudo ./install.sh --data-dir=/data/anemone  # Custom data directory
+#   sudo ./install.sh --user=anemone            # Run as specific user
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Configuration
+# Default configuration
 DATA_DIR="/srv/anemone"
 INSTALL_DIR="$(pwd)"
 BINARY_NAME="anemone"
 SERVICE_NAME="anemone"
-CURRENT_USER="${SUDO_USER:-$USER}"
-LANGUAGE="${1:-fr}"  # Parse language parameter, default to French
+SERVICE_USER="${SUDO_USER:-$USER}"
 
-# Functions
+# Parse command line arguments
+parse_args() {
+    for arg in "$@"; do
+        case $arg in
+            --data-dir=*)
+                DATA_DIR="${arg#*=}"
+                ;;
+            --user=*)
+                SERVICE_USER="${arg#*=}"
+                ;;
+            --help)
+                show_help
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $arg"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+show_help() {
+    echo "Anemone NAS - Automated Installer"
+    echo ""
+    echo "Usage: sudo ./install.sh [options]"
+    echo ""
+    echo "Options:"
+    echo "  --data-dir=PATH    Set data directory (default: /srv/anemone)"
+    echo "  --user=USERNAME    Set service user (default: current user)"
+    echo "  --help             Show this help message"
+    echo ""
+    echo "After installation, complete setup via the web wizard at:"
+    echo "  https://<server-ip>:8443"
+}
+
+# Logging functions
 log_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
@@ -42,12 +82,8 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-validate_language() {
-    if [ "$LANGUAGE" != "fr" ] && [ "$LANGUAGE" != "en" ]; then
-        log_error "Invalid language: $LANGUAGE. Use 'fr' (French) or 'en' (English)"
-        exit 1
-    fi
-    log_info "Language set to: $LANGUAGE"
+log_step() {
+    echo -e "${BLUE}[STEP]${NC} $1"
 }
 
 check_root() {
@@ -71,73 +107,19 @@ detect_distro() {
         SMB_SERVICE="smbd"
         PKG_MANAGER="apt"
     else
-        log_error "Unsupported distribution"
+        log_error "Unsupported distribution. Supported: Fedora, RHEL, Debian, Ubuntu"
         exit 1
     fi
     log_info "Detected distribution: $DISTRO"
 }
 
-check_storage_setup() {
-    echo ""
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo -e "${YELLOW}⚠️  IMPORTANT : Configuration du stockage${NC}"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo "Anemone stocke les données dans : $DATA_DIR"
-    echo ""
-    echo -e "${YELLOW}Pour de meilleures performances et redondance, il est FORTEMENT recommandé${NC}"
-    echo -e "${YELLOW}de monter un pool ZFS/Btrfs RAID sur $DATA_DIR AVANT l'installation.${NC}"
-    echo ""
-    echo "📚 Documentation complète : https://github.com/juste-un-gars/anemone/blob/main/docs/STORAGE_SETUP.md"
-    echo ""
-    echo "Options recommandées :"
-    echo "  • ZFS Mirror/RaidZ : Protection contre la perte de données + snapshots"
-    echo "  • Btrfs RAID1/RAID10 : Redondance native + compression"
-    echo "  • Cockpit + ZFS Manager : Interface graphique pour gérer ZFS facilement"
-    echo ""
-    echo "Avez-vous :"
-    echo "  1) Créé et monté votre pool de stockage sur $DATA_DIR"
-    echo "  2) OU acceptez-vous d'utiliser le stockage système actuel (non recommandé)"
-    echo ""
-
-    # Check if DATA_DIR already has something mounted
-    if mountpoint -q "$DATA_DIR" 2>/dev/null; then
-        FS_TYPE=$(df -T "$DATA_DIR" | tail -1 | awk '{print $2}')
-        echo -e "${GREEN}✓ Détecté : $DATA_DIR est déjà monté (type: $FS_TYPE)${NC}"
-        echo ""
-    else
-        echo -e "${YELLOW}⚠️  Attention : $DATA_DIR n'est pas un point de montage séparé${NC}"
-        echo ""
-    fi
-
-    read -p "Continuer l'installation ? (oui/non) : " CONFIRM
-    echo ""
-
-    if [[ ! "$CONFIRM" =~ ^(oui|yes|o|y|OUI|YES|O|Y)$ ]]; then
-        echo -e "${YELLOW}Installation annulée.${NC}"
-        echo ""
-        echo "Pour configurer votre stockage :"
-        echo "  1. Installez Cockpit + ZFS Manager (voir documentation)"
-        echo "  2. Créez votre pool de stockage"
-        echo "  3. Montez-le sur $DATA_DIR"
-        echo "  4. Relancez ce script d'installation"
-        echo ""
-        exit 0
-    fi
-
-    log_info "Poursuite de l'installation..."
-}
-
 install_gcc() {
-    log_info "Checking GCC installation..."
-
     if command -v gcc &> /dev/null; then
-        GCC_VERSION=$(gcc --version | head -n1)
-        log_info "GCC is already installed: $GCC_VERSION"
+        log_info "GCC already installed"
         return
     fi
 
-    log_info "GCC not found. Installing..."
+    log_info "Installing GCC (required for CGO)..."
     if [ "$PKG_MANAGER" = "dnf" ]; then
         dnf install -y gcc
     elif [ "$PKG_MANAGER" = "apt" ]; then
@@ -145,37 +127,28 @@ install_gcc() {
         apt install -y gcc build-essential
     fi
 
-    if command -v gcc &> /dev/null; then
-        log_info "GCC installed successfully"
-    else
+    if ! command -v gcc &> /dev/null; then
         log_error "Failed to install GCC"
         exit 1
     fi
+    log_info "GCC installed"
 }
 
 install_go() {
-    log_info "Checking Go installation..."
-
     if command -v go &> /dev/null; then
         GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
-        log_info "Go is already installed: $GO_VERSION"
+        log_info "Go already installed: $GO_VERSION"
         return
     fi
 
-    log_info "Go not found. Installing latest version..."
+    log_info "Installing Go..."
 
     # Detect architecture
     ARCH=$(uname -m)
     case $ARCH in
-        x86_64)
-            GO_ARCH="amd64"
-            ;;
-        aarch64|arm64)
-            GO_ARCH="arm64"
-            ;;
-        armv6l)
-            GO_ARCH="armv6l"
-            ;;
+        x86_64)      GO_ARCH="amd64" ;;
+        aarch64|arm64) GO_ARCH="arm64" ;;
+        armv6l)      GO_ARCH="armv6l" ;;
         *)
             log_error "Unsupported architecture: $ARCH"
             exit 1
@@ -183,21 +156,16 @@ install_go() {
     esac
 
     # Get latest Go version
-    log_info "Fetching latest Go version..."
     LATEST_GO=$(curl -sL https://go.dev/VERSION?m=text | head -n1)
-
     if [ -z "$LATEST_GO" ]; then
         log_error "Failed to fetch latest Go version"
         exit 1
     fi
 
-    log_info "Latest Go version: $LATEST_GO"
-
-    # Download Go
+    log_info "Downloading Go $LATEST_GO..."
     GO_TARBALL="$LATEST_GO.linux-$GO_ARCH.tar.gz"
     GO_URL="https://go.dev/dl/$GO_TARBALL"
 
-    log_info "Downloading Go from $GO_URL..."
     cd /tmp
     curl -LO "$GO_URL"
 
@@ -207,18 +175,13 @@ install_go() {
     fi
 
     # Remove old installation if exists
-    if [ -d /usr/local/go ]; then
-        log_info "Removing old Go installation..."
-        rm -rf /usr/local/go
-    fi
+    [ -d /usr/local/go ] && rm -rf /usr/local/go
 
-    # Extract Go
-    log_info "Installing Go to /usr/local/go..."
+    # Extract and configure
     tar -C /usr/local -xzf "$GO_TARBALL"
     rm "$GO_TARBALL"
 
-    # Configure PATH for all users
-    log_info "Configuring Go PATH..."
+    # Configure PATH
     cat > /etc/profile.d/go.sh <<'EOF'
 export PATH=$PATH:/usr/local/go/bin
 export GOPATH=$HOME/go
@@ -226,59 +189,43 @@ export PATH=$PATH:$GOPATH/bin
 EOF
     chmod +x /etc/profile.d/go.sh
 
-    # Also configure for current root session
+    # Apply to current session
     export PATH=$PATH:/usr/local/go/bin
     export GOPATH=$HOME/go
     export PATH=$PATH:$GOPATH/bin
 
-    # Verify installation
-    if command -v go &> /dev/null; then
-        GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
-        log_info "Go $GO_VERSION installed successfully"
-    else
+    if ! command -v go &> /dev/null; then
         log_error "Failed to install Go"
         exit 1
     fi
-
+    log_info "Go installed"
     cd "$INSTALL_DIR"
 }
 
-check_prerequisites() {
-    log_info "Checking prerequisites..."
-
-    # Install GCC if needed (required for CGO)
-    install_gcc
-
-    # Install Go if needed
-    install_go
-
-    # Check git
-    if ! command -v git &> /dev/null; then
-        log_info "Git not found. Installing..."
-        if [ "$PKG_MANAGER" = "dnf" ]; then
-            dnf install -y git
-        elif [ "$PKG_MANAGER" = "apt" ]; then
-            apt update
-            apt install -y git
-        fi
-
-        if ! command -v git &> /dev/null; then
-            log_error "Failed to install Git"
-            exit 1
-        fi
-        log_info "Git installed successfully"
-    else
-        log_info "Git is already installed"
+install_git() {
+    if command -v git &> /dev/null; then
+        log_info "Git already installed"
+        return
     fi
 
-    log_info "All prerequisites met"
+    log_info "Installing Git..."
+    if [ "$PKG_MANAGER" = "dnf" ]; then
+        dnf install -y git
+    elif [ "$PKG_MANAGER" = "apt" ]; then
+        apt update
+        apt install -y git
+    fi
+
+    if ! command -v git &> /dev/null; then
+        log_error "Failed to install Git"
+        exit 1
+    fi
+    log_info "Git installed"
 }
 
 install_samba() {
-    log_info "Checking Samba installation..."
-
-    if command -v smbd &> /dev/null || command -v smb &> /dev/null; then
-        log_info "Samba is already installed"
+    if command -v smbd &> /dev/null; then
+        log_info "Samba already installed"
         return
     fi
 
@@ -289,55 +236,44 @@ install_samba() {
         apt update
         apt install -y samba
     fi
-
-    log_info "Samba installed successfully"
+    log_info "Samba installed"
 }
 
 install_storage_tools() {
-    log_info "Installing storage management tools..."
+    log_info "Installing storage tools..."
 
-    # Install smartmontools for disk health monitoring
+    # smartmontools for disk health
     if ! command -v smartctl &> /dev/null; then
-        log_info "Installing smartmontools..."
         if [ "$PKG_MANAGER" = "dnf" ]; then
             dnf install -y smartmontools
         elif [ "$PKG_MANAGER" = "apt" ]; then
             apt install -y smartmontools
         fi
         log_info "smartmontools installed"
-    else
-        log_info "smartmontools already installed"
     fi
 
-    # Install ZFS utilities if available
+    # ZFS utilities (optional, non-fatal if unavailable)
     if ! command -v zpool &> /dev/null; then
         log_info "Checking ZFS availability..."
         if [ "$PKG_MANAGER" = "dnf" ]; then
-            # Check if ZFS repo is available (ZFS on Linux)
             if dnf list available zfs 2>/dev/null | grep -q zfs; then
-                log_info "Installing ZFS from repository..."
-                dnf install -y zfs
+                dnf install -y zfs && log_info "ZFS installed" || log_warn "ZFS installation failed (optional)"
             else
-                log_warn "ZFS not available in repositories. To enable ZFS:"
-                log_warn "  Visit: https://openzfs.github.io/openzfs-docs/Getting%20Started/Fedora.html"
+                log_warn "ZFS not available in repositories (optional)"
             fi
         elif [ "$PKG_MANAGER" = "apt" ]; then
-            # On Debian/Ubuntu, zfsutils-linux is usually available
             if apt-cache show zfsutils-linux &>/dev/null; then
-                log_info "Installing ZFS utilities..."
-                apt install -y zfsutils-linux
-                log_info "ZFS utilities installed"
+                apt install -y zfsutils-linux && log_info "ZFS installed" || log_warn "ZFS installation failed (optional)"
             else
-                log_warn "ZFS not available. Install manually if needed."
+                log_warn "ZFS not available (optional)"
             fi
         fi
     else
         log_info "ZFS already installed"
     fi
 
-    # Install lsblk/util-linux (usually pre-installed)
+    # util-linux for lsblk
     if ! command -v lsblk &> /dev/null; then
-        log_info "Installing util-linux..."
         if [ "$PKG_MANAGER" = "dnf" ]; then
             dnf install -y util-linux
         elif [ "$PKG_MANAGER" = "apt" ]; then
@@ -345,117 +281,127 @@ install_storage_tools() {
         fi
     fi
 
-    log_info "Storage tools installation complete"
+    log_info "Storage tools ready"
 }
 
 build_binary() {
-    log_info "Building Anemone binary..."
+    log_info "Building Anemone..."
 
     cd "$INSTALL_DIR"
-    su - "$CURRENT_USER" -c "cd '$INSTALL_DIR' && CGO_ENABLED=1 go build -o $BINARY_NAME ./cmd/anemone"
+
+    # Build as non-root user if possible
+    if [ -n "$SERVICE_USER" ] && [ "$SERVICE_USER" != "root" ]; then
+        su - "$SERVICE_USER" -c "cd '$INSTALL_DIR' && CGO_ENABLED=1 go build -o $BINARY_NAME ./cmd/anemone"
+    else
+        CGO_ENABLED=1 go build -o $BINARY_NAME ./cmd/anemone
+    fi
 
     if [ ! -f "$BINARY_NAME" ]; then
         log_error "Failed to build binary"
         exit 1
     fi
 
-    log_info "Binary built successfully"
+    # Build dfree helper for Samba quota display
+    if [ -d "cmd/anemone-dfree" ]; then
+        log_info "Building dfree helper..."
+        if [ -n "$SERVICE_USER" ] && [ "$SERVICE_USER" != "root" ]; then
+            su - "$SERVICE_USER" -c "cd '$INSTALL_DIR' && CGO_ENABLED=1 go build -o anemone-dfree ./cmd/anemone-dfree" 2>/dev/null || true
+        else
+            CGO_ENABLED=1 go build -o anemone-dfree ./cmd/anemone-dfree 2>/dev/null || true
+        fi
+    fi
+
+    log_info "Build complete"
 }
 
 create_data_directory() {
-    log_info "Creating data directory..."
+    log_info "Creating data directory: $DATA_DIR"
 
-    if [ ! -d "$DATA_DIR" ]; then
-        mkdir -p "$DATA_DIR"
-        log_info "Created $DATA_DIR"
-    else
-        log_warn "$DATA_DIR already exists"
-    fi
-
-    # Set ownership
-    chown -R "$CURRENT_USER:$CURRENT_USER" "$DATA_DIR"
+    mkdir -p "$DATA_DIR"
+    chown "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR"
     chmod 755 "$DATA_DIR"
 
-    log_info "Data directory configured"
+    log_info "Data directory ready"
 }
 
 configure_sudoers() {
-    log_info "Configuring sudoers for SMB management and auto-update..."
+    log_info "Configuring sudoers..."
 
     SUDOERS_FILE="/etc/sudoers.d/anemone"
 
     cat > "$SUDOERS_FILE" <<EOF
 # Anemone NAS - Sudo Permissions
-# Allow user to manage Samba, users, and auto-update
+# Generated by install.sh
+# Data directory: $DATA_DIR
 
-# Auto-update permissions (restart anemone service)
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart anemone
-$CURRENT_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart anemone
+# Service management
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart anemone
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/systemctl restart anemone
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload $SMB_SERVICE
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload $SMB_SERVICE.service
 
-# SMB Management Permissions
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload $SMB_SERVICE
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload $SMB_SERVICE.service
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/useradd -M -s /usr/sbin/nologin *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/userdel *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/smbpasswd
+# User management for Samba
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/useradd -M -s /usr/sbin/nologin *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/userdel *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/smbpasswd
 
-# File operations restricted to Anemone data directory
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/chown * $DATA_DIR/*
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/chown -R * $DATA_DIR/*
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/chmod * $DATA_DIR/*
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/chmod -R * $DATA_DIR/*
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p $DATA_DIR/*
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/rm -rf $DATA_DIR/shares/*
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/rm -rf $DATA_DIR/backups/*
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/rmdir $DATA_DIR/*
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/mv $DATA_DIR/* $DATA_DIR/*
+# File operations - restricted to data directory
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/chown * $DATA_DIR/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/chown -R * $DATA_DIR/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/chmod * $DATA_DIR/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/chmod -R * $DATA_DIR/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p $DATA_DIR/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/rm -rf $DATA_DIR/shares/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/rm -rf $DATA_DIR/backups/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/rmdir $DATA_DIR/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mv $DATA_DIR/* $DATA_DIR/*
 
 # SMB configuration
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/cp $DATA_DIR/smb/smb.conf /etc/samba/smb.conf
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/cp $DATA_DIR/smb/smb.conf /etc/samba/smb.conf
 
 # SELinux (RHEL/Fedora)
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/semanage fcontext -a -t samba_share_t $DATA_DIR/*
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/restorecon -Rv $DATA_DIR/*
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/setsebool -P samba_enable_home_dirs on
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/setsebool -P samba_export_all_rw on
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/semanage fcontext -a -t samba_share_t $DATA_DIR/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/restorecon -Rv $DATA_DIR/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/setsebool -P samba_enable_home_dirs on
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/setsebool -P samba_export_all_rw on
 
 # Btrfs quota management
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs subvolume create $DATA_DIR/*
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs subvolume delete $DATA_DIR/*
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs subvolume show $DATA_DIR/*
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs qgroup *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs quota enable *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs subvolume create $DATA_DIR/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs subvolume delete $DATA_DIR/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs subvolume show $DATA_DIR/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs qgroup *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/btrfs quota enable *
 
-# Storage Management Permissions (SMART, ZFS)
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/smartctl *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/zpool *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/zpool *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/zfs *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/zfs *
+# Storage management (SMART, ZFS)
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/smartctl *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/zpool *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/zpool *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/zfs *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/zfs *
 
-# Disk Formatting and Partition Management
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/mkfs.ext4 *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/mkfs.ext4 *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/mkfs.xfs *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/mkfs.xfs *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/wipefs *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/wipefs *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/parted *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/parted *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/partprobe *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/partprobe *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /sbin/blockdev *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/sbin/blockdev *
+# Disk formatting (for setup wizard)
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/mkfs.ext4 *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/mkfs.ext4 *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/mkfs.xfs *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/mkfs.xfs *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/wipefs *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/wipefs *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/parted *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/parted *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/partprobe *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/partprobe *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/blockdev *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/blockdev *
 
-# Disk Wiping (dd with zero input only, for specific device paths)
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/sd* bs=1M count=1 *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/nvme* bs=1M count=1 *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/vd* bs=1M count=1 *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/loop* bs=1M count=1 *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/sd* bs=1M count=1 *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/nvme* bs=1M count=1 *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/vd* bs=1M count=1 *
-$CURRENT_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/loop* bs=1M count=1 *
+# Disk wiping (zero only, restricted to device paths)
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/sd* bs=1M count=1 *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/nvme* bs=1M count=1 *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/vd* bs=1M count=1 *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/loop* bs=1M count=1 *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/sd* bs=1M count=1 *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/nvme* bs=1M count=1 *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/vd* bs=1M count=1 *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/loop* bs=1M count=1 *
 EOF
 
     chmod 440 "$SUDOERS_FILE"
@@ -464,12 +410,10 @@ EOF
 
 configure_selinux() {
     if [ "$DISTRO" != "fedora" ] && [ "$DISTRO" != "rhel" ]; then
-        log_info "SELinux not applicable for this distribution"
         return
     fi
 
     if ! command -v getenforce &> /dev/null; then
-        log_info "SELinux not installed"
         return
     fi
 
@@ -478,14 +422,9 @@ configure_selinux() {
         return
     fi
 
-    log_info "Configuring SELinux for Samba..."
-
-    # Set context for shares directory
+    log_info "Configuring SELinux..."
     semanage fcontext -a -t samba_share_t "$DATA_DIR/shares(/.*)?" 2>/dev/null || true
-
-    # Enable Samba export
-    setsebool -P samba_export_all_rw on
-
+    setsebool -P samba_export_all_rw on 2>/dev/null || true
     log_info "SELinux configured"
 }
 
@@ -493,24 +432,20 @@ configure_firewall() {
     log_info "Configuring firewall..."
 
     if command -v firewall-cmd &> /dev/null; then
-        # FirewallD (Fedora/RHEL)
         if systemctl is-active --quiet firewalld; then
-            firewall-cmd --permanent --add-service=samba
-            firewall-cmd --permanent --add-port=8443/tcp
-            firewall-cmd --reload
+            firewall-cmd --permanent --add-service=samba 2>/dev/null || true
+            firewall-cmd --permanent --add-port=8443/tcp 2>/dev/null || true
+            firewall-cmd --reload 2>/dev/null || true
             log_info "FirewallD configured"
         else
             log_warn "FirewallD is not running"
         fi
     elif command -v ufw &> /dev/null; then
-        # UFW (Ubuntu/Debian)
-        ufw allow Samba
-        ufw allow 8443/tcp
+        ufw allow Samba 2>/dev/null || true
+        ufw allow 8443/tcp 2>/dev/null || true
         log_info "UFW configured"
     else
-        log_warn "No firewall detected. Please configure manually:"
-        log_warn "  - Allow ports: 139, 445 (SMB)"
-        log_warn "  - Allow port: 8443 (HTTPS)"
+        log_warn "No firewall detected. Ensure ports 139, 445 (SMB) and 8443 (HTTPS) are open"
     fi
 }
 
@@ -527,13 +462,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=$CURRENT_USER
-Group=$CURRENT_USER
+User=$SERVICE_USER
+Group=$SERVICE_USER
 WorkingDirectory=$INSTALL_DIR
 Environment="ANEMONE_DATA_DIR=$DATA_DIR"
 Environment="ENABLE_HTTPS=true"
 Environment="HTTPS_PORT=8443"
-Environment="LANGUAGE=$LANGUAGE"
 ExecStart=$INSTALL_DIR/$BINARY_NAME
 Restart=on-failure
 RestartSec=5s
@@ -546,22 +480,14 @@ EOF
     log_info "Systemd service created"
 }
 
-enable_samba_service() {
-    log_info "Enabling Samba service..."
+enable_services() {
+    log_info "Enabling services..."
 
+    # Enable and start Samba
     systemctl enable "$SMB_SERVICE"
-    systemctl start "$SMB_SERVICE"
+    systemctl start "$SMB_SERVICE" || log_warn "Samba failed to start"
 
-    if systemctl is-active --quiet "$SMB_SERVICE"; then
-        log_info "Samba service is running"
-    else
-        log_warn "Samba service failed to start. Check logs: journalctl -u $SMB_SERVICE"
-    fi
-}
-
-start_anemone_service() {
-    log_info "Starting Anemone service..."
-
+    # Enable and start Anemone
     systemctl enable "$SERVICE_NAME"
     systemctl start "$SERVICE_NAME"
 
@@ -570,60 +496,82 @@ start_anemone_service() {
     if systemctl is-active --quiet "$SERVICE_NAME"; then
         log_info "Anemone service is running"
     else
-        log_error "Anemone service failed to start. Check logs: journalctl -u $SERVICE_NAME"
+        log_error "Anemone service failed to start"
+        log_error "Check logs: journalctl -u $SERVICE_NAME -n 50"
         exit 1
     fi
 }
 
 show_completion_message() {
+    # Get server IP
+    SERVER_IP=$(hostname -I | awk '{print $1}')
+
     echo ""
-    echo -e "${GREEN}========================================${NC}"
-    echo -e "${GREEN}  🪸 Anemone Installation Complete!${NC}"
-    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}================================================================${NC}"
+    echo -e "${GREEN}       Anemone NAS - Installation Complete                     ${NC}"
+    echo -e "${GREEN}================================================================${NC}"
     echo ""
-    echo "Next steps:"
+    echo -e "  ${BLUE}Next step: Complete setup via the web wizard${NC}"
     echo ""
-    echo "1. Access the web interface:"
-    echo -e "   ${YELLOW}https://$(hostname -I | awk '{print $1}'):8443${NC}"
+    echo -e "  Open your browser and go to:"
+    echo -e "  ${YELLOW}https://${SERVER_IP}:8443${NC}"
     echo ""
-    echo "2. Complete initial setup:"
-    echo "   - Choose language (FR/EN)"
-    echo "   - Set NAS name and timezone"
-    echo "   - Create admin user"
+    echo -e "  The setup wizard will guide you through:"
+    echo -e "    1. Storage configuration (default path, ZFS, or custom)"
+    echo -e "    2. Backup storage location"
+    echo -e "    3. Admin account creation"
     echo ""
-    echo "3. Useful commands:"
-    echo "   - Check status: systemctl status anemone"
-    echo "   - View logs:    journalctl -u anemone -f"
-    echo "   - Restart:      systemctl restart anemone"
+    echo -e "  ${BLUE}Useful commands:${NC}"
+    echo -e "    Status:   systemctl status anemone"
+    echo -e "    Logs:     journalctl -u anemone -f"
+    echo -e "    Restart:  sudo systemctl restart anemone"
     echo ""
-    echo "4. SMB shares will be created automatically when users are activated"
-    echo ""
-    echo "📚 Documentation: $INSTALL_DIR/README.md"
+    echo -e "  ${BLUE}Configuration:${NC}"
+    echo -e "    Data directory: $DATA_DIR"
+    echo -e "    Service user:   $SERVICE_USER"
+    echo -e "    Install path:   $INSTALL_DIR"
     echo ""
 }
 
 # Main installation flow
 main() {
-    echo -e "${GREEN}🪸 Anemone NAS - Automated Installer${NC}"
+    echo -e "${GREEN}Anemone NAS - Automated Installer${NC}"
     echo ""
 
+    parse_args "$@"
     check_root
-    validate_language
     detect_distro
-    check_storage_setup
-    check_prerequisites
+
+    log_step "1/8 Installing build tools..."
+    install_gcc
+    install_go
+    install_git
+
+    log_step "2/8 Installing Samba..."
     install_samba
+
+    log_step "3/8 Installing storage tools..."
     install_storage_tools
+
+    log_step "4/8 Building Anemone..."
     build_binary
+
+    log_step "5/8 Creating data directory..."
     create_data_directory
+
+    log_step "6/8 Configuring permissions..."
     configure_sudoers
     configure_selinux
+
+    log_step "7/8 Configuring firewall..."
     configure_firewall
+
+    log_step "8/8 Starting services..."
     create_systemd_service
-    enable_samba_service
-    start_anemone_service
+    enable_services
+
     show_completion_message
 }
 
 # Run installation
-main
+main "$@"

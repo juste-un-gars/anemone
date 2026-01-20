@@ -7,6 +7,166 @@
 
 ## Current Session
 
+**Session 66** - Tests d'intégration Setup Wizard
+- **Status:** Completed
+- **Date:** 2026-01-20
+
+### Completed (Session 66)
+
+#### Bug Fix - Mutex Copy
+- [x] Corrigé bug `go vet` : SetupState contenait un mutex copié
+- [x] Créé `SetupStateView` - struct sans mutex pour usage externe
+- [x] Mis à jour `GetState()` pour retourner `SetupStateView`
+- [x] Mis à jour `SetupWizardData` dans handlers
+
+#### Vérifications
+- [x] `go vet ./...` - Aucune erreur
+- [x] `go build` - Compilation OK
+- [x] `go test ./...` - Tests passent
+- [x] JSON translations valides
+
+### Files Modified (Session 66)
+- `internal/setup/setup.go` - Ajout SetupStateView, fix GetState()
+- `internal/web/handlers_setup_wizard.go` - Utilise SetupStateView
+
+---
+
+## Previous Session
+
+**Session 65** - Mode Restauration Serveur
+- **Status:** Completed
+- **Date:** 2026-01-20
+
+### Completed (Session 65)
+
+#### Backend Restauration (restore.go)
+- [x] Créé `internal/setup/restore.go`
+- [x] `ValidateBackup()` - Décrypte et valide un fichier backup
+- [x] `ExecuteRestore()` - Restaure la config dans la DB
+- [x] Restauration : system_config, users, shares, peers, sync_config
+- [x] Support des chemins configurables (SharesDir, IncomingDir)
+
+#### Handlers Web (handlers_setup_wizard.go)
+- [x] `POST /setup/wizard/restore/validate` - Upload + validation backup
+- [x] `POST /setup/wizard/restore/execute` - Exécution restauration
+- [x] Stockage temporaire du backup pendant le wizard
+- [x] Intégration avec le Manager (finalize, cleanup)
+
+#### Frontend Wizard (setup_wizard.html)
+- [x] Étape upload : fichier + passphrase
+- [x] Étape confirmation : aperçu users/peers
+- [x] Étape succès : résumé + lien login
+- [x] JavaScript : validation, API calls, navigation
+- [x] Drag & drop support pour upload
+
+#### Traductions FR/EN
+- [x] 25+ nouvelles clés `setup_wizard.restore.*`
+- [x] Mise à jour note mode restore (plus "version future")
+
+### Files Created (Session 65)
+- `internal/setup/restore.go` - Logique de restauration
+
+### Files Modified (Session 65)
+- `internal/web/handlers_setup_wizard.go` - Endpoints restore
+- `web/templates/setup_wizard.html` - UI flux restauration
+- `internal/i18n/locales/fr.json` - Traductions restore
+- `internal/i18n/locales/en.json` - Traductions restore
+
+---
+
+## Previous Session
+
+**Session 64** - Nouveau install.sh simplifié
+- **Status:** Completed
+- **Date:** 2026-01-20
+
+### Completed (Session 64)
+
+#### Simplification install.sh
+- [x] Supprimé `check_storage_setup()` - délégué au wizard web
+- [x] Supprimé `validate_language()` - délégué au wizard web
+- [x] Ajouté options CLI : `--data-dir`, `--user`, `--help`
+- [x] Ajouté `parse_args()` et `show_help()`
+- [x] Simplifié les fonctions (logging, structure)
+- [x] Mise à jour message de fin → pointe vers wizard web
+- [x] Réduit de 630 à 578 lignes
+
+#### Mise à jour README.md
+- [x] Section "Quick Installation" mise à jour
+- [x] Section "Prerequisites" simplifiée (installer gère tout)
+- [x] Section "One-Line Installation" simplifiée
+- [x] Section "Standard Installation" mise à jour
+- [x] Ajouté "Advanced Installation Options"
+- [x] Section "Initial Setup" → décrit le wizard web
+
+### Files Modified (Session 64)
+- `install.sh` - Script simplifié avec options CLI
+- `README.md` - Documentation mise à jour pour nouveau flux
+
+---
+
+## Previous Session
+
+**Session 63** - Mode Setup - Frontend
+- **Status:** Completed
+- **Date:** 2026-01-20
+
+### Completed (Session 63)
+
+#### Setup Wizard Frontend
+- [x] Modifié `handlers_setup_wizard.go` pour servir HTML au lieu de JSON
+- [x] Créé template `setup_wizard.html` avec wizard multi-étapes complet
+- [x] Étape 0 : Choix mode (Nouvelle installation / Restauration / Import pool)
+- [x] Étape 1 : Sélection stockage (Défaut / ZFS existant / ZFS nouveau / Custom)
+- [x] Étape 2 : Stockage sauvegardes entrantes (Même / Séparé)
+- [x] Étape 3 : Création compte administrateur
+- [x] Étape 4 : Résumé et finalisation
+- [x] Étape 5 : Succès avec clé de chiffrement et mot de passe sync
+- [x] Traductions FR/EN complètes (50+ clés)
+- [x] JavaScript pour navigation wizard, validation, API calls
+- [x] Compilation OK - pas d'erreurs
+
+### Files Created (Session 63)
+- `web/templates/setup_wizard.html` - Template wizard complet avec TailwindCSS
+
+### Files Modified (Session 63)
+- `internal/web/handlers_setup_wizard.go` - Ajout imports i18n/template, SetupWizardData, rendu HTML
+- `internal/web/router.go` - Passage lang à NewSetupWizardServer()
+- `internal/i18n/locales/fr.json` - 50+ traductions setup_wizard.*
+- `internal/i18n/locales/en.json` - 50+ traductions setup_wizard.*
+
+---
+
+## Previous Session
+
+**Session 62** - Mode Setup - Backend
+- **Status:** Completed
+- **Date:** 2026-01-20
+
+### Completed (Session 62)
+
+#### Setup Wizard Backend
+- [x] Créé `internal/setup/setup.go` - Détection mode setup, gestion d'état
+- [x] Créé `internal/setup/storage.go` - Configuration stockage (ZFS, défaut, custom)
+- [x] Créé `internal/setup/finalize.go` - Finalisation (DB init, admin user, encryption keys)
+- [x] Créé `internal/web/handlers_setup_wizard.go` - API endpoints wizard
+- [x] Intégré mode setup dans main.go et router.go
+- [x] Tests passent - compilation OK
+
+### Files Created (Session 62)
+- `internal/setup/setup.go` - Détection IsSetupNeeded(), Manager, SetupState
+- `internal/setup/storage.go` - GetStorageOptions(), GetAvailableDisks(), SetupZFSStorage()
+- `internal/setup/finalize.go` - FinalizeSetup(), création admin, sync password
+- `internal/web/handlers_setup_wizard.go` - SetupWizardServer, API handlers
+
+### Files Modified (Session 62)
+- `cmd/anemone/main.go` - Ajout détection setup mode, runSetupMode()
+- `internal/web/router.go` - Ajout NewSetupRouter(), NewRouterWithSetupCheck()
+
+---
+
+## Previous Session
+
 **Session 61** - Refactoring permissions et utilisateur système
 - **Status:** Completed
 - **Date:** 2026-01-20
@@ -188,55 +348,78 @@ Ensuite, question optionnelle pour le stockage séparé des backups entrants (si
 
 ---
 
-### Session 62 : Mode Setup - Backend
+### Session 62 : Mode Setup - Backend ✅ COMPLETED
 **Objectif :** Créer la logique backend du wizard d'installation
 
-- [ ] Créer `internal/setup/` package
-- [ ] Détection "mode setup" au démarrage (pas de DB ou flag `--setup`)
-- [ ] API endpoints : `/setup/storage`, `/setup/admin`, `/setup/finalize`
-- [ ] Logique création pool ZFS avec permissions correctes
-- [ ] Logique montage disque USB
-- [ ] Création structure répertoires avec bons droits
+- [x] Créer `internal/setup/` package
+- [x] Détection "mode setup" au démarrage (pas de DB ou flag `--setup`)
+- [x] API endpoints : `/setup/wizard/*` (state, storage, disks, admin, finalize)
+- [x] Logique création pool ZFS avec permissions correctes
+- [x] Création structure répertoires avec bons droits
+- [x] Intégration dans main.go et router.go
 
-**Fichiers à créer :**
+**Fichiers créés :**
 - `internal/setup/setup.go` - Détection et état du setup
 - `internal/setup/storage.go` - Configuration stockage
 - `internal/setup/finalize.go` - Finalisation installation
-- `internal/web/handlers_setup.go` - API handlers
+- `internal/web/handlers_setup_wizard.go` - API handlers
 
 ---
 
-### Session 63 : Mode Setup - Frontend
+### Session 63 : Mode Setup - Frontend ✅ COMPLETED
 **Objectif :** Créer l'interface utilisateur du wizard
 
-- [ ] Template `setup_wizard.html` (wizard multi-étapes)
-- [ ] Étape 1 : Sélection stockage principal (ZFS / chemin existant / USB)
-- [ ] Étape 2 : Stockage sauvegardes entrantes (même disque / disque séparé)
-- [ ] Étape 3 : Configuration avancée (chemins personnalisés, optionnel)
-- [ ] Étape 4 : Création compte admin
-- [ ] Étape 5 : Résumé et finalisation
-- [ ] Traductions FR/EN complètes
-- [ ] JavaScript pour navigation wizard
+- [x] Template `setup_wizard.html` (wizard multi-étapes)
+- [x] **Étape 0 : Choix mode** (Nouvelle installation / Restauration / Import pool)
+- [x] Étape 1 : Sélection stockage principal (ZFS / chemin existant / USB)
+- [x] Étape 2 : Stockage sauvegardes entrantes (même disque / disque séparé)
+- [x] Étape 3 : Création compte admin
+- [x] Étape 4 : Résumé et finalisation
+- [x] Étape 5 : Succès (clé chiffrement + mot de passe sync)
+- [x] Traductions FR/EN complètes (50+ clés)
+- [x] JavaScript pour navigation wizard
 
-**Fichiers à créer :**
-- `web/templates/setup_wizard.html`
-- `web/static/js/setup.js` (optionnel)
+**Fichiers créés :**
+- `web/templates/setup_wizard.html` - Template complet avec TailwindCSS
+
+**Fichiers modifiés :**
+- `internal/web/handlers_setup_wizard.go` - Rendu HTML
+- `internal/web/router.go` - Passage langue
+- `internal/i18n/locales/fr.json` - Traductions
+- `internal/i18n/locales/en.json` - Traductions
 
 ---
 
-### Session 64 : Nouveau install.sh
+### Session 65 : Mode Restauration Serveur ✅ COMPLETED
+**Objectif :** Intégrer la restauration serveur dans le wizard d'installation
+
+- [x] Créé `internal/setup/restore.go` - ValidateBackup() et ExecuteRestore()
+- [x] Endpoints: `/setup/wizard/restore/validate` et `/setup/wizard/restore/execute`
+- [x] UI wizard: upload, confirmation, succès
+- [x] Traductions FR/EN (25+ clés)
+- [x] Support drag & drop pour upload fichier
+
+**Fichiers créés/modifiés :**
+- `internal/setup/restore.go` - Logique de restauration
+- `internal/web/handlers_setup_wizard.go` - Endpoints restauration
+- `web/templates/setup_wizard.html` - UI flux restauration
+- `internal/i18n/locales/fr.json` - Traductions
+- `internal/i18n/locales/en.json` - Traductions
+
+---
+
+### Session 64 : Nouveau install.sh ✅ COMPLETED
 **Objectif :** Simplifier le script d'installation
 
-- [ ] Réécrire `install.sh` : installe deps + binaire + service uniquement
-- [ ] Ne configure plus les chemins (délégué au wizard web)
-- [ ] Créer utilisateur système `anemone` si option choisie
-- [ ] Mettre à jour `README.md` avec nouveau flux d'installation
-- [ ] Tests d'installation sur VM propre (Fedora + Debian)
+- [x] Réécrire `install.sh` : installe deps + binaire + service uniquement
+- [x] Ne configure plus les chemins (délégué au wizard web)
+- [x] Ajout options CLI : `--data-dir`, `--user`, `--help`
+- [x] Mettre à jour `README.md` avec nouveau flux d'installation
+- [ ] Tests d'installation sur VM propre (Fedora + Debian) → Session 67
 
-**Fichiers concernés :**
-- `install.sh`
-- `README.md`
-- `docs/INSTALL.md` (nouveau, optionnel)
+**Fichiers modifiés :**
+- `install.sh` - Script simplifié (630→578 lignes)
+- `README.md` - Documentation mise à jour
 
 ---
 
@@ -274,6 +457,11 @@ Ensuite, question optionnelle pour le stockage séparé des backups entrants (si
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 66 | Tests d'intégration Setup Wizard | 2026-01-20 | Completed |
+| 65 | Mode Restauration Serveur | 2026-01-20 | Completed |
+| 64 | Nouveau install.sh simplifié | 2026-01-20 | Completed |
+| 63 | Mode Setup - Frontend | 2026-01-20 | Completed |
+| 62 | Mode Setup - Backend | 2026-01-20 | Completed |
 | 61 | Refactoring permissions | 2026-01-20 | Completed |
 | 60 | Refactoring chemins configurables | 2026-01-20 | Completed |
 | 59 | Corrections urgentes (pré-refactoring) | 2026-01-20 | Completed |
@@ -329,8 +517,13 @@ All detailed session files are in `.claude/sessions/`:
 
 ## Next Steps
 
-**Prochaine session : Session 62** - Mode Setup - Backend
+**Prochaine session : Session 67** - Tests VM
 
-Objectif : Créer la logique backend du wizard d'installation.
+Objectif : Tester l'installation complète sur des VM propres (Fedora et Debian).
 
-Commencer par `"continue"` ou `"session 62"`.
+**Sessions planifiées :**
+- Session 67 : Tests VM (Fedora + Debian)
+- Session 68 : Mode Import Pool ZFS (récupération après réinstallation)
+- Session 69 : Documentation mise à jour
+
+Commencer par `"continue"` ou `"session 67"`.

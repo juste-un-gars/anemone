@@ -1,0 +1,171 @@
+// Anemone - Multi-user NAS with P2P encrypted synchronization
+// Copyright (C) 2025 juste-un-gars
+// Licensed under the GNU Affero General Public License v3.0
+
+package setup
+
+import (
+	"crypto/rand"
+	"database/sql"
+	"encoding/base64"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/juste-un-gars/anemone/internal/database"
+	"github.com/juste-un-gars/anemone/internal/syncauth"
+	"github.com/juste-un-gars/anemone/internal/users"
+)
+
+// FinalizeOptions contains options for finalizing the setup
+type FinalizeOptions struct {
+	DataDir       string
+	SharesDir     string
+	IncomingDir   string
+	AdminUsername string
+	AdminPassword string
+	AdminEmail    string
+	Language      string
+}
+
+// FinalizeResult contains the results of the finalization
+type FinalizeResult struct {
+	AdminUserID   int    `json:"admin_user_id"`
+	AdminUsername string `json:"admin_username"`
+	EncryptionKey string `json:"encryption_key"`
+	SyncPassword  string `json:"sync_password"`
+	EnvFile       string `json:"env_file"`
+}
+
+// FinalizeSetup completes the Anemone setup
+func FinalizeSetup(opts FinalizeOptions) (*FinalizeResult, error) {
+	result := &FinalizeResult{}
+
+	// 1. Initialize database
+	dbPath := filepath.Join(opts.DataDir, "db", "anemone.db")
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+		return nil, fmt.Errorf("failed to create database directory: %w", err)
+	}
+
+	db, err := database.Init(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
+	}
+	defer db.Close()
+
+	// 2. Run migrations
+	if err := database.Migrate(db); err != nil {
+		return nil, fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	// 3. Generate master key for encrypting user keys
+	masterKeyBytes := make([]byte, 32)
+	if _, err := rand.Read(masterKeyBytes); err != nil {
+		return nil, fmt.Errorf("failed to generate master key: %w", err)
+	}
+	masterKey := base64.StdEncoding.EncodeToString(masterKeyBytes)
+
+	// 4. Create admin user
+	language := opts.Language
+	if language == "" {
+		language = "fr"
+	}
+	adminUser, encryptionKey, err := users.CreateFirstAdmin(
+		db,
+		opts.AdminUsername,
+		opts.AdminPassword,
+		opts.AdminEmail,
+		masterKey,
+		language,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create admin user: %w", err)
+	}
+	result.AdminUserID = adminUser.ID
+	result.AdminUsername = adminUser.Username
+	result.EncryptionKey = encryptionKey
+
+	// 5. Generate sync authentication password
+	syncPasswordBytes := make([]byte, 24) // 24 bytes = 192 bits
+	if _, err := rand.Read(syncPasswordBytes); err != nil {
+		return nil, fmt.Errorf("failed to generate sync password: %w", err)
+	}
+	syncPassword := base64.URLEncoding.EncodeToString(syncPasswordBytes)
+	result.SyncPassword = syncPassword
+
+	// 6. Store sync password hash in database
+	if err := syncauth.SetSyncAuthPassword(db, syncPassword); err != nil {
+		return nil, fmt.Errorf("failed to store sync password: %w", err)
+	}
+
+	// 7. Save system configuration
+	if err := saveSystemConfig(db, masterKey, language); err != nil {
+		return nil, fmt.Errorf("failed to save system config: %w", err)
+	}
+
+	// 8. Write environment file for service
+	envFile := filepath.Join(opts.DataDir, "anemone.env")
+	if err := writeEnvFile(envFile, opts); err != nil {
+		return nil, fmt.Errorf("failed to write environment file: %w", err)
+	}
+	result.EnvFile = envFile
+
+	return result, nil
+}
+
+// saveSystemConfig saves essential system configuration
+func saveSystemConfig(db *sql.DB, masterKey, language string) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	configs := map[string]string{
+		"master_key": masterKey,
+		"language":   language,
+		"nas_name":   "Anemone NAS",
+		"timezone":   "Europe/Paris",
+	}
+
+	for key, value := range configs {
+		_, err = tx.Exec(
+			"INSERT OR REPLACE INTO system_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
+			key, value,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to save config %s: %w", key, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+// writeEnvFile writes the environment configuration file
+func writeEnvFile(path string, opts FinalizeOptions) error {
+	content := fmt.Sprintf(`# Anemone NAS Configuration
+# Generated during setup - do not edit manually
+
+ANEMONE_DATA_DIR=%s
+`, opts.DataDir)
+
+	// Add optional overrides
+	if opts.SharesDir != "" && opts.SharesDir != filepath.Join(opts.DataDir, "shares") {
+		content += fmt.Sprintf("ANEMONE_SHARES_DIR=%s\n", opts.SharesDir)
+	}
+
+	if opts.IncomingDir != "" && opts.IncomingDir != filepath.Join(opts.DataDir, "backups", "incoming") {
+		content += fmt.Sprintf("ANEMONE_INCOMING_DIR=%s\n", opts.IncomingDir)
+	}
+
+	return os.WriteFile(path, []byte(content), 0600)
+}
+
+// GenerateSystemdOverride generates a systemd override file for Anemone
+func GenerateSystemdOverride(dataDir string) (string, error) {
+	content := fmt.Sprintf(`[Service]
+Environment="ANEMONE_DATA_DIR=%s"
+`, dataDir)
+
+	return content, nil
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/database"
 	"github.com/juste-un-gars/anemone/internal/scheduler"
 	"github.com/juste-un-gars/anemone/internal/serverbackup"
+	"github.com/juste-un-gars/anemone/internal/setup"
 	syncpkg "github.com/juste-un-gars/anemone/internal/sync"
 	"github.com/juste-un-gars/anemone/internal/sysconfig"
 	"github.com/juste-un-gars/anemone/internal/tls"
@@ -30,6 +31,13 @@ func main() {
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Check if setup is needed
+	if setup.IsSetupNeeded(cfg.DataDir) {
+		log.Println("🔧 Setup mode detected - starting setup wizard...")
+		runSetupMode(cfg)
+		return
 	}
 
 	// Validate directories exist and are writable
@@ -156,4 +164,41 @@ func startHTTPServer(cfg *config.Config, router http.Handler) {
 	if err := http.ListenAndServe(addr, router); err != nil {
 		log.Fatalf("HTTP server failed: %v", err)
 	}
+}
+
+// runSetupMode runs the setup wizard server
+func runSetupMode(cfg *config.Config) {
+	// Create setup wizard router
+	router := web.NewSetupRouter(cfg)
+
+	// WaitGroup to wait for all servers
+	var wg sync.WaitGroup
+
+	// Start HTTPS server if enabled
+	if cfg.EnableHTTPS {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			startHTTPSServer(cfg, router)
+		}()
+	}
+
+	// Start HTTP server if enabled
+	if cfg.EnableHTTP {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			startHTTPServer(cfg, router)
+		}()
+	}
+
+	// If neither is enabled, default to HTTP for setup
+	if !cfg.EnableHTTPS && !cfg.EnableHTTP {
+		log.Println("⚠️  No server protocol enabled, defaulting to HTTP for setup wizard")
+		startHTTPServer(cfg, router)
+		return
+	}
+
+	// Wait for all servers
+	wg.Wait()
 }
