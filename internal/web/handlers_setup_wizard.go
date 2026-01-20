@@ -77,12 +77,6 @@ func (s *SetupWizardServer) handleWizard(w http.ResponseWriter, r *http.Request)
 	// Get current state
 	state := s.manager.GetState()
 
-	// If setup is complete, redirect to login
-	if state.Finalized {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
 	// Determine current step based on state
 	currentStep := 0 // Mode selection
 	if state.StorageConfigured {
@@ -90,6 +84,10 @@ func (s *SetupWizardServer) handleWizard(w http.ResponseWriter, r *http.Request)
 	}
 	if state.AdminCreated {
 		currentStep = 5 // Summary
+	}
+	// If finalized, show the final success step (step 6) with restart message
+	if state.Finalized {
+		currentStep = 6
 	}
 
 	// Get language from query param or default
