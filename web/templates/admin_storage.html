@@ -201,7 +201,7 @@
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
                         {{range .Disks}}
-                        <tr>
+                        <tr class="cursor-pointer hover:bg-gray-50" onclick="showSMARTDetails('{{.Name}}')">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
                                     <div class="text-sm font-medium text-gray-900">{{.Name}}</div>
@@ -280,6 +280,10 @@
                                 {{else}}bg-red-100 text-red-800{{end}}">
                                 {{.State}}
                             </span>
+                            <button onclick="startScrub('{{.Name}}')"
+                                    class="ml-3 px-3 py-1 text-xs font-medium rounded-md bg-indigo-100 text-indigo-700 hover:bg-indigo-200">
+                                {{T $.Lang "storage.start_scrub"}}
+                            </button>
                         </div>
                         <div class="text-sm text-gray-500">
                             {{.AllocHuman}} / {{.SizeHuman}} ({{printf "%.1f" .UsedPercent}}%)
@@ -394,5 +398,149 @@
         {{end}}
     </div>
 </div>
+
+<!-- SMART Details Modal -->
+<div id="smartModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-medium text-gray-900">
+                {{T .Lang "storage.smart_details"}} - <span id="smartDiskName"></span>
+            </h3>
+            <button onclick="closeSMARTModal()" class="text-gray-400 hover:text-gray-600">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div id="smartContent" class="mt-4">
+            <!-- Content loaded via JS -->
+        </div>
+    </div>
+</div>
+
+<script>
+// Start ZFS scrub
+function startScrub(poolName) {
+    if (!confirm('{{T .Lang "storage.confirm_scrub"}}')) {
+        return;
+    }
+
+    fetch('/api/admin/storage/pool/' + poolName + '/scrub', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('{{T .Lang "storage.scrub_started"}}');
+            location.reload();
+        } else {
+            alert('{{T .Lang "storage.scrub_error"}}: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(err => {
+        alert('{{T .Lang "storage.scrub_error"}}: ' + err);
+    });
+}
+
+// Show SMART details modal
+function showSMARTDetails(diskName) {
+    document.getElementById('smartDiskName').textContent = diskName;
+    document.getElementById('smartContent').innerHTML = '<p class="text-center text-gray-500">{{T .Lang "common.loading"}}...</p>';
+    document.getElementById('smartModal').classList.remove('hidden');
+
+    fetch('/api/admin/storage/disk/' + diskName + '/smart')
+    .then(response => response.json())
+    .then(data => {
+        let html = '';
+
+        if (!data.available) {
+            html = '<p class="text-center text-gray-500">{{T .Lang "storage.smart_not_available"}}</p>';
+        } else {
+            // Summary
+            html += '<div class="grid grid-cols-2 gap-4 mb-4">';
+            html += '<div class="bg-gray-50 p-3 rounded"><span class="text-gray-500">{{T .Lang "storage.health"}}:</span> ';
+            html += data.healthy ? '<span class="text-green-600 font-medium">OK</span>' : '<span class="text-red-600 font-medium">FAILED</span>';
+            html += '</div>';
+            html += '<div class="bg-gray-50 p-3 rounded"><span class="text-gray-500">{{T .Lang "storage.temp"}}:</span> ';
+            html += data.temperature > 0 ? data.temperature + '°C' : '-';
+            html += '</div>';
+            html += '<div class="bg-gray-50 p-3 rounded"><span class="text-gray-500">{{T .Lang "storage.power_on"}}:</span> ';
+            html += data.power_on_hours > 0 ? data.power_on_hours + 'h' : '-';
+            html += '</div>';
+            html += '<div class="bg-gray-50 p-3 rounded"><span class="text-gray-500">{{T .Lang "storage.power_cycles"}}:</span> ';
+            html += data.power_cycle_count > 0 ? data.power_cycle_count : '-';
+            html += '</div>';
+            html += '</div>';
+
+            // Critical values
+            if (data.reallocated_sectors > 0 || data.pending_sectors > 0 || data.uncorrectable_sectors > 0) {
+                html += '<div class="bg-red-50 border border-red-200 rounded p-3 mb-4">';
+                html += '<h4 class="text-red-800 font-medium mb-2">{{T .Lang "storage.critical_values"}}</h4>';
+                html += '<div class="grid grid-cols-3 gap-2 text-sm">';
+                html += '<div>{{T .Lang "storage.reallocated"}}: <span class="font-medium">' + data.reallocated_sectors + '</span></div>';
+                html += '<div>{{T .Lang "storage.pending"}}: <span class="font-medium">' + data.pending_sectors + '</span></div>';
+                html += '<div>{{T .Lang "storage.uncorrectable"}}: <span class="font-medium">' + data.uncorrectable_sectors + '</span></div>';
+                html += '</div></div>';
+            }
+
+            // Attributes table
+            if (data.attributes && data.attributes.length > 0) {
+                html += '<h4 class="font-medium text-gray-900 mb-2">{{T .Lang "storage.smart_attributes"}}</h4>';
+                html += '<div class="overflow-x-auto max-h-64 overflow-y-auto">';
+                html += '<table class="min-w-full text-sm">';
+                html += '<thead class="bg-gray-50"><tr>';
+                html += '<th class="px-2 py-1 text-left">ID</th>';
+                html += '<th class="px-2 py-1 text-left">{{T .Lang "storage.attr_name"}}</th>';
+                html += '<th class="px-2 py-1 text-right">{{T .Lang "storage.attr_value"}}</th>';
+                html += '<th class="px-2 py-1 text-right">{{T .Lang "storage.attr_worst"}}</th>';
+                html += '<th class="px-2 py-1 text-right">{{T .Lang "storage.attr_thresh"}}</th>';
+                html += '<th class="px-2 py-1 text-left">{{T .Lang "storage.attr_raw"}}</th>';
+                html += '</tr></thead><tbody>';
+
+                data.attributes.forEach(function(attr) {
+                    let rowClass = '';
+                    if (attr.status === 'failing') rowClass = 'bg-red-50';
+                    else if (attr.status === 'warning') rowClass = 'bg-yellow-50';
+
+                    html += '<tr class="' + rowClass + '">';
+                    html += '<td class="px-2 py-1">' + attr.id + '</td>';
+                    html += '<td class="px-2 py-1">' + attr.name + '</td>';
+                    html += '<td class="px-2 py-1 text-right">' + attr.value + '</td>';
+                    html += '<td class="px-2 py-1 text-right">' + attr.worst + '</td>';
+                    html += '<td class="px-2 py-1 text-right">' + attr.threshold + '</td>';
+                    html += '<td class="px-2 py-1 font-mono text-xs">' + attr.raw_value + '</td>';
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table></div>';
+            }
+        }
+
+        document.getElementById('smartContent').innerHTML = html;
+    })
+    .catch(err => {
+        document.getElementById('smartContent').innerHTML = '<p class="text-center text-red-500">{{T .Lang "common.error"}}: ' + err + '</p>';
+    });
+}
+
+// Close SMART modal
+function closeSMARTModal() {
+    document.getElementById('smartModal').classList.add('hidden');
+}
+
+// Close modal on escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeSMARTModal();
+    }
+});
+
+// Close modal on background click
+document.getElementById('smartModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeSMARTModal();
+    }
+});
+</script>
 </body>
 </html>

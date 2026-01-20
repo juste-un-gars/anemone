@@ -344,3 +344,29 @@ func GetZFSPool(name string) (*ZFSPool, error) {
 
 	return nil, nil
 }
+
+// StartScrub initiates a scrub on a ZFS pool
+func StartScrub(poolName string) error {
+	if !IsZFSAvailable() {
+		return nil
+	}
+
+	cmd := exec.Command("sudo", "zpool", "scrub", poolName)
+	return cmd.Run()
+}
+
+// StopScrub stops an ongoing scrub on a ZFS pool
+func StopScrub(poolName string) error {
+	if !IsZFSAvailable() {
+		return nil
+	}
+
+	cmd := exec.Command("sudo", "zpool", "scrub", "-s", poolName)
+	return cmd.Run()
+}
+
+// IsScrubRunning checks if a scrub is currently running on a pool
+func IsScrubRunning(poolName string) bool {
+	status := getPoolScanStatus(poolName)
+	return strings.Contains(status, "scrub in progress")
+}
