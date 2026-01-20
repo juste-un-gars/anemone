@@ -3,7 +3,6 @@ package storage
 import (
 	"encoding/json"
 	"os/exec"
-	"strconv"
 	"strings"
 )
 
@@ -11,13 +10,13 @@ import (
 type lsblkDevice struct {
 	Name       string        `json:"name"`
 	Path       string        `json:"path"`
-	Size       string        `json:"size"`      // Size in bytes as string
-	Type       string        `json:"type"`      // disk, part, rom, etc.
+	Size       uint64        `json:"size"`       // Size in bytes as integer
+	Type       string        `json:"type"`       // disk, part, rom, etc.
 	Model      string        `json:"model"`
 	Serial     string        `json:"serial"`
-	Rota       string        `json:"rota"`      // "1" for rotational, "0" for SSD
-	Tran       string        `json:"tran"`      // Transport: sata, nvme, usb, etc.
-	Fstype     string        `json:"fstype"`    // Filesystem type
+	Rota       bool          `json:"rota"`       // true for rotational (HDD), false for SSD
+	Tran       string        `json:"tran"`       // Transport: sata, nvme, usb, etc.
+	Fstype     string        `json:"fstype"`     // Filesystem type
 	Mountpoint string        `json:"mountpoint"`
 	Label      string        `json:"label"`
 	Children   []lsblkDevice `json:"children"`
@@ -57,20 +56,16 @@ func ListDisks() ([]Disk, error) {
 		}
 
 		disk := Disk{
-			Name:       dev.Name,
-			Path:       dev.Path,
-			Model:      strings.TrimSpace(dev.Model),
-			Serial:     strings.TrimSpace(dev.Serial),
-			Rotational: dev.Rota == "1",
-			Health:     HealthUnknown, // Will be updated by SMART
-			Temperature: -1,
+			Name:         dev.Name,
+			Path:         dev.Path,
+			Model:        strings.TrimSpace(dev.Model),
+			Serial:       strings.TrimSpace(dev.Serial),
+			Size:         dev.Size,
+			SizeHuman:    FormatBytes(dev.Size),
+			Rotational:   dev.Rota,
+			Health:       HealthUnknown, // Will be updated by SMART
+			Temperature:  -1,
 			PowerOnHours: -1,
-		}
-
-		// Parse size
-		if size, err := strconv.ParseUint(dev.Size, 10, 64); err == nil {
-			disk.Size = size
-			disk.SizeHuman = FormatBytes(size)
 		}
 
 		// Determine disk type
@@ -82,13 +77,11 @@ func ListDisks() ([]Disk, error) {
 				part := Partition{
 					Name:       child.Name,
 					Path:       child.Path,
+					Size:       child.Size,
+					SizeHuman:  FormatBytes(child.Size),
 					Filesystem: child.Fstype,
 					Mountpoint: child.Mountpoint,
 					Label:      child.Label,
-				}
-				if size, err := strconv.ParseUint(child.Size, 10, 64); err == nil {
-					part.Size = size
-					part.SizeHuman = FormatBytes(size)
 				}
 				disk.Partitions = append(disk.Partitions, part)
 			}
@@ -107,8 +100,8 @@ func determineDiskType(dev lsblkDevice) DiskType {
 		return DiskTypeNVMe
 	}
 
-	// Check if rotational
-	if dev.Rota == "0" {
+	// Check if rotational (true = HDD, false = SSD)
+	if !dev.Rota {
 		return DiskTypeSSD
 	}
 
