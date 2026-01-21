@@ -354,38 +354,42 @@ func ValidateStorageConfig(config SetupConfig) error {
 	return nil
 }
 
-// createDirectoryWithSudo creates a directory using sudo.
+// createDirectoryWithSudo creates a directory using sudo and sets ownership.
 // Returns a helpful error message if sudo fails due to password requirement.
 func createDirectoryWithSudo(path string) error {
-	// First check if directory already exists
-	if _, err := os.Stat(path); err == nil {
-		return nil // Directory exists
-	}
-
 	// Get current user for ownership
 	currentUser := os.Getenv("USER")
 	if currentUser == "" {
 		currentUser = os.Getenv("LOGNAME")
 	}
 
-	// Try to create with sudo
-	cmd := exec.Command("sudo", "mkdir", "-p", path)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		outputStr := string(output)
-		if strings.Contains(outputStr, "password") || strings.Contains(outputStr, "terminal") {
-			return fmt.Errorf("cannot create directory '%s'. Please create it manually:\n\nsudo mkdir -p %s\nsudo chown %s:%s %s", path, path, currentUser, currentUser, path)
-		}
-		return fmt.Errorf("failed to create directory %s: %s", path, outputStr)
+	// Check if directory already exists
+	dirExists := false
+	if _, err := os.Stat(path); err == nil {
+		dirExists = true
 	}
 
-	// Set ownership to current user so anemone can write to it
+	// Create directory if it doesn't exist
+	if !dirExists {
+		cmd := exec.Command("sudo", "mkdir", "-p", path)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			outputStr := string(output)
+			if strings.Contains(outputStr, "password") || strings.Contains(outputStr, "terminal") {
+				return fmt.Errorf("cannot create directory '%s'. Please create it manually:\n\nsudo mkdir -p %s\nsudo chown %s:%s %s", path, path, currentUser, currentUser, path)
+			}
+			return fmt.Errorf("failed to create directory %s: %s", path, outputStr)
+		}
+	}
+
+	// Always set ownership to current user so anemone can write to it
+	// (even if directory already existed with wrong ownership)
 	if currentUser != "" {
-		cmd = exec.Command("sudo", "chown", currentUser+":"+currentUser, path)
+		cmd := exec.Command("sudo", "chown", currentUser+":"+currentUser, path)
 		cmd.Run() // Ignore errors
 	}
 
 	// Set permissions
-	cmd = exec.Command("sudo", "chmod", "755", path)
+	cmd := exec.Command("sudo", "chmod", "755", path)
 	cmd.Run() // Ignore errors
 
 	return nil
