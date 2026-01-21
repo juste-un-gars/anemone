@@ -418,11 +418,8 @@ func createDirectoryWithSudo(path string) error {
 
 	// Check if directory already exists
 	if _, err := os.Stat(path); err == nil {
-		// Directory exists, just ensure correct ownership
-		if currentUser != "" {
-			cmd := exec.Command("sudo", "chown", currentUser+":"+currentUser, path)
-			cmd.Run() // Ignore errors
-		}
+		// Directory exists - assume ownership is correct
+		// (user either created it or ran the manual commands we showed)
 		return nil
 	}
 
