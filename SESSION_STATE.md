@@ -32,6 +32,7 @@ Tests du setup wizard sur VM et corrections de bugs chemins personnalisés.
 - [x] Fix chown toujours appliqué même si répertoire existe déjà
 - [x] Test synchro P2P avec incoming séparé (FR2 -> FR1) - OK
 - [x] Fix API restauration utilisait DataDir au lieu de IncomingDir (4 fonctions corrigées)
+- [x] Mise à jour CLAUDE.md avec nouveau modèle v2.0 (philosophie incrémentale, audit sécurité)
 
 ### Remaining
 - [ ] Test complet sur VM Fedora

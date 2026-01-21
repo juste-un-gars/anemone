@@ -1,9 +1,9 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code when working with code in this repository.
 
 **Key Documentation Files:**
-- **[CLAUDE.md](CLAUDE.md)** - Project overview, objectives, architecture, session management
+- **[CLAUDE.md](CLAUDE.md)** - Project overview, philosophy, session management
 - **[SESSION_STATE.md](SESSION_STATE.md)** - Current session status and recent work
 - **[.claude/REFERENCE.md](.claude/REFERENCE.md)** - Quick reference: URLs, credentials, cmdlets
 - **[README.md](README.md)** - Installation and setup guide
@@ -18,6 +18,64 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Key Dependencies:** CGO (for SQLite), Samba (SMB file sharing), Btrfs (optional, for quotas)
 **Architecture Pattern:** Monolith with internal packages
 **Development Environment:** Linux (Fedora/RHEL, Debian/Ubuntu)
+
+---
+
+## Development Philosophy
+
+### Golden Rule: Incremental Development
+
+**NEVER write large amounts of code without validation.**
+
+```
+One module → Test → User validates → Next module
+```
+
+**Per iteration limits:**
+- 1-3 related files maximum
+- ~50-150 lines of new code
+- Must be independently testable
+
+### Mandatory Stop Points
+
+Claude MUST stop and wait for user validation after:
+- Database connection/schema changes
+- Authentication/authorization code
+- Each API endpoint or route group
+- File system or external service integrations
+- Any security-sensitive code
+
+**Stop format:**
+```
+✅ [Module] complete.
+
+**Test it:**
+1. [Step 1]
+2. [Step 2]
+Expected: [Result]
+
+Waiting for your validation before continuing.
+```
+
+### Code Hygiene Rules (MANDATORY)
+
+**NEVER hardcode in source files:**
+- Passwords, API keys, tokens, secrets
+- Database credentials
+- Absolute paths (`/home/user/...`)
+- IP addresses, server names (production)
+
+**ALWAYS use instead:**
+- Environment variables (`.env` files, never committed)
+- Configuration files (with `.example` templates)
+- Relative paths or configurable base paths (`cfg.DataDir`, `cfg.IncomingDir`, etc.)
+
+### Development Order
+
+1. **Foundation first** — Config, DB, Auth
+2. **Test foundation** — Don't continue if broken
+3. **Core features** — One by one, tested
+4. **Advanced features** — Only after core works
 
 ---
 
@@ -91,137 +149,111 @@ sudo systemctl reload smbd
 
 ---
 
-## File Encoding Standards
+## Session Management
 
-- **All files:** UTF-8 with LF (Unix) line endings
-- **Timestamps:** ISO 8601 (YYYY-MM-DD HH:mm)
-- **Time format:** 24-hour (HH:mm)
-
----
-
-## Claude Code Session Management
-
-### Quick Start (TL;DR)
+### Quick Start
 
 **Continue work:** `"continue"` or `"let's continue"`
-**New session:** `"new session: Feature Name"` or `"start new session"`
+**New session:** `"new session: Feature Name"`
 
-**Claude handles everything automatically** - no need to manage session numbers or files manually.
+### File Structure
 
----
+- **SESSION_STATE.md** (root) — Overview and session index
+- **.claude/sessions/SESSION_XXX_[name].md** — Detailed session logs
 
-### Session File Structure
+**Naming:** `SESSION_001_project_setup.md`
 
-**Two-Tier System:**
-1. **SESSION_STATE.md** (root) - Overview and index of all sessions
-2. **.claude/sessions/SESSION_XXX_[name].md** - Detailed session files
-
-**Naming:** `SESSION_001_project_setup.md` (three digits, 001-999)
-
-**Session Limits (Recommendations):**
-- Max tasks: 20-25 per session
-- Max files modified: 15-20 per session
-- Recommended duration: 2-4 hours
-
----
-
-### Automatic Session Workflow
-
-#### 1. Session Start
-- Read CLAUDE.md, SESSION_STATE.md, current session file
-- Display status and next tasks
-
-#### 2. During Development (AUTO-UPDATE)
-**Individual Session File:**
-- Mark completed tasks immediately
-- Log technical decisions and issues in real-time
-- Track all modified files
-- Document all code created
-
-**SESSION_STATE.md:**
-- Update timestamp and session reference
-- Update current status
-- Add to recent sessions summary
-
-#### 3. Session File Template
+### Session Template
 
 ```markdown
 # Session XXX: [Feature Name]
 
-## Date: YYYY-MM-DD
-## Duration: [Start - Current]
-## Goal: [Brief description]
+## Meta
+- **Date:** YYYY-MM-DD
+- **Goal:** [Brief description]
+- **Status:** In Progress / Blocked / Complete
 
-## Completed Tasks
-- [x] Task 1 (HH:mm)
-- [ ] Task 2 - In progress
-
-## Current Status
-**Currently working on:** [Task]
+## Current Module
+**Working on:** [Module name]
 **Progress:** [Status]
 
-## Next Steps
-1. [ ] Next immediate task
-2. [ ] Following task
+## Module Checklist
+- [ ] Module planned (files, dependencies, test procedure)
+- [ ] Code written
+- [ ] Self-tested by Claude
+- [ ] User validated ← **REQUIRED before next module**
+
+## Completed Modules
+| Module | Validated | Date |
+|--------|-----------|------|
+| Example | ✅ | YYYY-MM-DD |
+
+## Next Modules (Prioritized)
+1. [ ] [Next module]
+2. [ ] [Following module]
 
 ## Technical Decisions
-- **Decision:** [What]
-  - **Reason:** [Why]
-  - **Trade-offs:** [Pros/cons]
+- **[Decision]:** [Reason]
 
 ## Issues & Solutions
-- **Issue:** [Problem]
-  - **Solution:** [Resolution]
-  - **Root cause:** [Why]
+- **[Issue]:** [Solution]
 
 ## Files Modified
-### Created
-- path/file.go - [Description]
-### Updated
-- path/file.go - [Changes]
-
-## Dependencies Added
-- package@version - [Reason]
-
-## Testing Notes
-- [ ] Tests written/passing
-- **Coverage:** [%]
-
-## Session Summary
-[Paragraph summarizing accomplishments]
+- `path/file.ext` — [What/Why]
 
 ## Handoff Notes
-- **Critical context:** [Must-know info]
-- **Blockers:** [If any]
-- **Next steps:** [Recommendations]
+[Critical context for next session]
 ```
 
----
+### Session Rules
 
-### Session Management Rules
+**MUST DO:**
+1. Read CLAUDE.md and current session first
+2. Update session file in real-time
+3. Wait for validation after each module
+4. Fix bugs before new features
 
-#### MANDATORY Actions:
-1. Always read CLAUDE.md first for context
-2. Always read current session file
-3. Update session in real-time as tasks complete
-4. Never lose context between messages
-5. Auto-save progress every 10-15 minutes
-
-#### When to Create New Session:
+**NEW SESSION when:**
 - New major feature/module
-- Completed session goal
+- Current session goal complete
 - Different project area
-- After long break
-- Approaching session limits
 
 ---
 
-### Common Commands
+## Module Workflow
 
-**Continue:** "continue", "let's continue", "keep going"
-**New session:** "new session: [name]", "start new session"
-**Save:** "save progress", "checkpoint"
-**Update:** "update session", "update SESSION_STATE.md"
+### 1. Plan (Before Coding)
+
+```markdown
+📋 **Module:** [Name]
+📝 **Purpose:** [One sentence]
+📁 **Files:** [List]
+🔗 **Depends on:** [Previous modules]
+🧪 **Test procedure:** [How to verify]
+🔒 **Security concerns:** [If any]
+```
+
+### 2. Implement
+
+- Write minimal working code
+- Include error handling
+- Document as you go (headers, comments)
+
+### 3. Validate
+
+**Functional:**
+- [ ] Runs without errors
+- [ ] Expected output verified
+- [ ] Errors handled gracefully
+
+**Security (if applicable):**
+- [ ] Input validated
+- [ ] No hardcoded secrets, paths, or credentials
+- [ ] Parameterized queries (SQL)
+
+### 4. User Confirmation
+
+**DO NOT proceed until user says "OK", "validated", or "continue"**
 
 ---
 
@@ -254,7 +286,39 @@ Add new strings to both `internal/i18n/locales/fr.json` and `en.json`.
 
 ---
 
-## Git Workflow Integration
+## Pre-Launch Security Audit
+
+### When to Run
+
+**MANDATORY before any deployment or "project complete" status.**
+
+### Security Audit Checklist
+
+#### 1. Code Review (Full Scan)
+- [ ] No hardcoded secrets (API keys, passwords, tokens)
+- [ ] No hardcoded paths (use configurable: `cfg.DataDir`, `cfg.IncomingDir`)
+- [ ] No sensitive data in logs
+- [ ] All user inputs validated and sanitized
+
+#### 2. OWASP Top 10 Check
+- [ ] **Injection** — SQL parameterized, OS command injection protected
+- [ ] **Broken Auth** — Strong passwords, session management
+- [ ] **Sensitive Data Exposure** — Encryption at rest and in transit (HTTPS)
+- [ ] **Broken Access Control** — Authorization verified on all routes
+- [ ] **Security Misconfiguration** — Default credentials removed
+- [ ] **XSS** — Output encoding in templates
+- [ ] **Vulnerable Components** — Dependencies updated
+
+#### 3. Dependency Audit
+```bash
+# Go
+go list -m -u all          # Check for updates
+govulncheck ./...          # Check for vulnerabilities
+```
+
+---
+
+## Git Integration
 
 ### Branch Naming
 **Format:** `feature/brief-description` or `bugfix/brief-description`
@@ -275,19 +339,14 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
 
 ---
 
-## Quick Reference Commands
+## Quick Commands
 
-### Starting
-```bash
-"continue"                    # Continue existing work
-"new session: Feature Name"   # Start new session
-```
-
-### During Work
-```bash
-"save progress"               # Save current state
-"update session"              # Update session file
-```
+| Command | Action |
+|---------|--------|
+| `continue` | Resume current session |
+| `new session: [name]` | Start new session |
+| `save progress` | Update session file |
+| `validate` | Mark current module as validated |
 
 ### Build & Test
 ```bash
@@ -295,6 +354,14 @@ go build -o anemone cmd/anemone/main.go
 go test ./...
 sudo systemctl restart anemone
 ```
+
+---
+
+## File Standards
+
+- **Encoding:** UTF-8 with LF line endings
+- **Timestamps:** ISO 8601 (YYYY-MM-DD HH:mm)
+- **Time format:** 24-hour
 
 ---
 
@@ -306,5 +373,5 @@ sudo systemctl restart anemone
 
 ---
 
-**Last Updated:** 2025-01-18
-**Version:** 1.0.0
+**Last Updated:** 2026-01-21
+**Version:** 2.0.0
