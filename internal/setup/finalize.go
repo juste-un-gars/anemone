@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -64,14 +65,23 @@ func FinalizeSetup(opts FinalizeOptions) (*FinalizeResult, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	// 3. Generate master key for encrypting user keys
+	// 3. Update sudoers if using custom data directory (MUST be done before creating users)
+	defaultDataDir := "/srv/anemone"
+	if opts.DataDir != defaultDataDir {
+		if err := updateSudoersDataDir(defaultDataDir, opts.DataDir); err != nil {
+			// Non-fatal: log warning but continue
+			log.Printf("Warning: Failed to update sudoers for custom path: %v", err)
+		}
+	}
+
+	// 4. Generate master key for encrypting user keys
 	masterKeyBytes := make([]byte, 32)
 	if _, err := rand.Read(masterKeyBytes); err != nil {
 		return nil, fmt.Errorf("failed to generate master key: %w", err)
 	}
 	masterKey := base64.StdEncoding.EncodeToString(masterKeyBytes)
 
-	// 4. Create admin user
+	// 5. Create admin user
 	language := opts.Language
 	if language == "" {
 		language = "fr"
@@ -91,7 +101,7 @@ func FinalizeSetup(opts FinalizeOptions) (*FinalizeResult, error) {
 	result.AdminUsername = adminUser.Username
 	result.EncryptionKey = encryptionKey
 
-	// 5. Generate sync authentication password
+	// 6. Generate sync authentication password
 	syncPasswordBytes := make([]byte, 24) // 24 bytes = 192 bits
 	if _, err := rand.Read(syncPasswordBytes); err != nil {
 		return nil, fmt.Errorf("failed to generate sync password: %w", err)
@@ -99,12 +109,12 @@ func FinalizeSetup(opts FinalizeOptions) (*FinalizeResult, error) {
 	syncPassword := base64.URLEncoding.EncodeToString(syncPasswordBytes)
 	result.SyncPassword = syncPassword
 
-	// 6. Store sync password hash in database
+	// 7. Store sync password hash in database
 	if err := syncauth.SetSyncAuthPassword(db, syncPassword); err != nil {
 		return nil, fmt.Errorf("failed to store sync password: %w", err)
 	}
 
-	// 7. Save system configuration
+	// 8. Save system configuration
 	serverName := opts.ServerName
 	if serverName == "" {
 		serverName = "Anemone NAS"
@@ -113,21 +123,12 @@ func FinalizeSetup(opts FinalizeOptions) (*FinalizeResult, error) {
 		return nil, fmt.Errorf("failed to save system config: %w", err)
 	}
 
-	// 8. Write environment file for service (always in /etc/anemone/)
+	// 9. Write environment file for service (always in /etc/anemone/)
 	envFile := "/etc/anemone/anemone.env"
 	if err := writeEnvFile(envFile, opts); err != nil {
 		return nil, fmt.Errorf("failed to write environment file: %w", err)
 	}
 	result.EnvFile = envFile
-
-	// 9. Update sudoers if using custom data directory
-	defaultDataDir := "/srv/anemone"
-	if opts.DataDir != defaultDataDir {
-		if err := updateSudoersDataDir(defaultDataDir, opts.DataDir); err != nil {
-			// Non-fatal: log warning but continue
-			fmt.Printf("Warning: Failed to update sudoers for custom path: %v\n", err)
-		}
-	}
 
 	return result, nil
 }
