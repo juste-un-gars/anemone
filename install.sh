@@ -325,6 +325,11 @@ create_data_directory() {
     chown "$SERVICE_USER:$SERVICE_USER" "$DATA_DIR"
     chmod 755 "$DATA_DIR"
 
+    # Create /etc/anemone for config file (owned by service user for setup wizard)
+    mkdir -p /etc/anemone
+    chown "$SERVICE_USER:$SERVICE_USER" /etc/anemone
+    chmod 755 /etc/anemone
+
     log_info "Data directory ready"
 }
 

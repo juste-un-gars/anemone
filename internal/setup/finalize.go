@@ -177,7 +177,14 @@ ANEMONE_DATA_DIR=%s
 			// Try with sudo
 			cmd := exec.Command("sudo", "mkdir", "-p", dir)
 			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("failed to create %s: %w", dir, err)
+				currentUser := os.Getenv("USER")
+				if currentUser == "" {
+					currentUser = os.Getenv("LOGNAME")
+				}
+				if currentUser == "" {
+					currentUser = "YOUR_USER"
+				}
+				return fmt.Errorf("cannot create %s. Please create it manually:\n\nsudo mkdir -p %s\nsudo chown %s:%s %s", dir, dir, currentUser, currentUser, dir)
 			}
 		}
 	}
@@ -191,7 +198,7 @@ ANEMONE_DATA_DIR=%s
 	cmd := exec.Command("sudo", "tee", path)
 	cmd.Stdin = strings.NewReader(content)
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to write %s: %w", path, err)
+		return fmt.Errorf("cannot write to %s. Please create the directory manually:\n\nsudo mkdir -p %s\nsudo chown $(whoami):$(whoami) %s\n\nThen retry the setup.", path, dir, dir)
 	}
 
 	return nil
