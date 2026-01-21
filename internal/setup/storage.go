@@ -162,25 +162,37 @@ func SetupZFSStorage(opts ZFSSetupOptions) error {
 		raidLevel = "stripe" // Map "single" from frontend to "stripe" for ZFS
 	}
 
-	// Create the ZFS pool
-	// Force is true because user confirmed disk erasure in the setup wizard
-	// Don't set Owner here - we'll handle ownership in SetupDefaultStorage to avoid sudo issues
-	createOpts := storage.PoolCreateOptions{
-		Name:        opts.PoolName,
-		Disks:       opts.Devices,
-		VDevType:    raidLevel,
-		Mountpoint:  opts.Mountpoint,
-		Compression: "lz4",
-		Force:       true,
+	// Check if pool already exists (retry case)
+	pools, _ := storage.ListZFSPools()
+	poolExists := false
+	for _, p := range pools {
+		if p.Name == opts.PoolName {
+			poolExists = true
+			break
+		}
 	}
 
-	if err := storage.CreatePool(createOpts); err != nil {
-		// Check if pool was created but ownership failed
-		errStr := err.Error()
-		if strings.Contains(errStr, "pool created but failed to set ownership") {
-			// Pool exists, continue to directory setup
-		} else {
-			return fmt.Errorf("failed to create ZFS pool: %w", err)
+	if !poolExists {
+		// Create the ZFS pool
+		// Force is true because user confirmed disk erasure in the setup wizard
+		// Don't set Owner here - we'll handle ownership in SetupDefaultStorage to avoid sudo issues
+		createOpts := storage.PoolCreateOptions{
+			Name:        opts.PoolName,
+			Disks:       opts.Devices,
+			VDevType:    raidLevel,
+			Mountpoint:  opts.Mountpoint,
+			Compression: "lz4",
+			Force:       true,
+		}
+
+		if err := storage.CreatePool(createOpts); err != nil {
+			// Check if pool was created but ownership failed
+			errStr := err.Error()
+			if strings.Contains(errStr, "pool created but failed to set ownership") {
+				// Pool exists, continue to directory setup
+			} else {
+				return fmt.Errorf("failed to create ZFS pool: %w", err)
+			}
 		}
 	}
 
