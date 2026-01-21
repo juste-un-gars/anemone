@@ -25,12 +25,23 @@ Tests du setup wizard sur VM et corrections de bugs chemins personnalisés.
 - [x] Message d'aide clair si sudo échoue (commandes manuelles à exécuter)
 - [x] Pré-remplissage du nom admin avec "admin" dans le wizard
 - [x] Fix SetupIncomingDirectory vérifie si répertoire existe avant sudo mkdir
+- [x] Fix FinalizeSetup utilise sudo pour créer le répertoire db (était os.MkdirAll)
+- [x] Fix ownership des répertoires créés avec sudo (chown vers user courant)
+- [x] Ajout EnvironmentFile au service systemd pour lire anemone.env (ANEMONE_INCOMING_DIR)
+- [x] Ajout champ "Nom du serveur" au setup wizard (étape Admin)
+- [x] Fix chown toujours appliqué même si répertoire existe déjà
+- [x] Test synchro P2P avec incoming séparé (FR2 -> FR1) - OK
 
 ### Remaining
-- [ ] Test complet chemin incoming séparé (après création manuelle du répertoire)
 - [ ] Test complet sur VM Fedora
 - [ ] Test autres types de stockage (ZFS existing, ZFS new, custom)
 - [ ] Vérifier flux restauration
+
+### Commits de cette session
+- `6b8af6d` fix: Use sudo to create database directory in FinalizeSetup
+- `c731c17` fix: Set ownership of created directories to current user
+- `381f0a9` fix: Add EnvironmentFile to systemd service and server name to setup wizard
+- `4dd7ae1` fix: Always set ownership on directories even if they already exist
 
 ---
 
@@ -50,7 +61,7 @@ Corrigé bug `go vet` : mutex copié dans SetupState. Créé SetupStateView pour
 
 | # | Name | Date | Status | Details |
 |---|------|------|--------|---------|
-| 67 | Tests VM & Bug Fixes Setup Wizard | 2026-01-20 | In Progress | [Link](.claude/sessions/SESSION_067_vm_tests.md) |
+| 67 | Tests VM & Bug Fixes Setup Wizard | 2026-01-21 | In Progress | [Link](.claude/sessions/SESSION_067_vm_tests.md) |
 | 66 | Tests d'intégration Setup Wizard | 2026-01-20 | Completed | [Link](.claude/sessions/SESSION_066_integration_tests.md) |
 | 65 | Mode Restauration Serveur | 2026-01-20 | Completed | [Link](.claude/sessions/SESSION_065_restore_mode.md) |
 | 64 | Nouveau install.sh simplifié | 2026-01-20 | Completed | [Link](.claude/sessions/SESSION_064_install_script.md) |
