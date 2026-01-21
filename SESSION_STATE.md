@@ -8,7 +8,7 @@
 ## Current Session
 
 **Session 69** - Restore Flow Fixes
-- **Status:** In Progress (paused)
+- **Status:** Completed ✅
 - **Date:** 2026-01-21
 
 ### Summary
@@ -53,7 +53,7 @@ Added persistent sessions with "Remember me" feature and rewrote documentation.
 
 | # | Name | Date | Status |
 |---|------|------|--------|
-| 69 | Restore Flow Fixes | 2026-01-21 | In Progress |
+| 69 | Restore Flow Fixes | 2026-01-21 | Completed |
 | 68 | Persistent Sessions & Documentation | 2026-01-21 | Completed |
 | 67 | Tests VM & Bug Fixes Setup Wizard | 2026-01-21 | Completed |
 | 66 | Tests d'intégration Setup Wizard | 2026-01-20 | Completed |
@@ -82,12 +82,15 @@ Added persistent sessions with "Remember me" feature and rewrote documentation.
 
 ## Next Steps
 
-**À tester :**
-- Déployer le fix et tester login après restore
-- Tester les différents modes d'installation (ZFS, restore avec stockage personnalisé)
+**Tests validés :**
+- ✅ Login après restore fonctionne
+
+**Reste à tester :**
+- [ ] Test complet sur VM Fedora
+- [ ] Test ZFS new pool
+- [ ] Test ZFS existing pool
 
 **Fichiers debug à nettoyer (optionnel) :**
 - `debug_auth.go`, `fix_hash.go`, `verify_hash.go`, `backup_20260121_154509.enc`
-- `/tmp/check_backup.go`
 
 Commencer par `"continue"`.
