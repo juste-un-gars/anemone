@@ -218,8 +218,9 @@ ANEMONE_DATA_DIR=%s
 func updateSudoersDataDir(oldDir, newDir string) error {
 	sudoersFile := "/etc/sudoers.d/anemone"
 
-	// Read current sudoers file
-	content, err := os.ReadFile(sudoersFile)
+	// Read current sudoers file using sudo (file has 440 permissions)
+	cmd := exec.Command("sudo", "cat", sudoersFile)
+	content, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to read sudoers file: %w", err)
 	}
@@ -231,7 +232,7 @@ func updateSudoersDataDir(oldDir, newDir string) error {
 	newContent = strings.Replace(newContent, "# Data directory: "+newDir, "# Data directory: "+newDir+" (updated by setup wizard)", 1)
 
 	// Write back using sudo tee (sudoers file requires root)
-	cmd := exec.Command("sudo", "tee", sudoersFile)
+	cmd = exec.Command("sudo", "tee", sudoersFile)
 	cmd.Stdin = strings.NewReader(newContent)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to write sudoers file: %s", string(output))

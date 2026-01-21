@@ -413,6 +413,8 @@ $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/vd* bs=1M count=1
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/loop* bs=1M count=1 *
 
 # Setup wizard - update sudoers when custom path is used
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/cat /etc/sudoers.d/anemone
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/cat /etc/sudoers.d/anemone
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/tee /etc/sudoers.d/anemone
 EOF
 
