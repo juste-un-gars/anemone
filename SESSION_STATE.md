@@ -13,14 +13,21 @@
 - **Details:** [SESSION_067_vm_tests.md](.claude/sessions/SESSION_067_vm_tests.md)
 
 ### Summary
-Tests du setup wizard sur VM et corrections de bugs.
+Tests du setup wizard sur VM et corrections de bugs chemins personnalisés.
 
 ### Completed (2026-01-21)
 - [x] Fix boucle HTTP/2 sur page "Configuration terminée" (suppression polling JS)
 - [x] Fix Samba non démarré après installation (ajout `systemctl enable --now` dans install.sh)
 - [x] Test installation propre sur VM Ubuntu (FR1) - OK
+- [x] Fix validation chemin custom data directory (vérifiait parent au lieu du chemin cible)
+- [x] Fix incoming directory séparé ignoré par le backend (SeparateIncoming non traité)
+- [x] Utilisation de sudo pour création de répertoires (cohérent avec le reste du code)
+- [x] Message d'aide clair si sudo échoue (commandes manuelles à exécuter)
+- [x] Pré-remplissage du nom admin avec "admin" dans le wizard
+- [x] Fix SetupIncomingDirectory vérifie si répertoire existe avant sudo mkdir
 
 ### Remaining
+- [ ] Test complet chemin incoming séparé (après création manuelle du répertoire)
 - [ ] Test complet sur VM Fedora
 - [ ] Test autres types de stockage (ZFS existing, ZFS new, custom)
 - [ ] Vérifier flux restauration
