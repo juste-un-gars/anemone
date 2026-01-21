@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/juste-un-gars/anemone/internal/storage"
 )
@@ -382,7 +383,7 @@ func checkWritable(path string) error {
 // It handles three cases:
 // 1. Directory already exists -> OK
 // 2. Directory doesn't exist but sudo can create it -> OK (cleans up test dir)
-// 3. Cannot create directory -> Returns clear error message
+// 3. Cannot create directory -> Returns helpful error message
 func checkCanCreateDirectory(path string) error {
 	// Clean the path to avoid issues with trailing slashes
 	path = filepath.Clean(path)
@@ -399,7 +400,12 @@ func checkCanCreateDirectory(path string) error {
 	// Directory doesn't exist - try to create it with sudo
 	cmd := exec.Command("sudo", "mkdir", "-p", path)
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("cannot create directory '%s': %s", path, string(output))
+		outputStr := string(output)
+		// Check if it's a sudo password issue
+		if strings.Contains(outputStr, "password") || strings.Contains(outputStr, "terminal") {
+			return fmt.Errorf("directory '%s' does not exist. Please create it manually:\n\nsudo mkdir -p %s\nsudo chmod 755 %s", path, path, path)
+		}
+		return fmt.Errorf("cannot create directory '%s': %s", path, outputStr)
 	}
 
 	// Clean up - remove the test directory with sudo
