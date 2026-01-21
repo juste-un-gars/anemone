@@ -610,6 +610,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/srv/anemone
+EnvironmentFile=-/srv/anemone/anemone.env
 Environment="ANEMONE_DATA_DIR=/srv/anemone"
 ExecStart=/usr/local/bin/anemone
 Restart=on-failure

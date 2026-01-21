@@ -251,9 +251,10 @@ func (s *SetupWizardServer) handleAdmin(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var req struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Username   string `json:"username"`
+		Password   string `json:"password"`
+		Email      string `json:"email"`
+		ServerName string `json:"server_name"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -277,6 +278,11 @@ func (s *SetupWizardServer) handleAdmin(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if req.ServerName == "" {
+		http.Error(w, "Server name is required", http.StatusBadRequest)
+		return
+	}
+
 	// Finalize setup (creates DB, admin user, etc.)
 	result, err := setup.FinalizeSetup(setup.FinalizeOptions{
 		DataDir:       state.Config.DataDir,
@@ -285,6 +291,7 @@ func (s *SetupWizardServer) handleAdmin(w http.ResponseWriter, r *http.Request) 
 		AdminUsername: req.Username,
 		AdminPassword: req.Password,
 		AdminEmail:    req.Email,
+		ServerName:    req.ServerName,
 	})
 
 	if err != nil {

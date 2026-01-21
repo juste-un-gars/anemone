@@ -25,6 +25,7 @@ type FinalizeOptions struct {
 	AdminUsername string
 	AdminPassword string
 	AdminEmail    string
+	ServerName    string
 	Language      string
 }
 
@@ -102,7 +103,11 @@ func FinalizeSetup(opts FinalizeOptions) (*FinalizeResult, error) {
 	}
 
 	// 7. Save system configuration
-	if err := saveSystemConfig(db, masterKey, language); err != nil {
+	serverName := opts.ServerName
+	if serverName == "" {
+		serverName = "Anemone NAS"
+	}
+	if err := saveSystemConfig(db, masterKey, serverName, language); err != nil {
 		return nil, fmt.Errorf("failed to save system config: %w", err)
 	}
 
@@ -117,7 +122,7 @@ func FinalizeSetup(opts FinalizeOptions) (*FinalizeResult, error) {
 }
 
 // saveSystemConfig saves essential system configuration
-func saveSystemConfig(db *sql.DB, masterKey, language string) error {
+func saveSystemConfig(db *sql.DB, masterKey, serverName, language string) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -127,7 +132,7 @@ func saveSystemConfig(db *sql.DB, masterKey, language string) error {
 	configs := map[string]string{
 		"master_key":      masterKey,
 		"language":        language,
-		"nas_name":        "Anemone NAS",
+		"nas_name":        serverName,
 		"timezone":        "Europe/Paris",
 		"setup_completed": "true",
 	}
