@@ -138,6 +138,7 @@ func CreateFirstAdmin(db *sql.DB, username, password, email, masterKey, language
 func GetByUsername(db *sql.DB, username string) (*User, error) {
 	user := &User{}
 	var activatedAt, lastLogin sql.NullTime
+	var email, encKeyHash, encKeyEncrypted, language sql.NullString
 
 	err := db.QueryRow(`
 		SELECT id, username, password_hash, email,
@@ -146,9 +147,9 @@ func GetByUsername(db *sql.DB, username string) (*User, error) {
 		       created_at, activated_at, last_login
 		FROM users WHERE username = ?
 	`, username).Scan(
-		&user.ID, &user.Username, &user.PasswordHash, &user.Email,
-		&user.EncryptionKeyHash, &user.EncryptionKeyEncrypted,
-		&user.IsAdmin, &user.QuotaTotalGB, &user.QuotaBackupGB, &user.Language,
+		&user.ID, &user.Username, &user.PasswordHash, &email,
+		&encKeyHash, &encKeyEncrypted,
+		&user.IsAdmin, &user.QuotaTotalGB, &user.QuotaBackupGB, &language,
 		&user.CreatedAt, &activatedAt, &lastLogin,
 	)
 
@@ -158,6 +159,12 @@ func GetByUsername(db *sql.DB, username string) (*User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
+
+	// Convert nullable fields
+	user.Email = email.String
+	user.EncryptionKeyHash = encKeyHash.String
+	user.EncryptionKeyEncrypted = encKeyEncrypted.String
+	user.Language = language.String
 
 	if activatedAt.Valid {
 		user.ActivatedAt = &activatedAt.Time
@@ -275,6 +282,7 @@ func ActivateUser(db *sql.DB, userID int, password, masterKey string) (string, e
 func GetByID(db *sql.DB, userID int) (*User, error) {
 	user := &User{}
 	var activatedAt, lastLogin sql.NullTime
+	var email, encKeyHash, encKeyEncrypted, language sql.NullString
 
 	err := db.QueryRow(`
 		SELECT id, username, password_hash, email,
@@ -283,9 +291,9 @@ func GetByID(db *sql.DB, userID int) (*User, error) {
 		       created_at, activated_at, last_login
 		FROM users WHERE id = ?
 	`, userID).Scan(
-		&user.ID, &user.Username, &user.PasswordHash, &user.Email,
-		&user.EncryptionKeyHash, &user.EncryptionKeyEncrypted,
-		&user.IsAdmin, &user.QuotaTotalGB, &user.QuotaBackupGB, &user.Language,
+		&user.ID, &user.Username, &user.PasswordHash, &email,
+		&encKeyHash, &encKeyEncrypted,
+		&user.IsAdmin, &user.QuotaTotalGB, &user.QuotaBackupGB, &language,
 		&user.CreatedAt, &activatedAt, &lastLogin,
 	)
 
@@ -295,6 +303,12 @@ func GetByID(db *sql.DB, userID int) (*User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
+
+	// Convert nullable fields
+	user.Email = email.String
+	user.EncryptionKeyHash = encKeyHash.String
+	user.EncryptionKeyEncrypted = encKeyEncrypted.String
+	user.Language = language.String
 
 	if activatedAt.Valid {
 		user.ActivatedAt = &activatedAt.Time
@@ -325,16 +339,23 @@ func GetAllUsers(db *sql.DB) ([]*User, error) {
 	for rows.Next() {
 		user := &User{}
 		var activatedAt, lastLogin sql.NullTime
+		var email, encKeyHash, encKeyEncrypted, language sql.NullString
 
 		err := rows.Scan(
-			&user.ID, &user.Username, &user.PasswordHash, &user.Email,
-			&user.EncryptionKeyHash, &user.EncryptionKeyEncrypted,
-			&user.IsAdmin, &user.QuotaTotalGB, &user.QuotaBackupGB, &user.Language,
+			&user.ID, &user.Username, &user.PasswordHash, &email,
+			&encKeyHash, &encKeyEncrypted,
+			&user.IsAdmin, &user.QuotaTotalGB, &user.QuotaBackupGB, &language,
 			&user.CreatedAt, &activatedAt, &lastLogin,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan user: %w", err)
 		}
+
+		// Convert nullable fields
+		user.Email = email.String
+		user.EncryptionKeyHash = encKeyHash.String
+		user.EncryptionKeyEncrypted = encKeyEncrypted.String
+		user.Language = language.String
 
 		if activatedAt.Valid {
 			user.ActivatedAt = &activatedAt.Time

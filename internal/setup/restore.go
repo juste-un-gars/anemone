@@ -184,7 +184,7 @@ func ExecuteRestore(serverBackup *backup.ServerBackup, opts RestoreOptions) erro
 	// Post-DB restoration: System setup
 	// ============================================
 
-	// 6. Create system users and set SMB passwords
+	// 6. Create system users, set SMB passwords, and fix password hashes
 	for _, u := range serverBackup.Users {
 		// Only process activated users (those with passwords)
 		if u.ActivatedAt == nil {
@@ -204,6 +204,20 @@ func ExecuteRestore(serverBackup *backup.ServerBackup, opts RestoreOptions) erro
 		}
 
 		if plainPassword != "" {
+			// Recalculate password_hash from decrypted password to ensure consistency
+			// This fixes any potential mismatch between password_hash and password_encrypted
+			newHash, err := crypto.HashPassword(plainPassword)
+			if err != nil {
+				log.Printf("Warning: failed to hash password for user %s: %v", u.Username, err)
+			} else {
+				_, err = db.Exec("UPDATE users SET password_hash = ? WHERE id = ?", newHash, u.ID)
+				if err != nil {
+					log.Printf("Warning: failed to update password_hash for user %s: %v", u.Username, err)
+				} else {
+					log.Printf("Updated password_hash for user: %s", u.Username)
+				}
+			}
+
 			// Create system user and set SMB password
 			if err := smb.AddSMBUser(u.Username, plainPassword); err != nil {
 				log.Printf("Warning: failed to create SMB user %s: %v", u.Username, err)
