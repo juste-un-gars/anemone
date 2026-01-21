@@ -191,7 +191,10 @@
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">{{T .Lang "storage.select_disks"}}</label>
+                            <div class="flex items-center justify-between mb-2">
+                                <label class="block text-sm font-medium text-gray-700">{{T .Lang "storage.select_disks"}}</label>
+                                <span id="disk-count" class="text-sm text-indigo-600 font-medium"></span>
+                            </div>
                             <div id="available-disks" class="space-y-2 max-h-48 overflow-y-auto">
                                 <p class="text-gray-500 text-center py-2">{{T .Lang "common.loading"}}...</p>
                             </div>
@@ -769,6 +772,11 @@ function toggleDisk(path) {
     if (diskCard.classList.contains('disabled')) return;
 
     diskCard.classList.toggle('selected');
+    // Sync checkbox state with card selection
+    const checkbox = diskCard.querySelector('input[type="checkbox"]');
+    if (checkbox) {
+        checkbox.checked = diskCard.classList.contains('selected');
+    }
     updateStorageNextButton();
 }
 
@@ -779,6 +787,8 @@ function updateStorageNextButton() {
         if (selectedStorage.type === 'zfs_new') {
             const selectedDisks = document.querySelectorAll('.disk-card.selected:not(.disabled)');
             enabled = selectedDisks.length > 0 && document.getElementById('zfs-pool-name').value;
+            // Update RAID options based on disk count
+            updateRaidOptions(selectedDisks.length);
         } else if (selectedStorage.type === 'custom') {
             enabled = document.getElementById('custom-data-dir').value.trim() !== '';
         } else {
@@ -787,6 +797,52 @@ function updateStorageNextButton() {
     }
 
     document.getElementById('btn-next-1').disabled = !enabled;
+}
+
+// Update RAID level options based on number of selected disks
+function updateRaidOptions(diskCount) {
+    const select = document.getElementById('zfs-raid-level');
+    const diskCountEl = document.getElementById('disk-count');
+    const currentValue = select.value;
+
+    // Update disk count display
+    if (diskCount > 0) {
+        diskCountEl.textContent = `${diskCount} {{T .Lang "setup_wizard.storage.disks_selected"}}`;
+    } else {
+        diskCountEl.textContent = '';
+    }
+
+    // Define RAID options with their minimum disk requirements
+    const raidOptions = [
+        { value: 'single', minDisks: 1, label: '{{T .Lang "setup_wizard.storage.raid.single"}}' },
+        { value: 'mirror', minDisks: 2, label: '{{T .Lang "setup_wizard.storage.raid.mirror"}}' },
+        { value: 'raidz', minDisks: 3, label: '{{T .Lang "setup_wizard.storage.raid.raidz1"}}' },
+        { value: 'raidz2', minDisks: 4, label: '{{T .Lang "setup_wizard.storage.raid.raidz2"}}' }
+    ];
+
+    // Clear and rebuild options
+    select.innerHTML = '';
+    let firstValidValue = null;
+    let currentValueStillValid = false;
+
+    raidOptions.forEach(opt => {
+        if (diskCount >= opt.minDisks) {
+            const option = document.createElement('option');
+            option.value = opt.value;
+            option.textContent = opt.label;
+            select.appendChild(option);
+
+            if (!firstValidValue) firstValidValue = opt.value;
+            if (opt.value === currentValue) currentValueStillValid = true;
+        }
+    });
+
+    // Restore previous selection if still valid, otherwise use first valid option
+    if (currentValueStillValid) {
+        select.value = currentValue;
+    } else if (firstValidValue) {
+        select.value = firstValidValue;
+    }
 }
 
 // Load storage options from API
@@ -868,7 +924,7 @@ function renderAvailableDisks() {
             <div class="disk-card border rounded-lg p-3 ${disabledClass} ${disabled}" data-path="${disk.path}" onclick="toggleDisk('${disk.path}')">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center space-x-3">
-                        <input type="checkbox" class="w-4 h-4 text-indigo-600 rounded" ${disabled} onclick="event.stopPropagation()">
+                        <input type="checkbox" class="w-4 h-4 text-indigo-600 rounded" ${disabled} onclick="event.stopPropagation(); toggleDisk('${disk.path}');">
                         <div>
                             <div class="font-medium text-gray-900">${disk.path}</div>
                             <div class="text-sm text-gray-500">${disk.model || disk.name} - ${disk.size_human}</div>

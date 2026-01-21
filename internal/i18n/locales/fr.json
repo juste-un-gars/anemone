@@ -757,6 +757,7 @@
   "setup_wizard.storage.raid.raidz1": "RAIDZ1 (3+ disques, 1 parité)",
   "setup_wizard.storage.raid.raidz2": "RAIDZ2 (4+ disques, 2 parités)",
   "setup_wizard.storage.disk_in_use": "Ce disque est déjà utilisé",
+  "setup_wizard.storage.disks_selected": "disque(s) sélectionné(s)",
   "setup_wizard.incoming.title": "Stockage des sauvegardes entrantes",
   "setup_wizard.incoming.description": "Les pairs distants peuvent sauvegarder leurs données sur ce serveur. Où souhaitez-vous stocker ces backups ?",
   "setup_wizard.incoming.same.title": "Même emplacement",
