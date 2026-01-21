@@ -203,7 +203,8 @@ func SetupZFSStorage(opts ZFSSetupOptions) error {
 	}
 
 	// Try to create directories - if it fails due to sudo, provide all commands at once
-	if err := SetupDefaultStorage(dataDir, opts.Owner); err != nil {
+	// Don't pass Owner here - user will set ownership manually via the commands we show
+	if err := SetupDefaultStorage(dataDir, ""); err != nil {
 		// Check if it's a sudo password issue (various error messages)
 		errStr := err.Error()
 		isSudoError := strings.Contains(errStr, "Please create it manually") ||
