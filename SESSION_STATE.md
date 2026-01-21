@@ -41,11 +41,20 @@ Tests du setup wizard sur VM et corrections de bugs chemins personnalisés.
 - [x] Pré-remplissage nom serveur avec hostname dans wizard
 - [x] Fix timing : mise à jour sudoers AVANT création utilisateur admin
 - [x] Fix lecture sudoers avec sudo cat (permissions 440)
+- [x] Fix sélection disques ZFS - checkbox click ne fonctionnait pas (stopPropagation)
+- [x] Options RAID dynamiques selon nombre de disques sélectionnés
+- [x] Popup confirmation rouge avant création pool ZFS (avertissement effacement disques)
+- [x] Ajout flag Force à création pool ZFS (user a confirmé)
+- [x] Affichage de TOUTES les commandes sudo à exécuter si échec (pas une par une)
+- [x] Fix mapping "single" → "stripe" pour vdev type ZFS
+- [x] Détection pool existant au retry (évite erreur "disk in use")
+- [x] UX : Séparation sélection disques et configuration RAID en 2 sous-étapes
+- [x] Suppression sudo chown inutile quand répertoire existe déjà
 
 ### Remaining
 - [ ] Test complet sur VM Fedora
-- [ ] Test autres types de stockage (ZFS existing, ZFS new, custom)
-- [ ] Test installation chemin custom (en cours - à valider)
+- [ ] Test ZFS new pool (en cours - à valider après retry)
+- [ ] Test ZFS existing pool
 - [x] Vérifier flux restauration (accès backup pair + téléchargement fichier OK)
 
 ### Commits de cette session
@@ -61,6 +70,14 @@ Tests du setup wizard sur VM et corrections de bugs chemins personnalisés.
 - `2bd5c53` feat: Pre-fill server name with hostname in setup wizard
 - `2c48198` fix: Update sudoers BEFORE creating admin user
 - `534b4e7` fix: Use sudo to read sudoers file (has 440 permissions)
+- `5078675` fix: Fix disk selection and improve ZFS RAID options UX
+- `681050b` feat: Add ZFS disk erasure confirmation popup
+- `eafd4b8` fix: Show all required commands at once when ZFS directory setup fails
+- `c850172` fix: ZFS pool creation - fix vdev type and ownership handling
+- `91391a0` fix: Detect existing ZFS pool on retry and skip creation
+- `e265f69` feat: Separate ZFS disk selection and RAID configuration into two steps
+- `7cb2ffb` fix: Don't try to set ownership via sudo after user runs manual commands
+- `be053d7` fix: Remove unnecessary sudo chown when directory already exists
 
 ---
 
