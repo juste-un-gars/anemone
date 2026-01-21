@@ -181,7 +181,29 @@ func SetupZFSStorage(opts ZFSSetupOptions) error {
 		dataDir = "/" + opts.PoolName
 	}
 
-	return SetupDefaultStorage(dataDir, opts.Owner)
+	// Try to create directories - if it fails due to sudo, provide all commands at once
+	if err := SetupDefaultStorage(dataDir, opts.Owner); err != nil {
+		// Check if it's a sudo password issue
+		errStr := err.Error()
+		if strings.Contains(errStr, "Please create it manually") || strings.Contains(errStr, "cannot create directory") {
+			// Pool was created successfully but directories failed
+			// Return all commands needed at once
+			currentUser := os.Getenv("USER")
+			if currentUser == "" {
+				currentUser = os.Getenv("LOGNAME")
+			}
+			if currentUser == "" {
+				currentUser = "YOUR_USER"
+			}
+			return fmt.Errorf("ZFS pool created successfully, but cannot create directories.\n\nPlease run these commands and retry:\n\nsudo chown %s:%s %s\nsudo mkdir -p %s/{db,shares,backups/incoming,certs,smb}\nsudo chown -R %s:%s %s",
+				currentUser, currentUser, dataDir,
+				dataDir,
+				currentUser, currentUser, dataDir)
+		}
+		return err
+	}
+
+	return nil
 }
 
 // ZFSSetupOptions contains options for ZFS storage setup

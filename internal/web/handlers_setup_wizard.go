@@ -188,11 +188,21 @@ func (s *SetupWizardServer) handleStorageConfig(w http.ResponseWriter, r *http.R
 		}
 
 	case "zfs_new":
+		// Get current user for ownership
+		currentUser := os.Getenv("USER")
+		if currentUser == "" {
+			currentUser = os.Getenv("LOGNAME")
+		}
+		owner := ""
+		if currentUser != "" {
+			owner = currentUser + ":" + currentUser
+		}
 		opts := setup.ZFSSetupOptions{
 			PoolName:   config.ZFSPoolName,
 			Devices:    config.ZFSDevices,
 			RaidLevel:  config.ZFSRaidLevel,
 			Mountpoint: config.ZFSMountpoint,
+			Owner:      owner,
 		}
 		err = setup.SetupZFSStorage(opts)
 		if err == nil {
