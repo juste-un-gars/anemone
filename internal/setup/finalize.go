@@ -10,7 +10,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/juste-un-gars/anemone/internal/database"
 	"github.com/juste-un-gars/anemone/internal/syncauth"
@@ -111,8 +113,8 @@ func FinalizeSetup(opts FinalizeOptions) (*FinalizeResult, error) {
 		return nil, fmt.Errorf("failed to save system config: %w", err)
 	}
 
-	// 8. Write environment file for service
-	envFile := filepath.Join(opts.DataDir, "anemone.env")
+	// 8. Write environment file for service (always in /etc/anemone/)
+	envFile := "/etc/anemone/anemone.env"
 	if err := writeEnvFile(envFile, opts); err != nil {
 		return nil, fmt.Errorf("failed to write environment file: %w", err)
 	}
@@ -150,7 +152,7 @@ func saveSystemConfig(db *sql.DB, masterKey, serverName, language string) error 
 	return tx.Commit()
 }
 
-// writeEnvFile writes the environment configuration file
+// writeEnvFile writes the environment configuration file to /etc/anemone/
 func writeEnvFile(path string, opts FinalizeOptions) error {
 	content := fmt.Sprintf(`# Anemone NAS Configuration
 # Generated during setup - do not edit manually
@@ -167,7 +169,32 @@ ANEMONE_DATA_DIR=%s
 		content += fmt.Sprintf("ANEMONE_INCOMING_DIR=%s\n", opts.IncomingDir)
 	}
 
-	return os.WriteFile(path, []byte(content), 0600)
+	// Create /etc/anemone/ directory if it doesn't exist
+	dir := filepath.Dir(path)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		// Try without sudo first
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			// Try with sudo
+			cmd := exec.Command("sudo", "mkdir", "-p", dir)
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("failed to create %s: %w", dir, err)
+			}
+		}
+	}
+
+	// Try to write directly first
+	if err := os.WriteFile(path, []byte(content), 0644); err == nil {
+		return nil
+	}
+
+	// Fall back to sudo tee
+	cmd := exec.Command("sudo", "tee", path)
+	cmd.Stdin = strings.NewReader(content)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to write %s: %w", path, err)
+	}
+
+	return nil
 }
 
 // GenerateSystemdOverride generates a systemd override file for Anemone
