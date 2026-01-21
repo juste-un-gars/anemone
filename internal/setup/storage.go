@@ -362,14 +362,26 @@ func createDirectoryWithSudo(path string) error {
 		return nil // Directory exists
 	}
 
+	// Get current user for ownership
+	currentUser := os.Getenv("USER")
+	if currentUser == "" {
+		currentUser = os.Getenv("LOGNAME")
+	}
+
 	// Try to create with sudo
 	cmd := exec.Command("sudo", "mkdir", "-p", path)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		outputStr := string(output)
 		if strings.Contains(outputStr, "password") || strings.Contains(outputStr, "terminal") {
-			return fmt.Errorf("cannot create directory '%s'. Please create it manually:\n\nsudo mkdir -p %s\nsudo chmod 755 %s", path, path, path)
+			return fmt.Errorf("cannot create directory '%s'. Please create it manually:\n\nsudo mkdir -p %s\nsudo chown %s:%s %s", path, path, currentUser, currentUser, path)
 		}
 		return fmt.Errorf("failed to create directory %s: %s", path, outputStr)
+	}
+
+	// Set ownership to current user so anemone can write to it
+	if currentUser != "" {
+		cmd = exec.Command("sudo", "chown", currentUser+":"+currentUser, path)
+		cmd.Run() // Ignore errors
 	}
 
 	// Set permissions
