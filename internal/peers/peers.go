@@ -40,10 +40,12 @@ type Peer struct {
 
 // Create creates a new peer
 func Create(db *sql.DB, peer *Peer) error {
+	// Initialize last_sync to CURRENT_TIMESTAMP so the scheduler waits for the next
+	// scheduled occurrence instead of triggering an immediate sync
 	query := `INSERT INTO peers (name, address, port, public_key, password, enabled, status,
 	          sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month,
-	          sync_interval_minutes, sync_timeout_hours, created_at, updated_at)
-	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+	          sync_interval_minutes, sync_timeout_hours, last_sync, created_at, updated_at)
+	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
 
 	result, err := db.Exec(query, peer.Name, peer.Address, peer.Port, peer.PublicKey, peer.Password,
 		peer.Enabled, peer.Status, peer.SyncEnabled, peer.SyncFrequency, peer.SyncTime,
