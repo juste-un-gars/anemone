@@ -164,24 +164,14 @@
                     <p class="text-gray-500 text-center py-4">{{T .Lang "common.loading"}}...</p>
                 </div>
 
-                <!-- ZFS New Pool Options (shown when zfs_new is selected) -->
-                <div id="zfs-new-options" class="hidden mt-6 p-6 bg-gray-50 rounded-lg">
-                    <h3 class="text-lg font-semibold text-gray-900 mb-4">{{T .Lang "setup_wizard.storage.zfs_config"}}</h3>
+                <!-- ZFS New Pool Options - Step 1: Disk Selection -->
+                <div id="zfs-step-disks" class="hidden mt-6 p-6 bg-gray-50 rounded-lg">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">{{T .Lang "setup_wizard.storage.zfs_select_disks"}}</h3>
 
                     <div class="grid gap-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">{{T .Lang "storage.pool_name"}}</label>
                             <input type="text" id="zfs-pool-name" value="anemone" pattern="[a-zA-Z][a-zA-Z0-9_-]*" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">{{T .Lang "storage.vdev_type"}}</label>
-                            <select id="zfs-raid-level" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
-                                <option value="single">{{T .Lang "setup_wizard.storage.raid.single"}}</option>
-                                <option value="mirror">{{T .Lang "setup_wizard.storage.raid.mirror"}}</option>
-                                <option value="raidz">{{T .Lang "setup_wizard.storage.raid.raidz1"}}</option>
-                                <option value="raidz2">{{T .Lang "setup_wizard.storage.raid.raidz2"}}</option>
-                            </select>
                         </div>
 
                         <div>
@@ -195,10 +185,55 @@
                                 <label class="block text-sm font-medium text-gray-700">{{T .Lang "storage.select_disks"}}</label>
                                 <span id="disk-count" class="text-sm text-indigo-600 font-medium"></span>
                             </div>
-                            <div id="available-disks" class="space-y-2 max-h-48 overflow-y-auto">
+                            <div id="available-disks" class="space-y-2 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-2">
                                 <p class="text-gray-500 text-center py-2">{{T .Lang "common.loading"}}...</p>
                             </div>
                         </div>
+                    </div>
+
+                    <div class="mt-6 flex justify-end">
+                        <button onclick="showZfsRaidConfig()" id="btn-zfs-to-raid" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            {{T .Lang "setup_wizard.storage.configure_raid"}}
+                            <svg class="inline-block w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ZFS New Pool Options - Step 2: RAID Configuration -->
+                <div id="zfs-step-raid" class="hidden mt-6 p-6 bg-gray-50 rounded-lg">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">{{T .Lang "setup_wizard.storage.zfs_raid_config"}}</h3>
+
+                    <!-- Selected disks summary -->
+                    <div class="mb-4 p-4 bg-white border border-gray-200 rounded-lg">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">{{T .Lang "setup_wizard.storage.selected_disks"}}</h4>
+                        <div id="selected-disks-summary" class="space-y-1 text-sm text-gray-600 font-mono"></div>
+                    </div>
+
+                    <div class="grid gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">{{T .Lang "storage.vdev_type"}}</label>
+                            <select id="zfs-raid-level" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+                                <!-- Options populated dynamically based on disk count -->
+                            </select>
+                            <p id="raid-description" class="text-xs text-gray-500 mt-2"></p>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 flex justify-between">
+                        <button onclick="showZfsDiskSelection()" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50">
+                            <svg class="inline-block w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                            </svg>
+                            {{T .Lang "setup_wizard.storage.change_disks"}}
+                        </button>
+                        <button onclick="confirmZfsConfig()" class="px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
+                            {{T .Lang "setup_wizard.storage.confirm_config"}}
+                            <svg class="inline-block w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                        </button>
                     </div>
                 </div>
 
@@ -756,17 +791,56 @@ function selectStorage(type, path) {
     document.querySelector(`.storage-option[data-type="${type}"]`)?.classList.add('selected');
 
     // Show/hide additional options
-    document.getElementById('zfs-new-options').classList.add('hidden');
+    document.getElementById('zfs-step-disks').classList.add('hidden');
+    document.getElementById('zfs-step-raid').classList.add('hidden');
     document.getElementById('custom-path-options').classList.add('hidden');
 
     if (type === 'zfs_new') {
-        document.getElementById('zfs-new-options').classList.remove('hidden');
+        document.getElementById('zfs-step-disks').classList.remove('hidden');
         loadAvailableDisks();
     } else if (type === 'custom') {
         document.getElementById('custom-path-options').classList.remove('hidden');
     }
 
     updateStorageNextButton();
+}
+
+// ZFS sub-step navigation
+let zfsConfigConfirmed = false;
+
+function showZfsRaidConfig() {
+    // Get selected disks
+    const selectedDisks = Array.from(document.querySelectorAll('.disk-card.selected:not(.disabled)'));
+    if (selectedDisks.length === 0) return;
+
+    // Update selected disks summary
+    const summary = document.getElementById('selected-disks-summary');
+    summary.innerHTML = selectedDisks.map(el => {
+        const path = el.dataset.path;
+        const info = el.querySelector('.text-sm.text-gray-500')?.textContent || '';
+        return `<div class="flex justify-between"><span>${path}</span><span class="text-gray-400">${info}</span></div>`;
+    }).join('');
+
+    // Update RAID options based on disk count
+    updateRaidOptions(selectedDisks.length);
+
+    // Switch views
+    document.getElementById('zfs-step-disks').classList.add('hidden');
+    document.getElementById('zfs-step-raid').classList.remove('hidden');
+}
+
+function showZfsDiskSelection() {
+    document.getElementById('zfs-step-raid').classList.add('hidden');
+    document.getElementById('zfs-step-disks').classList.remove('hidden');
+    zfsConfigConfirmed = false;
+    updateStorageNextButton();
+}
+
+function confirmZfsConfig() {
+    zfsConfigConfirmed = true;
+    updateStorageNextButton();
+    // Auto-advance to next step
+    nextStep();
 }
 
 // Incoming selection
@@ -805,13 +879,26 @@ function toggleDisk(path) {
 
 function updateStorageNextButton() {
     let enabled = false;
+    let zfsDiskButtonEnabled = false;
 
     if (selectedStorage) {
         if (selectedStorage.type === 'zfs_new') {
             const selectedDisks = document.querySelectorAll('.disk-card.selected:not(.disabled)');
-            enabled = selectedDisks.length > 0 && document.getElementById('zfs-pool-name').value;
-            // Update RAID options based on disk count
-            updateRaidOptions(selectedDisks.length);
+            const hasPoolName = document.getElementById('zfs-pool-name').value.trim() !== '';
+
+            // Enable "Configure RAID" button when disks are selected and pool name is set
+            zfsDiskButtonEnabled = selectedDisks.length > 0 && hasPoolName;
+
+            // Enable main "Next" button only when ZFS config is confirmed
+            enabled = zfsConfigConfirmed;
+
+            // Update disk count display
+            const diskCountEl = document.getElementById('disk-count');
+            if (selectedDisks.length > 0) {
+                diskCountEl.textContent = `${selectedDisks.length} {{T .Lang "setup_wizard.storage.disks_selected"}}`;
+            } else {
+                diskCountEl.textContent = '';
+            }
         } else if (selectedStorage.type === 'custom') {
             enabled = document.getElementById('custom-data-dir').value.trim() !== '';
         } else {
@@ -820,6 +907,12 @@ function updateStorageNextButton() {
     }
 
     document.getElementById('btn-next-1').disabled = !enabled;
+
+    // Update ZFS disk selection button
+    const zfsBtn = document.getElementById('btn-zfs-to-raid');
+    if (zfsBtn) {
+        zfsBtn.disabled = !zfsDiskButtonEnabled;
+    }
 }
 
 // Update RAID level options based on number of selected disks
