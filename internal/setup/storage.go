@@ -385,7 +385,7 @@ func createDirectoryWithSudo(path string) error {
 	if output, err := cmd.CombinedOutput(); err != nil {
 		outputStr := string(output)
 		if strings.Contains(outputStr, "password") || strings.Contains(outputStr, "terminal") {
-			return fmt.Errorf("cannot create directory '%s'. Please create it manually:\n\nsudo mkdir -p %s\nsudo chown %s:%s %s", path, path, currentUser, currentUser, path)
+			return fmt.Errorf("cannot create directory '%s'. Please create it manually:\n\nsudo mkdir -p %s\nsudo chown %s:%s %s\nsudo chmod 755 %s", path, path, currentUser, currentUser, path, path)
 		}
 		return fmt.Errorf("failed to create directory %s: %s", path, outputStr)
 	}
@@ -444,7 +444,7 @@ func checkCanCreateDirectory(path string) error {
 			if currentUser == "" {
 				currentUser = "YOUR_USER"
 			}
-			return fmt.Errorf("directory '%s' does not exist. Please create it manually:\n\nsudo mkdir -p %s\nsudo chown %s:%s %s", path, path, currentUser, currentUser, path)
+			return fmt.Errorf("directory '%s' does not exist. Please create it manually:\n\nsudo mkdir -p %s\nsudo chown %s:%s %s\nsudo chmod 755 %s", path, path, currentUser, currentUser, path, path)
 		}
 		return fmt.Errorf("cannot create directory '%s': %s", path, outputStr)
 	}
