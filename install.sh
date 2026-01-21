@@ -226,17 +226,21 @@ install_git() {
 install_samba() {
     if command -v smbd &> /dev/null; then
         log_info "Samba already installed"
-        return
+    else
+        log_info "Installing Samba..."
+        if [ "$PKG_MANAGER" = "dnf" ]; then
+            dnf install -y samba
+        elif [ "$PKG_MANAGER" = "apt" ]; then
+            apt update
+            apt install -y samba
+        fi
+        log_info "Samba installed"
     fi
 
-    log_info "Installing Samba..."
-    if [ "$PKG_MANAGER" = "dnf" ]; then
-        dnf install -y samba
-    elif [ "$PKG_MANAGER" = "apt" ]; then
-        apt update
-        apt install -y samba
-    fi
-    log_info "Samba installed"
+    # Enable and start Samba service
+    log_info "Enabling and starting Samba service..."
+    systemctl enable --now "$SMB_SERVICE"
+    log_info "Samba service started"
 }
 
 install_storage_tools() {
