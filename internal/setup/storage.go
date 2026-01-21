@@ -160,6 +160,7 @@ func SetupZFSStorage(opts ZFSSetupOptions) error {
 	}
 
 	// Create the ZFS pool
+	// Force is true because user confirmed disk erasure in the setup wizard
 	createOpts := storage.PoolCreateOptions{
 		Name:        opts.PoolName,
 		Disks:       opts.Devices,
@@ -167,6 +168,7 @@ func SetupZFSStorage(opts ZFSSetupOptions) error {
 		Mountpoint:  opts.Mountpoint,
 		Compression: "lz4",
 		Owner:       opts.Owner,
+		Force:       true,
 	}
 
 	if err := storage.CreatePool(createOpts); err != nil {

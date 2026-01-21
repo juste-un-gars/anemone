@@ -669,6 +669,29 @@
     </div>
 </div>
 
+<!-- ZFS Disk Erase Confirmation Modal -->
+<div id="zfs-confirm-modal" class="fixed inset-0 bg-black/50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
+        <div class="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+        </div>
+        <h3 class="text-lg font-bold text-center text-gray-900 mb-2">{{T .Lang "setup_wizard.zfs_confirm.title"}}</h3>
+        <p class="text-center text-gray-600 mb-2">{{T .Lang "setup_wizard.zfs_confirm.message"}}</p>
+        <div id="zfs-confirm-disks" class="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 text-sm font-mono text-red-800"></div>
+        <p class="text-center text-red-600 font-semibold mb-6">{{T .Lang "setup_wizard.zfs_confirm.warning"}}</p>
+        <div class="flex space-x-3">
+            <button onclick="hideZfsConfirm()" class="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50">
+                {{T .Lang "common.cancel"}}
+            </button>
+            <button onclick="confirmZfsCreation()" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700">
+                {{T .Lang "setup_wizard.zfs_confirm.confirm"}}
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 // State
 let currentStep = 0;
@@ -1063,8 +1086,33 @@ function updateSummary() {
     document.getElementById('summary-admin').textContent = `${translations.admin_user}: ${username}${email ? ` (${email})` : ''}`;
 }
 
+// ZFS confirmation modal functions
+function showZfsConfirm() {
+    const disks = Array.from(document.querySelectorAll('.disk-card.selected:not(.disabled)')).map(el => el.dataset.path);
+    document.getElementById('zfs-confirm-disks').innerHTML = disks.map(d => `<div>${d}</div>`).join('');
+    document.getElementById('zfs-confirm-modal').classList.remove('hidden');
+}
+
+function hideZfsConfirm() {
+    document.getElementById('zfs-confirm-modal').classList.add('hidden');
+}
+
+function confirmZfsCreation() {
+    hideZfsConfirm();
+    doFinalizeSetup();
+}
+
 // Finalize setup
 async function finalizeSetup() {
+    // If creating new ZFS pool, show confirmation first
+    if (selectedStorage?.type === 'zfs_new') {
+        showZfsConfirm();
+        return;
+    }
+    doFinalizeSetup();
+}
+
+async function doFinalizeSetup() {
     showLoading(translations.configuring_storage);
 
     try {
