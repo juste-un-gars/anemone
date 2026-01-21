@@ -289,6 +289,20 @@ func SetupCustomStorage(dataDir, sharesDir, incomingDir, owner string) error {
 	return nil
 }
 
+// SetupIncomingDirectory creates the incoming directory for backups
+func SetupIncomingDirectory(incomingDir string) error {
+	if incomingDir == "" {
+		return fmt.Errorf("incoming directory path is required")
+	}
+
+	// Create the directory
+	if err := os.MkdirAll(incomingDir, 0755); err != nil {
+		return fmt.Errorf("failed to create incoming directory %s: %w", incomingDir, err)
+	}
+
+	return nil
+}
+
 // ValidateStorageConfig validates the storage configuration
 func ValidateStorageConfig(config SetupConfig) error {
 	switch config.StorageType {
@@ -327,6 +341,16 @@ func ValidateStorageConfig(config SetupConfig) error {
 		}
 	default:
 		return fmt.Errorf("unknown storage type: %s", config.StorageType)
+	}
+
+	// Validate separate incoming directory if specified
+	if config.SeparateIncoming {
+		if config.IncomingDir == "" {
+			return fmt.Errorf("incoming directory path is required when using separate incoming storage")
+		}
+		if err := checkCanCreateDirectory(config.IncomingDir); err != nil {
+			return fmt.Errorf("incoming directory: %w", err)
+		}
 	}
 
 	return nil

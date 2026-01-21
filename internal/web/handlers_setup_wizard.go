@@ -158,6 +158,9 @@ func (s *SetupWizardServer) handleStorageConfig(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// Save user-provided incoming directory if separate incoming is enabled
+	userIncomingDir := config.IncomingDir
+
 	// Apply storage configuration based on type
 	var err error
 	switch config.StorageType {
@@ -198,6 +201,19 @@ func (s *SetupWizardServer) handleStorageConfig(w http.ResponseWriter, r *http.R
 	default:
 		http.Error(w, "Unknown storage type", http.StatusBadRequest)
 		return
+	}
+
+	// If separate incoming is enabled and user provided a custom path, use it
+	if config.SeparateIncoming && userIncomingDir != "" {
+		config.IncomingDir = userIncomingDir
+		// Create the separate incoming directory
+		if err == nil {
+			if createErr := setup.SetupIncomingDirectory(config.IncomingDir); createErr != nil {
+				log.Printf("Error creating separate incoming directory: %v", createErr)
+				http.Error(w, "Failed to create incoming directory: "+createErr.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
 	}
 
 	if err != nil {
