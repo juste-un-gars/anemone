@@ -411,6 +411,9 @@ $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/sd* bs=1M count=1
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/nvme* bs=1M count=1 *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/vd* bs=1M count=1 *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/loop* bs=1M count=1 *
+
+# Setup wizard - update sudoers when custom path is used
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/tee /etc/sudoers.d/anemone
 EOF
 
     chmod 440 "$SUDOERS_FILE"

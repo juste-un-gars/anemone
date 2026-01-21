@@ -120,6 +120,15 @@ func FinalizeSetup(opts FinalizeOptions) (*FinalizeResult, error) {
 	}
 	result.EnvFile = envFile
 
+	// 9. Update sudoers if using custom data directory
+	defaultDataDir := "/srv/anemone"
+	if opts.DataDir != defaultDataDir {
+		if err := updateSudoersDataDir(defaultDataDir, opts.DataDir); err != nil {
+			// Non-fatal: log warning but continue
+			fmt.Printf("Warning: Failed to update sudoers for custom path: %v\n", err)
+		}
+	}
+
 	return result, nil
 }
 
@@ -199,6 +208,32 @@ ANEMONE_DATA_DIR=%s
 	cmd.Stdin = strings.NewReader(content)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("cannot write to %s. Please create the directory manually:\n\nsudo mkdir -p %s\nsudo chown $(whoami):$(whoami) %s\n\nThen retry the setup.", path, dir, dir)
+	}
+
+	return nil
+}
+
+// updateSudoersDataDir updates /etc/sudoers.d/anemone to use the custom data directory
+func updateSudoersDataDir(oldDir, newDir string) error {
+	sudoersFile := "/etc/sudoers.d/anemone"
+
+	// Read current sudoers file
+	content, err := os.ReadFile(sudoersFile)
+	if err != nil {
+		return fmt.Errorf("failed to read sudoers file: %w", err)
+	}
+
+	// Replace old path with new path
+	newContent := strings.ReplaceAll(string(content), oldDir, newDir)
+
+	// Update the comment to reflect the new path
+	newContent = strings.Replace(newContent, "# Data directory: "+newDir, "# Data directory: "+newDir+" (updated by setup wizard)", 1)
+
+	// Write back using sudo tee (sudoers file requires root)
+	cmd := exec.Command("sudo", "tee", sudoersFile)
+	cmd.Stdin = strings.NewReader(newContent)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to write sudoers file: %s", string(output))
 	}
 
 	return nil
