@@ -33,10 +33,19 @@ Tests du setup wizard sur VM et corrections de bugs chemins personnalisés.
 - [x] Test synchro P2P avec incoming séparé (FR2 -> FR1) - OK
 - [x] Fix API restauration utilisait DataDir au lieu de IncomingDir (4 fonctions corrigées)
 - [x] Mise à jour CLAUDE.md avec nouveau modèle v2.0 (philosophie incrémentale, audit sécurité)
+- [x] Fix création répertoires sans sudo si parent accessible (évite demandes sudo répétées)
+- [x] Ajout chmod aux instructions manuelles de création répertoires
+- [x] Déplacement env file vers /etc/anemone/anemone.env (emplacement fixe)
+- [x] Création /etc/anemone pendant installation (install.sh)
+- [x] Mise à jour sudoers quand chemin custom utilisé (remplace /srv/anemone par chemin custom)
+- [x] Pré-remplissage nom serveur avec hostname dans wizard
+- [x] Fix timing : mise à jour sudoers AVANT création utilisateur admin
+- [x] Fix lecture sudoers avec sudo cat (permissions 440)
 
 ### Remaining
 - [ ] Test complet sur VM Fedora
 - [ ] Test autres types de stockage (ZFS existing, ZFS new, custom)
+- [ ] Test installation chemin custom (en cours - à valider)
 - [x] Vérifier flux restauration (accès backup pair + téléchargement fichier OK)
 
 ### Commits de cette session
@@ -44,6 +53,14 @@ Tests du setup wizard sur VM et corrections de bugs chemins personnalisés.
 - `c731c17` fix: Set ownership of created directories to current user
 - `381f0a9` fix: Add EnvironmentFile to systemd service and server name to setup wizard
 - `4dd7ae1` fix: Always set ownership on directories even if they already exist
+- `843d0b7` fix: Try creating directories without sudo first
+- `f44bb9d` fix: Add chmod to manual directory creation instructions
+- `dae1764` fix: Use /etc/anemone/anemone.env for service configuration
+- `a8c2417` fix: Create /etc/anemone during installation
+- `3b16e6d` fix: Update sudoers paths when custom data directory is used
+- `2bd5c53` feat: Pre-fill server name with hostname in setup wizard
+- `2c48198` fix: Update sudoers BEFORE creating admin user
+- `534b4e7` fix: Use sudo to read sudoers file (has 440 permissions)
 
 ---
 
