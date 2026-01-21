@@ -297,19 +297,8 @@ func SetupIncomingDirectory(incomingDir string) error {
 		return fmt.Errorf("incoming directory path is required")
 	}
 
-	// Create the directory using sudo (consistent with other privileged operations)
-	cmd := exec.Command("sudo", "mkdir", "-p", incomingDir)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to create incoming directory %s: %s", incomingDir, string(output))
-	}
-
-	// Set permissions to 755
-	cmd = exec.Command("sudo", "chmod", "755", incomingDir)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to set permissions on %s: %s", incomingDir, string(output))
-	}
-
-	return nil
+	// Use the common helper that checks if directory exists first
+	return createDirectoryWithSudo(incomingDir)
 }
 
 // ValidateStorageConfig validates the storage configuration
