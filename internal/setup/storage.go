@@ -321,8 +321,9 @@ func ValidateStorageConfig(config SetupConfig) error {
 		if config.DataDir == "" {
 			return fmt.Errorf("data directory is required")
 		}
-		if err := checkWritable(filepath.Dir(config.DataDir)); err != nil {
-			return fmt.Errorf("cannot write to %s: %w", filepath.Dir(config.DataDir), err)
+		// Validate that we can actually create/write to the target directory
+		if err := checkCanCreateDirectory(config.DataDir); err != nil {
+			return err
 		}
 	default:
 		return fmt.Errorf("unknown storage type: %s", config.StorageType)
@@ -341,5 +342,66 @@ func checkWritable(path string) error {
 	}
 	f.Close()
 	os.Remove(testFile)
+	return nil
+}
+
+// checkCanCreateDirectory validates that we can create a directory at the given path.
+// It handles three cases:
+// 1. Directory already exists and is writable -> OK
+// 2. Directory doesn't exist but we can create it -> OK (cleans up test dir)
+// 3. Cannot create directory -> Returns clear error message
+func checkCanCreateDirectory(path string) error {
+	// Clean the path to avoid issues with trailing slashes
+	path = filepath.Clean(path)
+
+	// Check if directory already exists
+	if info, err := os.Stat(path); err == nil {
+		if !info.IsDir() {
+			return fmt.Errorf("path '%s' exists but is not a directory", path)
+		}
+		// Directory exists, check if writable
+		if err := checkWritable(path); err != nil {
+			return fmt.Errorf("directory '%s' exists but is not writable: %w", path, err)
+		}
+		return nil
+	}
+
+	// Directory doesn't exist - try to create it
+	// First, find the deepest existing parent directory
+	parent := path
+	for {
+		parentDir := filepath.Dir(parent)
+		if parentDir == parent {
+			// Reached root
+			break
+		}
+		parent = parentDir
+		if _, err := os.Stat(parent); err == nil {
+			// Found existing parent
+			break
+		}
+	}
+
+	// Check if the existing parent is writable
+	if err := checkWritable(parent); err != nil {
+		return fmt.Errorf("cannot create '%s': no write permission on '%s'", path, parent)
+	}
+
+	// Try to actually create the directory to confirm it works
+	if err := os.MkdirAll(path, 0755); err != nil {
+		return fmt.Errorf("cannot create directory '%s': %w", path, err)
+	}
+
+	// Clean up - remove the test directory
+	// We need to remove only what we created, walking back up to parent
+	toRemove := path
+	for toRemove != parent {
+		if err := os.Remove(toRemove); err != nil {
+			// Directory might not be empty or other issue, stop cleanup
+			break
+		}
+		toRemove = filepath.Dir(toRemove)
+	}
+
 	return nil
 }
