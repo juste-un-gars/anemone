@@ -7,6 +7,7 @@ package setup
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/juste-un-gars/anemone/internal/storage"
@@ -295,9 +296,16 @@ func SetupIncomingDirectory(incomingDir string) error {
 		return fmt.Errorf("incoming directory path is required")
 	}
 
-	// Create the directory
-	if err := os.MkdirAll(incomingDir, 0755); err != nil {
-		return fmt.Errorf("failed to create incoming directory %s: %w", incomingDir, err)
+	// Create the directory using sudo (consistent with other privileged operations)
+	cmd := exec.Command("sudo", "mkdir", "-p", incomingDir)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to create incoming directory %s: %s", incomingDir, string(output))
+	}
+
+	// Set permissions to 755
+	cmd = exec.Command("sudo", "chmod", "755", incomingDir)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to set permissions on %s: %s", incomingDir, string(output))
 	}
 
 	return nil
@@ -370,9 +378,10 @@ func checkWritable(path string) error {
 }
 
 // checkCanCreateDirectory validates that we can create a directory at the given path.
+// It uses sudo since Anemone runs privileged operations with sudo.
 // It handles three cases:
-// 1. Directory already exists and is writable -> OK
-// 2. Directory doesn't exist but we can create it -> OK (cleans up test dir)
+// 1. Directory already exists -> OK
+// 2. Directory doesn't exist but sudo can create it -> OK (cleans up test dir)
 // 3. Cannot create directory -> Returns clear error message
 func checkCanCreateDirectory(path string) error {
 	// Clean the path to avoid issues with trailing slashes
@@ -383,49 +392,19 @@ func checkCanCreateDirectory(path string) error {
 		if !info.IsDir() {
 			return fmt.Errorf("path '%s' exists but is not a directory", path)
 		}
-		// Directory exists, check if writable
-		if err := checkWritable(path); err != nil {
-			return fmt.Errorf("directory '%s' exists but is not writable: %w", path, err)
-		}
+		// Directory exists, that's fine (we'll use sudo for operations anyway)
 		return nil
 	}
 
-	// Directory doesn't exist - try to create it
-	// First, find the deepest existing parent directory
-	parent := path
-	for {
-		parentDir := filepath.Dir(parent)
-		if parentDir == parent {
-			// Reached root
-			break
-		}
-		parent = parentDir
-		if _, err := os.Stat(parent); err == nil {
-			// Found existing parent
-			break
-		}
+	// Directory doesn't exist - try to create it with sudo
+	cmd := exec.Command("sudo", "mkdir", "-p", path)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("cannot create directory '%s': %s", path, string(output))
 	}
 
-	// Check if the existing parent is writable
-	if err := checkWritable(parent); err != nil {
-		return fmt.Errorf("cannot create '%s': no write permission on '%s'", path, parent)
-	}
-
-	// Try to actually create the directory to confirm it works
-	if err := os.MkdirAll(path, 0755); err != nil {
-		return fmt.Errorf("cannot create directory '%s': %w", path, err)
-	}
-
-	// Clean up - remove the test directory
-	// We need to remove only what we created, walking back up to parent
-	toRemove := path
-	for toRemove != parent {
-		if err := os.Remove(toRemove); err != nil {
-			// Directory might not be empty or other issue, stop cleanup
-			break
-		}
-		toRemove = filepath.Dir(toRemove)
-	}
+	// Clean up - remove the test directory with sudo
+	cmd = exec.Command("sudo", "rmdir", path)
+	cmd.Run() // Ignore errors, directory might have parent dirs we created
 
 	return nil
 }
