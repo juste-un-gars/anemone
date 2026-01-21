@@ -636,7 +636,7 @@
                 </div>
 
                 <div class="mt-8 flex justify-between">
-                    <button onclick="showRestoreUpload()" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50">
+                    <button onclick="backToIncomingStep()" class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50">
                         <svg class="inline-block w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                         </svg>
@@ -1064,7 +1064,14 @@ function nextStep() {
         // Storage configured, go to incoming
         currentStep = 2;
     } else if (currentStep === 2) {
-        // Incoming configured, go to admin
+        // Incoming configured
+        if (selectedMode === 'restore') {
+            // For restore mode, go to restore confirm step
+            hideAllSteps();
+            document.getElementById('step-restore-confirm').classList.remove('hidden');
+            return;
+        }
+        // For new installation, go to admin
         currentStep = 3;
     } else if (currentStep === 3) {
         // Admin form - validate and go to summary
@@ -1439,7 +1446,7 @@ async function validateRestore() {
 
 // Show restore confirm step with backup info
 function showRestoreConfirm(result) {
-    // Populate backup info
+    // Populate backup info for later display
     document.getElementById('restore-server-name').textContent = result.server_name || '-';
     document.getElementById('restore-exported-at').textContent = result.exported_at || '-';
     document.getElementById('restore-users-count').textContent = result.users_count || 0;
@@ -1471,30 +1478,52 @@ function showRestoreConfirm(result) {
         peersContainer.innerHTML = '<p class="text-gray-500">No peers</p>';
     }
 
-    // Show confirm step
-    hideAllSteps();
-    document.getElementById('step-restore-confirm').classList.remove('hidden');
+    // Go to storage configuration step (same as new installation)
+    // The user needs to choose where to store data before restoring
+    currentStep = 1;
+    showStep(currentStep);
+    loadStorageOptions();
 }
 
 // Execute the restore
 async function executeRestore() {
-    showLoading(translations.restoring || 'Restoring server configuration...');
+    showLoading(translations.configuring_storage || 'Configuring storage...');
 
     try {
-        const resp = await fetch('/setup/wizard/restore/execute', {
+        // Step 1: Configure storage (same as new installation)
+        const storageConfig = buildStorageConfig();
+        const storageResp = await fetch('/setup/wizard/storage/config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(storageConfig)
+        });
+
+        if (!storageResp.ok) {
+            const error = await storageResp.text();
+            throw new Error('Storage configuration failed: ' + error);
+        }
+
+        const storageResult = await storageResp.json();
+
+        // Step 2: Execute restore with configured paths
+        showLoading(translations.restoring || 'Restoring server configuration...');
+
+        const restoreResp = await fetch('/setup/wizard/restore/execute', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                data_dir: '/srv/anemone' // Use default for now
+                data_dir: storageResult.config?.data_dir || '/srv/anemone',
+                shares_dir: storageResult.config?.shares_dir || '/srv/anemone/shares',
+                incoming_dir: storageResult.config?.incoming_dir || '/srv/anemone/backups/incoming'
             })
         });
 
-        if (!resp.ok) {
-            const error = await resp.text();
+        if (!restoreResp.ok) {
+            const error = await restoreResp.text();
             throw new Error(error);
         }
 
-        const result = await resp.json();
+        const result = await restoreResp.json();
         hideLoading();
 
         // Show success
@@ -1516,6 +1545,12 @@ async function executeRestore() {
 function showRestoreUpload() {
     hideAllSteps();
     document.getElementById('step-restore-upload').classList.remove('hidden');
+}
+
+function backToIncomingStep() {
+    // Go back to step 2 (incoming storage configuration)
+    currentStep = 2;
+    showStep(currentStep);
 }
 
 function backToModeSelection() {

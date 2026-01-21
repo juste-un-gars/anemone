@@ -7,12 +7,15 @@ package setup
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/juste-un-gars/anemone/internal/backup"
 	"github.com/juste-un-gars/anemone/internal/crypto"
 	"github.com/juste-un-gars/anemone/internal/database"
+	"github.com/juste-un-gars/anemone/internal/smb"
 )
 
 // RestoreResult contains the result of a backup validation
@@ -177,6 +180,107 @@ func ExecuteRestore(serverBackup *backup.ServerBackup, opts RestoreOptions) erro
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
+	// ============================================
+	// Post-DB restoration: System setup
+	// ============================================
+
+	// 6. Create system users and set SMB passwords
+	for _, u := range serverBackup.Users {
+		// Only process activated users (those with passwords)
+		if u.ActivatedAt == nil {
+			continue
+		}
+
+		// Try to decrypt password using master key
+		var plainPassword string
+		if len(u.PasswordEncrypted) > 0 && masterKey != "" {
+			decrypted, err := crypto.DecryptPassword(u.PasswordEncrypted, masterKey)
+			if err != nil {
+				log.Printf("Warning: could not decrypt password for user %s: %v", u.Username, err)
+				// Continue without SMB setup for this user
+				continue
+			}
+			plainPassword = decrypted
+		}
+
+		if plainPassword != "" {
+			// Create system user and set SMB password
+			if err := smb.AddSMBUser(u.Username, plainPassword); err != nil {
+				log.Printf("Warning: failed to create SMB user %s: %v", u.Username, err)
+				// Continue - user can reset password later
+			} else {
+				log.Printf("Created system user and SMB account for: %s", u.Username)
+			}
+		}
+	}
+
+	// 7. Create share directories
+	for _, s := range serverBackup.Shares {
+		// Calculate the actual path (may be updated if sharesDir changed)
+		path := s.Path
+		if opts.SharesDir != "" {
+			baseName := filepath.Base(filepath.Dir(s.Path)) // username
+			shareName := filepath.Base(s.Path)              // sharename
+			path = filepath.Join(opts.SharesDir, baseName, shareName)
+		}
+
+		// Create directory if it doesn't exist
+		if err := os.MkdirAll(path, 0755); err != nil {
+			log.Printf("Warning: failed to create share directory %s: %v", path, err)
+			continue
+		}
+
+		// Find username for this share
+		var username string
+		for _, u := range serverBackup.Users {
+			if u.ID == s.UserID {
+				username = u.Username
+				break
+			}
+		}
+
+		// Set ownership (requires the system user to exist)
+		if username != "" {
+			if err := setDirectoryOwnership(path, username); err != nil {
+				log.Printf("Warning: failed to set ownership for %s: %v", path, err)
+			}
+		}
+
+		// Create .trash directory
+		trashDir := filepath.Join(path, ".trash", username)
+		if err := os.MkdirAll(trashDir, 0755); err != nil {
+			log.Printf("Warning: failed to create trash directory %s: %v", trashDir, err)
+		}
+
+		log.Printf("Created share directory: %s", path)
+	}
+
+	// 8. Regenerate Samba configuration
+	serverName := serverBackup.ServerName
+	if serverName == "" {
+		serverName = "Anemone"
+	}
+
+	smbCfg := &smb.Config{
+		ConfigPath: filepath.Join(opts.DataDir, "smb", "smb.conf"),
+		WorkGroup:  "WORKGROUP",
+		ServerName: serverName,
+		SharesDir:  opts.SharesDir,
+	}
+
+	if err := smb.GenerateConfig(db, smbCfg); err != nil {
+		log.Printf("Warning: failed to generate Samba config: %v", err)
+	} else {
+		log.Printf("Generated Samba configuration")
+	}
+
+	// 9. Reload Samba
+	if err := smb.ReloadConfig(); err != nil {
+		log.Printf("Warning: failed to reload Samba: %v", err)
+	} else {
+		log.Printf("Reloaded Samba configuration")
+	}
+
 	return nil
 }
 
@@ -305,4 +409,14 @@ func nullInt(i *int) interface{} {
 		return nil
 	}
 	return *i
+}
+
+// setDirectoryOwnership sets ownership of a directory to the specified user
+func setDirectoryOwnership(path, username string) error {
+	// Use chown command (requires sudo)
+	cmd := exec.Command("sudo", "chown", "-R", username+":"+username, path)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("chown failed: %w", err)
+	}
+	return nil
 }
