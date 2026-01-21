@@ -788,6 +788,8 @@
   "setup_wizard.complete.description": "L'installation d'Anemone est terminée. Redémarrez le service pour appliquer la configuration.",
   "setup_wizard.complete.restart_hint": "Exécutez cette commande pour redémarrer le service :",
   "setup_wizard.complete.checking": "Vérification du redémarrage",
+  "setup_wizard.complete.after_restart": "Une fois le service redémarré, cliquez sur le bouton ci-dessous pour accéder à l'interface.",
+  "setup_wizard.complete.goto_login": "Accéder à la connexion",
   "setup_wizard.loading.configuring_storage": "Configuration du stockage...",
   "setup_wizard.loading.creating_admin": "Création du compte administrateur...",
   "setup_wizard.loading.finalizing": "Finalisation de l'installation...",

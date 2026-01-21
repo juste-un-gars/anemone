@@ -469,9 +469,11 @@
                     </code>
                 </div>
 
-                <div class="text-gray-500 text-sm">
-                    <span id="checking-status">{{T .Lang "setup_wizard.complete.checking"}}...</span>
-                </div>
+                <p class="text-gray-600 mb-6">{{T .Lang "setup_wizard.complete.after_restart"}}</p>
+
+                <a href="/login" class="inline-block px-8 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700">
+                    {{T .Lang "setup_wizard.complete.goto_login"}}
+                </a>
             </div>
         </div>
 
@@ -684,9 +686,8 @@ const translations = {
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
     {{if .State.Finalized}}
-    // Setup is finalized, start checking for restart
+    // Setup is finalized, show step 6 (no polling - user must click after restart)
     currentStep = 6;
-    checkServerRestart();
     {{else}}
     loadStorageOptions();
     {{end}}
@@ -1122,11 +1123,9 @@ function checkConfirmations() {
 }
 
 function showRestartStep() {
-    // Show step 6 with restart instructions
+    // Show step 6 with restart instructions (no polling - user clicks after restart)
     currentStep = 6;
     showStep(6);
-    // Start checking if service restarted
-    checkServerRestart();
 }
 
 function checkServerRestart() {

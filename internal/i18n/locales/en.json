@@ -788,6 +788,8 @@
   "setup_wizard.complete.description": "Anemone setup is complete. Restart the service to apply the configuration.",
   "setup_wizard.complete.restart_hint": "Run this command to restart the service:",
   "setup_wizard.complete.checking": "Checking for restart",
+  "setup_wizard.complete.after_restart": "After the service restarts, click the button below to access the interface.",
+  "setup_wizard.complete.goto_login": "Go to Login",
   "setup_wizard.loading.configuring_storage": "Configuring storage...",
   "setup_wizard.loading.creating_admin": "Creating administrator account...",
   "setup_wizard.loading.finalizing": "Finalizing setup...",
