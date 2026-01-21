@@ -148,31 +148,40 @@ func SetupZFSStorage(opts ZFSSetupOptions) error {
 	}
 
 	// Determine RAID level based on device count and preference
+	// Map frontend values to ZFS vdev types
 	raidLevel := opts.RaidLevel
 	if raidLevel == "" {
 		if len(opts.Devices) == 1 {
-			raidLevel = "single"
+			raidLevel = "stripe" // single disk = stripe (no redundancy)
 		} else if len(opts.Devices) == 2 {
 			raidLevel = "mirror"
 		} else {
 			raidLevel = "raidz"
 		}
+	} else if raidLevel == "single" {
+		raidLevel = "stripe" // Map "single" from frontend to "stripe" for ZFS
 	}
 
 	// Create the ZFS pool
 	// Force is true because user confirmed disk erasure in the setup wizard
+	// Don't set Owner here - we'll handle ownership in SetupDefaultStorage to avoid sudo issues
 	createOpts := storage.PoolCreateOptions{
 		Name:        opts.PoolName,
 		Disks:       opts.Devices,
 		VDevType:    raidLevel,
 		Mountpoint:  opts.Mountpoint,
 		Compression: "lz4",
-		Owner:       opts.Owner,
 		Force:       true,
 	}
 
 	if err := storage.CreatePool(createOpts); err != nil {
-		return fmt.Errorf("failed to create ZFS pool: %w", err)
+		// Check if pool was created but ownership failed
+		errStr := err.Error()
+		if strings.Contains(errStr, "pool created but failed to set ownership") {
+			// Pool exists, continue to directory setup
+		} else {
+			return fmt.Errorf("failed to create ZFS pool: %w", err)
+		}
 	}
 
 	// Create directory structure on the pool
@@ -183,10 +192,16 @@ func SetupZFSStorage(opts ZFSSetupOptions) error {
 
 	// Try to create directories - if it fails due to sudo, provide all commands at once
 	if err := SetupDefaultStorage(dataDir, opts.Owner); err != nil {
-		// Check if it's a sudo password issue
+		// Check if it's a sudo password issue (various error messages)
 		errStr := err.Error()
-		if strings.Contains(errStr, "Please create it manually") || strings.Contains(errStr, "cannot create directory") {
-			// Pool was created successfully but directories failed
+		isSudoError := strings.Contains(errStr, "Please create it manually") ||
+			strings.Contains(errStr, "cannot create directory") ||
+			strings.Contains(errStr, "failed to set ownership") ||
+			strings.Contains(errStr, "auth could not identify") ||
+			strings.Contains(errStr, "conversation failed")
+
+		if isSudoError {
+			// Pool was created successfully but directories/ownership failed
 			// Return all commands needed at once
 			currentUser := os.Getenv("USER")
 			if currentUser == "" {
@@ -195,7 +210,7 @@ func SetupZFSStorage(opts ZFSSetupOptions) error {
 			if currentUser == "" {
 				currentUser = "YOUR_USER"
 			}
-			return fmt.Errorf("ZFS pool created successfully, but cannot create directories.\n\nPlease run these commands and retry:\n\nsudo chown %s:%s %s\nsudo mkdir -p %s/{db,shares,backups/incoming,certs,smb}\nsudo chown -R %s:%s %s",
+			return fmt.Errorf("ZFS pool created successfully, but cannot configure directories.\n\nPlease run these commands and retry:\n\nsudo chown %s:%s %s\nsudo mkdir -p %s/{db,shares,backups/incoming,certs,smb}\nsudo chown -R %s:%s %s",
 				currentUser, currentUser, dataDir,
 				dataDir,
 				currentUser, currentUser, dataDir)
