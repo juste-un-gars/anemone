@@ -1,350 +1,202 @@
-# Configuration du stockage avec ZFS/Btrfs
+# Storage Setup with ZFS
 
-## 📋 Table des matières
+This guide explains how to prepare your storage before installing Anemone.
 
-- [Pourquoi utiliser un stockage RAID ?](#pourquoi-utiliser-un-stockage-raid-)
-- [Option 1 : ZFS (Recommandé)](#option-1--zfs-recommandé)
-- [Option 2 : Btrfs](#option-2--btrfs)
-- [Installation de Anemone](#installation-de-anemone)
+## Why Use ZFS?
 
----
+**Strongly recommended** - Configure a ZFS pool **before** installing Anemone.
 
-## Pourquoi utiliser un stockage RAID ?
+### Benefits
 
-**Il est FORTEMENT recommandé** de configurer un pool de stockage RAID **AVANT** d'installer Anemone.
+- **Data protection**: Checksums on all data detect and prevent corruption
+- **Built-in RAID**: Mirror, RaidZ, RaidZ2 for redundancy
+- **Instant snapshots**: Point-in-time backups without downtime
+- **Transparent compression**: Automatic space savings (lz4)
+- **Native quotas**: Per-user storage limits (used by Anemone)
+- **Self-healing**: Automatic error detection and correction
 
-### Avantages de ZFS
+### Without ZFS
 
-- ✅ **Protection contre la corruption** : Checksums sur toutes les données
-- ✅ **Redondance RAID intégrée** : Mirror, RaidZ, RaidZ2
-- ✅ **Snapshots instantanés** : Sauvegardes incrémentielles sans temps d'arrêt
-- ✅ **Compression transparente** : Économie d'espace automatique
-- ✅ **Quotas natifs** : Limitation d'espace par utilisateur
-- ✅ **Résilience** : Détection et correction automatique des erreurs
-
-### Avantages de Btrfs
-
-- ✅ **RAID intégré** : RAID0, RAID1, RAID10, RAID5, RAID6
-- ✅ **Snapshots** : Points de restauration instantanés
-- ✅ **Compression** : lzo, zstd
-- ✅ **Quotas** : Support natif (utilisé par Anemone)
-- ✅ **Plus simple** que ZFS sur certaines distributions
+Anemone will work on a regular filesystem, but you lose:
+- No redundancy (disk failure = data loss)
+- No snapshots
+- No compression
+- No corruption protection
 
 ---
 
-## Option 1 : ZFS (Recommandé)
+## Setup Wizard Options
 
-### Installation avec Cockpit (Interface graphique)
+When you run Anemone's setup wizard, you'll see these storage options:
 
-#### Étape 1 : Installer les dépendances
+| Option | Description |
+|--------|-------------|
+| **Default** | Uses `/srv/anemone` on existing filesystem |
+| **Use existing ZFS pool** | Select an existing pool, creates `anemone` dataset |
+| **Create new ZFS pool** | Create a pool from available disks |
+| **Custom paths** | Specify custom directories |
 
-**Debian/Ubuntu** :
+---
+
+## Option 1: Create ZFS Pool via Setup Wizard
+
+The setup wizard can create a ZFS pool for you.
+
+### Prerequisites
+
+**Debian/Ubuntu**:
 ```bash
 sudo apt update
-sudo apt install git zfsutils-linux cockpit -y
+sudo apt install zfsutils-linux -y
 ```
 
-**Fedora/RHEL** :
+**Fedora/RHEL**:
 ```bash
-# ZFS nécessite un repository externe sur Fedora
-# Voir : https://openzfs.github.io/openzfs-docs/Getting%20Started/Fedora/index.html
-sudo dnf install git cockpit -y
+# ZFS requires an external repository on Fedora
+# See: https://openzfs.github.io/openzfs-docs/Getting%20Started/Fedora/index.html
 ```
 
-#### Étape 2 : Installer le module ZFS Manager pour Cockpit
+### RAID Levels
 
-```bash
-git clone https://github.com/45drives/cockpit-zfs-manager.git
-sudo cp -r cockpit-zfs-manager/zfs /usr/share/cockpit
-```
+The wizard supports:
 
-**Note** : Pas besoin de redémarrer, Cockpit détecte automatiquement le nouveau module.
+| Type | Min Disks | Fault Tolerance | Usable Capacity | Recommendation |
+|------|-----------|-----------------|-----------------|----------------|
+| **Single** | 1 | None | 100% | Testing only |
+| **Mirror** | 2 | N-1 disks | 50% | Simple & reliable |
+| **RaidZ** | 3 | 1 disk | (N-1)/N | Good balance |
+| **RaidZ2** | 4 | 2 disks | (N-2)/N | Production |
 
-#### Étape 3 : Accéder à Cockpit
+---
 
-Ouvrez votre navigateur et allez sur :
+## Option 2: Create ZFS Pool Manually (Before Installation)
 
-```
-https://votre-serveur:9090
-```
+If you prefer to create the pool yourself before running Anemone:
 
-Connectez-vous avec vos identifiants système.
-
-#### Étape 4 : Créer votre pool ZFS
-
-1. Dans le menu de gauche, cliquez sur **"ZFS"**
-2. Cliquez sur **"Create Pool"**
-3. Remplissez les informations :
-   - **Nom du pool** : `anemone-pool` (ou autre nom)
-   - **Point de montage** : `/srv/anemone` ⚠️ **IMPORTANT**
-   - **Sélectionnez vos disques** dans la liste
-4. Choisissez le **type de redondance** :
-
-| Type | Disques min | Tolérance panne | Capacité utilisable | Recommandation |
-|------|-------------|-----------------|---------------------|----------------|
-| **Mirror** | 2 | N-1 disques | 50% | ⭐ Simple et fiable |
-| **RaidZ** (RAID5) | 3 | 1 disque | (N-1)/N | Bon compromis |
-| **RaidZ2** (RAID6) | 4 | 2 disques | (N-2)/N | ⭐ Production |
-| **RaidZ3** | 5 | 3 disques | (N-3)/N | Haute sécurité |
-
-5. Cliquez sur **"Create"**
-
-#### Étape 5 : Vérifier le pool
-
-```bash
-# Vérifier l'état du pool
-sudo zpool status
-
-# Vérifier le montage
-df -h | grep /srv/anemone
-```
-
-Vous devriez voir :
-```
-anemone-pool   X.XG   XX.XK   X.XG   1% /srv/anemone
-```
-
-### Installation en ligne de commande (Alternative)
-
-Si vous préférez la ligne de commande :
-
-#### Mirror (2 disques)
+### Mirror (2 disks)
 ```bash
 sudo zpool create -m /srv/anemone anemone-pool mirror /dev/sdb /dev/sdc
 ```
 
-#### RaidZ (3+ disques, tolère 1 panne)
+### RaidZ (3+ disks, tolerates 1 failure)
 ```bash
 sudo zpool create -m /srv/anemone anemone-pool raidz /dev/sdb /dev/sdc /dev/sdd
 ```
 
-#### RaidZ2 (4+ disques, tolère 2 pannes)
+### RaidZ2 (4+ disks, tolerates 2 failures)
 ```bash
 sudo zpool create -m /srv/anemone anemone-pool raidz2 /dev/sdb /dev/sdc /dev/sdd /dev/sde
 ```
 
-#### RaidZ3 (5+ disques, tolère 3 pannes)
-```bash
-sudo zpool create -m /srv/anemone anemone-pool raidz3 /dev/sdb /dev/sdc /dev/sdd /dev/sde /dev/sdf
-```
+### Recommended Optimizations
 
-### Optimisations recommandées
-
-#### Activer la compression (économise de l'espace)
 ```bash
+# Enable compression (saves space)
 sudo zfs set compression=lz4 anemone-pool
-```
 
-#### Désactiver atime (améliore les performances)
-```bash
+# Disable atime (improves performance)
 sudo zfs set atime=off anemone-pool
 ```
 
-#### Activer les snapshots automatiques (optionnel)
-```bash
-# Installer zfs-auto-snapshot
-sudo apt install zfs-auto-snapshot  # Debian/Ubuntu
-sudo dnf install zfs-auto-snapshot  # Fedora
-
-# Activer pour le pool
-sudo zfs set com.sun:auto-snapshot=true anemone-pool
-```
+Then in the setup wizard, select **"Use existing ZFS pool"** and choose your pool.
 
 ---
 
-## Option 2 : Btrfs
+## Option 3: Using Cockpit (GUI)
 
-### RAID1 (Mirror, 2+ disques)
+For a graphical interface:
 
+### Install Cockpit + ZFS Manager
+
+**Debian/Ubuntu**:
 ```bash
-# Créer le filesystem Btrfs
-sudo mkfs.btrfs -L anemone-pool -m raid1 -d raid1 /dev/sdb /dev/sdc
-
-# Créer le point de montage
-sudo mkdir -p /srv/anemone
-
-# Monter
-sudo mount /dev/sdb /srv/anemone
-
-# Ajouter au fstab pour montage automatique
-UUID=$(sudo blkid -s UUID -o value /dev/sdb)
-echo "UUID=$UUID /srv/anemone btrfs defaults 0 0" | sudo tee -a /etc/fstab
+sudo apt install cockpit -y
+git clone https://github.com/45drives/cockpit-zfs-manager.git
+sudo cp -r cockpit-zfs-manager/zfs /usr/share/cockpit
 ```
 
-### RAID10 (4+ disques, striping + mirroring)
-
+**Fedora/RHEL**:
 ```bash
-sudo mkfs.btrfs -L anemone-pool -m raid10 -d raid10 /dev/sd{b,c,d,e}
-sudo mkdir -p /srv/anemone
-sudo mount /dev/sdb /srv/anemone
-
-# Ajouter au fstab
-UUID=$(sudo blkid -s UUID -o value /dev/sdb)
-echo "UUID=$UUID /srv/anemone btrfs defaults 0 0" | sudo tee -a /etc/fstab
+sudo dnf install cockpit -y
+git clone https://github.com/45drives/cockpit-zfs-manager.git
+sudo cp -r cockpit-zfs-manager/zfs /usr/share/cockpit
 ```
 
-### RAID5 (3+ disques, 1 panne tolérée)
+### Create Pool
 
-```bash
-sudo mkfs.btrfs -L anemone-pool -m raid5 -d raid5 /dev/sd{b,c,d}
-sudo mkdir -p /srv/anemone
-sudo mount /dev/sdb /srv/anemone
-
-# Ajouter au fstab
-UUID=$(sudo blkid -s UUID -o value /dev/sdb)
-echo "UUID=$UUID /srv/anemone btrfs defaults 0 0" | sudo tee -a /etc/fstab
-```
-
-### RAID6 (4+ disques, 2 pannes tolérées)
-
-```bash
-sudo mkfs.btrfs -L anemone-pool -m raid6 -d raid6 /dev/sd{b,c,d,e}
-sudo mkdir -p /srv/anemone
-sudo mount /dev/sdb /srv/anemone
-
-# Ajouter au fstab
-UUID=$(sudo blkid -s UUID -o value /dev/sdb)
-echo "UUID=$UUID /srv/anemone btrfs defaults 0 0" | sudo tee -a /etc/fstab
-```
-
-### Vérification Btrfs
-
-```bash
-# Voir les informations du filesystem
-sudo btrfs filesystem show
-
-# Voir l'utilisation
-sudo btrfs filesystem usage /srv/anemone
-
-# Vérifier le montage
-df -h | grep /srv/anemone
-```
+1. Open `https://your-server:9090` in your browser
+2. Log in with your system credentials
+3. Click **"ZFS"** in the left menu
+4. Click **"Create Pool"**
+5. Set mountpoint to `/srv/anemone`
+6. Select your disks and RAID type
+7. Click **"Create"**
 
 ---
 
-## Installation de Anemone
-
-Une fois votre pool de stockage créé et monté sur `/srv/anemone`, vous pouvez installer Anemone :
+## Useful Commands
 
 ```bash
-# Cloner le repository
-git clone https://github.com/juste-un-gars/anemone.git
-cd anemone
-
-# Lancer l'installation
-sudo ./install.sh
-```
-
-Le script d'installation détectera automatiquement que `/srv/anemone` est monté et continuera l'installation.
-
----
-
-## Commandes utiles
-
-### ZFS
-
-```bash
-# Voir l'état des pools
+# Check pool status
 zpool status
 
-# Voir l'utilisation
+# Check space usage
 zfs list
 
-# Créer un snapshot
+# Create a snapshot
 sudo zfs snapshot anemone-pool@$(date +%Y%m%d)
 
-# Lister les snapshots
+# List snapshots
 zfs list -t snapshot
 
-# Restaurer un snapshot
-sudo zfs rollback anemone-pool@20260112
+# Restore a snapshot
+sudo zfs rollback anemone-pool@20260121
 
-# Scrub (vérification d'intégrité)
+# Run integrity check (scrub)
 sudo zpool scrub anemone-pool
 ```
 
-### Btrfs
+---
 
-```bash
-# Voir les filesystems
-sudo btrfs filesystem show
+## Disk Recommendations
 
-# Voir l'utilisation
-sudo btrfs filesystem usage /srv/anemone
+| Use Case | Configuration | Notes |
+|----------|---------------|-------|
+| **Home/Testing** | 2 disks (Mirror) | Simple and reliable |
+| **Small Business** | 4 disks (RaidZ2) | Good balance |
+| **Production** | 6+ disks (RaidZ2) | Maximum safety |
 
-# Créer un snapshot
-sudo btrfs subvolume snapshot /srv/anemone /srv/anemone-snapshot-$(date +%Y%m%d)
+### RAM Requirements
 
-# Lister les subvolumes/snapshots
-sudo btrfs subvolume list /srv/anemone
-
-# Balance (optimisation)
-sudo btrfs balance start /srv/anemone
-
-# Scrub (vérification)
-sudo btrfs scrub start /srv/anemone
-```
+ZFS benefits from RAM for caching. Recommended: **1GB per TB** of storage.
 
 ---
 
 ## FAQ
 
-### Puis-je migrer vers ZFS/Btrfs après installation ?
+### Can I migrate to ZFS after installation?
 
-Oui, mais c'est plus complexe. Il faut :
-1. Arrêter Anemone
-2. Copier les données vers le nouveau pool
-3. Modifier le service systemd
-4. Redémarrer
+Yes, but it requires:
+1. Stop Anemone
+2. Create ZFS pool
+3. Copy data to new pool
+4. Update systemd service paths
+5. Restart
 
-Il est préférable de configurer le stockage AVANT l'installation.
+It's easier to set up ZFS before installation.
 
-### Que se passe-t-il si j'installe sans RAID ?
+### What if I don't have multiple disks?
 
-Anemone fonctionnera, mais vous n'aurez :
-- ❌ Aucune redondance (perte d'un disque = perte de données)
-- ❌ Pas de snapshots
-- ❌ Pas de compression
-- ❌ Pas de protection contre la corruption
+You can use "Single" mode (no redundancy) or "Default" storage. Anemone will work fine, but consider regular backups since you have no disk fault tolerance.
 
-### ZFS ou Btrfs ?
+### ZFS or Btrfs?
 
-**ZFS** si :
-- ✅ Vous voulez la meilleure protection des données
-- ✅ Vous êtes sur Debian/Ubuntu (installation facile)
-- ✅ Vous avez assez de RAM (recommandé : 1GB par TB)
-
-**Btrfs** si :
-- ✅ Vous êtes sur Fedora/RHEL
-- ✅ Vous avez peu de RAM
-- ✅ Vous voulez plus de simplicité
-
-### Combien de disques faut-il ?
-
-| Configuration | Disques min | Recommandation |
-|---------------|-------------|----------------|
-| **Test/Home** | 2 (Mirror) | Fiable et simple |
-| **PME** | 4 (RaidZ2) | Bon compromis |
-| **Production** | 6+ (RaidZ2) | Sécurité maximale |
-
-### Dois-je utiliser Cockpit ?
-
-**Non, c'est optionnel**. Cockpit fournit juste une interface graphique pratique pour :
-- Créer des pools visuellement
-- Monitorer la santé des disques
-- Gérer les snapshots
-
-Vous pouvez tout faire en ligne de commande si vous préférez.
+Anemone's setup wizard only supports ZFS pool creation. If you prefer Btrfs, create it manually and use the "Custom paths" option in the wizard.
 
 ---
 
-## Ressources
+## Resources
 
-- 📖 [Documentation ZFS](https://openzfs.github.io/openzfs-docs/)
-- 📖 [Documentation Btrfs](https://btrfs.wiki.kernel.org/)
-- 🖥️ [Cockpit Project](https://cockpit-project.org/)
-- 🖥️ [Cockpit ZFS Manager](https://github.com/45drives/cockpit-zfs-manager)
-
----
-
-**Prêt ?** Une fois votre pool configuré, retournez au [README principal](../README.md) pour installer Anemone ! 🚀
+- [OpenZFS Documentation](https://openzfs.github.io/openzfs-docs/)
+- [Cockpit Project](https://cockpit-project.org/)
+- [Cockpit ZFS Manager](https://github.com/45drives/cockpit-zfs-manager)

@@ -369,7 +369,7 @@ sudo systemctl restart anemone
 
 - **README.md** - Full installation and usage guide
 - **internal/i18n/locales/README.md** - Translation guide
-- **docs/STORAGE_SETUP.md** - RAID/storage configuration
+- **docs/storage-setup.md** - ZFS storage configuration
 
 ---
 
