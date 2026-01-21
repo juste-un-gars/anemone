@@ -646,8 +646,8 @@ func (s *Server) handleAPISyncListUserBackups(w http.ResponseWriter, r *http.Req
 	}
 
 	// Scan incoming backups directory for this user
-	// Structure: /backups/incoming/{source_server}/{user_id}_{share_name}/
-	backupsDir := filepath.Join(s.cfg.DataDir, "backups", "incoming")
+	// Structure: {IncomingDir}/{source_server}/{user_id}_{share_name}/
+	backupsDir := s.cfg.IncomingDir
 
 	type BackupInfo struct {
 		SourceServer string    `json:"source_server"`
@@ -759,7 +759,7 @@ func (s *Server) handleAPISyncDownloadEncryptedManifest(w http.ResponseWriter, r
 		username = strings.TrimPrefix(shareName, "data_")
 	}
 	backupDir := fmt.Sprintf("%d_%s", userID, username)
-	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", sourceServer, backupDir)
+	backupPath := filepath.Join(s.cfg.IncomingDir, sourceServer, backupDir)
 	manifestPath := filepath.Join(backupPath, ".anemone-manifest.json.enc")
 
 	// Check if manifest exists
@@ -815,7 +815,7 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 		username = strings.TrimPrefix(shareName, "data_")
 	}
 	backupDir := fmt.Sprintf("%d_%s", userID, username)
-	backupPath := filepath.Join(s.cfg.DataDir, "backups", "incoming", sourceServer, backupDir)
+	backupPath := filepath.Join(s.cfg.IncomingDir, sourceServer, backupDir)
 
 	// Build encrypted file path
 	encryptedFilePath := filepath.Join(backupPath, filePath+".enc")

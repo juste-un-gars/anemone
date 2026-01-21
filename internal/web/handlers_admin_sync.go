@@ -307,11 +307,11 @@ func (s *Server) handleAdminIncomingDelete(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Security check: ensure path is within data directory
-	dataDir := s.cfg.DataDir
-	absDataDir, err := filepath.Abs(dataDir)
+	// Security check: ensure path is within incoming directory
+	incomingDir := s.cfg.IncomingDir
+	absIncomingDir, err := filepath.Abs(incomingDir)
 	if err != nil {
-		http.Redirect(w, r, "/admin/incoming?error=Invalid+data+directory", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/incoming?error=Invalid+incoming+directory", http.StatusSeeOther)
 		return
 	}
 	absBackupPath, err := filepath.Abs(backupPath)
@@ -320,9 +320,9 @@ func (s *Server) handleAdminIncomingDelete(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	// Use filepath.Rel to properly check if path is within directory
-	relPath, err := filepath.Rel(absDataDir, absBackupPath)
+	relPath, err := filepath.Rel(absIncomingDir, absBackupPath)
 	if err != nil || strings.HasPrefix(relPath, "..") || filepath.IsAbs(relPath) {
-		log.Printf("Security: Attempted to delete path outside data directory: %s", backupPath)
+		log.Printf("Security: Attempted to delete path outside incoming directory: %s", backupPath)
 		http.Redirect(w, r, "/admin/incoming?error=Invalid+backup+path", http.StatusSeeOther)
 		return
 	}
