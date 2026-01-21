@@ -90,6 +90,9 @@ func isPathTraversal(path string) bool {
 
 // NewRouter creates and configures the HTTP router
 func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
+	// Initialize session manager with database
+	auth.InitSessionManager(db)
+
 	// Load language from database if setup is completed
 	var dbLang string
 	err := db.QueryRow("SELECT value FROM system_config WHERE key = 'language'").Scan(&dbLang)

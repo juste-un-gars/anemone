@@ -38,6 +38,7 @@
   "login.username": "Username",
   "login.password": "Password",
   "login.button": "Sign In",
+  "login.remember_me": "Remember me",
   "login.error": "Invalid username or password",
   "dashboard.title": "Dashboard",
   "dashboard.welcome": "Welcome, {{username}}!",

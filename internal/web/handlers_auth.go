@@ -47,6 +47,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 		username := strings.TrimSpace(r.FormValue("username"))
 		password := r.FormValue("password")
+		rememberMe := r.FormValue("remember_me") == "on"
 
 		// Get user from database
 		user, err := users.GetByUsername(s.db, username)
@@ -65,9 +66,16 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Create session
+		// Get client info for session tracking
+		userAgent := r.UserAgent()
+		ipAddress := r.RemoteAddr
+		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+			ipAddress = strings.Split(forwarded, ",")[0]
+		}
+
+		// Create session with remember me option
 		sm := auth.GetSessionManager()
-		session, err := sm.CreateSession(user.ID, user.Username, user.IsAdmin)
+		session, err := sm.CreateSessionWithOptions(user.ID, user.Username, user.IsAdmin, rememberMe, userAgent, ipAddress)
 		if err != nil {
 			log.Printf("Error creating session: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -75,7 +83,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Set cookie
-		auth.SetSessionCookie(w, session.ID)
+		auth.SetSessionCookie(w, session.ID, rememberMe)
 
 		// Update last login
 		user.UpdateLastLogin(s.db)

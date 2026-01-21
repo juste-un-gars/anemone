@@ -50,6 +50,7 @@ Tests du setup wizard sur VM et corrections de bugs chemins personnalisés.
 - [x] Détection pool existant au retry (évite erreur "disk in use")
 - [x] UX : Séparation sélection disques et configuration RAID en 2 sous-étapes
 - [x] Suppression sudo chown inutile quand répertoire existe déjà
+- [x] Fix sync immédiate à la création d'un peer (initialise last_sync à CURRENT_TIMESTAMP)
 
 ### Remaining
 - [ ] Test complet sur VM Fedora
@@ -78,6 +79,7 @@ Tests du setup wizard sur VM et corrections de bugs chemins personnalisés.
 - `e265f69` feat: Separate ZFS disk selection and RAID configuration into two steps
 - `7cb2ffb` fix: Don't try to set ownership via sudo after user runs manual commands
 - `be053d7` fix: Remove unnecessary sudo chown when directory already exists
+- `c2e8e31` fix: Don't trigger immediate sync when creating a new peer
 
 ---
 

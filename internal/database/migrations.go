@@ -142,7 +142,24 @@ func Migrate(db *sql.DB) error {
 		// Insert default sync config
 		`INSERT OR IGNORE INTO sync_config (id, enabled, interval, fixed_hour) VALUES (1, 0, '1h', 23)`,
 
+		// Sessions (persistent login sessions)
+		`CREATE TABLE IF NOT EXISTS sessions (
+			id TEXT PRIMARY KEY,
+			user_id INTEGER NOT NULL,
+			username TEXT NOT NULL,
+			is_admin BOOLEAN DEFAULT 0,
+			remember_me BOOLEAN DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			expires_at DATETIME NOT NULL,
+			last_activity DATETIME DEFAULT CURRENT_TIMESTAMP,
+			user_agent TEXT,
+			ip_address TEXT,
+			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		)`,
+
 		// Indexes for performance
+		`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)`,
 		`CREATE INDEX IF NOT EXISTS idx_activation_tokens_token ON activation_tokens(token)`,
 		`CREATE INDEX IF NOT EXISTS idx_activation_tokens_expires ON activation_tokens(expires_at)`,

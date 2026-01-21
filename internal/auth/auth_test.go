@@ -6,16 +6,49 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
-func TestSessionManagerCreateSession(t *testing.T) {
-	sm := &SessionManager{
-		sessions: make(map[string]*Session),
+// setupTestDB creates an in-memory SQLite database for testing
+func setupTestDB(t *testing.T) *sql.DB {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to open test database: %v", err)
 	}
+
+	// Create sessions table
+	_, err = db.Exec(`
+		CREATE TABLE sessions (
+			id TEXT PRIMARY KEY,
+			user_id INTEGER NOT NULL,
+			username TEXT NOT NULL,
+			is_admin BOOLEAN DEFAULT 0,
+			remember_me BOOLEAN DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			expires_at DATETIME NOT NULL,
+			last_activity DATETIME DEFAULT CURRENT_TIMESTAMP,
+			user_agent TEXT,
+			ip_address TEXT
+		)
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create sessions table: %v", err)
+	}
+
+	return db
+}
+
+func TestSessionManagerCreateSession(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	sm := &SessionManager{db: db}
 
 	session, err := sm.CreateSession(1, "testuser", false)
 	if err != nil {
@@ -40,10 +73,40 @@ func TestSessionManagerCreateSession(t *testing.T) {
 	}
 }
 
-func TestSessionManagerGetSession(t *testing.T) {
-	sm := &SessionManager{
-		sessions: make(map[string]*Session),
+func TestSessionManagerCreateSessionWithOptions(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	sm := &SessionManager{db: db}
+
+	// Test with remember me
+	session, err := sm.CreateSessionWithOptions(1, "testuser", true, true, "Mozilla/5.0", "192.168.1.1")
+	if err != nil {
+		t.Fatalf("CreateSessionWithOptions failed: %v", err)
 	}
+
+	if !session.RememberMe {
+		t.Error("Expected RememberMe true")
+	}
+	if session.UserAgent != "Mozilla/5.0" {
+		t.Errorf("Expected UserAgent 'Mozilla/5.0', got %q", session.UserAgent)
+	}
+	if session.IPAddress != "192.168.1.1" {
+		t.Errorf("Expected IPAddress '192.168.1.1', got %q", session.IPAddress)
+	}
+
+	// Check that expiry is ~30 days for remember me
+	expectedExpiry := time.Now().Add(RememberMeDuration)
+	if session.ExpiresAt.Before(expectedExpiry.Add(-time.Minute)) {
+		t.Error("Remember me session should expire in ~30 days")
+	}
+}
+
+func TestSessionManagerGetSession(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	sm := &SessionManager{db: db}
 
 	// Create a session
 	session, _ := sm.CreateSession(1, "testuser", false)
@@ -66,34 +129,33 @@ func TestSessionManagerGetSession(t *testing.T) {
 }
 
 func TestSessionManagerGetExpiredSession(t *testing.T) {
-	sm := &SessionManager{
-		sessions: make(map[string]*Session),
-	}
+	db := setupTestDB(t)
+	defer db.Close()
 
-	// Create an already expired session
-	session := &Session{
-		ID:        "test-expired",
-		UserID:    1,
-		Username:  "testuser",
-		CreatedAt: time.Now().Add(-3 * time.Hour),
-		ExpiresAt: time.Now().Add(-1 * time.Hour), // Expired 1 hour ago
-	}
+	sm := &SessionManager{db: db}
 
-	sm.mu.Lock()
-	sm.sessions[session.ID] = session
-	sm.mu.Unlock()
+	// Insert an already expired session directly
+	_, err := db.Exec(`
+		INSERT INTO sessions (id, user_id, username, is_admin, created_at, expires_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, "test-expired", 1, "testuser", false,
+		time.Now().Add(-3*time.Hour), time.Now().Add(-1*time.Hour))
+	if err != nil {
+		t.Fatalf("Failed to insert expired session: %v", err)
+	}
 
 	// Try to get expired session
-	_, err := sm.GetSession(session.ID)
+	_, err = sm.GetSession("test-expired")
 	if err == nil {
 		t.Error("GetSession should fail for expired session")
 	}
 }
 
 func TestSessionManagerDeleteSession(t *testing.T) {
-	sm := &SessionManager{
-		sessions: make(map[string]*Session),
-	}
+	db := setupTestDB(t)
+	defer db.Close()
+
+	sm := &SessionManager{db: db}
 
 	// Create a session
 	session, _ := sm.CreateSession(1, "testuser", false)
@@ -108,10 +170,35 @@ func TestSessionManagerDeleteSession(t *testing.T) {
 	}
 }
 
-func TestSessionManagerRenewSession(t *testing.T) {
-	sm := &SessionManager{
-		sessions: make(map[string]*Session),
+func TestSessionManagerDeleteUserSessions(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	sm := &SessionManager{db: db}
+
+	// Create multiple sessions for the same user
+	session1, _ := sm.CreateSession(1, "testuser", false)
+	session2, _ := sm.CreateSession(1, "testuser", false)
+
+	// Delete all sessions for user
+	err := sm.DeleteUserSessions(1)
+	if err != nil {
+		t.Fatalf("DeleteUserSessions failed: %v", err)
 	}
+
+	// Both sessions should be gone
+	_, err1 := sm.GetSession(session1.ID)
+	_, err2 := sm.GetSession(session2.ID)
+	if err1 == nil || err2 == nil {
+		t.Error("All user sessions should be deleted")
+	}
+}
+
+func TestSessionManagerRenewSession(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	sm := &SessionManager{db: db}
 
 	// Create a session
 	session, _ := sm.CreateSession(1, "testuser", false)
@@ -134,13 +221,36 @@ func TestSessionManagerRenewSession(t *testing.T) {
 }
 
 func TestSessionManagerRenewNonExistentSession(t *testing.T) {
-	sm := &SessionManager{
-		sessions: make(map[string]*Session),
-	}
+	db := setupTestDB(t)
+	defer db.Close()
+
+	sm := &SessionManager{db: db}
 
 	err := sm.RenewSession("nonexistent")
 	if err == nil {
 		t.Error("RenewSession should fail for non-existent session")
+	}
+}
+
+func TestSessionManagerGetUserSessions(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	sm := &SessionManager{db: db}
+
+	// Create multiple sessions for the same user
+	sm.CreateSession(1, "testuser", false)
+	sm.CreateSession(1, "testuser", false)
+	sm.CreateSession(2, "otheruser", false)
+
+	// Get sessions for user 1
+	sessions, err := sm.GetUserSessions(1)
+	if err != nil {
+		t.Fatalf("GetUserSessions failed: %v", err)
+	}
+
+	if len(sessions) != 2 {
+		t.Errorf("Expected 2 sessions, got %d", len(sessions))
 	}
 }
 
@@ -239,7 +349,7 @@ func TestRedirectIfAuthenticatedMiddleware(t *testing.T) {
 
 func TestSessionCookieSecurityAttributes(t *testing.T) {
 	rr := httptest.NewRecorder()
-	SetSessionCookie(rr, "test-session-id")
+	SetSessionCookie(rr, "test-session-id", false)
 
 	cookies := rr.Result().Cookies()
 	if len(cookies) != 1 {
@@ -260,6 +370,28 @@ func TestSessionCookieSecurityAttributes(t *testing.T) {
 	}
 	if cookie.SameSite != http.SameSiteStrictMode {
 		t.Error("Cookie should have SameSite=Strict")
+	}
+}
+
+func TestSessionCookieRememberMe(t *testing.T) {
+	// Test without remember me
+	rr1 := httptest.NewRecorder()
+	SetSessionCookie(rr1, "test-session-id", false)
+
+	cookie1 := rr1.Result().Cookies()[0]
+	expectedMaxAge := int(SessionDuration.Seconds())
+	if cookie1.MaxAge != expectedMaxAge {
+		t.Errorf("Expected MaxAge %d, got %d", expectedMaxAge, cookie1.MaxAge)
+	}
+
+	// Test with remember me
+	rr2 := httptest.NewRecorder()
+	SetSessionCookie(rr2, "test-session-id", true)
+
+	cookie2 := rr2.Result().Cookies()[0]
+	expectedMaxAgeRemember := int(RememberMeDuration.Seconds())
+	if cookie2.MaxAge != expectedMaxAgeRemember {
+		t.Errorf("Expected RememberMe MaxAge %d, got %d", expectedMaxAgeRemember, cookie2.MaxAge)
 	}
 }
 
@@ -294,10 +426,16 @@ func TestGenerateSessionIDUniqueness(t *testing.T) {
 	}
 }
 
-func TestSessionDuration(t *testing.T) {
+func TestSessionDurations(t *testing.T) {
 	// Session duration should be 2 hours
 	expected := 2 * time.Hour
 	if SessionDuration != expected {
 		t.Errorf("SessionDuration should be %v, got %v", expected, SessionDuration)
+	}
+
+	// Remember me duration should be 30 days
+	expectedRemember := 30 * 24 * time.Hour
+	if RememberMeDuration != expectedRemember {
+		t.Errorf("RememberMeDuration should be %v, got %v", expectedRemember, RememberMeDuration)
 	}
 }

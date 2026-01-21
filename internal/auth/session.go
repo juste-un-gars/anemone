@@ -6,32 +6,40 @@ package auth
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"log"
 	"net/http"
 	"sync"
 	"time"
 )
 
 const (
-	SessionCookieName = "anemone_session"
-	SessionDuration   = 2 * time.Hour // 2 hours for better security
+	SessionCookieName       = "anemone_session"
+	SessionDuration         = 2 * time.Hour  // Normal session: 2 hours
+	RememberMeDuration      = 30 * 24 * time.Hour // Remember me: 30 days
+	SessionCleanupInterval  = 1 * time.Hour
 )
 
 // Session represents a user session
 type Session struct {
-	ID        string
-	UserID    int
-	Username  string
-	IsAdmin   bool
-	CreatedAt time.Time
-	ExpiresAt time.Time
+	ID           string
+	UserID       int
+	Username     string
+	IsAdmin      bool
+	RememberMe   bool
+	CreatedAt    time.Time
+	ExpiresAt    time.Time
+	LastActivity time.Time
+	UserAgent    string
+	IPAddress    string
 }
 
-// SessionManager manages user sessions
+// SessionManager manages user sessions with database persistence
 type SessionManager struct {
-	sessions map[string]*Session
-	mu       sync.RWMutex
+	db *sql.DB
+	mu sync.RWMutex
 }
 
 var (
@@ -39,15 +47,21 @@ var (
 	once           sync.Once
 )
 
-// GetSessionManager returns the default session manager
-func GetSessionManager() *SessionManager {
+// InitSessionManager initializes the session manager with a database connection
+func InitSessionManager(db *sql.DB) *SessionManager {
 	once.Do(func() {
 		defaultManager = &SessionManager{
-			sessions: make(map[string]*Session),
+			db: db,
 		}
 		// Start cleanup goroutine
 		go defaultManager.cleanupExpiredSessions()
 	})
+	return defaultManager
+}
+
+// GetSessionManager returns the default session manager
+// Note: InitSessionManager must be called first
+func GetSessionManager() *SessionManager {
 	return defaultManager
 }
 
@@ -62,96 +76,193 @@ func generateSessionID() (string, error) {
 
 // CreateSession creates a new session for a user
 func (sm *SessionManager) CreateSession(userID int, username string, isAdmin bool) (*Session, error) {
+	return sm.CreateSessionWithOptions(userID, username, isAdmin, false, "", "")
+}
+
+// CreateSessionWithOptions creates a new session with additional options
+func (sm *SessionManager) CreateSessionWithOptions(userID int, username string, isAdmin bool, rememberMe bool, userAgent string, ipAddress string) (*Session, error) {
 	sessionID, err := generateSessionID()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate session ID: %w", err)
 	}
 
 	now := time.Now()
-	session := &Session{
-		ID:        sessionID,
-		UserID:    userID,
-		Username:  username,
-		IsAdmin:   isAdmin,
-		CreatedAt: now,
-		ExpiresAt: now.Add(SessionDuration),
+	duration := SessionDuration
+	if rememberMe {
+		duration = RememberMeDuration
 	}
 
-	sm.mu.Lock()
-	sm.sessions[sessionID] = session
-	sm.mu.Unlock()
+	session := &Session{
+		ID:           sessionID,
+		UserID:       userID,
+		Username:     username,
+		IsAdmin:      isAdmin,
+		RememberMe:   rememberMe,
+		CreatedAt:    now,
+		ExpiresAt:    now.Add(duration),
+		LastActivity: now,
+		UserAgent:    userAgent,
+		IPAddress:    ipAddress,
+	}
+
+	// Insert into database
+	_, err = sm.db.Exec(`
+		INSERT INTO sessions (id, user_id, username, is_admin, remember_me, created_at, expires_at, last_activity, user_agent, ip_address)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, session.ID, session.UserID, session.Username, session.IsAdmin, session.RememberMe,
+		session.CreatedAt, session.ExpiresAt, session.LastActivity, session.UserAgent, session.IPAddress)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to store session: %w", err)
+	}
 
 	return session, nil
 }
 
 // GetSession retrieves a session by ID
 func (sm *SessionManager) GetSession(sessionID string) (*Session, error) {
-	sm.mu.RLock()
-	defer sm.mu.RUnlock()
+	var session Session
+	var rememberMe bool
 
-	session, exists := sm.sessions[sessionID]
-	if !exists {
+	err := sm.db.QueryRow(`
+		SELECT id, user_id, username, is_admin, remember_me, created_at, expires_at, last_activity,
+		       COALESCE(user_agent, ''), COALESCE(ip_address, '')
+		FROM sessions
+		WHERE id = ?
+	`, sessionID).Scan(
+		&session.ID, &session.UserID, &session.Username, &session.IsAdmin, &rememberMe,
+		&session.CreatedAt, &session.ExpiresAt, &session.LastActivity,
+		&session.UserAgent, &session.IPAddress,
+	)
+
+	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("session not found")
 	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get session: %w", err)
+	}
+
+	session.RememberMe = rememberMe
 
 	// Check if expired
 	if time.Now().After(session.ExpiresAt) {
+		// Delete expired session
+		sm.DeleteSession(sessionID)
 		return nil, fmt.Errorf("session expired")
 	}
 
-	return session, nil
+	return &session, nil
 }
 
 // DeleteSession deletes a session
 func (sm *SessionManager) DeleteSession(sessionID string) {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-	delete(sm.sessions, sessionID)
+	_, err := sm.db.Exec("DELETE FROM sessions WHERE id = ?", sessionID)
+	if err != nil {
+		log.Printf("Failed to delete session: %v", err)
+	}
+}
+
+// DeleteUserSessions deletes all sessions for a user
+func (sm *SessionManager) DeleteUserSessions(userID int) error {
+	_, err := sm.db.Exec("DELETE FROM sessions WHERE user_id = ?", userID)
+	return err
 }
 
 // RenewSession extends the session expiration
 func (sm *SessionManager) RenewSession(sessionID string) error {
-	sm.mu.Lock()
-	defer sm.mu.Unlock()
-
-	session, exists := sm.sessions[sessionID]
-	if !exists {
-		return fmt.Errorf("session not found")
+	session, err := sm.GetSession(sessionID)
+	if err != nil {
+		return err
 	}
 
-	session.ExpiresAt = time.Now().Add(SessionDuration)
-	return nil
+	duration := SessionDuration
+	if session.RememberMe {
+		duration = RememberMeDuration
+	}
+
+	newExpiry := time.Now().Add(duration)
+	_, err = sm.db.Exec(`
+		UPDATE sessions
+		SET expires_at = ?, last_activity = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, newExpiry, sessionID)
+
+	return err
+}
+
+// UpdateLastActivity updates the last activity timestamp
+func (sm *SessionManager) UpdateLastActivity(sessionID string) error {
+	_, err := sm.db.Exec(`
+		UPDATE sessions
+		SET last_activity = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`, sessionID)
+	return err
+}
+
+// GetUserSessions returns all active sessions for a user
+func (sm *SessionManager) GetUserSessions(userID int) ([]*Session, error) {
+	rows, err := sm.db.Query(`
+		SELECT id, user_id, username, is_admin, remember_me, created_at, expires_at, last_activity,
+		       COALESCE(user_agent, ''), COALESCE(ip_address, '')
+		FROM sessions
+		WHERE user_id = ? AND expires_at > CURRENT_TIMESTAMP
+		ORDER BY last_activity DESC
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sessions []*Session
+	for rows.Next() {
+		var s Session
+		err := rows.Scan(
+			&s.ID, &s.UserID, &s.Username, &s.IsAdmin, &s.RememberMe,
+			&s.CreatedAt, &s.ExpiresAt, &s.LastActivity,
+			&s.UserAgent, &s.IPAddress,
+		)
+		if err != nil {
+			return nil, err
+		}
+		sessions = append(sessions, &s)
+	}
+
+	return sessions, nil
 }
 
 // cleanupExpiredSessions removes expired sessions periodically
 func (sm *SessionManager) cleanupExpiredSessions() {
-	ticker := time.NewTicker(1 * time.Hour)
+	ticker := time.NewTicker(SessionCleanupInterval)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		sm.mu.Lock()
-		now := time.Now()
-		for id, session := range sm.sessions {
-			if now.After(session.ExpiresAt) {
-				delete(sm.sessions, id)
-			}
+		result, err := sm.db.Exec("DELETE FROM sessions WHERE expires_at < CURRENT_TIMESTAMP")
+		if err != nil {
+			log.Printf("Failed to cleanup expired sessions: %v", err)
+			continue
 		}
-		sm.mu.Unlock()
+		if count, _ := result.RowsAffected(); count > 0 {
+			log.Printf("Cleaned up %d expired sessions", count)
+		}
 	}
 }
 
 // SetSessionCookie sets the session cookie in the response
-// Uses SameSite=Strict for maximum CSRF protection (prevents cross-origin requests)
-// Uses Secure=true to enforce HTTPS only (works with HSTS header)
-func SetSessionCookie(w http.ResponseWriter, sessionID string) {
+func SetSessionCookie(w http.ResponseWriter, sessionID string, rememberMe bool) {
+	maxAge := int(SessionDuration.Seconds())
+	if rememberMe {
+		maxAge = int(RememberMeDuration.Seconds())
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     SessionCookieName,
 		Value:    sessionID,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true, // Enforce HTTPS (required with HSTS header)
-		SameSite: http.SameSiteStrictMode, // Strong CSRF protection
-		MaxAge:   int(SessionDuration.Seconds()),
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   maxAge,
 	})
 }
 
@@ -174,13 +285,25 @@ func GetSessionFromRequest(r *http.Request) (*Session, error) {
 	}
 
 	sm := GetSessionManager()
+	if sm == nil {
+		return nil, fmt.Errorf("session manager not initialized")
+	}
+
 	session, err := sm.GetSession(cookie.Value)
 	if err != nil {
 		return nil, fmt.Errorf("invalid session: %w", err)
 	}
 
-	// Renew session on each request
-	sm.RenewSession(cookie.Value)
+	// Update last activity (non-blocking)
+	go sm.UpdateLastActivity(cookie.Value)
+
+	// Renew session on each request for non-remember-me sessions
+	// For remember-me sessions, only renew if more than 1 day until expiry
+	if !session.RememberMe {
+		sm.RenewSession(cookie.Value)
+	} else if time.Until(session.ExpiresAt) < 24*time.Hour {
+		sm.RenewSession(cookie.Value)
+	}
 
 	return session, nil
 }
