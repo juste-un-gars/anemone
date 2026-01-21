@@ -37,7 +37,7 @@ Tests du setup wizard sur VM et corrections de bugs chemins personnalisés.
 ### Remaining
 - [ ] Test complet sur VM Fedora
 - [ ] Test autres types de stockage (ZFS existing, ZFS new, custom)
-- [ ] Vérifier flux restauration
+- [x] Vérifier flux restauration (accès backup pair + téléchargement fichier OK)
 
 ### Commits de cette session
 - `6b8af6d` fix: Use sudo to create database directory in FinalizeSetup
