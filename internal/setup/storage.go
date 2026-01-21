@@ -122,8 +122,8 @@ func SetupDefaultStorage(dataDir string, owner string) error {
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		if err := createDirectoryWithSudo(dir); err != nil {
+			return err
 		}
 	}
 
@@ -274,8 +274,8 @@ func SetupCustomStorage(dataDir, sharesDir, incomingDir, owner string) error {
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		if err := createDirectoryWithSudo(dir); err != nil {
+			return err
 		}
 	}
 
@@ -361,6 +361,31 @@ func ValidateStorageConfig(config SetupConfig) error {
 			return fmt.Errorf("incoming directory: %w", err)
 		}
 	}
+
+	return nil
+}
+
+// createDirectoryWithSudo creates a directory using sudo.
+// Returns a helpful error message if sudo fails due to password requirement.
+func createDirectoryWithSudo(path string) error {
+	// First check if directory already exists
+	if _, err := os.Stat(path); err == nil {
+		return nil // Directory exists
+	}
+
+	// Try to create with sudo
+	cmd := exec.Command("sudo", "mkdir", "-p", path)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		outputStr := string(output)
+		if strings.Contains(outputStr, "password") || strings.Contains(outputStr, "terminal") {
+			return fmt.Errorf("cannot create directory '%s'. Please create it manually:\n\nsudo mkdir -p %s\nsudo chmod 755 %s", path, path, path)
+		}
+		return fmt.Errorf("failed to create directory %s: %s", path, outputStr)
+	}
+
+	// Set permissions
+	cmd = exec.Command("sudo", "chmod", "755", path)
+	cmd.Run() // Ignore errors
 
 	return nil
 }
