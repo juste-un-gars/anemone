@@ -43,7 +43,10 @@ func FinalizeSetup(opts FinalizeOptions) (*FinalizeResult, error) {
 
 	// 1. Initialize database
 	dbPath := filepath.Join(opts.DataDir, "db", "anemone.db")
-	if err := os.MkdirAll(filepath.Dir(dbPath), 0755); err != nil {
+	dbDir := filepath.Dir(dbPath)
+
+	// Create database directory with sudo (needed for restricted paths like /srv)
+	if err := createDirectoryWithSudo(dbDir); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 
