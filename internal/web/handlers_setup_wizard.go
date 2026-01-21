@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -70,6 +71,7 @@ type SetupWizardData struct {
 	Title       string
 	CurrentStep int
 	State       setup.SetupStateView
+	Hostname    string
 }
 
 // handleWizard serves the setup wizard page
@@ -99,11 +101,18 @@ func (s *SetupWizardServer) handleWizard(w http.ResponseWriter, r *http.Request)
 		lang = "fr"
 	}
 
+	// Get hostname for default server name
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "Anemone"
+	}
+
 	data := SetupWizardData{
 		Lang:        lang,
 		Title:       i18n.T(lang, "setup_wizard.title"),
 		CurrentStep: currentStep,
 		State:       state,
+		Hostname:    hostname,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
