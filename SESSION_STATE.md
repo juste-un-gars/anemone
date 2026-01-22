@@ -1,11 +1,42 @@
 # Anemone - Session State
 
 **Current Version:** v0.9.24-beta
-**Last Updated:** 2026-01-21
+**Last Updated:** 2026-01-22
 
 ---
 
 ## Current Session
+
+**Session 70** - Enhanced SMART Modal
+- **Status:** Completed ✅
+- **Date:** 2026-01-22
+
+### Summary
+Improved the SMART details modal in the storage page with detailed metrics, help tooltips, and visual status indicators.
+
+### Completed (2026-01-22)
+- [x] Added NVMe-specific fields to SMARTInfo struct (media errors, unsafe shutdowns, available spare, percentage used, data units read/written)
+- [x] Populated NVMe fields in GetSMARTInfo() function
+- [x] Redesigned SMART modal with organized sections
+- [x] Added help tooltips (?) for each metric with explanations
+- [x] Color-coded values (green/yellow/red based on severity)
+- [x] Added FR/EN translations for all new labels and help texts
+- [x] Collapsible raw attributes table
+
+### Features
+The new SMART modal displays:
+- Health banner with visual status indicator
+- General info (temperature, power-on hours, power cycles)
+- For SATA/SSD: Disk errors (reallocated/pending/uncorrectable sectors)
+- For NVMe: Media errors, unsafe shutdowns, SSD wear (available spare, percentage used), data volume (TB written/read)
+- All raw SMART attributes (collapsible)
+
+### Commits
+- `127010b` feat: Enhanced SMART modal with detailed metrics and help tooltips
+
+---
+
+## Previous Session
 
 **Session 69** - Restore Flow Fixes
 - **Status:** Completed ✅
@@ -14,51 +45,18 @@
 ### Summary
 Fixed critical bugs in restore flow: login failure after restore and missing storage configuration.
 
-### Completed (2026-01-21)
-- [x] Updated docs/storage-setup.md (French → English, ZFS only)
-- [x] Fixed restore flow to include storage configuration (was hardcoded to /srv/anemone)
-- [x] Added post-restore system setup (SMB users, password hashes, share directories, Samba config)
-- [x] Fixed NULL field handling in users.go (root cause of login failure after restore)
-
-### Root Cause Analysis
-Login failed after restore because:
-1. Restored users have NULL email field in database
-2. `GetByUsername()` tried to scan NULL into a Go string → crash
-3. Fixed by using `sql.NullString` for nullable fields
-
-### Commits
-- `1e18fd1` (earlier) Restore flow with storage config, SMB setup
-- `852cad7` fix: Handle NULL fields when reading users from database
-
-### To Test
-After deploying (`sudo cp anemone /usr/local/bin/ && sudo systemctl restart anemone`):
-1. Use existing backup file to restore
-2. Login should now work
-3. Samba should work (was already fixed)
-
----
-
-## Previous Session
-
-**Session 68** - Persistent Sessions & Documentation
-- **Status:** Completed
-- **Date:** 2026-01-21
-
-### Summary
-Added persistent sessions with "Remember me" feature and rewrote documentation.
-
 ---
 
 ## Recent Sessions
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 70 | Enhanced SMART Modal | 2026-01-22 | Completed |
 | 69 | Restore Flow Fixes | 2026-01-21 | Completed |
 | 68 | Persistent Sessions & Documentation | 2026-01-21 | Completed |
 | 67 | Tests VM & Bug Fixes Setup Wizard | 2026-01-21 | Completed |
 | 66 | Tests d'intégration Setup Wizard | 2026-01-20 | Completed |
 | 65 | Mode Restauration Serveur | 2026-01-20 | Completed |
-| 64 | Nouveau install.sh simplifié | 2026-01-20 | Completed |
 
 ---
 
@@ -81,14 +79,6 @@ Added persistent sessions with "Remember me" feature and rewrote documentation.
 ---
 
 ## Next Steps
-
-**Tests validés :**
-- ✅ Login après restore fonctionne
-
-**Reste à tester :**
-- [ ] Test complet sur VM Fedora
-- [ ] Test ZFS new pool
-- [ ] Test ZFS existing pool
 
 **Fichiers debug à nettoyer (optionnel) :**
 - `debug_auth.go`, `fix_hash.go`, `verify_hash.go`, `backup_20260121_154509.enc`
