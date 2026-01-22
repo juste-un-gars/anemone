@@ -69,6 +69,23 @@ Fixed critical bugs in restore flow: login failure after restore and missing sto
 
 ---
 
+## Future Features
+
+### WireGuard Integration
+- [ ] Installation automatique du client WireGuard lors de l'installation d'Anemone
+- [ ] Interface web pour gérer la configuration WireGuard (clés, endpoints, peers)
+- [ ] Génération de fichiers de configuration `.conf`
+- [ ] Statut de connexion VPN dans le dashboard
+
+### Simple Sync Peers (rclone)
+- [ ] Nouveau type de pair : "Simple Sync" (en plus du P2P existant)
+- [ ] Synchronisation unidirectionnelle Anemone → destination externe
+- [ ] Support rclone pour multiples backends (S3, SFTP, Google Drive, etc.)
+- [ ] Configuration simplifiée pour utilisateurs ne souhaitant pas le P2P complet
+- [ ] Planification des sauvegardes simples
+
+---
+
 ## Quick Links
 
 - **[CLAUDE.md](CLAUDE.md)** - Project context & guidelines
