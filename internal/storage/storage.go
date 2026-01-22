@@ -62,12 +62,25 @@ type Partition struct {
 type SMARTInfo struct {
 	Available       bool         `json:"available"`        // SMART supported and enabled
 	Healthy         bool         `json:"healthy"`          // Overall health assessment passed
+	IsNVMe          bool         `json:"is_nvme"`          // True if this is an NVMe drive
 	Temperature     int          `json:"temperature"`      // Current temperature in Celsius
 	PowerOnHours    int          `json:"power_on_hours"`   // Total hours powered on
 	PowerCycleCount int          `json:"power_cycle_count"`// Number of power cycles
-	ReallocatedSectors int       `json:"reallocated_sectors"` // Bad sectors reallocated
-	PendingSectors  int          `json:"pending_sectors"`  // Sectors pending reallocation
+
+	// SATA/SSD specific
+	ReallocatedSectors   int     `json:"reallocated_sectors"`   // Bad sectors reallocated
+	PendingSectors       int     `json:"pending_sectors"`       // Sectors pending reallocation
 	UncorrectableSectors int     `json:"uncorrectable_sectors"` // Uncorrectable sector count
+
+	// NVMe specific
+	MediaErrors          int     `json:"media_errors"`           // NVMe media and data integrity errors
+	UnsafeShutdowns      int     `json:"unsafe_shutdowns"`       // Number of unsafe shutdowns
+	AvailableSpare       int     `json:"available_spare"`        // Available spare capacity (%)
+	AvailableSpareThresh int     `json:"available_spare_thresh"` // Available spare threshold (%)
+	PercentageUsed       int     `json:"percentage_used"`        // SSD life used (%)
+	DataUnitsRead        int64   `json:"data_units_read"`        // Data units read (in 512KB units)
+	DataUnitsWritten     int64   `json:"data_units_written"`     // Data units written (in 512KB units)
+
 	Attributes      []SMARTAttribute `json:"attributes"`   // Raw SMART attributes
 	LastChecked     time.Time    `json:"last_checked"`     // When SMART was last read
 }

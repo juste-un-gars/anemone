@@ -729,6 +729,41 @@
   "storage.disk_formatted": "Disque formaté avec succès",
   "storage.confirm_action": "Confirmer l'action",
   "storage.confirm": "Confirmer",
+
+  "storage.smart.general_info": "Informations générales",
+  "storage.smart.disk_errors": "Erreurs disque",
+  "storage.smart.nvme_info": "Informations NVMe",
+  "storage.smart.ssd_wear": "Usure du SSD",
+  "storage.smart.data_volume": "Volume de données",
+  "storage.smart.all_attributes": "Tous les attributs",
+
+  "storage.smart.media_errors": "Erreurs média",
+  "storage.smart.unsafe_shutdowns": "Arrêts non propres",
+  "storage.smart.available_spare": "Capacité de réserve",
+  "storage.smart.percentage_used": "Usure du SSD",
+  "storage.smart.data_written": "Données écrites",
+  "storage.smart.data_read": "Données lues",
+
+  "storage.smart.help.health": "État de santé global du disque basé sur l'auto-diagnostic SMART. Un échec indique un risque imminent de panne.",
+  "storage.smart.help.temperature": "Température actuelle du disque. Au-dessus de 50°C peut réduire la durée de vie. Au-dessus de 60°C est critique.",
+  "storage.smart.help.power_on_hours": "Nombre total d'heures de fonctionnement du disque. Un HDD dépasse rarement 50 000h, un SSD peut durer plus longtemps.",
+  "storage.smart.help.power_cycles": "Nombre de fois que le disque a été allumé/éteint. Des cycles fréquents peuvent user le disque plus rapidement.",
+
+  "storage.smart.help.reallocated": "Secteurs défectueux remplacés par des secteurs de réserve. Quelques-uns sont normaux, beaucoup indiquent un disque en fin de vie.",
+  "storage.smart.help.pending": "Secteurs en attente de vérification ou de réallocation. Si ce nombre augmente, le disque se dégrade.",
+  "storage.smart.help.uncorrectable": "Erreurs de lecture/écriture non récupérables. Toute valeur supérieure à 0 est préoccupante.",
+
+  "storage.smart.help.media_errors": "Erreurs d'intégrité des données sur le SSD NVMe. Devrait être 0. Toute erreur indique un problème matériel.",
+  "storage.smart.help.unsafe_shutdowns": "Nombre de coupures d'alimentation sans arrêt propre. Des valeurs élevées peuvent réduire la durée de vie du SSD.",
+  "storage.smart.help.available_spare": "Pourcentage de capacité de réserve restante pour remplacer les cellules usées. En dessous de 10% est critique.",
+  "storage.smart.help.percentage_used": "Estimation de l'usure du SSD basée sur les cycles d'écriture. 100% = durée de vie théorique atteinte (mais peut continuer à fonctionner).",
+  "storage.smart.help.data_written": "Volume total de données écrites sur le SSD depuis sa mise en service.",
+  "storage.smart.help.data_read": "Volume total de données lues depuis le SSD depuis sa mise en service.",
+
+  "storage.smart.status.good": "Bon",
+  "storage.smart.status.warning": "Attention",
+  "storage.smart.status.critical": "Critique",
+
   "setup_wizard.title": "Installation d'Anemone",
   "setup_wizard.step.mode": "Mode",
   "setup_wizard.step.storage": "Stockage",

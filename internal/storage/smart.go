@@ -131,11 +131,27 @@ func GetSMARTInfo(devicePath string) (*SMARTInfo, error) {
 
 	// Handle NVMe drives differently
 	if smart.Device.Protocol == "NVMe" || strings.Contains(devicePath, "nvme") {
+		info.IsNVMe = true
 		info.Temperature = smart.NVMeSmartHealthInfo.Temperature
 		info.PowerOnHours = smart.NVMeSmartHealthInfo.PowerOnHours
 		info.PowerCycleCount = smart.NVMeSmartHealthInfo.PowerCycles
+
+		// NVMe specific fields
+		info.MediaErrors = smart.NVMeSmartHealthInfo.MediaErrors
+		info.UnsafeShutdowns = smart.NVMeSmartHealthInfo.UnsafeShutdowns
+		info.AvailableSpare = smart.NVMeSmartHealthInfo.AvailableSpare
+		info.AvailableSpareThresh = smart.NVMeSmartHealthInfo.AvailableSpareThresh
+		info.PercentageUsed = smart.NVMeSmartHealthInfo.PercentageUsed
+		info.DataUnitsRead = smart.NVMeSmartHealthInfo.DataUnitsRead
+		info.DataUnitsWritten = smart.NVMeSmartHealthInfo.DataUnitsWritten
+
 		// NVMe media errors are significant
 		if smart.NVMeSmartHealthInfo.MediaErrors > 0 {
+			info.Healthy = false
+		}
+		// Also check if spare is low
+		if smart.NVMeSmartHealthInfo.AvailableSpare > 0 &&
+			smart.NVMeSmartHealthInfo.AvailableSpare <= smart.NVMeSmartHealthInfo.AvailableSpareThresh {
 			info.Healthy = false
 		}
 		return info, nil

@@ -351,8 +351,8 @@
 
 <!-- SMART Details Modal -->
 <div id="smartModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
-    <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
-        <div class="flex justify-between items-center mb-4">
+    <div class="relative top-10 mx-auto p-5 border w-11/12 max-w-3xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4 sticky top-0 bg-white pb-2 border-b">
             <h3 class="text-lg font-medium text-gray-900">{{T .Lang "storage.smart_details"}} - <span id="smartDiskName"></span></h3>
             <button onclick="closeSMARTModal()" class="text-gray-400 hover:text-gray-600">
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -361,6 +361,72 @@
         <div id="smartContent" class="mt-4"></div>
     </div>
 </div>
+
+<!-- Tooltip style -->
+<style>
+.help-tooltip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    background: #e5e7eb;
+    border-radius: 50%;
+    font-size: 10px;
+    color: #6b7280;
+    cursor: help;
+    margin-left: 4px;
+    flex-shrink: 0;
+}
+.help-tooltip:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1f2937;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: normal;
+    white-space: normal;
+    width: 280px;
+    max-width: 90vw;
+    z-index: 100;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    line-height: 1.4;
+    margin-bottom: 4px;
+}
+.help-tooltip:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #1f2937;
+    margin-bottom: -8px;
+    z-index: 100;
+}
+.smart-value-good { color: #10b981; }
+.smart-value-warning { color: #f59e0b; }
+.smart-value-critical { color: #ef4444; }
+.smart-card {
+    background: #f9fafb;
+    border-radius: 8px;
+    padding: 12px;
+}
+.smart-card-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+}
+</style>
 
 <!-- Create Pool Modal -->
 <div id="createPoolModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
@@ -574,36 +640,224 @@ async function submitPasswordVerification(e) {
     }
 }
 
-// SMART Modal
+// SMART Modal - Translation strings
+const smartTranslations = {
+    generalInfo: '{{T .Lang "storage.smart.general_info"}}',
+    diskErrors: '{{T .Lang "storage.smart.disk_errors"}}',
+    nvmeInfo: '{{T .Lang "storage.smart.nvme_info"}}',
+    ssdWear: '{{T .Lang "storage.smart.ssd_wear"}}',
+    dataVolume: '{{T .Lang "storage.smart.data_volume"}}',
+    allAttributes: '{{T .Lang "storage.smart.all_attributes"}}',
+    health: '{{T .Lang "storage.health"}}',
+    temp: '{{T .Lang "storage.temp"}}',
+    powerOn: '{{T .Lang "storage.power_on"}}',
+    powerCycles: '{{T .Lang "storage.power_cycles"}}',
+    reallocated: '{{T .Lang "storage.reallocated"}}',
+    pending: '{{T .Lang "storage.pending"}}',
+    uncorrectable: '{{T .Lang "storage.uncorrectable"}}',
+    mediaErrors: '{{T .Lang "storage.smart.media_errors"}}',
+    unsafeShutdowns: '{{T .Lang "storage.smart.unsafe_shutdowns"}}',
+    availableSpare: '{{T .Lang "storage.smart.available_spare"}}',
+    percentageUsed: '{{T .Lang "storage.smart.percentage_used"}}',
+    dataWritten: '{{T .Lang "storage.smart.data_written"}}',
+    dataRead: '{{T .Lang "storage.smart.data_read"}}',
+    statusGood: '{{T .Lang "storage.smart.status.good"}}',
+    statusWarning: '{{T .Lang "storage.smart.status.warning"}}',
+    statusCritical: '{{T .Lang "storage.smart.status.critical"}}',
+    notAvailable: '{{T .Lang "storage.smart_not_available"}}',
+    helpHealth: '{{T .Lang "storage.smart.help.health"}}',
+    helpTemp: '{{T .Lang "storage.smart.help.temperature"}}',
+    helpPowerOn: '{{T .Lang "storage.smart.help.power_on_hours"}}',
+    helpPowerCycles: '{{T .Lang "storage.smart.help.power_cycles"}}',
+    helpReallocated: '{{T .Lang "storage.smart.help.reallocated"}}',
+    helpPending: '{{T .Lang "storage.smart.help.pending"}}',
+    helpUncorrectable: '{{T .Lang "storage.smart.help.uncorrectable"}}',
+    helpMediaErrors: '{{T .Lang "storage.smart.help.media_errors"}}',
+    helpUnsafeShutdowns: '{{T .Lang "storage.smart.help.unsafe_shutdowns"}}',
+    helpAvailableSpare: '{{T .Lang "storage.smart.help.available_spare"}}',
+    helpPercentageUsed: '{{T .Lang "storage.smart.help.percentage_used"}}',
+    helpDataWritten: '{{T .Lang "storage.smart.help.data_written"}}',
+    helpDataRead: '{{T .Lang "storage.smart.help.data_read"}}',
+    attrName: '{{T .Lang "storage.attr_name"}}',
+    attrValue: '{{T .Lang "storage.attr_value"}}',
+    attrWorst: '{{T .Lang "storage.attr_worst"}}',
+    attrRaw: '{{T .Lang "storage.attr_raw"}}'
+};
+
+function helpIcon(tip) {
+    return `<span class="help-tooltip" data-tip="${tip.replace(/"/g, '&quot;')}">?</span>`;
+}
+
+function formatBytes(units) {
+    // units are in 512KB blocks for NVMe
+    const bytes = units * 512 * 1000;
+    if (bytes >= 1e15) return (bytes / 1e15).toFixed(1) + ' PB';
+    if (bytes >= 1e12) return (bytes / 1e12).toFixed(1) + ' TB';
+    if (bytes >= 1e9) return (bytes / 1e9).toFixed(1) + ' GB';
+    return (bytes / 1e6).toFixed(1) + ' MB';
+}
+
+function formatHours(hours) {
+    if (hours < 24) return hours + 'h';
+    const days = Math.floor(hours / 24);
+    if (days < 365) return days + 'j (' + hours.toLocaleString() + 'h)';
+    const years = (days / 365).toFixed(1);
+    return years + ' ans (' + hours.toLocaleString() + 'h)';
+}
+
+function getValueClass(value, warnThresh, critThresh, inverse = false) {
+    if (inverse) {
+        if (value <= critThresh) return 'smart-value-critical';
+        if (value <= warnThresh) return 'smart-value-warning';
+        return 'smart-value-good';
+    } else {
+        if (value >= critThresh) return 'smart-value-critical';
+        if (value >= warnThresh) return 'smart-value-warning';
+        return 'smart-value-good';
+    }
+}
+
+function smartMetricRow(label, value, helpTip, valueClass = '') {
+    return `<div class="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
+        <div class="flex items-center text-sm text-gray-600">${label}${helpIcon(helpTip)}</div>
+        <div class="text-sm font-medium ${valueClass}">${value}</div>
+    </div>`;
+}
+
 function showSMARTDetails(diskName) {
     document.getElementById('smartDiskName').textContent = diskName;
-    document.getElementById('smartContent').innerHTML = '<p class="text-center text-gray-500">{{T .Lang "common.loading"}}...</p>';
+    document.getElementById('smartContent').innerHTML = '<p class="text-center text-gray-500 py-8">{{T .Lang "common.loading"}}...</p>';
     document.getElementById('smartModal').classList.remove('hidden');
+
     fetch('/api/admin/storage/disk/' + diskName + '/smart')
     .then(r => r.json())
     .then(data => {
-        let html = '';
         if (!data.available) {
-            html = '<p class="text-center text-gray-500">{{T .Lang "storage.smart_not_available"}}</p>';
-        } else {
-            html += '<div class="grid grid-cols-2 gap-4 mb-4">';
-            html += '<div class="bg-gray-50 p-3 rounded"><span class="text-gray-500">{{T .Lang "storage.health"}}:</span> ' + (data.healthy ? '<span class="text-green-600 font-medium">OK</span>' : '<span class="text-red-600 font-medium">FAILED</span>') + '</div>';
-            html += '<div class="bg-gray-50 p-3 rounded"><span class="text-gray-500">{{T .Lang "storage.temp"}}:</span> ' + (data.temperature > 0 ? data.temperature + '°C' : '-') + '</div>';
-            html += '<div class="bg-gray-50 p-3 rounded"><span class="text-gray-500">{{T .Lang "storage.power_on"}}:</span> ' + (data.power_on_hours > 0 ? data.power_on_hours + 'h' : '-') + '</div>';
-            html += '<div class="bg-gray-50 p-3 rounded"><span class="text-gray-500">{{T .Lang "storage.power_cycles"}}:</span> ' + (data.power_cycle_count > 0 ? data.power_cycle_count : '-') + '</div>';
-            html += '</div>';
-            if (data.attributes && data.attributes.length > 0) {
-                html += '<div class="overflow-x-auto max-h-64 overflow-y-auto"><table class="min-w-full text-sm"><thead class="bg-gray-50"><tr><th class="px-2 py-1 text-left">ID</th><th class="px-2 py-1 text-left">{{T .Lang "storage.attr_name"}}</th><th class="px-2 py-1 text-right">{{T .Lang "storage.attr_value"}}</th><th class="px-2 py-1 text-right">{{T .Lang "storage.attr_worst"}}</th><th class="px-2 py-1 text-left">{{T .Lang "storage.attr_raw"}}</th></tr></thead><tbody>';
-                data.attributes.forEach(attr => {
-                    let rowClass = attr.status === 'failing' ? 'bg-red-50' : (attr.status === 'warning' ? 'bg-yellow-50' : '');
-                    html += '<tr class="' + rowClass + '"><td class="px-2 py-1">' + attr.id + '</td><td class="px-2 py-1">' + attr.name + '</td><td class="px-2 py-1 text-right">' + attr.value + '</td><td class="px-2 py-1 text-right">' + attr.worst + '</td><td class="px-2 py-1 font-mono text-xs">' + attr.raw_value + '</td></tr>';
-                });
-                html += '</tbody></table></div>';
-            }
+            document.getElementById('smartContent').innerHTML = '<p class="text-center text-gray-500 py-8">' + smartTranslations.notAvailable + '</p>';
+            return;
         }
+
+        let html = '';
+
+        // Overall health banner
+        const healthClass = data.healthy ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800';
+        const healthIcon = data.healthy
+            ? '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>'
+            : '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>';
+        const healthText = data.healthy ? smartTranslations.statusGood : smartTranslations.statusCritical;
+
+        html += `<div class="flex items-center gap-2 p-3 rounded-lg border mb-4 ${healthClass}">
+            ${healthIcon}
+            <span class="font-medium">${smartTranslations.health}: ${healthText}</span>
+            ${helpIcon(smartTranslations.helpHealth)}
+        </div>`;
+
+        // General info section
+        html += `<div class="smart-card mb-4">
+            <div class="smart-card-title">${smartTranslations.generalInfo}</div>`;
+
+        // Temperature
+        const tempClass = data.temperature > 60 ? 'smart-value-critical' : (data.temperature > 50 ? 'smart-value-warning' : 'smart-value-good');
+        const tempValue = data.temperature > 0 ? data.temperature + '°C' : '-';
+        html += smartMetricRow(smartTranslations.temp, tempValue, smartTranslations.helpTemp, tempClass);
+
+        // Power on hours
+        const powerHoursValue = data.power_on_hours > 0 ? formatHours(data.power_on_hours) : '-';
+        const powerHoursClass = data.power_on_hours > 50000 ? 'smart-value-warning' : '';
+        html += smartMetricRow(smartTranslations.powerOn, powerHoursValue, smartTranslations.helpPowerOn, powerHoursClass);
+
+        // Power cycles
+        const powerCyclesValue = data.power_cycle_count > 0 ? data.power_cycle_count.toLocaleString() : '-';
+        html += smartMetricRow(smartTranslations.powerCycles, powerCyclesValue, smartTranslations.helpPowerCycles);
+
+        html += '</div>';
+
+        // NVMe specific section
+        if (data.is_nvme) {
+            // NVMe errors section
+            html += `<div class="smart-card mb-4">
+                <div class="smart-card-title">${smartTranslations.nvmeInfo}</div>`;
+
+            const mediaErrorsClass = data.media_errors > 0 ? 'smart-value-critical' : 'smart-value-good';
+            html += smartMetricRow(smartTranslations.mediaErrors, data.media_errors, smartTranslations.helpMediaErrors, mediaErrorsClass);
+
+            const unsafeClass = data.unsafe_shutdowns > 100 ? 'smart-value-warning' : '';
+            html += smartMetricRow(smartTranslations.unsafeShutdowns, data.unsafe_shutdowns, smartTranslations.helpUnsafeShutdowns, unsafeClass);
+
+            html += '</div>';
+
+            // SSD wear section
+            html += `<div class="smart-card mb-4">
+                <div class="smart-card-title">${smartTranslations.ssdWear}</div>`;
+
+            const spareClass = getValueClass(data.available_spare, 20, 10, true);
+            html += smartMetricRow(smartTranslations.availableSpare, data.available_spare + '%', smartTranslations.helpAvailableSpare, spareClass);
+
+            const usedClass = getValueClass(data.percentage_used, 80, 100, false);
+            html += smartMetricRow(smartTranslations.percentageUsed, data.percentage_used + '%', smartTranslations.helpPercentageUsed, usedClass);
+
+            html += '</div>';
+
+            // Data volume section
+            if (data.data_units_written > 0 || data.data_units_read > 0) {
+                html += `<div class="smart-card mb-4">
+                    <div class="smart-card-title">${smartTranslations.dataVolume}</div>`;
+                html += smartMetricRow(smartTranslations.dataWritten, formatBytes(data.data_units_written), smartTranslations.helpDataWritten);
+                html += smartMetricRow(smartTranslations.dataRead, formatBytes(data.data_units_read), smartTranslations.helpDataRead);
+                html += '</div>';
+            }
+        } else {
+            // SATA/SSD errors section
+            const hasErrors = data.reallocated_sectors > 0 || data.pending_sectors > 0 || data.uncorrectable_sectors > 0;
+            const errorCardClass = hasErrors ? 'border border-red-200' : '';
+
+            html += `<div class="smart-card mb-4 ${errorCardClass}">
+                <div class="smart-card-title">${smartTranslations.diskErrors}</div>`;
+
+            const reallocClass = getValueClass(data.reallocated_sectors, 10, 100, false);
+            html += smartMetricRow(smartTranslations.reallocated, data.reallocated_sectors, smartTranslations.helpReallocated, reallocClass);
+
+            const pendingClass = data.pending_sectors > 0 ? 'smart-value-critical' : 'smart-value-good';
+            html += smartMetricRow(smartTranslations.pending, data.pending_sectors, smartTranslations.helpPending, pendingClass);
+
+            const uncorrClass = data.uncorrectable_sectors > 0 ? 'smart-value-critical' : 'smart-value-good';
+            html += smartMetricRow(smartTranslations.uncorrectable, data.uncorrectable_sectors, smartTranslations.helpUncorrectable, uncorrClass);
+
+            html += '</div>';
+        }
+
+        // Raw attributes (collapsible)
+        if (data.attributes && data.attributes.length > 0) {
+            html += `<details class="smart-card">
+                <summary class="smart-card-title cursor-pointer hover:text-indigo-600">${smartTranslations.allAttributes} (${data.attributes.length})</summary>
+                <div class="overflow-x-auto mt-2 max-h-48 overflow-y-auto">
+                    <table class="min-w-full text-xs">
+                        <thead class="bg-gray-100 sticky top-0">
+                            <tr>
+                                <th class="px-2 py-1 text-left">ID</th>
+                                <th class="px-2 py-1 text-left">${smartTranslations.attrName}</th>
+                                <th class="px-2 py-1 text-right">${smartTranslations.attrValue}</th>
+                                <th class="px-2 py-1 text-right">${smartTranslations.attrWorst}</th>
+                                <th class="px-2 py-1 text-left">${smartTranslations.attrRaw}</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+            data.attributes.forEach(attr => {
+                const rowClass = attr.status === 'failing' ? 'bg-red-100' : (attr.status === 'warning' ? 'bg-yellow-100' : '');
+                html += `<tr class="${rowClass}">
+                    <td class="px-2 py-1">${attr.id}</td>
+                    <td class="px-2 py-1">${attr.name}</td>
+                    <td class="px-2 py-1 text-right">${attr.value}</td>
+                    <td class="px-2 py-1 text-right">${attr.worst}</td>
+                    <td class="px-2 py-1 font-mono">${attr.raw_value}</td>
+                </tr>`;
+            });
+            html += '</tbody></table></div></details>';
+        }
+
         document.getElementById('smartContent').innerHTML = html;
     }).catch(err => {
-        document.getElementById('smartContent').innerHTML = '<p class="text-center text-red-500">{{T .Lang "common.error"}}: ' + err + '</p>';
+        document.getElementById('smartContent').innerHTML = '<p class="text-center text-red-500 py-8">{{T .Lang "common.error"}}: ' + err + '</p>';
     });
 }
 

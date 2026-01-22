@@ -729,6 +729,41 @@
   "storage.disk_formatted": "Disk formatted successfully",
   "storage.confirm_action": "Confirm Action",
   "storage.confirm": "Confirm",
+
+  "storage.smart.general_info": "General Information",
+  "storage.smart.disk_errors": "Disk Errors",
+  "storage.smart.nvme_info": "NVMe Information",
+  "storage.smart.ssd_wear": "SSD Wear",
+  "storage.smart.data_volume": "Data Volume",
+  "storage.smart.all_attributes": "All Attributes",
+
+  "storage.smart.media_errors": "Media Errors",
+  "storage.smart.unsafe_shutdowns": "Unsafe Shutdowns",
+  "storage.smart.available_spare": "Available Spare",
+  "storage.smart.percentage_used": "SSD Wear",
+  "storage.smart.data_written": "Data Written",
+  "storage.smart.data_read": "Data Read",
+
+  "storage.smart.help.health": "Overall disk health based on SMART self-test. A failure indicates imminent risk of disk failure.",
+  "storage.smart.help.temperature": "Current disk temperature. Above 50°C may reduce lifespan. Above 60°C is critical.",
+  "storage.smart.help.power_on_hours": "Total hours the disk has been running. HDDs rarely exceed 50,000h, SSDs can last longer.",
+  "storage.smart.help.power_cycles": "Number of times the disk has been powered on/off. Frequent cycles can wear the disk faster.",
+
+  "storage.smart.help.reallocated": "Defective sectors replaced by spare sectors. A few are normal, many indicate a dying disk.",
+  "storage.smart.help.pending": "Sectors awaiting verification or reallocation. If this number increases, the disk is degrading.",
+  "storage.smart.help.uncorrectable": "Unrecoverable read/write errors. Any value above 0 is concerning.",
+
+  "storage.smart.help.media_errors": "Data integrity errors on NVMe SSD. Should be 0. Any error indicates hardware problems.",
+  "storage.smart.help.unsafe_shutdowns": "Number of power losses without proper shutdown. High values can reduce SSD lifespan.",
+  "storage.smart.help.available_spare": "Percentage of spare capacity remaining to replace worn cells. Below 10% is critical.",
+  "storage.smart.help.percentage_used": "Estimated SSD wear based on write cycles. 100% = theoretical lifespan reached (but may continue working).",
+  "storage.smart.help.data_written": "Total data written to the SSD since it was put into service.",
+  "storage.smart.help.data_read": "Total data read from the SSD since it was put into service.",
+
+  "storage.smart.status.good": "Good",
+  "storage.smart.status.warning": "Warning",
+  "storage.smart.status.critical": "Critical",
+
   "setup_wizard.title": "Anemone Setup",
   "setup_wizard.step.mode": "Mode",
   "setup_wizard.step.storage": "Storage",
