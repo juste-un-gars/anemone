@@ -84,6 +84,14 @@ Fixed critical bugs in restore flow: login failure after restore and missing sto
 - [ ] Configuration simplifiée pour utilisateurs ne souhaitant pas le P2P complet
 - [ ] Planification des sauvegardes simples
 
+### USB Configuration Backup
+- [ ] Détection automatique des clés USB connectées au serveur
+- [ ] Interface web pour sélectionner la clé USB de sauvegarde
+- [ ] Export de la configuration complète (DB, certificats, config Samba)
+- [ ] Chiffrement de la sauvegarde avec mot de passe (défaut configurable)
+- [ ] Restauration depuis clé USB dans le Setup Wizard
+- [ ] Sauvegarde automatique programmable (quotidienne/hebdomadaire)
+
 ---
 
 ## Quick Links
