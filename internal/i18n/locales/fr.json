@@ -827,7 +827,6 @@
   "setup_wizard.summary.warning_title": "Important :",
   "setup_wizard.summary.warning_message": "L'installation va créer la base de données et configurer le stockage. Cette opération peut prendre quelques minutes.",
   "setup_wizard.summary.default_storage": "Répertoire par défaut",
-  "setup_wizard.summary.zfs_existing": "Pool ZFS existant",
   "setup_wizard.summary.zfs_new": "Nouveau pool ZFS",
   "setup_wizard.summary.custom_path": "Chemin personnalisé",
   "setup_wizard.summary.same_storage": "Même emplacement que les données",

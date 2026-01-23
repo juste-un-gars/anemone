@@ -179,14 +179,6 @@ func (s *SetupWizardServer) handleStorageConfig(w http.ResponseWriter, r *http.R
 		config.IncomingDir = "/srv/anemone/backups/incoming"
 		err = setup.SetupDefaultStorage(config.DataDir, "")
 
-	case "zfs_existing":
-		err = setup.SetupExistingZFS(config.ZFSPoolName, "anemone", "")
-		if err == nil {
-			config.DataDir = "/" + config.ZFSPoolName + "/anemone"
-			config.SharesDir = config.DataDir + "/shares"
-			config.IncomingDir = config.DataDir + "/backups/incoming"
-		}
-
 	case "zfs_new":
 		// Get current user for ownership
 		currentUser := os.Getenv("USER")

@@ -16,7 +16,7 @@ import (
 
 // StorageOption represents a storage configuration option
 type StorageOption struct {
-	Type        string `json:"type"`        // "default", "zfs_existing", "zfs_new", "custom"
+	Type        string `json:"type"`        // "default", "zfs_new", "custom"
 	Name        string `json:"name"`        // Display name
 	Description string `json:"description"` // Description for UI
 	Path        string `json:"path"`        // Path (for existing options)
@@ -44,24 +44,6 @@ func GetStorageOptions() ([]StorageOption, error) {
 			Description: "/srv/anemone - Utilise le système de fichiers existant",
 			Path:        "/srv/anemone",
 		},
-	}
-
-	// Check for existing ZFS pools
-	pools, err := storage.ListZFSPools()
-	if err == nil && len(pools) > 0 {
-		for _, pool := range pools {
-			// Get mountpoint from root dataset
-			mountpoint, _ := storage.GetDatasetProperty(pool.Name, "mountpoint")
-			if mountpoint == "" {
-				mountpoint = "/" + pool.Name
-			}
-			options = append(options, StorageOption{
-				Type:        "zfs_existing",
-				Name:        fmt.Sprintf("Pool ZFS: %s", pool.Name),
-				Description: fmt.Sprintf("Utiliser le pool existant (%s, %s disponible)", pool.Health, pool.FreeHuman),
-				Path:        mountpoint,
-			})
-		}
 	}
 
 	// Option to create new ZFS pool
@@ -243,68 +225,6 @@ type ZFSSetupOptions struct {
 	Owner      string   `json:"owner"` // e.g., "anemone:anemone"
 }
 
-// SetupExistingZFS sets up Anemone on an existing ZFS pool
-func SetupExistingZFS(poolName, datasetName, owner string) error {
-	// Get pool info
-	pools, err := storage.ListZFSPools()
-	if err != nil {
-		return fmt.Errorf("failed to list pools: %w", err)
-	}
-
-	var pool *storage.ZFSPool
-	for i := range pools {
-		if pools[i].Name == poolName {
-			pool = &pools[i]
-			break
-		}
-	}
-
-	if pool == nil {
-		return fmt.Errorf("pool %s not found", poolName)
-	}
-
-	// Create dataset for Anemone if needed
-	datasetPath := poolName
-	if datasetName != "" {
-		datasetPath = poolName + "/" + datasetName
-
-		// Check if dataset exists
-		datasets, err := storage.ListDatasets(poolName)
-		if err != nil {
-			return fmt.Errorf("failed to list datasets: %w", err)
-		}
-
-		exists := false
-		for _, d := range datasets {
-			if d.Name == datasetPath {
-				exists = true
-				break
-			}
-		}
-
-		if !exists {
-			// Create the dataset
-			createOpts := storage.DatasetCreateOptions{
-				Name:        datasetPath,
-				Compression: "lz4",
-				Owner:       owner,
-			}
-			if err := storage.CreateDataset(createOpts); err != nil {
-				return fmt.Errorf("failed to create dataset: %w", err)
-			}
-		}
-	}
-
-	// Get the mountpoint
-	mountpoint, err := storage.GetDatasetProperty(datasetPath, "mountpoint")
-	if err != nil {
-		return fmt.Errorf("failed to get mountpoint: %w", err)
-	}
-
-	// Create directory structure
-	return SetupDefaultStorage(mountpoint, owner)
-}
-
 // SetupCustomStorage sets up Anemone at a custom path
 func SetupCustomStorage(dataDir, sharesDir, incomingDir, owner string) error {
 	// Use defaults if not specified
@@ -369,10 +289,6 @@ func ValidateStorageConfig(config SetupConfig) error {
 			if err := checkWritable("/srv"); err != nil {
 				return fmt.Errorf("cannot write to /srv (need to create %s): %w", defaultDir, err)
 			}
-		}
-	case "zfs_existing":
-		if config.ZFSPoolName == "" {
-			return fmt.Errorf("ZFS pool name is required")
 		}
 	case "zfs_new":
 		if config.ZFSPoolName == "" {

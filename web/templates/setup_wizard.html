@@ -744,7 +744,6 @@ const translations = {
     creating_admin: "{{T .Lang "setup_wizard.loading.creating_admin"}}",
     finalizing: "{{T .Lang "setup_wizard.loading.finalizing"}}",
     default_storage: "{{T .Lang "setup_wizard.summary.default_storage"}}",
-    zfs_existing: "{{T .Lang "setup_wizard.summary.zfs_existing"}}",
     zfs_new: "{{T .Lang "setup_wizard.summary.zfs_new"}}",
     custom_path: "{{T .Lang "setup_wizard.summary.custom_path"}}",
     same_storage: "{{T .Lang "setup_wizard.summary.same_storage"}}",
@@ -1002,8 +1001,6 @@ function getStorageIcon(type) {
     switch(type) {
         case 'default':
             return { bg: 'bg-green-100', svg: '<svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>' };
-        case 'zfs_existing':
-            return { bg: 'bg-blue-100', svg: '<svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>' };
         case 'zfs_new':
             return { bg: 'bg-purple-100', svg: '<svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>' };
         case 'custom':
@@ -1154,9 +1151,6 @@ function updateSummary() {
             case 'default':
                 storageSummary = `${translations.default_storage}: /srv/anemone`;
                 break;
-            case 'zfs_existing':
-                storageSummary = `${translations.zfs_existing}: ${selectedStorage.path}`;
-                break;
             case 'zfs_new':
                 const poolName = document.getElementById('zfs-pool-name').value;
                 const raidLevel = document.getElementById('zfs-raid-level').value;
@@ -1281,11 +1275,7 @@ function buildStorageConfig() {
         storage_type: selectedStorage?.type || 'default'
     };
 
-    if (selectedStorage?.type === 'zfs_existing') {
-        // Extract pool name from path (e.g., /poolname -> poolname)
-        const match = selectedStorage.path.match(/^\/([^\/]+)/);
-        config.zfs_pool_name = match ? match[1] : selectedStorage.path;
-    } else if (selectedStorage?.type === 'zfs_new') {
+    if (selectedStorage?.type === 'zfs_new') {
         config.zfs_pool_name = document.getElementById('zfs-pool-name').value;
         config.zfs_raid_level = document.getElementById('zfs-raid-level').value;
         config.zfs_mountpoint = document.getElementById('zfs-mountpoint').value;
