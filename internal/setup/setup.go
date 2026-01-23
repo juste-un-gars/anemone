@@ -194,6 +194,16 @@ func (m *Manager) Cleanup() error {
 
 // LoadState loads the setup state from disk
 func (m *Manager) LoadState() error {
+	// Check for .needs-setup marker file first
+	markerPath := filepath.Join(m.stateDir, ".needs-setup")
+	if _, err := os.Stat(markerPath); err == nil {
+		// Marker exists, activate setup mode
+		m.state.mu.Lock()
+		m.state.Active = true
+		m.state.mu.Unlock()
+		return nil
+	}
+
 	statePath := filepath.Join(m.stateDir, ".setup-state.json")
 	state, err := loadState(statePath)
 	if err != nil {
