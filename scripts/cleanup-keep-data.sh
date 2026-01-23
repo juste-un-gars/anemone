@@ -124,21 +124,10 @@ fi
 systemctl restart smbd 2>/dev/null || echo "Could not restart smbd"
 
 echo ""
-echo "--- Creating setup state file ---"
-# Create .setup-state.json to force setup wizard on next start
-cat > "$DATA_DIR/.setup-state.json" << 'SETUPEOF'
-{
-  "active": true,
-  "storage_configured": false,
-  "admin_created": false,
-  "finalized": false,
-  "config": {
-    "storage_type": "import_existing",
-    "data_dir": ""
-  }
-}
-SETUPEOF
-echo "Created $DATA_DIR/.setup-state.json (forces setup wizard)"
+echo "--- Creating setup marker ---"
+# Create .needs-setup marker to force setup wizard on next start
+touch "$DATA_DIR/.needs-setup"
+echo "Created $DATA_DIR/.needs-setup (forces setup wizard)"
 
 echo ""
 echo -e "${GREEN}=== Cleanup complete ===${NC}"
