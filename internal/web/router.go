@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -334,10 +335,11 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 }
 
 // isSetupCompleted checks if initial setup is done
+// Setup is completed when .needs-setup marker file does NOT exist
 func (s *Server) isSetupCompleted() bool {
-	var count int
-	err := s.db.QueryRow("SELECT COUNT(*) FROM system_config WHERE key = 'setup_completed'").Scan(&count)
-	return err == nil && count > 0
+	markerPath := filepath.Join(s.cfg.DataDir, ".needs-setup")
+	_, err := os.Stat(markerPath)
+	return os.IsNotExist(err)
 }
 
 // syncAuthMiddleware checks for sync authentication password in X-Sync-Password header

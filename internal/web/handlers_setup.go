@@ -9,7 +9,6 @@ import (
 	"encoding/base64"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/juste-un-gars/anemone/internal/i18n"
 	"github.com/juste-un-gars/anemone/internal/syncauth"
@@ -171,18 +170,8 @@ func (s *Server) handleSetupConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Mark setup as completed
-	_, err := s.db.Exec(
-		"INSERT OR REPLACE INTO system_config (key, value, updated_at) VALUES (?, ?, ?)",
-		"setup_completed",
-		time.Now().Format(time.RFC3339),
-		time.Now(),
-	)
-	if err != nil {
-		log.Printf("Error marking setup as completed: %v", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
+	// Setup completion is now handled by removing .needs-setup marker file
+	// (done by setup.Manager.Cleanup())
 
 	// Clear the setup key cookie
 	http.SetCookie(w, &http.Cookie{

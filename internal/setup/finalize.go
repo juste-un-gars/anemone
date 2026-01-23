@@ -145,11 +145,12 @@ func saveSystemConfig(db *sql.DB, masterKey, serverName, language string) error 
 	defer tx.Rollback()
 
 	configs := map[string]string{
-		"master_key":      masterKey,
-		"language":        language,
-		"nas_name":        serverName,
-		"timezone":        "Europe/Paris",
-		"setup_completed": "true",
+		"master_key": masterKey,
+		"language":   language,
+		"nas_name":   serverName,
+		"timezone":   "Europe/Paris",
+		// Note: setup_completed is no longer stored in DB
+		// Setup completion is tracked via absence of .needs-setup marker file
 	}
 
 	for key, value := range configs {
