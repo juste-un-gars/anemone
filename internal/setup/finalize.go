@@ -15,7 +15,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/juste-un-gars/anemone/internal/crypto"
 	"github.com/juste-un-gars/anemone/internal/database"
+	"github.com/juste-un-gars/anemone/internal/smb"
+	syncpkg "github.com/juste-un-gars/anemone/internal/sync"
 	"github.com/juste-un-gars/anemone/internal/syncauth"
 	"github.com/juste-un-gars/anemone/internal/users"
 )
@@ -239,6 +242,155 @@ func updateSudoersDataDir(oldDir, newDir string) error {
 	}
 
 	return nil
+}
+
+// FinalizeImport completes the setup for an imported existing installation
+// This is used when recovering an existing Anemone installation (e.g., after OS reinstall)
+// Unlike FinalizeSetup, this does NOT:
+// - Create a new database (uses existing)
+// - Generate new keys (uses existing)
+// - Create admin user (uses existing)
+func FinalizeImport(opts FinalizeOptions) error {
+	// 1. Verify the database exists
+	dbPath := filepath.Join(opts.DataDir, "db", "anemone.db")
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		return fmt.Errorf("database not found at %s - this doesn't appear to be a valid Anemone installation", dbPath)
+	}
+
+	// 2. Update sudoers if using custom data directory
+	defaultDataDir := "/srv/anemone"
+	if opts.DataDir != defaultDataDir {
+		if err := updateSudoersDataDir(defaultDataDir, opts.DataDir); err != nil {
+			// Non-fatal: log warning but continue
+			log.Printf("Warning: Failed to update sudoers for custom path: %v", err)
+		}
+	}
+
+	// 3. Write environment file for service (always in /etc/anemone/)
+	envFile := "/etc/anemone/anemone.env"
+	if err := writeEnvFile(envFile, opts); err != nil {
+		return fmt.Errorf("failed to write environment file: %w", err)
+	}
+
+	// 4. Open existing database to regenerate Samba config
+	db, err := database.Init(dbPath)
+	if err != nil {
+		log.Printf("Warning: Failed to open database for Samba config: %v", err)
+	} else {
+		defer db.Close()
+
+		// Get server name from DB
+		serverName, _ := syncpkg.GetServerName(db)
+		if serverName == "" {
+			serverName = "Anemone NAS"
+		}
+
+		// Determine shares directory
+		sharesDir := opts.SharesDir
+		if sharesDir == "" {
+			sharesDir = filepath.Join(opts.DataDir, "shares")
+		}
+
+		// Regenerate Samba configuration
+		smbCfg := &smb.Config{
+			ConfigPath: filepath.Join(opts.DataDir, "smb", "smb.conf"),
+			WorkGroup:  "WORKGROUP",
+			ServerName: serverName,
+			SharesDir:  sharesDir,
+		}
+
+		if err := smb.GenerateConfig(db, smbCfg); err != nil {
+			log.Printf("Warning: Failed to generate Samba config: %v", err)
+		} else {
+			log.Printf("Generated Samba configuration")
+
+			// Reload Samba
+			if err := smb.ReloadConfig(); err != nil {
+				log.Printf("Warning: Failed to reload Samba: %v", err)
+			} else {
+				log.Printf("Reloaded Samba configuration")
+			}
+		}
+
+		// 5. Recreate system users and Samba accounts
+		// After OS reinstall, users don't exist - we need to recreate them
+		masterKey, err := getMasterKey(db)
+		if err != nil {
+			log.Printf("Warning: Failed to get master key: %v", err)
+		} else {
+			// Get all activated users with their encrypted passwords
+			userRows, err := db.Query(`
+				SELECT id, username, password_encrypted, activated_at
+				FROM users
+				WHERE activated_at IS NOT NULL AND password_encrypted IS NOT NULL
+			`)
+			if err != nil {
+				log.Printf("Warning: Failed to query users: %v", err)
+			} else {
+				defer userRows.Close()
+				for userRows.Next() {
+					var userID int
+					var username string
+					var passwordEncrypted []byte
+					var activatedAt *string
+					if err := userRows.Scan(&userID, &username, &passwordEncrypted, &activatedAt); err != nil {
+						log.Printf("Warning: Failed to scan user: %v", err)
+						continue
+					}
+
+					// Decrypt password
+					if len(passwordEncrypted) > 0 {
+						plainPassword, err := crypto.DecryptPassword(passwordEncrypted, masterKey)
+						if err != nil {
+							log.Printf("Warning: Failed to decrypt password for user %s: %v", username, err)
+							continue
+						}
+
+						// Create system user and set SMB password
+						if err := smb.AddSMBUser(username, plainPassword); err != nil {
+							log.Printf("Warning: Failed to create SMB user %s: %v", username, err)
+						} else {
+							log.Printf("Created system user and SMB account for: %s", username)
+						}
+					}
+				}
+			}
+		}
+
+		// 6. Fix ownership of share directories
+		shareRows, err := db.Query("SELECT u.username, s.path FROM users u JOIN shares s ON u.id = s.user_id")
+		if err != nil {
+			log.Printf("Warning: Failed to query shares for ownership fix: %v", err)
+		} else {
+			defer shareRows.Close()
+			for shareRows.Next() {
+				var username, sharePath string
+				if err := shareRows.Scan(&username, &sharePath); err != nil {
+					continue
+				}
+				// Fix ownership of the share directory
+				cmd := exec.Command("sudo", "chown", "-R", username+":"+username, sharePath)
+				if err := cmd.Run(); err != nil {
+					log.Printf("Warning: Failed to fix ownership for %s: %v", sharePath, err)
+				} else {
+					log.Printf("Fixed ownership for share: %s -> %s", sharePath, username)
+				}
+			}
+		}
+	}
+
+	log.Printf("Import finalized: data directory = %s", opts.DataDir)
+	return nil
+}
+
+// getMasterKey retrieves the master encryption key from the database
+func getMasterKey(db *sql.DB) (string, error) {
+	var masterKey string
+	err := db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to get master_key: %w", err)
+	}
+	return masterKey, nil
 }
 
 // GenerateSystemdOverride generates a systemd override file for Anemone

@@ -209,6 +209,18 @@ func (s *SetupWizardServer) handleStorageConfig(w http.ResponseWriter, r *http.R
 	case "custom":
 		err = setup.SetupCustomStorage(config.DataDir, config.SharesDir, config.IncomingDir, "")
 
+	case "import_existing":
+		// Import existing installation - just set up paths, don't create anything
+		// The database and directories already exist
+		if config.SharesDir == "" {
+			config.SharesDir = filepath.Join(config.DataDir, "shares")
+		}
+		if config.IncomingDir == "" {
+			config.IncomingDir = filepath.Join(config.DataDir, "backups", "incoming")
+		}
+		// Mark admin as already created since the DB contains the existing users
+		// This will be done after saving the storage config
+
 	default:
 		http.Error(w, "Unknown storage type", http.StatusBadRequest)
 		return
@@ -240,10 +252,20 @@ func (s *SetupWizardServer) handleStorageConfig(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// For import_existing, mark admin as already created (skip admin step)
+	if config.StorageType == "import_existing" {
+		if err := s.manager.SetAdminCreated("imported"); err != nil {
+			log.Printf("Error marking admin as created: %v", err)
+			http.Error(w, "Failed to mark admin as created", http.StatusInternalServerError)
+			return
+		}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"config":  config,
+		"success":       true,
+		"config":        config,
+		"skip_admin":    config.StorageType == "import_existing",
 	})
 }
 
@@ -336,6 +358,20 @@ func (s *SetupWizardServer) handleFinalize(w http.ResponseWriter, r *http.Reques
 	if !state.StorageConfigured || !state.AdminCreated {
 		http.Error(w, "Setup steps incomplete", http.StatusBadRequest)
 		return
+	}
+
+	// For import_existing, we need to write the .env file here
+	// (since we skipped the admin creation step which normally does this)
+	if state.Config.StorageType == "import_existing" {
+		if err := setup.FinalizeImport(setup.FinalizeOptions{
+			DataDir:     state.Config.DataDir,
+			SharesDir:   state.Config.SharesDir,
+			IncomingDir: state.Config.IncomingDir,
+		}); err != nil {
+			log.Printf("Error finalizing import: %v", err)
+			http.Error(w, "Failed to finalize import: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Mark as finalized (keep state file so step-6 shows restart message)

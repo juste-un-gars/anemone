@@ -16,7 +16,7 @@ import (
 
 // StorageOption represents a storage configuration option
 type StorageOption struct {
-	Type        string `json:"type"`        // "default", "zfs_new", "custom"
+	Type        string `json:"type"`        // "default", "zfs_new", "custom", "import_existing"
 	Name        string `json:"name"`        // Display name
 	Description string `json:"description"` // Description for UI
 	Path        string `json:"path"`        // Path (for existing options)
@@ -58,6 +58,13 @@ func GetStorageOptions() ([]StorageOption, error) {
 		Type:        "custom",
 		Name:        "Chemin personnalisé",
 		Description: "Spécifier un chemin personnalisé pour les données",
+	})
+
+	// Import existing installation option
+	options = append(options, StorageOption{
+		Type:        "import_existing",
+		Name:        "Importer installation existante",
+		Description: "Récupérer une installation Anemone existante (après réinstallation OS)",
 	})
 
 	return options, nil
@@ -263,6 +270,22 @@ func SetupCustomStorage(dataDir, sharesDir, incomingDir, owner string) error {
 	return nil
 }
 
+// ValidateExistingInstallation checks if a valid Anemone installation exists at the given path
+func ValidateExistingInstallation(dataDir string) error {
+	// Check that the directory exists
+	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
+		return fmt.Errorf("directory '%s' does not exist", dataDir)
+	}
+
+	// Check that the database file exists
+	dbPath := filepath.Join(dataDir, "db", "anemone.db")
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		return fmt.Errorf("no Anemone database found at '%s' - this does not appear to be a valid Anemone installation", dbPath)
+	}
+
+	return nil
+}
+
 // SetupIncomingDirectory creates the incoming directory for backups
 func SetupIncomingDirectory(incomingDir string) error {
 	if incomingDir == "" {
@@ -303,6 +326,14 @@ func ValidateStorageConfig(config SetupConfig) error {
 		}
 		// Validate that we can actually create/write to the target directory
 		if err := checkCanCreateDirectory(config.DataDir); err != nil {
+			return err
+		}
+	case "import_existing":
+		if config.DataDir == "" {
+			return fmt.Errorf("data directory is required")
+		}
+		// Validate that an existing installation is present
+		if err := ValidateExistingInstallation(config.DataDir); err != nil {
 			return err
 		}
 	default:
