@@ -4,7 +4,8 @@
 # Used to test the "Import existing installation" feature
 #
 # Usage: sudo ./scripts/cleanup-keep-data.sh [data_dir]
-# Default data_dir: /srv/anemone
+# If no argument provided, reads from /etc/anemone/anemone.env
+# Fallback: /srv/anemone
 
 set -e
 
@@ -14,12 +15,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Data directory (default or from argument)
-DATA_DIR="${1:-/srv/anemone}"
-
 echo -e "${YELLOW}=== Anemone Cleanup (preserving data) ===${NC}"
-echo ""
-echo -e "Data directory: ${GREEN}$DATA_DIR${NC}"
 echo ""
 
 # Check if running as root
@@ -27,6 +23,28 @@ if [ "$EUID" -ne 0 ]; then
     echo -e "${RED}Error: This script must be run as root (sudo)${NC}"
     exit 1
 fi
+
+# Determine data directory
+if [ -n "$1" ]; then
+    # Argument provided
+    DATA_DIR="$1"
+    echo "Using provided path: $DATA_DIR"
+elif [ -f /etc/anemone/anemone.env ]; then
+    # Read from environment file
+    DATA_DIR=$(grep -E '^ANEMONE_DATA_DIR=' /etc/anemone/anemone.env | cut -d'=' -f2 | tr -d '"' | tr -d "'")
+    if [ -z "$DATA_DIR" ]; then
+        DATA_DIR="/srv/anemone"
+    fi
+    echo "Detected from /etc/anemone/anemone.env: $DATA_DIR"
+else
+    echo -e "${RED}Error: Anemone is not installed (/etc/anemone/anemone.env not found)${NC}"
+    echo "If you know the data directory path, provide it as argument:"
+    echo "  sudo $0 /path/to/data"
+    exit 1
+fi
+
+echo -e "Data directory: ${GREEN}$DATA_DIR${NC}"
+echo ""
 
 # Check if data directory exists
 if [ ! -d "$DATA_DIR" ]; then
