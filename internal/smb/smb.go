@@ -58,6 +58,7 @@ const smbConfigTemplate = `[global]
    valid users = {{.Username}}
    read only = no
    browseable = yes
+   hide dot files = yes
    create mask = 0664
    directory mask = 0775
    force user = {{.Username}}
