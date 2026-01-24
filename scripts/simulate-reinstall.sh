@@ -24,16 +24,34 @@ detect_data_dir() {
         return
     fi
 
-    # 2. Read from systemd service (production)
-    if [[ -f /etc/systemd/system/anemone.service ]]; then
-        local dir=$(grep -oP 'ANEMONE_DATA_DIR=\K[^\s"]+' /etc/systemd/system/anemone.service 2>/dev/null)
+    # 2. Read from running systemd service
+    if systemctl is-active --quiet anemone 2>/dev/null; then
+        local dir=$(systemctl show anemone -p Environment 2>/dev/null | grep -oP 'ANEMONE_DATA_DIR=\K[^\s"]+')
         if [[ -n "$dir" ]]; then
             echo "$dir"
             return
         fi
     fi
 
-    # 3. Not found
+    # 3. Read from env file
+    if [[ -f /etc/anemone/anemone.env ]]; then
+        local dir=$(grep -oP '^ANEMONE_DATA_DIR=\K.+' /etc/anemone/anemone.env 2>/dev/null)
+        if [[ -n "$dir" ]]; then
+            echo "$dir"
+            return
+        fi
+    fi
+
+    # 4. Read from service file
+    if [[ -f /etc/systemd/system/anemone.service ]]; then
+        local dir=$(grep -oP 'ANEMONE_DATA_DIR=\K[^"]+' /etc/systemd/system/anemone.service 2>/dev/null)
+        if [[ -n "$dir" ]]; then
+            echo "$dir"
+            return
+        fi
+    fi
+
+    # 5. Not found
     echo ""
 }
 
