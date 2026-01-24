@@ -47,12 +47,12 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 75 | Release v0.10.0-beta | 2026-01-24 | Completed ✅ |
 | 74 | USB Backup Module | 2026-01-24 | Completed ✅ |
 | 73 | Repair Mode in install.sh | 2026-01-24 | Completed ✅ |
 | 72 | Setup Detection Refactor (.needs-setup) | 2026-01-23 | Completed ✅ |
 | 71 | Import Existing Installation | 2026-01-23 | Completed ✅ |
 | 70 | Enhanced SMART Modal | 2026-01-22 | Completed ✅ |
-| 69 | Restore Flow Fixes | 2026-01-21 | Completed ✅ |
 
 ---
 
