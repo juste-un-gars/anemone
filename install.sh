@@ -734,7 +734,6 @@ User=$SERVICE_USER
 Group=$SERVICE_USER
 WorkingDirectory=$INSTALL_DIR
 EnvironmentFile=-/etc/anemone/anemone.env
-Environment="ANEMONE_DATA_DIR=$DATA_DIR"
 Environment="ENABLE_HTTPS=true"
 Environment="HTTPS_PORT=8443"
 ExecStart=$INSTALL_DIR/$BINARY_NAME
