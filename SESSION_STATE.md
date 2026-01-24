@@ -1,5 +1,10 @@
 # Anemone - Session State
 
+> **Claude : Appliquer le protocole de session (CLAUDE.md)**
+> - Créer/mettre à jour la session en temps réel
+> - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
+> - Ne pas continuer sans validation utilisateur
+
 **Current Version:** v0.9.24-beta
 **Last Updated:** 2026-01-24
 
@@ -7,49 +12,87 @@
 
 ## Current Session
 
+**Session 74** - USB Backup Module
+- **Status:** In Progress (awaiting validation)
+- **Date:** 2026-01-24
+- **Branch:** `feature/backup-modules`
+
+### Summary
+Created new `internal/usbbackup/` module for local backup to USB drives and external storage. This is a separate module from P2P sync, following the principle of not modifying existing working code.
+
+### Architecture Decision
+- **Approach:** Separate modules (not extending existing peers/sync)
+- **Reason:** Minimize risk to working P2P sync, cleaner separation of concerns
+- **Shared:** `internal/crypto/` for encryption
+- **Duplicated:** Manifest logic (simpler, independent evolution)
+
+### Files Created
+- `internal/usbbackup/usbbackup.go` - Structures + CRUD (Create, Get, Update, Delete)
+- `internal/usbbackup/detect.go` - USB/external drive detection
+- `internal/usbbackup/sync.go` - Encrypted backup with manifest tracking
+- `internal/web/handlers_admin_usb.go` - HTTP handlers
+- `web/templates/admin_usb_backup.html` - Main USB backup page
+- `web/templates/admin_usb_backup_edit.html` - Edit configuration page
+
+### Files Modified
+- `internal/database/migrations.go` - Added `usb_backups` table
+- `internal/web/router.go` - Added `/admin/usb-backup/*` routes
+- `web/templates/dashboard_admin.html` - Added USB Backup card
+- `internal/i18n/locales/fr.json` - French translations
+- `internal/i18n/locales/en.json` - English translations
+
+### Database Schema
+```sql
+CREATE TABLE usb_backups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    mount_path TEXT NOT NULL,
+    backup_path TEXT DEFAULT 'anemone-backup',
+    enabled BOOLEAN DEFAULT 1,
+    auto_detect BOOLEAN DEFAULT 1,
+    last_sync DATETIME,
+    last_status TEXT DEFAULT 'unknown',
+    last_error TEXT DEFAULT '',
+    files_synced INTEGER DEFAULT 0,
+    bytes_synced INTEGER DEFAULT 0,
+    created_at DATETIME,
+    updated_at DATETIME
+);
+```
+
+### Features Implemented
+- [x] USB/external drive detection (`/media/`, `/mnt/`, removable devices)
+- [x] Configuration CRUD (add, edit, delete backup configs)
+- [x] Manual sync trigger with background execution
+- [x] Encrypted file backup (AES-256-GCM via streaming)
+- [x] Manifest-based incremental sync (add/update/delete)
+- [x] Status tracking (success, error, running, files/bytes synced)
+- [x] Web UI integrated in admin dashboard
+- [x] FR/EN translations
+
+### Cleanup Done
+- Removed debug files: `debug_auth.go`, `fix_hash.go`, `verify_hash.go`, `backup_20260121_154509.enc`
+
+### Pending Validation
+- [ ] Test USB detection on real system
+- [ ] Test full backup cycle to USB drive
+- [ ] Test incremental sync (add/modify/delete files)
+- [ ] Verify encrypted files can be restored
+
+### Next Steps (this session)
+1. Validate USB Backup module
+2. Consider: rclone module or scheduler for USB
+
+---
+
+## Previous Session
+
 **Session 73** - Repair Mode in install.sh
 - **Status:** Completed ✅
 - **Date:** 2026-01-24
 
 ### Summary
 Added repair/reinstall mode to `install.sh` for recovering existing Anemone installations after OS reinstall. Fixed critical bug where systemd service ignored wizard-configured data path.
-
-### Bug Fixes
-- **Critical:** Removed hardcoded `ANEMONE_DATA_DIR` from systemd service - was overriding the wizard's configured path in `/etc/anemone/anemone.env`
-- SMB access denied after repair - fixed path generation bug (was reconstructing path instead of using DB path)
-- Added `hide dot files = yes` to Samba config to hide `.anemone` and `.trash`
-
-### Changes
-- [x] Added menu in `install.sh`: New installation / Repair
-- [x] Repair mode reads existing DB, recreates system users, fixes permissions
-- [x] Repair mode regenerates Samba configuration from DB
-- [x] Removed "Import existing installation" option from wizard HTML
-- [x] Removed `.needs-setup` marker file logic (no longer needed)
-- [x] Simplified `isSetupCompleted()` to check DB existence
-- [x] Deleted `scripts/cleanup-keep-data.sh` (obsolete)
-- [x] Created `scripts/simulate-reinstall.sh` for testing repair mode
-- [x] Fixed systemd service to read DATA_DIR from env file (not hardcoded)
-- [x] Added `hide dot files = yes` in Samba share config
-
-### New Logic
-```
-install.sh → Menu:
-  1) New installation    → wizard configures path → writes /etc/anemone/anemone.env
-  2) Repair/Reinstall    → reads DB, recreates users, direct login
-
-Service reads ANEMONE_DATA_DIR from /etc/anemone/anemone.env (written by wizard)
-```
-
-### Files Modified
-- `install.sh` - Removed hardcoded ANEMONE_DATA_DIR from systemd service
-- `internal/smb/smb.go` - Added `hide dot files = yes`
-- `scripts/simulate-reinstall.sh` - New script for testing repair mode
-
-### Deleted Files
-- `scripts/cleanup-keep-data.sh`
-
-### Note
-After repair, users must reset their password via web interface to restore SMB access.
 
 ---
 
@@ -59,43 +102,18 @@ After repair, users must reset their password via web interface to restore SMB a
 - **Status:** Superseded by Session 73
 - **Date:** 2026-01-23
 
-### Summary
-Attempted to use `.needs-setup` marker file for setup detection. Approach was replaced by repair mode in install.sh.
-
----
-
-## Previous Session
-
-**Session 71** - Import Existing Installation
-- **Status:** Superseded by Session 73
-- **Date:** 2026-01-23
-
-### Summary
-Added wizard option to import existing installation. Replaced by repair mode in install.sh.
-
----
-
-## Previous Session
-
-**Session 70** - Enhanced SMART Modal
-- **Status:** Completed ✅
-- **Date:** 2026-01-22
-
-### Summary
-Improved the SMART details modal in the storage page with detailed metrics, help tooltips, and visual status indicators.
-
 ---
 
 ## Recent Sessions
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 74 | USB Backup Module | 2026-01-24 | In Progress |
 | 73 | Repair Mode in install.sh | 2026-01-24 | Completed |
 | 72 | Setup Detection Refactor (.needs-setup) | 2026-01-23 | Superseded |
 | 71 | Import Existing Installation | 2026-01-23 | Superseded |
 | 70 | Enhanced SMART Modal | 2026-01-22 | Completed |
 | 69 | Restore Flow Fixes | 2026-01-21 | Completed |
-| 68 | Persistent Sessions & Documentation | 2026-01-21 | Completed |
 
 ---
 
@@ -106,6 +124,7 @@ Improved the SMART details modal in the storage page with detailed metrics, help
 - [ ] Test repair mode (install.sh option 2) → simulate-reinstall.sh created
 - [x] Test restauration complète → Fixed login bug
 - [ ] Verify hide dot files works after Samba reload
+- [ ] **Test USB Backup module** (new)
 
 ---
 
@@ -118,7 +137,7 @@ Improved the SMART details modal in the storage page with detailed metrics, help
 - [ ] Statut de connexion VPN dans le dashboard
 
 ### Simple Sync Peers (rclone)
-- [ ] Nouveau type de pair : "Simple Sync" (en plus du P2P existant)
+- [ ] Nouveau module `internal/rclone/` (séparé des peers)
 - [ ] Synchronisation unidirectionnelle Anemone → destination externe
 - [ ] Support rclone pour multiples backends (S3, SFTP, Google Drive, etc.)
 - [ ] Configuration simplifiée pour utilisateurs ne souhaitant pas le P2P complet
@@ -126,19 +145,23 @@ Improved the SMART details modal in the storage page with detailed metrics, help
 
 ### Local Backup (USB/External Drive)
 
-**Niveau 1 : Config Backup (léger)**
-- [ ] Détection automatique des disques USB/externes connectés
-- [ ] Interface web pour sélectionner le disque de sauvegarde
+**Niveau 1 : Data Backup** ✅ Session 74
+- [x] Nouveau module `internal/usbbackup/` (séparé des peers)
+- [x] Détection automatique des disques USB/externes connectés
+- [x] Interface web pour configurer les sauvegardes
+- [x] Synchronisation chiffrée avec manifest
+- [ ] Planification automatique (à faire)
+- [ ] Auto-sync quand disque branché (à faire)
+
+**Niveau 2 : Config Backup (léger)** - À faire
 - [ ] Export de la configuration : DB, certificats, config Samba
 - [ ] Chiffrement avec mot de passe
 - [ ] Restauration depuis le Setup Wizard
 
-**Niveau 2 : Data Backup (Local Peer)**
-- [ ] Nouveau type de peer : "Local" (disque externe monté)
-- [ ] Synchronisation des shares uniquement (pas incoming - c'est déjà des backups)
-- [ ] Réutilise la logique de sync incrémentale/manifest existante
-- [ ] Planification (quotidien, hebdomadaire...)
-- [ ] Interface unifiée avec les peers réseau
+### USB Drive Management (future)
+- [ ] Formatage des disques USB depuis l'interface
+- [ ] État des disques dans le dashboard
+- [ ] Gestion de la mise en veille
 
 ---
 
@@ -153,7 +176,8 @@ Improved the SMART details modal in the storage page with detailed metrics, help
 
 ## Next Steps
 
-**Fichiers debug à nettoyer (optionnel) :**
-- `debug_auth.go`, `fix_hash.go`, `verify_hash.go`, `backup_20260121_154509.enc`
+1. Valider le module USB Backup (Session 74)
+2. Module rclone pour backup cloud
+3. Scheduler pour USB auto-sync
 
-Commencer par `"continue"`.
+Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.

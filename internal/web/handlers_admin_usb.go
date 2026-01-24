@@ -1,0 +1,400 @@
+// Anemone - Multi-user NAS with P2P encrypted synchronization
+// Copyright (C) 2025 juste-un-gars
+// Licensed under the GNU Affero General Public License v3.0
+
+package web
+
+import (
+	"encoding/json"
+	"log"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/juste-un-gars/anemone/internal/auth"
+	"github.com/juste-un-gars/anemone/internal/i18n"
+	"github.com/juste-un-gars/anemone/internal/incoming"
+	"github.com/juste-un-gars/anemone/internal/sync"
+	"github.com/juste-un-gars/anemone/internal/usbbackup"
+)
+
+// handleAdminUSBBackup displays the USB backup management page
+func (s *Server) handleAdminUSBBackup(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	lang := s.getLang(r)
+
+	// Get all USB backup configurations
+	backups, err := usbbackup.GetAll(s.db)
+	if err != nil {
+		log.Printf("Error getting USB backups: %v", err)
+		backups = []*usbbackup.USBBackup{}
+	}
+
+	// Detect available drives
+	drives, err := usbbackup.DetectDrives()
+	if err != nil {
+		log.Printf("Error detecting drives: %v", err)
+		drives = []usbbackup.DriveInfo{}
+	}
+
+	// Check mount status for each backup
+	type BackupWithStatus struct {
+		*usbbackup.USBBackup
+		IsMounted     bool
+		FreeSpace     string
+		TotalSpace    string
+		FreeBytes     int64
+		TotalBytes    int64
+		LastSyncAgo   string
+		StatusClass   string
+	}
+
+	var backupsWithStatus []BackupWithStatus
+	for _, b := range backups {
+		bws := BackupWithStatus{
+			USBBackup: b,
+			IsMounted: b.IsMounted(),
+		}
+
+		// Get disk space if mounted
+		if bws.IsMounted {
+			for _, d := range drives {
+				if d.MountPath == b.MountPath {
+					bws.FreeBytes = d.FreeBytes
+					bws.TotalBytes = d.TotalBytes
+					bws.FreeSpace = usbbackup.FormatBytes(d.FreeBytes)
+					bws.TotalSpace = usbbackup.FormatBytes(d.TotalBytes)
+					break
+				}
+			}
+		}
+
+		// Format last sync time
+		if b.LastSync != nil {
+			bws.LastSyncAgo = incoming.FormatTimeAgo(*b.LastSync, lang)
+		}
+
+		// Status class for styling
+		switch b.LastStatus {
+		case "success":
+			bws.StatusClass = "text-green-600"
+		case "error":
+			bws.StatusClass = "text-red-600"
+		case "running":
+			bws.StatusClass = "text-blue-600"
+		default:
+			bws.StatusClass = "text-gray-500"
+		}
+
+		backupsWithStatus = append(backupsWithStatus, bws)
+	}
+
+	// Available drives (not yet configured)
+	var availableDrives []usbbackup.DriveInfo
+	for _, d := range drives {
+		isConfigured := false
+		for _, b := range backups {
+			if b.MountPath == d.MountPath {
+				isConfigured = true
+				break
+			}
+		}
+		if !isConfigured {
+			availableDrives = append(availableDrives, d)
+		}
+	}
+
+	data := map[string]interface{}{
+		"Session":         session,
+		"Title":           i18n.T(lang, "usb_backup.title"),
+		"Lang":            lang,
+		"Backups":         backupsWithStatus,
+		"AvailableDrives": availableDrives,
+		"FormatBytes":     usbbackup.FormatBytes,
+		"Success":         r.URL.Query().Get("success") != "",
+		"Syncing":         r.URL.Query().Get("syncing") != "",
+		"Error":           r.URL.Query().Get("error"),
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "admin_usb_backup.html", data); err != nil {
+		log.Printf("Template error: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
+// handleAdminUSBBackupAdd handles adding a new USB backup configuration
+func (s *Server) handleAdminUSBBackupAdd(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	mountPath := strings.TrimSpace(r.FormValue("mount_path"))
+	backupPath := strings.TrimSpace(r.FormValue("backup_path"))
+	enabled := r.FormValue("enabled") == "on"
+	autoDetect := r.FormValue("auto_detect") == "on"
+
+	if name == "" || mountPath == "" {
+		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "missing_fields"), http.StatusSeeOther)
+		return
+	}
+
+	if backupPath == "" {
+		backupPath = "anemone-backup"
+	}
+
+	backup := &usbbackup.USBBackup{
+		Name:       name,
+		MountPath:  mountPath,
+		BackupPath: backupPath,
+		Enabled:    enabled,
+		AutoDetect: autoDetect,
+	}
+
+	if err := usbbackup.Create(s.db, backup); err != nil {
+		log.Printf("Error creating USB backup: %v", err)
+		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "error_creating"), http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/usb-backup?success=1", http.StatusSeeOther)
+}
+
+// handleAdminUSBBackupActions handles edit, delete, sync actions for USB backups
+func (s *Server) handleAdminUSBBackupActions(w http.ResponseWriter, r *http.Request) {
+	// Extract ID from URL: /admin/usb-backup/{id}/{action}
+	path := strings.TrimPrefix(r.URL.Path, "/admin/usb-backup/")
+	parts := strings.Split(path, "/")
+
+	if len(parts) < 1 {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	id, err := strconv.Atoi(parts[0])
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	action := ""
+	if len(parts) > 1 {
+		action = parts[1]
+	}
+
+	switch action {
+	case "delete":
+		s.handleUSBBackupDelete(w, r, id)
+	case "sync":
+		s.handleUSBBackupSync(w, r, id)
+	case "edit":
+		s.handleUSBBackupEdit(w, r, id)
+	default:
+		// Show edit form
+		s.handleUSBBackupEditForm(w, r, id)
+	}
+}
+
+// handleUSBBackupDelete deletes a USB backup configuration
+func (s *Server) handleUSBBackupDelete(w http.ResponseWriter, r *http.Request, id int) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if err := usbbackup.Delete(s.db, id); err != nil {
+		log.Printf("Error deleting USB backup: %v", err)
+		http.Error(w, "Error deleting backup", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/usb-backup?deleted=1", http.StatusSeeOther)
+}
+
+// handleUSBBackupSync triggers a manual sync for a USB backup
+func (s *Server) handleUSBBackupSync(w http.ResponseWriter, r *http.Request, id int) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	backup, err := usbbackup.GetByID(s.db, id)
+	if err != nil {
+		log.Printf("Error getting USB backup: %v", err)
+		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "backup_not_found"), http.StatusSeeOther)
+		return
+	}
+
+	if !backup.IsMounted() {
+		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "drive_not_mounted"), http.StatusSeeOther)
+		return
+	}
+
+	// Get server name
+	serverName, _ := sync.GetServerName(s.db)
+	if serverName == "" {
+		serverName = "anemone"
+	}
+
+	// Get master key
+	var masterKey string
+	if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
+		log.Printf("Error getting master key: %v", err)
+		http.Redirect(w, r, "/admin/usb-backup?error=internal_error", http.StatusSeeOther)
+		return
+	}
+
+	// Run sync in background
+	go func() {
+		result, err := usbbackup.SyncAllShares(s.db, backup, masterKey, serverName)
+		if err != nil {
+			log.Printf("USB backup sync error: %v", err)
+		} else {
+			log.Printf("USB backup sync completed: %d added, %d updated, %d deleted, %s",
+				result.FilesAdded, result.FilesUpdated, result.FilesDeleted,
+				usbbackup.FormatBytes(result.BytesSynced))
+		}
+	}()
+
+	http.Redirect(w, r, "/admin/usb-backup?syncing=1", http.StatusSeeOther)
+}
+
+// handleUSBBackupEditForm shows the edit form for a USB backup
+func (s *Server) handleUSBBackupEditForm(w http.ResponseWriter, r *http.Request, id int) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	lang := s.getLang(r)
+
+	backup, err := usbbackup.GetByID(s.db, id)
+	if err != nil {
+		http.Redirect(w, r, "/admin/usb-backup?error=not_found", http.StatusSeeOther)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Session":     session,
+		"Title":       i18n.T(lang, "usb_backup.edit"),
+		"Lang":        lang,
+		"Backup":      backup,
+		"FormatBytes": usbbackup.FormatBytes,
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "admin_usb_backup_edit.html", data); err != nil {
+		log.Printf("Template error: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
+// handleUSBBackupEdit processes the edit form submission
+func (s *Server) handleUSBBackupEdit(w http.ResponseWriter, r *http.Request, id int) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	backup, err := usbbackup.GetByID(s.db, id)
+	if err != nil {
+		http.Redirect(w, r, "/admin/usb-backup?error=not_found", http.StatusSeeOther)
+		return
+	}
+
+	backup.Name = strings.TrimSpace(r.FormValue("name"))
+	backup.MountPath = strings.TrimSpace(r.FormValue("mount_path"))
+	backup.BackupPath = strings.TrimSpace(r.FormValue("backup_path"))
+	backup.Enabled = r.FormValue("enabled") == "on"
+	backup.AutoDetect = r.FormValue("auto_detect") == "on"
+
+	if backup.Name == "" || backup.MountPath == "" {
+		http.Redirect(w, r, "/admin/usb-backup/"+strconv.Itoa(id)+"?error="+i18n.T(lang, "missing_fields"), http.StatusSeeOther)
+		return
+	}
+
+	if err := usbbackup.Update(s.db, backup); err != nil {
+		log.Printf("Error updating USB backup: %v", err)
+		http.Redirect(w, r, "/admin/usb-backup/"+strconv.Itoa(id)+"?error="+i18n.T(lang, "error_updating"), http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/usb-backup?updated=1", http.StatusSeeOther)
+}
+
+// handleAdminUSBBackupAPI provides JSON API for USB backup status
+func (s *Server) handleAdminUSBBackupAPI(w http.ResponseWriter, r *http.Request) {
+	backups, err := usbbackup.GetAll(s.db)
+	if err != nil {
+		http.Error(w, "Error getting backups", http.StatusInternalServerError)
+		return
+	}
+
+	type BackupStatus struct {
+		ID         int    `json:"id"`
+		Name       string `json:"name"`
+		IsMounted  bool   `json:"is_mounted"`
+		LastStatus string `json:"last_status"`
+		LastSync   string `json:"last_sync,omitempty"`
+	}
+
+	var statuses []BackupStatus
+	for _, b := range backups {
+		status := BackupStatus{
+			ID:         b.ID,
+			Name:       b.Name,
+			IsMounted:  b.IsMounted(),
+			LastStatus: b.LastStatus,
+		}
+		if b.LastSync != nil {
+			status.LastSync = b.LastSync.Format("2006-01-02 15:04")
+		}
+		statuses = append(statuses, status)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(statuses)
+}
+
+// handleAdminUSBDrives provides JSON API to list detected drives
+func (s *Server) handleAdminUSBDrives(w http.ResponseWriter, r *http.Request) {
+	drives, err := usbbackup.DetectDrives()
+	if err != nil {
+		http.Error(w, "Error detecting drives", http.StatusInternalServerError)
+		return
+	}
+
+	type DriveResponse struct {
+		MountPath  string `json:"mount_path"`
+		Label      string `json:"label"`
+		Filesystem string `json:"filesystem"`
+		TotalGB    string `json:"total_gb"`
+		FreeGB     string `json:"free_gb"`
+		Removable  bool   `json:"removable"`
+	}
+
+	var response []DriveResponse
+	for _, d := range drives {
+		response = append(response, DriveResponse{
+			MountPath:  d.MountPath,
+			Label:      d.Label,
+			Filesystem: d.Filesystem,
+			TotalGB:    usbbackup.FormatBytes(d.TotalBytes),
+			FreeGB:     usbbackup.FormatBytes(d.FreeBytes),
+			Removable:  d.IsRemovable,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}

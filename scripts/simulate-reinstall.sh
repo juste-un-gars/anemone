@@ -68,7 +68,11 @@ fi
 
 # Verify database exists
 if [[ ! -f "$DATA_DIR/db/anemone.db" ]]; then
-    echo -e "${RED}Error: Database not found: ${DATA_DIR}/db/anemone.db${NC}"
+    echo -e "${RED}Error: Database not found at: ${DATA_DIR}/db/anemone.db${NC}"
+    echo ""
+    echo "The service points to '$DATA_DIR' but the database is not there."
+    echo "Specify the correct path with:"
+    echo "  sudo ANEMONE_DATA_DIR=/path/to/data $0"
     exit 1
 fi
 

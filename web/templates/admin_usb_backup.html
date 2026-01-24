@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{T .Lang "usb_backup.title"}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/dashboard" class="text-2xl font-bold text-gray-900">
+                        🪸 Anemone - {{ServerName}}
+                    </a>
+                    <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                        {{T .Lang "users.role.admin"}}
+                    </span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700">{{.Session.Username}}</span>
+                    <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
+                        {{T .Lang "dashboard.logout"}}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Breadcrumb -->
+        <nav class="mb-4">
+            <a href="/dashboard" class="text-purple-600 hover:text-purple-800">{{T .Lang "dashboard.title"}}</a>
+            <span class="mx-2 text-gray-400">/</span>
+            <span class="text-gray-600">{{T .Lang "usb_backup.title"}}</span>
+        </nav>
+
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h2 class="text-3xl font-bold text-gray-900">
+                    {{T .Lang "usb_backup.title"}}
+                </h2>
+                <p class="mt-2 text-gray-600">
+                    {{T .Lang "usb_backup.description"}}
+                </p>
+            </div>
+        </div>
+
+        <!-- Success/Error Messages -->
+        {{if .Success}}
+        <div class="mb-4 bg-green-50 border-l-4 border-green-400 p-4">
+            <p class="text-sm text-green-700">{{T .Lang "usb_backup.success"}}</p>
+        </div>
+        {{end}}
+
+        {{if .Error}}
+        <div class="mb-4 bg-red-50 border-l-4 border-red-400 p-4">
+            <p class="text-sm text-red-700">{{.Error}}</p>
+        </div>
+        {{end}}
+
+        {{if .Syncing}}
+        <div class="mb-4 bg-blue-50 border-l-4 border-blue-400 p-4">
+            <p class="text-sm text-blue-700">{{T .Lang "usb_backup.sync_started"}}</p>
+        </div>
+        {{end}}
+
+        <!-- Configured Backups -->
+        <div class="bg-white shadow rounded-lg mb-8">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900">{{T .Lang "usb_backup.configured"}}</h3>
+            </div>
+
+            {{if .Backups}}
+            <div class="divide-y divide-gray-200">
+                {{range .Backups}}
+                <div class="p-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <!-- Drive icon -->
+                            <div class="flex-shrink-0 h-12 w-12 rounded-lg {{if .IsMounted}}bg-green-100{{else}}bg-gray-100{{end}} flex items-center justify-center">
+                                <svg class="h-6 w-6 {{if .IsMounted}}text-green-600{{else}}text-gray-400{{end}}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                                </svg>
+                            </div>
+
+                            <div class="ml-4">
+                                <h4 class="text-lg font-medium text-gray-900">{{.Name}}</h4>
+                                <p class="text-sm text-gray-500">{{.MountPath}}</p>
+                                {{if .IsMounted}}
+                                <p class="text-xs text-gray-400">{{.FreeSpace}} {{T $.Lang "usb_backup.free"}} / {{.TotalSpace}}</p>
+                                {{else}}
+                                <p class="text-xs text-red-500">{{T $.Lang "usb_backup.not_mounted"}}</p>
+                                {{end}}
+                            </div>
+                        </div>
+
+                        <div class="flex items-center space-x-4">
+                            <!-- Status -->
+                            <div class="text-right">
+                                <span class="text-sm {{.StatusClass}}">
+                                    {{if eq .LastStatus "success"}}{{T $.Lang "usb_backup.status.success"}}{{end}}
+                                    {{if eq .LastStatus "error"}}{{T $.Lang "usb_backup.status.error"}}{{end}}
+                                    {{if eq .LastStatus "running"}}{{T $.Lang "usb_backup.status.running"}}{{end}}
+                                    {{if eq .LastStatus "unknown"}}{{T $.Lang "usb_backup.status.unknown"}}{{end}}
+                                </span>
+                                {{if .LastSyncAgo}}
+                                <p class="text-xs text-gray-400">{{.LastSyncAgo}}</p>
+                                {{end}}
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="flex space-x-2">
+                                {{if .IsMounted}}
+                                <form method="POST" action="/admin/usb-backup/{{.ID}}/sync" class="inline">
+                                    <button type="submit" class="px-3 py-1 text-sm bg-purple-100 text-purple-700 rounded hover:bg-purple-200" {{if eq .LastStatus "running"}}disabled{{end}}>
+                                        {{T $.Lang "usb_backup.sync_now"}}
+                                    </button>
+                                </form>
+                                {{end}}
+                                <a href="/admin/usb-backup/{{.ID}}" class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
+                                    {{T $.Lang "common.edit"}}
+                                </a>
+                                <form method="POST" action="/admin/usb-backup/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T $.Lang "usb_backup.confirm_delete"}}');">
+                                    <button type="submit" class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200">
+                                        {{T $.Lang "common.delete"}}
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{if .LastError}}
+                    <div class="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded">
+                        {{.LastError}}
+                    </div>
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+            {{else}}
+            <div class="p-6 text-center text-gray-500">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                </svg>
+                <p class="mt-2">{{T .Lang "usb_backup.no_backups"}}</p>
+            </div>
+            {{end}}
+        </div>
+
+        <!-- Available Drives -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900">{{T .Lang "usb_backup.available_drives"}}</h3>
+                <p class="text-sm text-gray-500">{{T .Lang "usb_backup.available_drives_info"}}</p>
+            </div>
+
+            {{if .AvailableDrives}}
+            <div class="divide-y divide-gray-200">
+                {{range .AvailableDrives}}
+                <form method="POST" action="/admin/usb-backup/add" class="p-6">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                                <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="font-medium text-gray-900">
+                                    {{if .Label}}{{.Label}}{{else}}{{.MountPath}}{{end}}
+                                    {{if .IsRemovable}}<span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded ml-2">USB</span>{{end}}
+                                </p>
+                                <p class="text-sm text-gray-500">{{.MountPath}} - {{.Filesystem}}</p>
+                                <p class="text-xs text-gray-400">{{call $.FormatBytes .FreeBytes}} {{T $.Lang "usb_backup.free"}} / {{call $.FormatBytes .TotalBytes}}</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center space-x-4">
+                            <input type="hidden" name="mount_path" value="{{.MountPath}}">
+                            <input type="text" name="name" placeholder="{{T $.Lang "usb_backup.name_placeholder"}}"
+                                   value="{{if .Label}}{{.Label}}{{else}}USB Backup{{end}}"
+                                   class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-purple-500 focus:border-purple-500" required>
+                            <input type="hidden" name="backup_path" value="anemone-backup">
+                            <input type="hidden" name="enabled" value="on">
+                            <input type="hidden" name="auto_detect" value="on">
+                            <button type="submit" class="px-4 py-2 text-sm font-medium text-white anemone-gradient rounded-md hover:opacity-90">
+                                {{T $.Lang "usb_backup.add"}}
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                {{end}}
+            </div>
+            {{else}}
+            <div class="p-6 text-center text-gray-500">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p class="mt-2">{{T .Lang "usb_backup.no_drives"}}</p>
+                <p class="text-sm text-gray-400">{{T .Lang "usb_backup.no_drives_hint"}}</p>
+            </div>
+            {{end}}
+        </div>
+
+        <!-- Back link -->
+        <div class="mt-8">
+            <a href="/dashboard" class="text-purple-600 hover:text-purple-800">
+                &larr; {{T .Lang "common.back_to_dashboard"}}
+            </a>
+        </div>
+    </div>
+</div>
+</body>
+</html>

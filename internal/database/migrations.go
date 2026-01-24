@@ -185,6 +185,11 @@ func Migrate(db *sql.DB) error {
 		return fmt.Errorf("users table migration failed: %w", err)
 	}
 
+	// Migration pour créer la table usb_backups
+	if err := migrateUSBBackupsTable(db); err != nil {
+		return fmt.Errorf("usb_backups table migration failed: %w", err)
+	}
+
 	return nil
 }
 
@@ -353,6 +358,45 @@ func migrateUsersTable(db *sql.DB) error {
 		if _, err := db.Exec("ALTER TABLE users ADD COLUMN password_encrypted BLOB"); err != nil {
 			return fmt.Errorf("failed to add password_encrypted column: %w", err)
 		}
+	}
+
+	return nil
+}
+
+// migrateUSBBackupsTable creates the usb_backups table if it doesn't exist
+func migrateUSBBackupsTable(db *sql.DB) error {
+	// Check if table exists
+	var tableName string
+	err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='usb_backups'").Scan(&tableName)
+	if err == nil {
+		// Table exists, nothing to do
+		return nil
+	}
+
+	// Create the usb_backups table
+	query := `CREATE TABLE usb_backups (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT UNIQUE NOT NULL,
+		mount_path TEXT NOT NULL,
+		backup_path TEXT DEFAULT 'anemone-backup',
+		enabled BOOLEAN DEFAULT 1,
+		auto_detect BOOLEAN DEFAULT 1,
+		last_sync DATETIME,
+		last_status TEXT DEFAULT 'unknown',
+		last_error TEXT DEFAULT '',
+		files_synced INTEGER DEFAULT 0,
+		bytes_synced INTEGER DEFAULT 0,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`
+
+	if _, err := db.Exec(query); err != nil {
+		return fmt.Errorf("failed to create usb_backups table: %w", err)
+	}
+
+	// Create index for quick lookups
+	if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_usb_backups_enabled ON usb_backups(enabled)"); err != nil {
+		return fmt.Errorf("failed to create usb_backups index: %w", err)
 	}
 
 	return nil

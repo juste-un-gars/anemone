@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{T .Lang "usb_backup.edit"}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/dashboard" class="text-2xl font-bold text-gray-900">
+                        🪸 Anemone - {{ServerName}}
+                    </a>
+                    <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                        {{T .Lang "users.role.admin"}}
+                    </span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700">{{.Session.Username}}</span>
+                    <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
+                        {{T .Lang "dashboard.logout"}}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Breadcrumb -->
+        <nav class="mb-4">
+            <a href="/dashboard" class="text-purple-600 hover:text-purple-800">{{T .Lang "dashboard.title"}}</a>
+            <span class="mx-2 text-gray-400">/</span>
+            <a href="/admin/usb-backup" class="text-purple-600 hover:text-purple-800">{{T .Lang "usb_backup.title"}}</a>
+            <span class="mx-2 text-gray-400">/</span>
+            <span class="text-gray-600">{{T .Lang "usb_backup.edit"}}</span>
+        </nav>
+
+        <!-- Header -->
+        <h2 class="text-2xl font-bold text-gray-900 mb-6">{{T .Lang "usb_backup.edit"}}</h2>
+
+        <!-- Edit Form -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <form method="POST" action="/admin/usb-backup/{{.Backup.ID}}/edit">
+                <!-- Name -->
+                <div class="mb-4">
+                    <label for="name" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{T .Lang "usb_backup.name"}}
+                    </label>
+                    <input type="text" id="name" name="name" value="{{.Backup.Name}}" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                </div>
+
+                <!-- Mount Path -->
+                <div class="mb-4">
+                    <label for="mount_path" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{T .Lang "usb_backup.mount_path"}}
+                    </label>
+                    <input type="text" id="mount_path" name="mount_path" value="{{.Backup.MountPath}}" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                    <p class="mt-1 text-xs text-gray-500">{{T .Lang "usb_backup.mount_path_hint"}}</p>
+                </div>
+
+                <!-- Backup Path -->
+                <div class="mb-4">
+                    <label for="backup_path" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{T .Lang "usb_backup.backup_path"}}
+                    </label>
+                    <input type="text" id="backup_path" name="backup_path" value="{{.Backup.BackupPath}}"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                    <p class="mt-1 text-xs text-gray-500">{{T .Lang "usb_backup.backup_path_hint"}}</p>
+                </div>
+
+                <!-- Enabled -->
+                <div class="mb-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" name="enabled" {{if .Backup.Enabled}}checked{{end}}
+                               class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded">
+                        <span class="ml-2 text-sm text-gray-700">{{T .Lang "usb_backup.enabled"}}</span>
+                    </label>
+                </div>
+
+                <!-- Auto Detect -->
+                <div class="mb-6">
+                    <label class="flex items-center">
+                        <input type="checkbox" name="auto_detect" {{if .Backup.AutoDetect}}checked{{end}}
+                               class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded">
+                        <span class="ml-2 text-sm text-gray-700">{{T .Lang "usb_backup.auto_detect"}}</span>
+                    </label>
+                    <p class="ml-6 text-xs text-gray-500">{{T .Lang "usb_backup.auto_detect_hint"}}</p>
+                </div>
+
+                <!-- Buttons -->
+                <div class="flex justify-between">
+                    <a href="/admin/usb-backup" class="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+                        {{T .Lang "common.cancel"}}
+                    </a>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white anemone-gradient rounded-md hover:opacity-90">
+                        {{T .Lang "common.save"}}
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Stats -->
+        {{if .Backup.LastSync}}
+        <div class="mt-6 bg-gray-50 rounded-lg p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-2">{{T .Lang "usb_backup.stats"}}</h3>
+            <dl class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <dt class="text-gray-500">{{T .Lang "usb_backup.last_sync"}}</dt>
+                    <dd class="font-medium">{{.Backup.LastSync.Format "2006-01-02 15:04"}}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">{{T .Lang "usb_backup.last_status"}}</dt>
+                    <dd class="font-medium">{{.Backup.LastStatus}}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">{{T .Lang "usb_backup.files_synced"}}</dt>
+                    <dd class="font-medium">{{.Backup.FilesSynced}}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">{{T .Lang "usb_backup.bytes_synced"}}</dt>
+                    <dd class="font-medium">{{call $.FormatBytes .Backup.BytesSynced}}</dd>
+                </div>
+            </dl>
+        </div>
+        {{end}}
+    </div>
+</div>
+</body>
+</html>
