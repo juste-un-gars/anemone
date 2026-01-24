@@ -8,15 +8,16 @@
 ## Current Session
 
 **Session 73** - Repair Mode in install.sh
-- **Status:** In Progress 🔄
+- **Status:** Completed ✅
 - **Date:** 2026-01-24
 
 ### Summary
-Added repair/reinstall mode to `install.sh` for recovering existing Anemone installations after OS reinstall. Removed the "Import existing installation" option from the web wizard - repair is now handled entirely by the install script.
+Added repair/reinstall mode to `install.sh` for recovering existing Anemone installations after OS reinstall. Fixed critical bug where systemd service ignored wizard-configured data path.
 
-### Known Issue (to fix)
+### Bug Fixes
+- **Critical:** Removed hardcoded `ANEMONE_DATA_DIR` from systemd service - was overriding the wizard's configured path in `/etc/anemone/anemone.env`
 - SMB access denied after repair - fixed path generation bug (was reconstructing path instead of using DB path)
-- Users need to reset password via web interface after repair to restore SMB access
+- Added `hide dot files = yes` to Samba config to hide `.anemone` and `.trash`
 
 ### Changes
 - [x] Added menu in `install.sh`: New installation / Repair
@@ -26,33 +27,29 @@ Added repair/reinstall mode to `install.sh` for recovering existing Anemone inst
 - [x] Removed `.needs-setup` marker file logic (no longer needed)
 - [x] Simplified `isSetupCompleted()` to check DB existence
 - [x] Deleted `scripts/cleanup-keep-data.sh` (obsolete)
-- [x] Cleaned up translations (fr.json, en.json)
+- [x] Created `scripts/simulate-reinstall.sh` for testing repair mode
+- [x] Fixed systemd service to read DATA_DIR from env file (not hardcoded)
+- [x] Added `hide dot files = yes` in Samba share config
 
 ### New Logic
 ```
 install.sh → Menu:
-  1) New installation    → wizard
+  1) New installation    → wizard configures path → writes /etc/anemone/anemone.env
   2) Repair/Reinstall    → reads DB, recreates users, direct login
 
-Setup needed if:
-  - No database exists
-  - ANEMONE_SETUP_MODE=true
-  - Setup state file active but not finalized
+Service reads ANEMONE_DATA_DIR from /etc/anemone/anemone.env (written by wizard)
 ```
 
 ### Files Modified
-- `install.sh` - Added repair mode with menu, user recreation, Samba regeneration
-- `web/templates/setup_wizard.html` - Removed import_existing option
-- `internal/i18n/locales/fr.json` - Removed import translations
-- `internal/i18n/locales/en.json` - Removed import translations
-- `internal/setup/setup.go` - Removed .needs-setup logic
-- `internal/web/router.go` - isSetupCompleted() checks DB existence
-- `internal/web/handlers_setup.go` - Updated comments
-- `internal/setup/restore.go` - Updated comments
-- `internal/setup/finalize.go` - Updated comments
+- `install.sh` - Removed hardcoded ANEMONE_DATA_DIR from systemd service
+- `internal/smb/smb.go` - Added `hide dot files = yes`
+- `scripts/simulate-reinstall.sh` - New script for testing repair mode
 
 ### Deleted Files
 - `scripts/cleanup-keep-data.sh`
+
+### Note
+After repair, users must reset their password via web interface to restore SMB access.
 
 ---
 
@@ -105,9 +102,10 @@ Improved the SMART details modal in the storage page with detailed metrics, help
 ## Remaining Tests
 
 - [ ] Test complet sur VM Fedora
-- [ ] Test ZFS new pool
-- [ ] Test repair mode (install.sh option 2)
+- [x] Test ZFS new pool → Fixed systemd DATA_DIR bug
+- [ ] Test repair mode (install.sh option 2) → simulate-reinstall.sh created
 - [x] Test restauration complète → Fixed login bug
+- [ ] Verify hide dot files works after Samba reload
 
 ---
 
@@ -126,13 +124,21 @@ Improved the SMART details modal in the storage page with detailed metrics, help
 - [ ] Configuration simplifiée pour utilisateurs ne souhaitant pas le P2P complet
 - [ ] Planification des sauvegardes simples
 
-### USB Configuration Backup
-- [ ] Détection automatique des clés USB connectées au serveur
-- [ ] Interface web pour sélectionner la clé USB de sauvegarde
-- [ ] Export de la configuration complète (DB, certificats, config Samba)
-- [ ] Chiffrement de la sauvegarde avec mot de passe (défaut configurable)
-- [ ] Restauration depuis clé USB dans le Setup Wizard
-- [ ] Sauvegarde automatique programmable (quotidienne/hebdomadaire)
+### Local Backup (USB/External Drive)
+
+**Niveau 1 : Config Backup (léger)**
+- [ ] Détection automatique des disques USB/externes connectés
+- [ ] Interface web pour sélectionner le disque de sauvegarde
+- [ ] Export de la configuration : DB, certificats, config Samba
+- [ ] Chiffrement avec mot de passe
+- [ ] Restauration depuis le Setup Wizard
+
+**Niveau 2 : Data Backup (Local Peer)**
+- [ ] Nouveau type de peer : "Local" (disque externe monté)
+- [ ] Synchronisation des shares uniquement (pas incoming - c'est déjà des backups)
+- [ ] Réutilise la logique de sync incrémentale/manifest existante
+- [ ] Planification (quotidien, hebdomadaire...)
+- [ ] Interface unifiée avec les peers réseau
 
 ---
 
