@@ -19,10 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Web UI integration**: Full management interface in admin dashboard
 - **Status tracking**: Real-time progress, files/bytes synced, error reporting
 
-#### Installation Improvements
-- **Repair mode in install.sh**: Option to recover existing Anemone installation after OS reinstall
-- **Import existing installation**: Setup wizard option to import from existing data directory
-- **simulate-reinstall.sh**: Test script for validating repair mode functionality
+#### Setup Wizard - Import Existing Installation
+- **New wizard option** to recover Anemone after OS reinstallation
+- Validates existing database at specified path
+- Recreates system users and Samba accounts automatically
+- Decrypts passwords using master_key from existing DB
+- Regenerates smb.conf and reloads Samba
+- Works like restore but without needing a backup file
+
+#### Installation Script
+- **Repair mode** in `install.sh` (option 2) for OS reinstallation recovery
+- `simulate-reinstall.sh` test script for validating repair scenarios
 
 ### Changed
 - **Setup detection refactored**: Uses `.needs-setup` marker file as single source of truth
