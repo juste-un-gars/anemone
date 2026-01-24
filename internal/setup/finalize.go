@@ -150,7 +150,7 @@ func saveSystemConfig(db *sql.DB, masterKey, serverName, language string) error 
 		"nas_name":   serverName,
 		"timezone":   "Europe/Paris",
 		// Note: setup_completed is no longer stored in DB
-		// Setup completion is tracked via absence of .needs-setup marker file
+		// Setup completion is tracked by the existence of the database
 	}
 
 	for key, value := range configs {

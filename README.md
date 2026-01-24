@@ -22,6 +22,7 @@
 ## Quick Install
 
 ```bash
+sudo apt update
 git clone https://github.com/juste-un-gars/anemone.git
 cd anemone
 sudo ./install.sh

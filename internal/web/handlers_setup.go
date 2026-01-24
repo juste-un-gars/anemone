@@ -170,8 +170,8 @@ func (s *Server) handleSetupConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Setup completion is now handled by removing .needs-setup marker file
-	// (done by setup.Manager.Cleanup())
+	// Setup completion is tracked by the existence of the database
+	// Cleanup removes temporary setup state file
 
 	// Clear the setup key cookie
 	http.SetCookie(w, &http.Cookie{

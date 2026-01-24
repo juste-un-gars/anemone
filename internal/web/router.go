@@ -335,11 +335,11 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 }
 
 // isSetupCompleted checks if initial setup is done
-// Setup is completed when .needs-setup marker file does NOT exist
+// Setup is completed when the database exists
 func (s *Server) isSetupCompleted() bool {
-	markerPath := filepath.Join(s.cfg.DataDir, ".needs-setup")
-	_, err := os.Stat(markerPath)
-	return os.IsNotExist(err)
+	dbPath := filepath.Join(s.cfg.DataDir, "db", "anemone.db")
+	_, err := os.Stat(dbPath)
+	return err == nil
 }
 
 // syncAuthMiddleware checks for sync authentication password in X-Sync-Password header

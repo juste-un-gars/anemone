@@ -83,6 +83,22 @@ By default, Anemone generates a self-signed certificate.
 - Browser warning is normal
 - Secure for local/private use
 - Recommended: add exception in browser
+- **Validity: 10 years** (no automatic renewal)
+
+#### Certificate Renewal
+
+The self-signed certificate is valid for 10 years. When it expires:
+- Browsers will show a blocking error (`ERR_CERT_DATE_INVALID`)
+- P2P synchronization will fail
+
+To renew manually:
+
+```bash
+rm /srv/anemone/certs/server.crt /srv/anemone/certs/server.key
+sudo systemctl restart anemone
+```
+
+A new certificate will be generated automatically on restart.
 
 ### Custom Certificate
 

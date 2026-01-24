@@ -137,7 +137,7 @@ func ExecuteRestore(serverBackup *backup.ServerBackup, opts RestoreOptions) erro
 	}
 
 	// Note: setup_completed is no longer used in DB
-	// Setup completion is now tracked via absence of .needs-setup marker file
+	// Setup completion is tracked by the existence of the database
 
 	// Get master key for encrypting peer passwords
 	var masterKey string

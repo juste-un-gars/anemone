@@ -27,10 +27,12 @@ NC='\033[0m' # No Color
 
 # Default configuration
 DATA_DIR="/srv/anemone"
+INCOMING_DIR=""  # Empty = same as DATA_DIR
 INSTALL_DIR="$(pwd)"
 BINARY_NAME="anemone"
 SERVICE_NAME="anemone"
 SERVICE_USER="${SUDO_USER:-$USER}"
+INSTALL_MODE="new"  # "new" or "repair"
 
 # Parse command line arguments
 parse_args() {
@@ -67,6 +69,260 @@ show_help() {
     echo ""
     echo "After installation, complete setup via the web wizard at:"
     echo "  https://<server-ip>:8443"
+}
+
+ask_install_mode() {
+    echo ""
+    echo -e "${BLUE}=== Installation Mode ===${NC}"
+    echo ""
+    echo "  1) New installation (default)"
+    echo "     Fresh install with setup wizard"
+    echo ""
+    echo "  2) Repair / Reinstall"
+    echo "     Restore from existing Anemone data (after OS reinstall)"
+    echo ""
+    read -p "Choose [1-2] (default: 1): " choice
+
+    case "$choice" in
+        2)
+            INSTALL_MODE="repair"
+            ask_repair_paths
+            ;;
+        *)
+            INSTALL_MODE="new"
+            ;;
+    esac
+}
+
+ask_repair_paths() {
+    echo ""
+    echo -e "${YELLOW}=== Repair Mode ===${NC}"
+    echo ""
+
+    # Ask for data directory
+    read -p "Anemone data directory (e.g., /mnt/zfs or /srv/anemone): " input_data_dir
+    if [ -z "$input_data_dir" ]; then
+        log_error "Data directory is required"
+        exit 1
+    fi
+    DATA_DIR="$input_data_dir"
+
+    # Check if database exists
+    if [ ! -f "$DATA_DIR/db/anemone.db" ]; then
+        log_error "Database not found: $DATA_DIR/db/anemone.db"
+        log_error "This directory does not contain a valid Anemone installation"
+        exit 1
+    fi
+
+    log_info "Database found: $DATA_DIR/db/anemone.db"
+
+    # Ask for incoming directory
+    echo ""
+    read -p "Incoming backups directory (press Enter for same as data): " input_incoming_dir
+    if [ -n "$input_incoming_dir" ]; then
+        INCOMING_DIR="$input_incoming_dir"
+        if [ ! -d "$INCOMING_DIR" ]; then
+            log_error "Incoming directory not found: $INCOMING_DIR"
+            exit 1
+        fi
+    fi
+
+    echo ""
+    log_info "Data directory: $DATA_DIR"
+    if [ -n "$INCOMING_DIR" ]; then
+        log_info "Incoming directory: $INCOMING_DIR"
+    else
+        log_info "Incoming directory: $DATA_DIR/incoming (same as data)"
+    fi
+    echo ""
+    read -p "Continue with repair? [Y/n] " confirm
+    if [[ "$confirm" =~ ^[Nn] ]]; then
+        echo "Aborted."
+        exit 0
+    fi
+}
+
+repair_installation() {
+    log_step "Repairing existing installation..."
+
+    # Install sqlite3 if not present
+    if ! command -v sqlite3 &> /dev/null; then
+        log_info "Installing sqlite3..."
+        if [ "$PKG_MANAGER" = "dnf" ]; then
+            dnf install -y sqlite
+        elif [ "$PKG_MANAGER" = "apt" ]; then
+            apt install -y sqlite3
+        fi
+    fi
+
+    DB_PATH="$DATA_DIR/db/anemone.db"
+
+    # Get shares directory from system_config
+    SHARES_DIR=$(sqlite3 "$DB_PATH" "SELECT value FROM system_config WHERE key='shares_dir';" 2>/dev/null)
+    if [ -z "$SHARES_DIR" ]; then
+        SHARES_DIR="$DATA_DIR/shares"
+    fi
+    log_info "Shares directory: $SHARES_DIR"
+
+    # Get incoming directory from system_config (or use provided/default)
+    if [ -z "$INCOMING_DIR" ]; then
+        INCOMING_DIR=$(sqlite3 "$DB_PATH" "SELECT value FROM system_config WHERE key='incoming_dir';" 2>/dev/null)
+        if [ -z "$INCOMING_DIR" ]; then
+            INCOMING_DIR="$DATA_DIR/incoming"
+        fi
+    fi
+    log_info "Incoming directory: $INCOMING_DIR"
+
+    # Get list of users from database
+    log_info "Reading users from database..."
+    USERS=$(sqlite3 "$DB_PATH" "SELECT username FROM users WHERE activated_at IS NOT NULL;" 2>/dev/null)
+
+    if [ -z "$USERS" ]; then
+        log_warn "No activated users found in database"
+    else
+        log_info "Found users: $(echo $USERS | tr '\n' ' ')"
+    fi
+
+    # Create system users and set SMB passwords
+    for username in $USERS; do
+        log_info "Creating system user: $username"
+
+        # Create system user (no login shell, no home)
+        if ! id "$username" &>/dev/null; then
+            useradd -M -s /usr/sbin/nologin "$username" 2>/dev/null || \
+            useradd -M -s /sbin/nologin "$username" 2>/dev/null || \
+            log_warn "Failed to create system user: $username"
+        else
+            log_info "System user already exists: $username"
+        fi
+
+        # Get encrypted password from database
+        PASSWORD_ENC=$(sqlite3 "$DB_PATH" "SELECT hex(password_encrypted) FROM users WHERE username='$username';" 2>/dev/null)
+        MASTER_KEY=$(sqlite3 "$DB_PATH" "SELECT value FROM system_config WHERE key='master_key';" 2>/dev/null)
+
+        if [ -n "$PASSWORD_ENC" ] && [ -n "$MASTER_KEY" ]; then
+            # We'll set SMB password later via the running service
+            # For now, just note that user needs password reset or service will handle it
+            log_info "User $username will need SMB password configured"
+        fi
+    done
+
+    # Fix ownership on share directories
+    log_info "Fixing permissions on shares..."
+    for username in $USERS; do
+        USER_SHARE_DIR="$SHARES_DIR/$username"
+        if [ -d "$USER_SHARE_DIR" ]; then
+            chown -R "$username:$username" "$USER_SHARE_DIR" 2>/dev/null || \
+            log_warn "Failed to set ownership on $USER_SHARE_DIR"
+            chmod 700 "$USER_SHARE_DIR" 2>/dev/null
+            log_info "Fixed permissions: $USER_SHARE_DIR"
+        fi
+    done
+
+    # Fix ownership on incoming directories
+    log_info "Fixing permissions on incoming..."
+    if [ -d "$INCOMING_DIR" ]; then
+        chown -R "$SERVICE_USER:$SERVICE_USER" "$INCOMING_DIR" 2>/dev/null
+        chmod 755 "$INCOMING_DIR" 2>/dev/null
+    fi
+
+    # Remove any .needs-setup marker file
+    rm -f "$DATA_DIR/.needs-setup" 2>/dev/null
+    rm -f "$DATA_DIR/.setup-state.json" 2>/dev/null
+
+    log_info "Repair preparation complete"
+}
+
+regenerate_samba_config() {
+    log_info "Regenerating Samba configuration..."
+
+    DB_PATH="$DATA_DIR/db/anemone.db"
+    SMB_DIR="$DATA_DIR/smb"
+    SMB_CONF="$SMB_DIR/smb.conf"
+
+    # Create smb directory
+    mkdir -p "$SMB_DIR"
+
+    # Get server name
+    SERVER_NAME=$(sqlite3 "$DB_PATH" "SELECT value FROM system_config WHERE key='server_name';" 2>/dev/null)
+    if [ -z "$SERVER_NAME" ]; then
+        SERVER_NAME="Anemone"
+    fi
+
+    # Get shares directory
+    SHARES_DIR=$(sqlite3 "$DB_PATH" "SELECT value FROM system_config WHERE key='shares_dir';" 2>/dev/null)
+    if [ -z "$SHARES_DIR" ]; then
+        SHARES_DIR="$DATA_DIR/shares"
+    fi
+
+    # Generate smb.conf header
+    cat > "$SMB_CONF" <<EOF
+# Anemone NAS - Samba Configuration
+# Auto-generated by install.sh repair mode
+# Do not edit manually - changes will be overwritten
+
+[global]
+workgroup = WORKGROUP
+server string = $SERVER_NAME
+netbios name = $SERVER_NAME
+security = user
+map to guest = never
+passdb backend = tdbsam
+unix password sync = no
+guest ok = no
+guest account = nobody
+log file = /var/log/samba/log.%m
+max log size = 1000
+logging = file
+panic action = /usr/share/samba/panic-action %d
+server role = standalone server
+obey pam restrictions = yes
+unix extensions = yes
+wide links = no
+create mask = 0600
+directory mask = 0700
+force create mode = 0600
+force directory mode = 0700
+hide dot files = no
+veto files = /._*/.DS_Store/.Thumbs.db/.desktop.ini/
+delete veto files = yes
+inherit permissions = no
+nt acl support = no
+acl allow execute always = no
+vfs objects = recycle
+recycle:repository = .trash/%U
+recycle:keeptree = yes
+recycle:touch = yes
+recycle:versions = yes
+recycle:maxsize = 0
+dfree command = /usr/local/bin/anemone-dfree
+
+EOF
+
+    # Get all shares from database and add them
+    sqlite3 "$DB_PATH" "SELECT s.name, s.path, u.username FROM shares s JOIN users u ON s.user_id = u.id WHERE u.activated_at IS NOT NULL;" 2>/dev/null | while IFS='|' read -r name path username; do
+        # Update path if shares_dir changed
+        actual_path="$SHARES_DIR/$username/$name"
+
+        cat >> "$SMB_CONF" <<EOF
+[$name]
+path = $actual_path
+valid users = $username
+read only = no
+browseable = yes
+create mask = 0600
+directory mask = 0700
+force user = $username
+force group = $username
+
+EOF
+        log_info "Added share: $name -> $actual_path"
+    done
+
+    # Copy to /etc/samba/smb.conf
+    cp "$SMB_CONF" /etc/samba/smb.conf 2>/dev/null || log_warn "Could not copy smb.conf to /etc/samba/"
+
+    log_info "Samba configuration generated: $SMB_CONF"
 }
 
 # Logging functions
@@ -548,6 +804,36 @@ show_completion_message() {
     echo ""
 }
 
+show_repair_completion_message() {
+    # Get server IP
+    SERVER_IP=$(hostname -I | awk '{print $1}')
+
+    echo ""
+    echo -e "${GREEN}================================================================${NC}"
+    echo -e "${GREEN}       Anemone NAS - Repair Complete                           ${NC}"
+    echo -e "${GREEN}================================================================${NC}"
+    echo ""
+    echo -e "  ${BLUE}Your installation has been restored!${NC}"
+    echo ""
+    echo -e "  Open your browser and log in:"
+    echo -e "  ${YELLOW}https://${SERVER_IP}:8443${NC}"
+    echo ""
+    echo -e "  ${YELLOW}Note about SMB passwords:${NC}"
+    echo -e "  Users may need to reset their passwords to restore SMB access."
+    echo -e "  They can do this from their profile page after logging in."
+    echo ""
+    echo -e "  ${BLUE}Useful commands:${NC}"
+    echo -e "    Status:   systemctl status anemone"
+    echo -e "    Logs:     journalctl -u anemone -f"
+    echo -e "    Restart:  sudo systemctl restart anemone"
+    echo ""
+    echo -e "  ${BLUE}Configuration:${NC}"
+    echo -e "    Data directory: $DATA_DIR"
+    echo -e "    Service user:   $SERVICE_USER"
+    echo -e "    Install path:   $INSTALL_DIR"
+    echo ""
+}
+
 # Main installation flow
 main() {
     echo -e "${GREEN}Anemone NAS - Automated Installer${NC}"
@@ -557,35 +843,71 @@ main() {
     check_root
     detect_distro
 
-    log_step "1/8 Installing build tools..."
-    install_gcc
-    install_go
-    install_git
+    # Ask for installation mode
+    ask_install_mode
 
-    log_step "2/8 Installing Samba..."
-    install_samba
+    if [ "$INSTALL_MODE" = "repair" ]; then
+        # Repair mode - fewer steps
+        log_step "1/6 Installing build tools..."
+        install_gcc
+        install_go
+        install_git
 
-    log_step "3/8 Installing storage tools..."
-    install_storage_tools
+        log_step "2/6 Installing Samba..."
+        install_samba
 
-    log_step "4/8 Building Anemone..."
-    build_binary
+        log_step "3/6 Building Anemone..."
+        build_binary
 
-    log_step "5/8 Creating data directory..."
-    create_data_directory
+        log_step "4/6 Repairing installation..."
+        repair_installation
+        regenerate_samba_config
 
-    log_step "6/8 Configuring permissions..."
-    configure_sudoers
-    configure_selinux
+        log_step "5/6 Configuring permissions..."
+        configure_sudoers
+        configure_selinux
+        configure_firewall
 
-    log_step "7/8 Configuring firewall..."
-    configure_firewall
+        log_step "6/6 Starting services..."
+        create_systemd_service
+        enable_services
 
-    log_step "8/8 Starting services..."
-    create_systemd_service
-    enable_services
+        # Reload Samba with new config
+        systemctl reload "$SMB_SERVICE" 2>/dev/null || systemctl restart "$SMB_SERVICE"
 
-    show_completion_message
+        show_repair_completion_message
+    else
+        # New installation mode
+        log_step "1/8 Installing build tools..."
+        install_gcc
+        install_go
+        install_git
+
+        log_step "2/8 Installing Samba..."
+        install_samba
+
+        log_step "3/8 Installing storage tools..."
+        install_storage_tools
+
+        log_step "4/8 Building Anemone..."
+        build_binary
+
+        log_step "5/8 Creating data directory..."
+        create_data_directory
+
+        log_step "6/8 Configuring permissions..."
+        configure_sudoers
+        configure_selinux
+
+        log_step "7/8 Configuring firewall..."
+        configure_firewall
+
+        log_step "8/8 Starting services..."
+        create_systemd_service
+        enable_services
+
+        show_completion_message
+    fi
 }
 
 # Run installation

@@ -1,54 +1,76 @@
 # Anemone - Session State
 
 **Current Version:** v0.9.24-beta
-**Last Updated:** 2026-01-23
+**Last Updated:** 2026-01-24
 
 ---
 
 ## Current Session
 
-**Session 72** - Setup Detection Refactor (.needs-setup)
-- **Status:** In Progress 🔄
-- **Date:** 2026-01-23
+**Session 73** - Repair Mode in install.sh
+- **Status:** Completed ✅
+- **Date:** 2026-01-24
 
 ### Summary
-Refactored setup detection to use a simple `.needs-setup` marker file instead of database flag. Added cleanup script for testing import flow.
+Added repair/reinstall mode to `install.sh` for recovering existing Anemone installations after OS reinstall. Removed the "Import existing installation" option from the web wizard - repair is now handled entirely by the install script.
 
-### Completed (2026-01-23)
-- [x] Created `scripts/cleanup-keep-data.sh` - simulates OS reinstall while preserving data
-- [x] Added `.needs-setup` marker file detection in `IsSetupNeeded()`
-- [x] `LoadState()` activates setup mode when `.needs-setup` exists
-- [x] `Cleanup()` removes both `.setup-state.json` and `.needs-setup`
-- [x] Removed all `setup_completed` references from database
-- [x] `isSetupCompleted()` now checks absence of `.needs-setup` instead of DB
+### Changes
+- [x] Added menu in `install.sh`: New installation / Repair
+- [x] Repair mode reads existing DB, recreates system users, fixes permissions
+- [x] Repair mode regenerates Samba configuration from DB
+- [x] Removed "Import existing installation" option from wizard HTML
+- [x] Removed `.needs-setup` marker file logic (no longer needed)
+- [x] Simplified `isSetupCompleted()` to check DB existence
+- [x] Deleted `scripts/cleanup-keep-data.sh` (obsolete)
+- [x] Cleaned up translations (fr.json, en.json)
 
-### New Setup Logic
+### New Logic
 ```
-.needs-setup exists     → setup wizard needed
-.needs-setup absent     → normal mode (setup completed)
+install.sh → Menu:
+  1) New installation    → wizard
+  2) Repair/Reinstall    → reads DB, recreates users, direct login
+
+Setup needed if:
+  - No database exists
+  - ANEMONE_SETUP_MODE=true
+  - Setup state file active but not finalized
 ```
 
 ### Files Modified
-- `internal/setup/setup.go` - `.needs-setup` detection in IsSetupNeeded() and LoadState()
-- `internal/web/router.go` - isSetupCompleted() uses file instead of DB
-- `internal/web/handlers_setup.go` - removed DB write for setup_completed
-- `internal/setup/restore.go` - removed DB write for setup_completed
-- `internal/setup/finalize.go` - removed setup_completed from config map
-- `scripts/cleanup-keep-data.sh` - new script for testing import flow
+- `install.sh` - Added repair mode with menu, user recreation, Samba regeneration
+- `web/templates/setup_wizard.html` - Removed import_existing option
+- `internal/i18n/locales/fr.json` - Removed import translations
+- `internal/i18n/locales/en.json` - Removed import translations
+- `internal/setup/setup.go` - Removed .needs-setup logic
+- `internal/web/router.go` - isSetupCompleted() checks DB existence
+- `internal/web/handlers_setup.go` - Updated comments
+- `internal/setup/restore.go` - Updated comments
+- `internal/setup/finalize.go` - Updated comments
 
-### Remaining
-- [ ] Test complete import flow on VM
+### Deleted Files
+- `scripts/cleanup-keep-data.sh`
+
+---
+
+## Previous Session
+
+**Session 72** - Setup Detection Refactor (.needs-setup)
+- **Status:** Superseded by Session 73
+- **Date:** 2026-01-23
+
+### Summary
+Attempted to use `.needs-setup` marker file for setup detection. Approach was replaced by repair mode in install.sh.
 
 ---
 
 ## Previous Session
 
 **Session 71** - Import Existing Installation
-- **Status:** Completed ✅
+- **Status:** Superseded by Session 73
 - **Date:** 2026-01-23
 
 ### Summary
-Added a new setup wizard option to import an existing Anemone installation (e.g., after OS reinstall).
+Added wizard option to import existing installation. Replaced by repair mode in install.sh.
 
 ---
 
@@ -67,12 +89,12 @@ Improved the SMART details modal in the storage page with detailed metrics, help
 
 | # | Name | Date | Status |
 |---|------|------|--------|
-| 72 | Setup Detection Refactor (.needs-setup) | 2026-01-23 | In Progress |
-| 71 | Import Existing Installation | 2026-01-23 | Completed |
+| 73 | Repair Mode in install.sh | 2026-01-24 | Completed |
+| 72 | Setup Detection Refactor (.needs-setup) | 2026-01-23 | Superseded |
+| 71 | Import Existing Installation | 2026-01-23 | Superseded |
 | 70 | Enhanced SMART Modal | 2026-01-22 | Completed |
 | 69 | Restore Flow Fixes | 2026-01-21 | Completed |
 | 68 | Persistent Sessions & Documentation | 2026-01-21 | Completed |
-| 67 | Tests VM & Bug Fixes Setup Wizard | 2026-01-21 | Completed |
 
 ---
 
@@ -80,7 +102,7 @@ Improved the SMART details modal in the storage page with detailed metrics, help
 
 - [ ] Test complet sur VM Fedora
 - [ ] Test ZFS new pool
-- [ ] Test import existing installation
+- [ ] Test repair mode (install.sh option 2)
 - [x] Test restauration complète → Fixed login bug
 
 ---

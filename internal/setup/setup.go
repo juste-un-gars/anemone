@@ -84,19 +84,12 @@ func NewManager(dataDir string) *Manager {
 
 // IsSetupNeeded checks if setup is required
 // Setup is needed if:
-// 1. Database doesn't exist (first run)
-// 2. ANEMONE_SETUP_MODE=true environment variable
+// 1. ANEMONE_SETUP_MODE=true environment variable
+// 2. Database doesn't exist (first run)
 // 3. Setup state file exists and is not finalized
-// 4. .needs-setup marker file exists (e.g., after OS reinstall with existing data)
 func IsSetupNeeded(dataDir string) bool {
 	// Check environment variable
 	if os.Getenv("ANEMONE_SETUP_MODE") == "true" {
-		return true
-	}
-
-	// Check for .needs-setup marker file (created by cleanup script or manually)
-	markerPath := filepath.Join(dataDir, ".needs-setup")
-	if _, err := os.Stat(markerPath); err == nil {
 		return true
 	}
 
@@ -184,26 +177,11 @@ func (m *Manager) Cleanup() error {
 	// Remove setup state file
 	statePath := filepath.Join(m.stateDir, ".setup-state.json")
 	os.Remove(statePath) // Ignore error if doesn't exist
-
-	// Remove .needs-setup marker file
-	markerPath := filepath.Join(m.stateDir, ".needs-setup")
-	os.Remove(markerPath) // Ignore error if doesn't exist
-
 	return nil
 }
 
 // LoadState loads the setup state from disk
 func (m *Manager) LoadState() error {
-	// Check for .needs-setup marker file first
-	markerPath := filepath.Join(m.stateDir, ".needs-setup")
-	if _, err := os.Stat(markerPath); err == nil {
-		// Marker exists, activate setup mode
-		m.state.mu.Lock()
-		m.state.Active = true
-		m.state.mu.Unlock()
-		return nil
-	}
-
 	statePath := filepath.Join(m.stateDir, ".setup-state.json")
 	state, err := loadState(statePath)
 	if err != nil {
