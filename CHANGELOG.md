@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0-beta] - 2026-01-24
+
+### Added
+
+#### USB Backup Module
+- **New `internal/usbbackup/` package**: Complete local backup solution for USB drives and external storage
+- **Automatic drive detection**: Detects USB and external drives mounted in `/media/`, `/mnt/`, and removable devices
+- **Encrypted backups**: AES-256-GCM encryption using existing crypto package
+- **Manifest-based incremental sync**: Only transfers new/modified files, removes deleted files
+- **Web UI integration**: Full management interface in admin dashboard
+- **Status tracking**: Real-time progress, files/bytes synced, error reporting
+
+#### Installation Improvements
+- **Repair mode in install.sh**: Option to recover existing Anemone installation after OS reinstall
+- **Import existing installation**: Setup wizard option to import from existing data directory
+- **simulate-reinstall.sh**: Test script for validating repair mode functionality
+
+### Changed
+- **Setup detection refactored**: Uses `.needs-setup` marker file as single source of truth
+- **Samba configuration**: Hide dot files (`.anemone/`, `.trash/`) from SMB shares
+
+### Fixed
+- **Systemd DATA_DIR bug**: Fixed hardcoded path in service file, now uses wizard-configured path
+- **Data directory detection**: Improved auto-detection from `anemone.env` in repair scenarios
+- **Storage options cleanup**: Removed redundant "existing ZFS pool" option from wizard
+
 ## [0.9.17-beta] - 2026-01-18
 
 ### Security
@@ -145,7 +171,9 @@ https://github.com/juste-un-gars/anemone
 
 ---
 
-[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.9.16-beta...HEAD
+[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.10.0-beta...HEAD
+[0.10.0-beta]: https://github.com/juste-un-gars/anemone/releases/tag/v0.10.0-beta
+[0.9.17-beta]: https://github.com/juste-un-gars/anemone/releases/tag/v0.9.17-beta
 [0.9.16-beta]: https://github.com/juste-un-gars/anemone/releases/tag/v0.9.16-beta
 [0.9.15-beta]: https://github.com/juste-un-gars/anemone/releases/tag/v0.9.15-beta
 [0.9.0-beta]: https://github.com/juste-un-gars/anemone/releases/tag/v0.9.0-beta

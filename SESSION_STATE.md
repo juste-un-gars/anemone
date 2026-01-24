@@ -5,7 +5,7 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.9.24-beta
+**Current Version:** v0.10.0-beta
 **Last Updated:** 2026-01-24
 
 ---
