@@ -301,12 +301,10 @@ EOF
 
     # Get all shares from database and add them
     sqlite3 "$DB_PATH" "SELECT s.name, s.path, u.username FROM shares s JOIN users u ON s.user_id = u.id WHERE u.activated_at IS NOT NULL;" 2>/dev/null | while IFS='|' read -r name path username; do
-        # Update path if shares_dir changed
-        actual_path="$SHARES_DIR/$username/$name"
-
+        # Use the path directly from the database
         cat >> "$SMB_CONF" <<EOF
 [$name]
-path = $actual_path
+path = $path
 valid users = $username
 read only = no
 browseable = yes
@@ -316,7 +314,7 @@ force user = $username
 force group = $username
 
 EOF
-        log_info "Added share: $name -> $actual_path"
+        log_info "Added share: $name -> $path"
     done
 
     # Copy to /etc/samba/smb.conf

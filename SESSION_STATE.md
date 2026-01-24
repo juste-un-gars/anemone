@@ -8,11 +8,15 @@
 ## Current Session
 
 **Session 73** - Repair Mode in install.sh
-- **Status:** Completed ✅
+- **Status:** In Progress 🔄
 - **Date:** 2026-01-24
 
 ### Summary
 Added repair/reinstall mode to `install.sh` for recovering existing Anemone installations after OS reinstall. Removed the "Import existing installation" option from the web wizard - repair is now handled entirely by the install script.
+
+### Known Issue (to fix)
+- SMB access denied after repair - fixed path generation bug (was reconstructing path instead of using DB path)
+- Users need to reset password via web interface after repair to restore SMB access
 
 ### Changes
 - [x] Added menu in `install.sh`: New installation / Repair
