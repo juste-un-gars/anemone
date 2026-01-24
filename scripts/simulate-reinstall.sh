@@ -16,8 +16,43 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
-# Configuration
-DATA_DIR="${ANEMONE_DATA_DIR:-/srv/anemone}"
+# Detect data directory
+detect_data_dir() {
+    # 1. Environment variable (explicit)
+    if [[ -n "$ANEMONE_DATA_DIR" ]]; then
+        echo "$ANEMONE_DATA_DIR"
+        return
+    fi
+
+    # 2. Read from systemd service (production)
+    if [[ -f /etc/systemd/system/anemone.service ]]; then
+        local dir=$(grep -oP 'ANEMONE_DATA_DIR=\K[^\s"]+' /etc/systemd/system/anemone.service 2>/dev/null)
+        if [[ -n "$dir" ]]; then
+            echo "$dir"
+            return
+        fi
+    fi
+
+    # 3. Not found
+    echo ""
+}
+
+DATA_DIR=$(detect_data_dir)
+
+# Check if data directory was found
+if [[ -z "$DATA_DIR" ]]; then
+    echo -e "${RED}Error: Could not determine data directory.${NC}"
+    echo ""
+    echo "Specify it with:"
+    echo "  sudo ANEMONE_DATA_DIR=/srv/anemone $0"
+    exit 1
+fi
+
+# Verify database exists
+if [[ ! -f "$DATA_DIR/db/anemone.db" ]]; then
+    echo -e "${RED}Error: Database not found: ${DATA_DIR}/db/anemone.db${NC}"
+    exit 1
+fi
 
 echo -e "${YELLOW}========================================${NC}"
 echo -e "${YELLOW}  Anemone - Simulate OS Reinstall${NC}"
@@ -43,19 +78,9 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-# Check if data directory exists
-if [[ ! -d "$DATA_DIR" ]]; then
-    echo -e "${RED}Error: Data directory not found: ${DATA_DIR}${NC}"
-    echo "Nothing to preserve. Use a fresh install instead."
-    exit 1
-fi
-
-# Check if database exists
-if [[ ! -f "$DATA_DIR/db/anemone.db" ]]; then
-    echo -e "${RED}Error: Database not found: ${DATA_DIR}/db/anemone.db${NC}"
-    echo "Nothing to restore from. Use a fresh install instead."
-    exit 1
-fi
+# Show detected path
+echo -e "Detected data directory: ${GREEN}${DATA_DIR}${NC}"
+echo ""
 
 # Confirmation
 echo -e "${YELLOW}Are you sure you want to continue? [y/N]${NC}"
