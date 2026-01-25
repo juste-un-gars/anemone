@@ -5,7 +5,7 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.11.0-beta
+**Current Version:** v0.11.3-beta
 **Last Updated:** 2026-01-25
 
 ---
@@ -13,6 +13,37 @@
 ## Current Session
 
 **No active session** - Ready for new work
+
+---
+
+## Release v0.11.3-beta (2026-01-25) ✅
+
+### Mount After Formatting
+- Option to automatically mount disk after formatting
+- Customizable mount path (default: /mnt/{diskname})
+- Checkbox enabled by default in format dialog
+
+### Eject Disk Button
+- New eject button in USB Backup page
+- Safely unmounts and ejects USB drives
+
+### Installer Improvements
+- `install.sh` now installs `dosfstools` (FAT32) and `exfatprogs` (exFAT)
+- Added sudoers permissions for: mount, umount, eject, mkfs.vfat, mkfs.exfat
+
+---
+
+## Release v0.11.2-beta (2026-01-25) ✅
+
+- Consolidated disk formatting in Storage section (ext4, XFS, exFAT, FAT32)
+- USB Backup section now links to Storage for formatting
+
+---
+
+## Release v0.11.1-beta (2026-01-25) ✅
+
+- Fixed SQLite database locking (added WAL mode + busy_timeout)
+- Fixed auto-update script failing on existing git tags
 
 ---
 
