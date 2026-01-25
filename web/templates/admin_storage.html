@@ -577,6 +577,15 @@
                     <label class="block text-sm font-medium text-gray-700">{{T .Lang "storage.label"}}</label>
                     <input type="text" id="formatLabel" maxlength="12" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md">
                 </div>
+                <div class="border-t pt-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="formatMount" checked class="h-4 w-4 text-indigo-600 border-gray-300 rounded" onchange="toggleMountPath()">
+                        <span class="ml-2 text-sm text-gray-700">{{T .Lang "storage.mount_after_format"}}</span>
+                    </label>
+                    <div id="mountPathContainer" class="mt-2">
+                        <input type="text" id="formatMountPath" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono" placeholder="/mnt/sda">
+                    </div>
+                </div>
             </div>
             <div class="mt-6 flex justify-end space-x-3">
                 <button type="button" onclick="closeFormatDiskModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">{{T .Lang "common.cancel"}}</button>
@@ -1120,22 +1129,33 @@ function rollbackSnapshot(name) {
 function showFormatDiskModal(device) {
     document.getElementById('formatDiskDevice').value = device;
     document.getElementById('formatDiskDeviceDisplay').textContent = device;
+    // Set default mount path based on device name (e.g., /dev/sda -> /mnt/sda)
+    const diskName = device.replace('/dev/', '');
+    document.getElementById('formatMountPath').value = '/mnt/' + diskName;
+    document.getElementById('formatMount').checked = true;
+    document.getElementById('mountPathContainer').style.display = 'block';
     document.getElementById('formatDiskModal').classList.remove('hidden');
 }
 function closeFormatDiskModal() { document.getElementById('formatDiskModal').classList.add('hidden'); }
+function toggleMountPath() {
+    const checked = document.getElementById('formatMount').checked;
+    document.getElementById('mountPathContainer').style.display = checked ? 'block' : 'none';
+}
 
 async function formatDisk(e) {
     e.preventDefault();
     const device = document.getElementById('formatDiskDevice').value;
     const filesystem = document.getElementById('formatFilesystem').value;
     const label = document.getElementById('formatLabel').value;
+    const mount = document.getElementById('formatMount').checked;
+    const mountPath = mount ? document.getElementById('formatMountPath').value : '';
     closeFormatDiskModal();
     requirePassword('{{T .Lang "storage.format_disk"}}: ' + device, '{{T .Lang "storage.format_disk_warning"}}', async () => {
         try {
             const resp = await fetch('/api/admin/storage/disk/format', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
-                body: JSON.stringify({device, filesystem, label, force: true})
+                body: JSON.stringify({device, filesystem, label, force: true, mount, mount_path: mountPath})
             });
             const data = await resp.json();
             if (data.success) { alert('{{T .Lang "storage.disk_formatted"}}'); closeFormatDiskModal(); location.reload(); }

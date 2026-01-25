@@ -11,10 +11,12 @@ import (
 
 // FormatOptions contains options for formatting a disk
 type FormatOptions struct {
-	Device     string `json:"device"`     // Device path (e.g., /dev/sdb)
-	Filesystem string `json:"filesystem"` // ext4, xfs
-	Label      string `json:"label"`      // Volume label (optional)
-	Force      bool   `json:"force"`      // Force format even if device has data
+	Device     string `json:"device"`      // Device path (e.g., /dev/sdb)
+	Filesystem string `json:"filesystem"`  // ext4, xfs, fat32, exfat
+	Label      string `json:"label"`       // Volume label (optional)
+	Force      bool   `json:"force"`       // Force format even if device has data
+	Mount      bool   `json:"mount"`       // Mount after formatting
+	MountPath  string `json:"mount_path"`  // Mount point (e.g., /mnt/sda)
 }
 
 // WipeOptions contains options for wiping a disk
@@ -491,4 +493,87 @@ func GetDiskInfo(device string) (*Disk, error) {
 	}
 
 	return disk, nil
+}
+
+// UnmountDisk unmounts a disk and optionally ejects it
+func UnmountDisk(mountPath string, eject bool) error {
+	// Validate mount path
+	if mountPath == "" {
+		return fmt.Errorf("mount path cannot be empty")
+	}
+	if !strings.HasPrefix(mountPath, "/") {
+		return fmt.Errorf("mount path must be absolute")
+	}
+	// Prevent path traversal
+	if strings.Contains(mountPath, "..") {
+		return fmt.Errorf("invalid mount path")
+	}
+
+	// Find the device for this mount point
+	var device string
+	if eject {
+		cmd := exec.Command("findmnt", "-n", "-o", "SOURCE", mountPath)
+		output, err := cmd.Output()
+		if err == nil {
+			device = strings.TrimSpace(string(output))
+			// Remove partition number to get base device (e.g., /dev/sda1 -> /dev/sda)
+			if matched, _ := regexp.MatchString(`^/dev/[a-z]+[0-9]+$`, device); matched {
+				device = regexp.MustCompile(`[0-9]+$`).ReplaceAllString(device, "")
+			}
+		}
+	}
+
+	// Unmount the disk
+	cmd := exec.Command("sudo", "umount", mountPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to unmount disk: %s - %w", strings.TrimSpace(string(output)), err)
+	}
+
+	// Eject the disk if requested
+	if eject && device != "" {
+		cmd = exec.Command("sudo", "eject", device)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			// Eject failure is not critical, just log it
+			return fmt.Errorf("unmounted but failed to eject: %s", strings.TrimSpace(string(output)))
+		}
+	}
+
+	return nil
+}
+
+// MountDisk mounts a disk at the specified mount point
+func MountDisk(device, mountPath string) error {
+	if err := ValidateDevicePath(device); err != nil {
+		return err
+	}
+
+	// Validate mount path
+	if mountPath == "" {
+		return fmt.Errorf("mount path cannot be empty")
+	}
+	if !strings.HasPrefix(mountPath, "/") {
+		return fmt.Errorf("mount path must be absolute")
+	}
+	// Security: only allow mounting under /mnt/ or /media/
+	if !strings.HasPrefix(mountPath, "/mnt/") && !strings.HasPrefix(mountPath, "/media/") {
+		return fmt.Errorf("mount path must be under /mnt/ or /media/")
+	}
+	// Prevent path traversal
+	if strings.Contains(mountPath, "..") {
+		return fmt.Errorf("invalid mount path")
+	}
+
+	// Create mount point directory
+	cmd := exec.Command("sudo", "mkdir", "-p", mountPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to create mount point: %s - %w", strings.TrimSpace(string(output)), err)
+	}
+
+	// Mount the disk
+	cmd = exec.Command("sudo", "mount", device, mountPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to mount disk: %s - %w", strings.TrimSpace(string(output)), err)
+	}
+
+	return nil
 }

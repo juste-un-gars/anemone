@@ -539,6 +539,25 @@ install_storage_tools() {
         fi
     fi
 
+    # Filesystem tools for USB formatting (FAT32, exFAT)
+    if ! command -v mkfs.vfat &> /dev/null; then
+        log_info "Installing FAT32 tools (dosfstools)..."
+        if [ "$PKG_MANAGER" = "dnf" ]; then
+            dnf install -y dosfstools
+        elif [ "$PKG_MANAGER" = "apt" ]; then
+            apt install -y dosfstools
+        fi
+    fi
+
+    if ! command -v mkfs.exfat &> /dev/null; then
+        log_info "Installing exFAT tools (exfatprogs)..."
+        if [ "$PKG_MANAGER" = "dnf" ]; then
+            dnf install -y exfatprogs
+        elif [ "$PKG_MANAGER" = "apt" ]; then
+            apt install -y exfatprogs
+        fi
+    fi
+
     log_info "Storage tools ready"
 }
 
@@ -642,11 +661,16 @@ $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/zpool *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/zfs *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/zfs *
 
-# Disk formatting (for setup wizard)
+# Disk formatting (for setup wizard and storage management)
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/mkfs.ext4 *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/mkfs.ext4 *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/mkfs.xfs *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/mkfs.xfs *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/mkfs.vfat *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/mkfs.vfat *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/mkfs.exfat *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/mkfs.exfat *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mkfs.exfat *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/wipefs *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/wipefs *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/parted *
@@ -655,6 +679,28 @@ $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/partprobe *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/partprobe *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /sbin/blockdev *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/blockdev *
+
+# Disk mounting (restricted to /mnt/ and /media/)
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mount /dev/sd* /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mount /dev/sd* /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mount /dev/nvme* /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mount /dev/nvme* /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mount /dev/sd* /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mount /dev/sd* /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mount /dev/nvme* /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mount /dev/nvme* /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/umount /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/umount /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/umount /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/umount /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/eject /dev/sd*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/eject /dev/nvme*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/eject /dev/sd*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/eject /dev/nvme*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mkdir -p /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mkdir -p /media/*
 
 # Disk wiping (zero only, restricted to device paths)
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/sd* bs=1M count=1 *

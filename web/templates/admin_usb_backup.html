@@ -207,6 +207,11 @@
                             <button type="submit" class="px-4 py-2 text-sm font-medium text-white anemone-gradient rounded-md hover:opacity-90">
                                 {{T $.Lang "usb_backup.add"}}
                             </button>
+                            <button type="button" onclick="ejectDisk('{{.MountPath}}')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200" title="{{T $.Lang "usb_backup.eject"}}">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                 </form>
@@ -246,5 +251,28 @@
         </div>
     </div>
 </div>
+
+<script>
+async function ejectDisk(mountPath) {
+    if (!confirm('{{T .Lang "usb_backup.eject_confirm"}}')) return;
+
+    try {
+        const resp = await fetch('/api/admin/storage/disk/unmount', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({mount_path: mountPath, eject: true})
+        });
+        const data = await resp.json();
+        if (data.success) {
+            alert('{{T .Lang "usb_backup.ejected"}}');
+            location.reload();
+        } else {
+            alert('{{T .Lang "common.error"}}: ' + data.error);
+        }
+    } catch (err) {
+        alert('{{T .Lang "common.error"}}: ' + err);
+    }
+}
+</script>
 </body>
 </html>

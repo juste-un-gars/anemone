@@ -727,6 +727,7 @@
   "storage.label": "Étiquette",
   "storage.format_disk_warning": "⚠️ ATTENTION : Toutes les données sur ce disque seront PERDUES. Cette action est IRRÉVERSIBLE !",
   "storage.disk_formatted": "Disque formaté avec succès",
+  "storage.mount_after_format": "Monter après formatage",
   "storage.confirm_action": "Confirmer l'action",
   "storage.confirm": "Confirmer",
 
@@ -901,6 +902,9 @@
   "usb_backup.last_status": "Dernier statut",
   "usb_backup.files_synced": "Fichiers synchronisés",
   "usb_backup.bytes_synced": "Données transférées",
+  "usb_backup.eject": "Éjecter",
+  "usb_backup.eject_confirm": "Voulez-vous éjecter ce disque ? Assurez-vous qu'aucune opération n'est en cours.",
+  "usb_backup.ejected": "Disque éjecté avec succès. Vous pouvez le débrancher.",
 
   "usb_format.title": "Formater un disque",
   "usb_format.description": "Disques non montés détectés. Formatez-les pour les utiliser avec Anemone.",

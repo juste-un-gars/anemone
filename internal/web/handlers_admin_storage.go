@@ -966,10 +966,67 @@ func (s *Server) handleAdminStorageDiskFormat(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Mount the disk if requested
+	var mountError string
+	if req.Mount && req.MountPath != "" {
+		if err := storage.MountDisk(req.Device, req.MountPath); err != nil {
+			log.Printf("Warning: Failed to mount disk %s at %s: %v", req.Device, req.MountPath, err)
+			mountError = err.Error()
+		} else {
+			log.Printf("Mounted disk %s at %s", req.Device, req.MountPath)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	response := map[string]interface{}{
+		"success":    true,
+		"device":     req.Device,
+		"mounted":    req.Mount && mountError == "",
+		"mount_path": req.MountPath,
+	}
+	if mountError != "" {
+		response["mount_error"] = mountError
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+// handleAdminStorageDiskUnmount unmounts and optionally ejects a disk
+func (s *Server) handleAdminStorageDiskUnmount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		MountPath string `json:"mount_path"`
+		Eject     bool   `json:"eject"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request"})
+		return
+	}
+
+	if err := storage.UnmountDisk(req.MountPath, req.Eject); err != nil {
+		log.Printf("Error unmounting disk at %s: %v", req.MountPath, err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	action := "unmounted"
+	if req.Eject {
+		action = "ejected"
+	}
+	log.Printf("Disk %s at %s", action, req.MountPath)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"device":  req.Device,
+		"success":    true,
+		"mount_path": req.MountPath,
+		"ejected":    req.Eject,
 	})
 }
 

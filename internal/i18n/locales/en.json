@@ -727,6 +727,7 @@
   "storage.label": "Label",
   "storage.format_disk_warning": "⚠️ WARNING: All data on this disk will be LOST. This action is IRREVERSIBLE!",
   "storage.disk_formatted": "Disk formatted successfully",
+  "storage.mount_after_format": "Mount after formatting",
   "storage.confirm_action": "Confirm Action",
   "storage.confirm": "Confirm",
 
@@ -901,6 +902,9 @@
   "usb_backup.last_status": "Last status",
   "usb_backup.files_synced": "Files synced",
   "usb_backup.bytes_synced": "Data transferred",
+  "usb_backup.eject": "Eject",
+  "usb_backup.eject_confirm": "Do you want to eject this disk? Make sure no operation is in progress.",
+  "usb_backup.ejected": "Disk ejected successfully. You can safely unplug it.",
 
   "usb_format.title": "Format a disk",
   "usb_format.description": "Unmounted disks detected. Format them to use with Anemone.",

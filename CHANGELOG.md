@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.3-beta] - 2026-01-25
+
+### Added
+- **Mount after formatting**: Option to automatically mount disk after formatting with customizable mount path (default: /mnt/{diskname})
+- **Eject disk button**: New eject button in USB Backup to safely unmount and eject USB drives
+- **FAT32/exFAT tools in installer**: `install.sh` now installs `dosfstools` and `exfatprogs` automatically
+
+### Fixed
+- **Missing sudoers permissions**: Added mount, umount, eject, mkdir, mkfs.vfat, mkfs.exfat to sudoers configuration
+
 ## [0.11.2-beta] - 2026-01-25
 
 ### Changed
