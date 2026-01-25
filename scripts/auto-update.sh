@@ -59,8 +59,8 @@ fi
 log "Step 3/6: Fetching tags and checking out version v$TARGET_VERSION..."
 cd "$PROJECT_DIR"
 
-# Fetch all tags from GitHub
-if ! git fetch --tags >> "$LOG_FILE" 2>&1; then
+# Fetch all tags from GitHub (--force to allow updating existing tags)
+if ! git fetch --tags --force >> "$LOG_FILE" 2>&1; then
     log_error "Failed to fetch tags from GitHub"
     log "Update failed. Binaries not modified."
     exit 1

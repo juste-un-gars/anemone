@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1-beta] - 2026-01-25
+
+### Fixed
+- **Database locking causing slow page loads**: Added SQLite WAL mode and busy_timeout (5s) for better concurrency
+- **Auto-update failing on existing tags**: Added `--force` flag to `git fetch --tags` to allow updating existing tags
+
 ## [0.11.0-beta] - 2026-01-25
 
 ### Added
