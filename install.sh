@@ -713,6 +713,10 @@ $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/chown *\:* /mnt/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/chown *\:* /media/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/chown *\:* /mnt/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/chown *\:* /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/rmdir /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/rmdir /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/rmdir /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/rmdir /media/*
 
 # Disk wiping (zero only, restricted to device paths)
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/sd* bs=1M count=1 *

@@ -4,6 +4,7 @@ package storage
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"regexp"
@@ -528,6 +529,17 @@ func UnmountDisk(mountPath string, eject bool) error {
 	cmd := exec.Command("sudo", "umount", mountPath)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to unmount disk: %s - %w", strings.TrimSpace(string(output)), err)
+	}
+
+	// Remove the mount point directory if it's empty
+	// Only attempt to remove if it's in /mnt or /media (safe locations)
+	// Use sudo rmdir because the directory was created with sudo mkdir
+	if strings.HasPrefix(mountPath, "/mnt/") || strings.HasPrefix(mountPath, "/media/") {
+		cmd = exec.Command("sudo", "rmdir", mountPath)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			// Not critical if removal fails (directory might not be empty)
+			log.Printf("Note: Could not remove mount point directory %s: %v - %s", mountPath, err, strings.TrimSpace(string(output)))
+		}
 	}
 
 	// Eject the disk if requested
