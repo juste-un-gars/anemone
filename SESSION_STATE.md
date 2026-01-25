@@ -5,7 +5,7 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.11.3-beta
+**Current Version:** v0.11.4-beta
 **Last Updated:** 2026-01-25
 
 ---
@@ -13,6 +13,21 @@
 ## Current Session
 
 **No active session** - Ready for new work
+
+---
+
+## Release v0.11.4-beta (2026-01-25) ✅
+
+### Disk Mount Status & Permissions
+- New "Status" column showing mount point with green icon
+- Unmount/Eject buttons for mounted disks in Storage page
+- FAT32/exFAT now mounted with correct user permissions (uid/gid)
+- ext4/XFS ownership set via chown after mounting
+
+### Security & Validation
+- Frontend validation for mount path (/mnt/ or /media/ only)
+- Added auth check on unmount endpoint
+- Updated sudoers for mount -o and chown
 
 ---
 

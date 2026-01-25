@@ -163,6 +163,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.model"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.size"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.type"}}</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.status"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.health"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.temp"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.power_on"}}</th>
@@ -182,6 +183,16 @@
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{if eq .Type "NVMe"}}bg-purple-100 text-purple-800{{else if eq .Type "SSD"}}bg-blue-100 text-blue-800{{else}}bg-gray-100 text-gray-800{{end}}">{{.Type}}</span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
+                                    {{if .Mountpoint}}
+                                    <div class="flex items-center text-sm">
+                                        <svg class="h-4 w-4 text-green-500 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                        <span class="text-green-700 font-mono text-xs">{{.Mountpoint}}</span>
+                                    </div>
+                                    {{else}}
+                                    <span class="text-gray-400 text-sm">-</span>
+                                    {{end}}
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{if eq .Health "OK"}}bg-green-100 text-green-800{{else if eq .Health "WARNING"}}bg-yellow-100 text-yellow-800{{else if eq .Health "CRITICAL"}}bg-red-100 text-red-800{{else}}bg-gray-100 text-gray-800{{end}}">{{.Health}}</span>
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -190,7 +201,16 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{if ge .PowerOnHours 0}}{{.PowerOnHours}}h{{else}}-{{end}}</td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm">
                                     <button onclick="showSMARTDetails('{{.Name}}')" class="text-indigo-600 hover:text-indigo-900 mr-2">SMART</button>
+                                    {{if .Mountpoint}}
+                                    <button onclick="unmountDisk('{{.Mountpoint}}')" class="text-orange-600 hover:text-orange-900 mr-2" title="{{T $.Lang "storage.unmount"}}">
+                                        <svg class="h-5 w-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                                    </button>
+                                    <button onclick="ejectDisk('{{.Mountpoint}}')" class="text-gray-600 hover:text-gray-900" title="{{T $.Lang "storage.eject"}}">
+                                        <svg class="h-5 w-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                                    </button>
+                                    {{else}}
                                     <button onclick="showFormatDiskModal('{{.Path}}')" class="text-red-600 hover:text-red-900">{{T $.Lang "storage.format"}}</button>
+                                    {{end}}
                                 </td>
                             </tr>
                             {{end}}
@@ -1149,6 +1169,15 @@ async function formatDisk(e) {
     const label = document.getElementById('formatLabel').value;
     const mount = document.getElementById('formatMount').checked;
     const mountPath = mount ? document.getElementById('formatMountPath').value : '';
+
+    // Validate mount path if mounting is requested
+    if (mount && mountPath) {
+        if (!mountPath.startsWith('/mnt/') && !mountPath.startsWith('/media/')) {
+            alert('{{T .Lang "storage.mount_path_error"}}');
+            return;
+        }
+    }
+
     closeFormatDiskModal();
     requirePassword('{{T .Lang "storage.format_disk"}}: ' + device, '{{T .Lang "storage.format_disk_warning"}}', async () => {
         try {
@@ -1162,6 +1191,36 @@ async function formatDisk(e) {
             else alert('{{T .Lang "common.error"}}: ' + data.error);
         } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
     });
+}
+
+// Unmount disk
+async function unmountDisk(mountPath) {
+    if (!confirm('{{T .Lang "storage.unmount_confirm"}}: ' + mountPath + '?')) return;
+    try {
+        const resp = await fetch('/api/admin/storage/disk/unmount', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({mount_path: mountPath, eject: false})
+        });
+        const data = await resp.json();
+        if (data.success) { alert('{{T .Lang "storage.disk_unmounted"}}'); location.reload(); }
+        else alert('{{T .Lang "common.error"}}: ' + data.error);
+    } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
+}
+
+// Eject disk (unmount + eject)
+async function ejectDisk(mountPath) {
+    if (!confirm('{{T .Lang "storage.eject_confirm"}}: ' + mountPath + '?')) return;
+    try {
+        const resp = await fetch('/api/admin/storage/disk/unmount', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({mount_path: mountPath, eject: true})
+        });
+        const data = await resp.json();
+        if (data.success) { alert('{{T .Lang "storage.disk_ejected"}}'); location.reload(); }
+        else alert('{{T .Lang "common.error"}}: ' + data.error);
+    } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
 }
 
 // Close modals on escape

@@ -4,6 +4,7 @@ package storage
 import (
 	"bufio"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -569,10 +570,37 @@ func MountDisk(device, mountPath string) error {
 		return fmt.Errorf("failed to create mount point: %s - %w", strings.TrimSpace(string(output)), err)
 	}
 
-	// Mount the disk
-	cmd = exec.Command("sudo", "mount", device, mountPath)
-	if output, err := cmd.CombinedOutput(); err != nil {
+	// Detect filesystem type
+	cmd = exec.Command("lsblk", "-no", "FSTYPE", device)
+	fsOutput, _ := cmd.Output()
+	fsType := strings.TrimSpace(string(fsOutput))
+
+	// Get current user's UID and GID for mount options
+	uid := fmt.Sprintf("%d", os.Getuid())
+	gid := fmt.Sprintf("%d", os.Getgid())
+
+	// Mount the disk with appropriate options based on filesystem
+	var mountCmd *exec.Cmd
+	switch fsType {
+	case "vfat", "exfat":
+		// FAT filesystems need uid/gid options at mount time
+		mountCmd = exec.Command("sudo", "mount", "-o", fmt.Sprintf("uid=%s,gid=%s", uid, gid), device, mountPath)
+	default:
+		// For ext4, xfs, etc. - mount normally
+		mountCmd = exec.Command("sudo", "mount", device, mountPath)
+	}
+
+	if output, err := mountCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to mount disk: %s - %w", strings.TrimSpace(string(output)), err)
+	}
+
+	// For native Linux filesystems (ext4, xfs), change ownership after mounting
+	if fsType != "vfat" && fsType != "exfat" && fsType != "" {
+		cmd = exec.Command("sudo", "chown", fmt.Sprintf("%s:%s", uid, gid), mountPath)
+		if output, err := cmd.CombinedOutput(); err != nil {
+			// Non-fatal, just log warning
+			return fmt.Errorf("mounted but failed to set ownership: %s - %w", strings.TrimSpace(string(output)), err)
+		}
 	}
 
 	return nil

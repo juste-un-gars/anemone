@@ -43,6 +43,8 @@ type Disk struct {
 	Health      HealthStatus `json:"health"`      // SMART health status
 	Temperature int          `json:"temperature"` // Temperature in Celsius (-1 if unknown)
 	PowerOnHours int         `json:"power_on_hours"` // Hours powered on (-1 if unknown)
+	Filesystem  string       `json:"filesystem"`  // Filesystem type if formatted directly (no partitions)
+	Mountpoint  string       `json:"mountpoint"`  // Mount point if mounted directly (no partitions)
 	Partitions  []Partition  `json:"partitions"`  // List of partitions
 	SMARTData   *SMARTInfo   `json:"smart_data"`  // Detailed SMART info (optional)
 }

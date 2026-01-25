@@ -111,6 +111,8 @@ func ListDisks() ([]Disk, error) {
 			Health:       HealthUnknown, // Will be updated by SMART
 			Temperature:  -1,
 			PowerOnHours: -1,
+			Filesystem:   dev.Fstype,     // Filesystem if formatted without partitions
+			Mountpoint:   dev.Mountpoint, // Mount point if mounted directly
 		}
 
 		// Determine disk type

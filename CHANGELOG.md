@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.4-beta] - 2026-01-25
+
+### Added
+- **Disk mount status display**: New "Status" column in Physical Disks table showing mount point with green icon
+- **Unmount/Eject buttons**: Buttons to unmount or eject mounted disks directly from Storage page
+- **Frontend mount path validation**: Validates mount path starts with /mnt/ or /media/ before submission
+
+### Fixed
+- **USB disk permissions after mount**: FAT32/exFAT disks now mounted with correct user ownership (uid/gid options)
+- **ext4/XFS disk permissions**: Ownership set via chown after mounting
+- **Missing auth check on unmount endpoint**: Added session verification to disk unmount handler
+- **Missing sudoers for mount options**: Added `mount -o *` and `chown` permissions to sudoers
+
 ## [0.11.3-beta] - 2026-01-25
 
 ### Added

@@ -992,6 +992,12 @@ func (s *Server) handleAdminStorageDiskFormat(w http.ResponseWriter, r *http.Req
 
 // handleAdminStorageDiskUnmount unmounts and optionally ejects a disk
 func (s *Server) handleAdminStorageDiskUnmount(w http.ResponseWriter, r *http.Request) {
+	_, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return

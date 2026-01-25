@@ -685,10 +685,18 @@ $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mount /dev/sd* /mnt/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mount /dev/sd* /media/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mount /dev/nvme* /mnt/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mount /dev/nvme* /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mount -o * /dev/sd* /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mount -o * /dev/sd* /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mount -o * /dev/nvme* /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mount -o * /dev/nvme* /media/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mount /dev/sd* /mnt/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mount /dev/sd* /media/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mount /dev/nvme* /mnt/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mount /dev/nvme* /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mount -o * /dev/sd* /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mount -o * /dev/sd* /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mount -o * /dev/nvme* /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mount -o * /dev/nvme* /media/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/umount /mnt/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/umount /media/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/umount /mnt/*
@@ -701,6 +709,10 @@ $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p /mnt/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p /media/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mkdir -p /mnt/*
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/mkdir -p /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/chown *\:* /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/chown *\:* /media/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/chown *\:* /mnt/*
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/chown *\:* /media/*
 
 # Disk wiping (zero only, restricted to device paths)
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/dd if=/dev/zero of=/dev/sd* bs=1M count=1 *
