@@ -16,6 +16,14 @@
 
 ---
 
+## Hotfix v0.11.5-beta (2026-01-25)
+
+- Fixed: Version number in code was still `0.11.4-beta` instead of `0.11.5-beta`
+- Fixed: GitHub release was in Draft mode, not published
+- Fixed: Git tag pointed to wrong commit
+
+---
+
 ## Release v0.11.5-beta (2026-01-25) ✅
 
 ### Mount Disk Feature
