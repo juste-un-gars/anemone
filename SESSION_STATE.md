@@ -16,9 +16,9 @@
 
 ---
 
-## Release v0.11.0-beta (2026-01-25)
+## Release v0.11.0-beta (2026-01-25) ✅
 
-Session 76 merged and released. Features:
+Session 76 merged, released and pushed to GitHub. Features:
 
 ### USB Disk Formatting (Session 76)
 - Format USB drives directly from web UI
