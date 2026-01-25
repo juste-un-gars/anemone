@@ -282,6 +282,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// Admin routes - Disk management
 	mux.HandleFunc("/api/admin/storage/disks/available", auth.RequireAdmin(server.handleAdminStorageDisksAvailable))
 	mux.HandleFunc("/api/admin/storage/disk/format", auth.RequireAdmin(server.handleAdminStorageDiskFormat))
+	mux.HandleFunc("/api/admin/storage/disk/mount", auth.RequireAdmin(server.handleAdminStorageDiskMount))
 	mux.HandleFunc("/api/admin/storage/disk/unmount", auth.RequireAdmin(server.handleAdminStorageDiskUnmount))
 	mux.HandleFunc("/api/admin/storage/disk/wipe", auth.RequireAdmin(server.handleAdminStorageDiskWipe))
 

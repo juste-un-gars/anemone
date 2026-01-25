@@ -163,6 +163,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.model"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.size"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.type"}}</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.filesystem"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.status"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.health"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.temp"}}</th>
@@ -181,6 +182,9 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{.SizeHuman}}</td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{if eq .Type "NVMe"}}bg-purple-100 text-purple-800{{else if eq .Type "SSD"}}bg-blue-100 text-blue-800{{else}}bg-gray-100 text-gray-800{{end}}">{{.Type}}</span>
+                                </td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                    {{if .Filesystem}}<span class="font-mono">{{.Filesystem}}</span>{{else}}-{{end}}
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     {{if .Mountpoint}}
@@ -208,6 +212,9 @@
                                     <button onclick="ejectDisk('{{.Mountpoint}}')" class="text-gray-600 hover:text-gray-900" title="{{T $.Lang "storage.eject"}}">
                                         <svg class="h-5 w-5 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
                                     </button>
+                                    {{else if .Filesystem}}
+                                    <button onclick="showMountDiskModal('{{.Path}}', '{{.Name}}')" class="text-green-600 hover:text-green-900 mr-2">{{T $.Lang "storage.mount"}}</button>
+                                    <button onclick="showFormatDiskModal('{{.Path}}')" class="text-red-600 hover:text-red-900">{{T $.Lang "storage.format"}}</button>
                                     {{else}}
                                     <button onclick="showFormatDiskModal('{{.Path}}')" class="text-red-600 hover:text-red-900">{{T $.Lang "storage.format"}}</button>
                                     {{end}}
@@ -610,6 +617,36 @@
             <div class="mt-6 flex justify-end space-x-3">
                 <button type="button" onclick="closeFormatDiskModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">{{T .Lang "common.cancel"}}</button>
                 <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">{{T .Lang "storage.format"}}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Mount Disk Modal -->
+<div id="mountDiskModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-medium text-gray-900">{{T .Lang "storage.mount_disk"}}</h3>
+            <button onclick="closeMountDiskModal()" class="text-gray-400 hover:text-gray-600">
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <form id="mountDiskForm" onsubmit="mountDisk(event)">
+            <input type="hidden" id="mountDiskDevice">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">{{T .Lang "storage.device"}}</label>
+                    <p id="mountDiskDeviceDisplay" class="mt-1 font-mono text-sm bg-gray-100 px-3 py-2 rounded"></p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">{{T .Lang "storage.mount_path"}}</label>
+                    <input type="text" id="mountDiskPath" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono" placeholder="/mnt/sda">
+                    <p class="mt-1 text-xs text-gray-500">{{T .Lang "storage.mount_path_hint"}}</p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button type="button" onclick="closeMountDiskModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">{{T .Lang "common.cancel"}}</button>
+                <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700">{{T .Lang "storage.mount"}}</button>
             </div>
         </form>
     </div>
@@ -1193,6 +1230,45 @@ async function formatDisk(e) {
     });
 }
 
+// Mount disk operations
+function showMountDiskModal(device, diskName) {
+    document.getElementById('mountDiskDevice').value = device;
+    document.getElementById('mountDiskDeviceDisplay').textContent = device;
+    document.getElementById('mountDiskPath').value = '/mnt/' + diskName;
+    document.getElementById('mountDiskModal').classList.remove('hidden');
+}
+function closeMountDiskModal() { document.getElementById('mountDiskModal').classList.add('hidden'); }
+
+async function mountDisk(e) {
+    e.preventDefault();
+    const device = document.getElementById('mountDiskDevice').value;
+    const mountPath = document.getElementById('mountDiskPath').value;
+
+    // Validate mount path
+    if (!mountPath.startsWith('/mnt/') && !mountPath.startsWith('/media/')) {
+        alert('{{T .Lang "storage.mount_path_error"}}');
+        return;
+    }
+
+    try {
+        const resp = await fetch('/api/admin/storage/disk/mount', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({device, mount_path: mountPath})
+        });
+        const data = await resp.json();
+        if (data.success) {
+            alert('{{T .Lang "storage.disk_mounted"}}');
+            closeMountDiskModal();
+            location.reload();
+        } else {
+            alert('{{T .Lang "common.error"}}: ' + data.error);
+        }
+    } catch (err) {
+        alert('{{T .Lang "common.error"}}: ' + err);
+    }
+}
+
 // Unmount disk
 async function unmountDisk(mountPath) {
     if (!confirm('{{T .Lang "storage.unmount_confirm"}}: ' + mountPath + '?')) return;
@@ -1232,6 +1308,7 @@ document.addEventListener('keydown', e => {
         closeCreateDatasetModal();
         closeCreateSnapshotModal();
         closeFormatDiskModal();
+        closeMountDiskModal();
     }
 });
 </script>

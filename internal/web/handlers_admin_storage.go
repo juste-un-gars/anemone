@@ -1036,6 +1036,53 @@ func (s *Server) handleAdminStorageDiskUnmount(w http.ResponseWriter, r *http.Re
 	})
 }
 
+// handleAdminStorageDiskMount mounts an already formatted disk
+func (s *Server) handleAdminStorageDiskMount(w http.ResponseWriter, r *http.Request) {
+	if _, ok := auth.GetSessionFromContext(r); !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Device    string `json:"device"`
+		MountPath string `json:"mount_path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request"})
+		return
+	}
+
+	if req.Device == "" || req.MountPath == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Device and mount_path are required"})
+		return
+	}
+
+	if err := storage.MountDisk(req.Device, req.MountPath); err != nil {
+		log.Printf("Error mounting disk %s at %s: %v", req.Device, req.MountPath, err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	log.Printf("Mounted disk %s at %s", req.Device, req.MountPath)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":    true,
+		"device":     req.Device,
+		"mount_path": req.MountPath,
+	})
+}
+
 // handleAdminStorageDiskWipe wipes a disk
 func (s *Server) handleAdminStorageDiskWipe(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.GetSessionFromContext(r)

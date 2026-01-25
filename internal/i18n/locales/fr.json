@@ -738,6 +738,11 @@
   "storage.eject_confirm": "Éjecter le disque",
   "storage.disk_unmounted": "Disque démonté avec succès",
   "storage.disk_ejected": "Disque éjecté avec succès",
+  "storage.mount": "Monter",
+  "storage.mount_disk": "Monter le disque",
+  "storage.mount_path": "Point de montage",
+  "storage.mount_path_hint": "Doit commencer par /mnt/ ou /media/",
+  "storage.disk_mounted": "Disque monté avec succès",
 
   "storage.smart.general_info": "Informations générales",
   "storage.smart.disk_errors": "Erreurs disque",
