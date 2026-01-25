@@ -5,7 +5,7 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.11.4-beta
+**Current Version:** v0.11.5-beta
 **Last Updated:** 2026-01-25
 
 ---
@@ -13,6 +13,26 @@
 ## Current Session
 
 **No active session** - Ready for new work
+
+---
+
+## Release v0.11.5-beta (2026-01-25) ✅
+
+### Mount Disk Feature
+- New "Mount" button for formatted but unmounted disks
+- Mount path selection dialog with validation
+- **Persistent mount option** - adds entry to /etc/fstab using UUID
+- Supports FAT/exFAT filesystems with proper uid/gid options
+
+### UI Improvements
+- Combined Filesystem and Status columns to reduce table width
+- Mounted disks show: mount point + (filesystem type)
+- Unmounted formatted disks show: filesystem badge + "(not mounted)"
+- Fixed horizontal scrollbar issue on Physical Disks table
+
+### Bug Fixes
+- Mount point directory now removed after unmount
+- Added missing sudoers rules for mount with options, rmdir, fstab
 
 ---
 
@@ -108,6 +128,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 77 | Mount Disk + Persistent fstab | 2026-01-25 | Completed ✅ |
 | 76 | USB Format + NVMe SMART Fix | 2026-01-25 | Completed ✅ |
 | 75 | Release v0.10.0-beta | 2026-01-24 | Completed ✅ |
 | 74 | USB Backup Module | 2026-01-24 | Completed ✅ |
