@@ -115,12 +115,26 @@ func GetSMARTInfo(devicePath string) (*SMARTInfo, error) {
 		return &SMARTInfo{Available: false}, nil
 	}
 
-	// Check if SMART is actually supported by this device
-	// exit_status bit 1 (value 2) = device open failed
-	// exit_status bit 2 (value 4) = SMART/ATA command failed
-	// Also check smart_support.available field
-	if !smart.SmartSupport.Available || (smart.SmartCtl.ExitStatus&6) != 0 {
-		return &SMARTInfo{Available: false}, nil
+	// Check if this is an NVMe drive first (they don't use ATA SMART)
+	isNVMe := smart.Device.Protocol == "NVMe" || strings.Contains(devicePath, "nvme")
+
+	// For NVMe drives, check if we have health info
+	// For ATA drives, check smart_support.available
+	if isNVMe {
+		// NVMe: check if we got health data (temperature > 0 is a good indicator)
+		if smart.NVMeSmartHealthInfo.Temperature == 0 && smart.NVMeSmartHealthInfo.PowerOnHours == 0 {
+			// Check exit_status bit 1 (device open failed)
+			if (smart.SmartCtl.ExitStatus & 2) != 0 {
+				return &SMARTInfo{Available: false}, nil
+			}
+		}
+	} else {
+		// ATA/SATA: check smart_support.available
+		// exit_status bit 1 (value 2) = device open failed
+		// exit_status bit 2 (value 4) = SMART/ATA command failed
+		if !smart.SmartSupport.Available || (smart.SmartCtl.ExitStatus&6) != 0 {
+			return &SMARTInfo{Available: false}, nil
+		}
 	}
 
 	info := &SMARTInfo{
@@ -130,7 +144,7 @@ func GetSMARTInfo(devicePath string) (*SMARTInfo, error) {
 	}
 
 	// Handle NVMe drives differently
-	if smart.Device.Protocol == "NVMe" || strings.Contains(devicePath, "nvme") {
+	if isNVMe {
 		info.IsNVMe = true
 		info.Temperature = smart.NVMeSmartHealthInfo.Temperature
 		info.PowerOnHours = smart.NVMeSmartHealthInfo.PowerOnHours

@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0-beta] - 2026-01-25
+
+### Added
+
+#### USB Disk Formatting
+- **Format USB drives from web UI**: New section in USB Backup page to format unmounted disks
+- **FAT32 and exFAT support**: Windows-compatible formats for portable backups
+- **Automatic detection of unmounted disks**: Detects USB drives that need formatting
+- **Safe formatting**: Validates device path, checks if disk is in use before formatting
+
+### Fixed
+- **NVMe SMART data not displaying**: Fixed detection logic for NVMe drives which use a different health protocol than ATA/SATA drives
+- NVMe drives now correctly show temperature, power-on hours, available spare, percentage used, and other health metrics
+
 ## [0.10.0-beta] - 2026-01-24
 
 ### Added

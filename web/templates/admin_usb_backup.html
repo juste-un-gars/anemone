@@ -79,6 +79,12 @@
         </div>
         {{end}}
 
+        {{if .Formatted}}
+        <div class="mb-4 bg-green-50 border-l-4 border-green-400 p-4">
+            <p class="text-sm text-green-700">{{T .Lang "usb_format.success"}}</p>
+        </div>
+        {{end}}
+
         <!-- Configured Backups -->
         <div class="bg-white shadow rounded-lg mb-8">
             <div class="px-6 py-4 border-b border-gray-200">
@@ -216,6 +222,61 @@
             </div>
             {{end}}
         </div>
+
+        <!-- Unmounted Disks (can be formatted) -->
+        {{if .UnmountedDisks}}
+        <div class="bg-white shadow rounded-lg mt-8">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900">{{T .Lang "usb_format.title"}}</h3>
+                <p class="text-sm text-gray-500">{{T .Lang "usb_format.description"}}</p>
+            </div>
+
+            <div class="divide-y divide-gray-200">
+                {{range .UnmountedDisks}}
+                <form method="POST" action="/admin/usb-backup/format" class="p-6" onsubmit="return confirm('{{T $.Lang "usb_format.confirm"}}');">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 h-10 w-10 rounded-lg bg-orange-100 flex items-center justify-center">
+                                <svg class="h-5 w-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                                </svg>
+                            </div>
+                            <div class="ml-4">
+                                <p class="font-medium text-gray-900">
+                                    {{if .Model}}{{.Model}}{{else}}{{.Name}}{{end}}
+                                    {{if .IsRemovable}}<span class="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded ml-2">USB</span>{{end}}
+                                </p>
+                                <p class="text-sm text-gray-500">{{.Path}} - {{.SizeHuman}}</p>
+                                {{if .Filesystem}}
+                                <p class="text-xs text-gray-400">{{T $.Lang "usb_format.current_fs"}}: {{.Filesystem}}</p>
+                                {{else}}
+                                <p class="text-xs text-orange-500">{{T $.Lang "usb_format.no_filesystem"}}</p>
+                                {{end}}
+                            </div>
+                        </div>
+
+                        <div class="flex items-center space-x-3">
+                            <input type="hidden" name="device" value="{{.Path}}">
+
+                            <input type="text" name="label" placeholder="{{T $.Lang "usb_format.label_placeholder"}}"
+                                   maxlength="11"
+                                   class="w-32 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-purple-500 focus:border-purple-500">
+
+                            <select name="filesystem" class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-purple-500 focus:border-purple-500">
+                                <option value="exfat">exFAT ({{T $.Lang "usb_format.recommended"}})</option>
+                                <option value="fat32">FAT32</option>
+                            </select>
+
+                            <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-md hover:bg-orange-700">
+                                {{T $.Lang "usb_format.format_btn"}}
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
 
         <!-- Back link -->
         <div class="mt-8">

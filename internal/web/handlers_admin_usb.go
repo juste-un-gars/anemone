@@ -14,6 +14,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/auth"
 	"github.com/juste-un-gars/anemone/internal/i18n"
 	"github.com/juste-un-gars/anemone/internal/incoming"
+	"github.com/juste-un-gars/anemone/internal/storage"
 	"github.com/juste-un-gars/anemone/internal/sync"
 	"github.com/juste-un-gars/anemone/internal/usbbackup"
 )
@@ -108,15 +109,24 @@ func (s *Server) handleAdminUSBBackup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Detect unmounted disks (can be formatted)
+	unmountedDisks, err := usbbackup.DetectUnmountedDisks()
+	if err != nil {
+		log.Printf("Error detecting unmounted disks: %v", err)
+		unmountedDisks = []usbbackup.UnmountedDisk{}
+	}
+
 	data := map[string]interface{}{
 		"Session":         session,
 		"Title":           i18n.T(lang, "usb_backup.title"),
 		"Lang":            lang,
 		"Backups":         backupsWithStatus,
 		"AvailableDrives": availableDrives,
+		"UnmountedDisks":  unmountedDisks,
 		"FormatBytes":     usbbackup.FormatBytes,
 		"Success":         r.URL.Query().Get("success") != "",
 		"Syncing":         r.URL.Query().Get("syncing") != "",
+		"Formatted":       r.URL.Query().Get("formatted") != "",
 		"Error":           r.URL.Query().Get("error"),
 	}
 
@@ -397,4 +407,81 @@ func (s *Server) handleAdminUSBDrives(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
+}
+
+// handleAdminUSBFormat handles formatting a USB disk
+func (s *Server) handleAdminUSBFormat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	lang := s.getLang(r)
+
+	device := strings.TrimSpace(r.FormValue("device"))
+	filesystem := strings.TrimSpace(r.FormValue("filesystem"))
+	label := strings.TrimSpace(r.FormValue("label"))
+
+	// Validate device
+	if device == "" {
+		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "usb_format.error.no_device"), http.StatusSeeOther)
+		return
+	}
+
+	// Validate filesystem (only allow FAT32 and exFAT for USB)
+	if filesystem != "fat32" && filesystem != "exfat" {
+		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "usb_format.error.invalid_fs"), http.StatusSeeOther)
+		return
+	}
+
+	// Validate device path for security
+	if err := storage.ValidateDevicePath(device); err != nil {
+		log.Printf("Invalid device path: %s - %v", device, err)
+		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "usb_format.error.invalid_device"), http.StatusSeeOther)
+		return
+	}
+
+	// Check if device is in use
+	inUse, usedBy, err := storage.IsDiskInUse(device)
+	if err != nil {
+		log.Printf("Error checking disk: %v", err)
+		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "usb_format.error.check_failed"), http.StatusSeeOther)
+		return
+	}
+	if inUse {
+		log.Printf("Disk %s is in use: %s", device, usedBy)
+		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "usb_format.error.in_use"), http.StatusSeeOther)
+		return
+	}
+
+	// Create partition and format
+	log.Printf("Formatting %s as %s with label %q", device, filesystem, label)
+
+	opts := storage.CreatePartitionOptions{
+		Device:     device,
+		TableType:  "gpt",
+		Filesystem: filesystem,
+		Label:      label,
+	}
+
+	if err := storage.CreatePartition(opts); err != nil {
+		log.Printf("Format failed: %v", err)
+		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "usb_format.error.format_failed"), http.StatusSeeOther)
+		return
+	}
+
+	log.Printf("Successfully formatted %s as %s", device, filesystem)
+	http.Redirect(w, r, "/admin/usb-backup?formatted=1", http.StatusSeeOther)
+}
+
+// handleAdminUSBUnmountedDisks provides JSON API to list unmounted disks
+func (s *Server) handleAdminUSBUnmountedDisks(w http.ResponseWriter, r *http.Request) {
+	disks, err := usbbackup.DetectUnmountedDisks()
+	if err != nil {
+		http.Error(w, "Error detecting disks", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(disks)
 }

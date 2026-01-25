@@ -191,10 +191,10 @@ func FormatDisk(opts FormatOptions) error {
 
 	// Validate filesystem
 	switch opts.Filesystem {
-	case "ext4", "xfs":
-		// OK
+	case "ext4", "xfs", "vfat", "fat32", "exfat":
+		// OK - vfat and fat32 are aliases
 	default:
-		return fmt.Errorf("unsupported filesystem: %s (use ext4 or xfs)", opts.Filesystem)
+		return fmt.Errorf("unsupported filesystem: %s (use ext4, xfs, fat32, or exfat)", opts.Filesystem)
 	}
 
 	// Check if disk is in use
@@ -232,6 +232,18 @@ func FormatDisk(opts FormatOptions) error {
 			args = append(args, "-f")
 		}
 		if opts.Label != "" && len(opts.Label) <= 12 {
+			args = append(args, "-L", opts.Label)
+		}
+		args = append(args, opts.Device)
+	case "vfat", "fat32":
+		args = []string{"mkfs.vfat", "-F", "32"}
+		if opts.Label != "" && len(opts.Label) <= 11 {
+			args = append(args, "-n", strings.ToUpper(opts.Label))
+		}
+		args = append(args, opts.Device)
+	case "exfat":
+		args = []string{"mkfs.exfat"}
+		if opts.Label != "" && len(opts.Label) <= 15 {
 			args = append(args, "-L", opts.Label)
 		}
 		args = append(args, opts.Device)
@@ -351,32 +363,37 @@ func CreatePartition(opts CreatePartitionOptions) error {
 
 	// Format partition if filesystem specified
 	if opts.Filesystem != "" {
-		formatOpts := FormatOptions{
-			Device:     partPath,
-			Filesystem: opts.Filesystem,
-			Label:      opts.Label,
-			Force:      true,
-		}
-		// Use mkfs directly for partition
-		switch formatOpts.Filesystem {
+		var args []string
+		switch opts.Filesystem {
 		case "ext4":
-			args := []string{"mkfs.ext4", "-F"}
-			if formatOpts.Label != "" {
-				args = append(args, "-L", formatOpts.Label)
+			args = []string{"mkfs.ext4", "-F"}
+			if opts.Label != "" && len(opts.Label) <= 16 {
+				args = append(args, "-L", opts.Label)
 			}
 			args = append(args, partPath)
-			cmd = exec.Command("sudo", args...)
 		case "xfs":
-			args := []string{"mkfs.xfs", "-f"}
-			if formatOpts.Label != "" {
-				args = append(args, "-L", formatOpts.Label)
+			args = []string{"mkfs.xfs", "-f"}
+			if opts.Label != "" && len(opts.Label) <= 12 {
+				args = append(args, "-L", opts.Label)
 			}
 			args = append(args, partPath)
-			cmd = exec.Command("sudo", args...)
+		case "vfat", "fat32":
+			args = []string{"mkfs.vfat", "-F", "32"}
+			if opts.Label != "" && len(opts.Label) <= 11 {
+				args = append(args, "-n", strings.ToUpper(opts.Label))
+			}
+			args = append(args, partPath)
+		case "exfat":
+			args = []string{"mkfs.exfat"}
+			if opts.Label != "" && len(opts.Label) <= 15 {
+				args = append(args, "-L", opts.Label)
+			}
+			args = append(args, partPath)
 		default:
-			return fmt.Errorf("unsupported filesystem: %s", formatOpts.Filesystem)
+			return fmt.Errorf("unsupported filesystem: %s (use ext4, xfs, fat32, or exfat)", opts.Filesystem)
 		}
 
+		cmd = exec.Command("sudo", args...)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("failed to format partition: %s - %w", strings.TrimSpace(string(output)), err)
 		}

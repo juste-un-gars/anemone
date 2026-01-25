@@ -5,14 +5,29 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.10.0-beta
-**Last Updated:** 2026-01-24
+**Current Version:** v0.11.0-beta
+**Last Updated:** 2026-01-25
 
 ---
 
 ## Current Session
 
 **No active session** - Ready for new work
+
+---
+
+## Release v0.11.0-beta (2026-01-25)
+
+Session 76 merged and released. Features:
+
+### USB Disk Formatting (Session 76)
+- Format USB drives directly from web UI
+- FAT32 and exFAT support (Windows-compatible)
+- Automatic detection of unmounted disks
+- Safe formatting with device validation
+
+### Bug Fixes
+- **NVMe SMART data**: Fixed detection for NVMe drives (different protocol than ATA/SATA)
 
 ---
 
@@ -47,12 +62,12 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 76 | USB Format + NVMe SMART Fix | 2026-01-25 | Completed ✅ |
 | 75 | Release v0.10.0-beta | 2026-01-24 | Completed ✅ |
 | 74 | USB Backup Module | 2026-01-24 | Completed ✅ |
 | 73 | Repair Mode in install.sh | 2026-01-24 | Completed ✅ |
 | 72 | Setup Detection Refactor (.needs-setup) | 2026-01-23 | Completed ✅ |
 | 71 | Import Existing Installation | 2026-01-23 | Completed ✅ |
-| 70 | Enhanced SMART Modal | 2026-01-22 | Completed ✅ |
 
 ---
 
@@ -63,7 +78,9 @@ Sessions 71-74 merged and released. Major features:
 - [ ] Test repair mode (install.sh option 2) → simulate-reinstall.sh created
 - [x] Test restauration complète → Fixed login bug
 - [ ] Verify hide dot files works after Samba reload
-- [ ] **Test USB Backup module** (new)
+- [ ] **Test USB Backup module**
+- [ ] **Test USB Format feature** (new)
+- [ ] **Test NVMe SMART display** (new)
 
 ---
 
@@ -97,8 +114,8 @@ Sessions 71-74 merged and released. Major features:
 - [ ] Chiffrement avec mot de passe
 - [ ] Restauration depuis le Setup Wizard
 
-### USB Drive Management (future)
-- [ ] Formatage des disques USB depuis l'interface
+### USB Drive Management ✅ Session 76
+- [x] Formatage des disques USB depuis l'interface (FAT32/exFAT)
 - [ ] État des disques dans le dashboard
 - [ ] Gestion de la mise en veille
 
@@ -116,8 +133,9 @@ Sessions 71-74 merged and released. Major features:
 ## Next Steps
 
 1. Tester le module USB Backup sur un vrai disque
-2. Module rclone pour backup cloud
-3. Scheduler pour USB auto-sync
-4. WireGuard integration
+2. Tester le formatage USB (FAT32/exFAT)
+3. Tester l'affichage SMART NVMe
+4. Module rclone pour backup cloud
+5. WireGuard integration
 
 Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.

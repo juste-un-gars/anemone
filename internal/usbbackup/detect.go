@@ -194,3 +194,147 @@ func FormatBytes(bytes int64) string {
 	}
 	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
+
+// UnmountedDisk represents a disk that is not mounted (can be formatted)
+type UnmountedDisk struct {
+	Name        string `json:"name"`         // e.g., sdb
+	Path        string `json:"path"`         // e.g., /dev/sdb
+	Model       string `json:"model"`        // Disk model
+	Size        int64  `json:"size"`         // Size in bytes
+	SizeHuman   string `json:"size_human"`   // Human-readable size
+	IsRemovable bool   `json:"is_removable"` // Whether disk is removable (USB)
+	HasParts    bool   `json:"has_parts"`    // Whether disk has partitions
+	Filesystem  string `json:"filesystem"`   // Current filesystem (if any)
+}
+
+// DetectUnmountedDisks returns USB/external disks that are not mounted
+// These can be formatted by the user
+func DetectUnmountedDisks() ([]UnmountedDisk, error) {
+	var disks []UnmountedDisk
+
+	// Get all block devices with details
+	cmd := exec.Command("lsblk", "-d", "-n", "-b", "-o", "NAME,SIZE,MODEL,TYPE,RM,FSTYPE")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list disks: %w", err)
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 5 {
+			continue
+		}
+
+		name := fields[0]
+		deviceType := fields[3]
+		removable := fields[4]
+
+		// Only include whole disks
+		if deviceType != "disk" {
+			continue
+		}
+
+		// Skip system disk (sda)
+		if name == "sda" {
+			continue
+		}
+
+		// Skip non-removable disks unless they look like external drives
+		// (sdb, sdc, etc. are often external even if not marked removable)
+		isRemovable := removable == "1"
+		isLikelyExternal := false
+		if strings.HasPrefix(name, "sd") && len(name) >= 3 {
+			letter := name[2]
+			if letter >= 'b' && letter <= 'z' {
+				isLikelyExternal = true
+			}
+		}
+
+		if !isRemovable && !isLikelyExternal {
+			continue
+		}
+
+		// Skip loop devices
+		if strings.HasPrefix(name, "loop") {
+			continue
+		}
+
+		devicePath := "/dev/" + name
+
+		// Check if any partition is mounted
+		isMounted, _ := isDiskOrPartitionMounted(name)
+		if isMounted {
+			continue
+		}
+
+		disk := UnmountedDisk{
+			Name:        name,
+			Path:        devicePath,
+			IsRemovable: isRemovable,
+		}
+
+		// Parse size
+		if len(fields) >= 2 {
+			if size, err := strconv.ParseInt(fields[1], 10, 64); err == nil {
+				disk.Size = size
+				disk.SizeHuman = FormatBytes(size)
+			}
+		}
+
+		// Parse model (field 2, but may be empty)
+		if len(fields) >= 3 && fields[2] != deviceType {
+			disk.Model = fields[2]
+		}
+
+		// Get filesystem type (from partitions if any)
+		disk.Filesystem, disk.HasParts = getDiskFilesystem(name)
+
+		disks = append(disks, disk)
+	}
+
+	return disks, nil
+}
+
+// isDiskOrPartitionMounted checks if a disk or any of its partitions are mounted
+func isDiskOrPartitionMounted(diskName string) (bool, string) {
+	cmd := exec.Command("lsblk", "-n", "-o", "NAME,MOUNTPOINT", "/dev/"+diskName)
+	output, err := cmd.Output()
+	if err != nil {
+		return false, ""
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) >= 2 && fields[1] != "" {
+			return true, fields[1]
+		}
+	}
+	return false, ""
+}
+
+// getDiskFilesystem returns the filesystem type of a disk or its first partition
+func getDiskFilesystem(diskName string) (string, bool) {
+	cmd := exec.Command("lsblk", "-n", "-o", "NAME,FSTYPE", "/dev/"+diskName)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", false
+	}
+
+	hasParts := false
+	fsType := ""
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	lineNum := 0
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		lineNum++
+		if lineNum > 1 {
+			hasParts = true
+		}
+		if len(fields) >= 2 && fields[1] != "" && fsType == "" {
+			fsType = fields[1]
+		}
+	}
+	return fsType, hasParts
+}

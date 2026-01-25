@@ -287,9 +287,11 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// Admin routes - USB Backup
 	mux.HandleFunc("/admin/usb-backup", auth.RequireAdmin(server.handleAdminUSBBackup))
 	mux.HandleFunc("/admin/usb-backup/add", auth.RequireAdmin(server.handleAdminUSBBackupAdd))
+	mux.HandleFunc("/admin/usb-backup/format", auth.RequireAdmin(server.handleAdminUSBFormat))
 	mux.HandleFunc("/admin/usb-backup/", auth.RequireAdmin(server.handleAdminUSBBackupActions))
 	mux.HandleFunc("/api/admin/usb-backup/status", auth.RequireAdmin(server.handleAdminUSBBackupAPI))
 	mux.HandleFunc("/api/admin/usb-backup/drives", auth.RequireAdmin(server.handleAdminUSBDrives))
+	mux.HandleFunc("/api/admin/usb-backup/unmounted", auth.RequireAdmin(server.handleAdminUSBUnmountedDisks))
 
 	// Admin routes - Restore all users (after server restoration)
 	mux.HandleFunc("/admin/restore-users", auth.RequireAdmin(server.handleAdminRestoreUsers))
