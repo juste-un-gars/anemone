@@ -163,7 +163,6 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.model"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.size"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.type"}}</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.filesystem"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.status"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.health"}}</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{T .Lang "storage.temp"}}</th>
@@ -183,14 +182,17 @@
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{if eq .Type "NVMe"}}bg-purple-100 text-purple-800{{else if eq .Type "SSD"}}bg-blue-100 text-blue-800{{else}}bg-gray-100 text-gray-800{{end}}">{{.Type}}</span>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {{if .Filesystem}}<span class="font-mono">{{.Filesystem}}</span>{{else}}-{{end}}
-                                </td>
                                 <td class="px-6 py-4 whitespace-nowrap">
                                     {{if .Mountpoint}}
                                     <div class="flex items-center text-sm">
                                         <svg class="h-4 w-4 text-green-500 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
                                         <span class="text-green-700 font-mono text-xs">{{.Mountpoint}}</span>
+                                        {{if .Filesystem}}<span class="text-gray-400 text-xs ml-1">({{.Filesystem}})</span>{{end}}
+                                    </div>
+                                    {{else if .Filesystem}}
+                                    <div class="flex items-center text-sm">
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">{{.Filesystem}}</span>
+                                        <span class="text-gray-400 text-xs ml-1">{{T $.Lang "storage.not_mounted"}}</span>
                                     </div>
                                     {{else}}
                                     <span class="text-gray-400 text-sm">-</span>
@@ -642,6 +644,13 @@
                     <label class="block text-sm font-medium text-gray-700">{{T .Lang "storage.mount_path"}}</label>
                     <input type="text" id="mountDiskPath" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono" placeholder="/mnt/sda">
                     <p class="mt-1 text-xs text-gray-500">{{T .Lang "storage.mount_path_hint"}}</p>
+                </div>
+                <div class="border-t pt-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="mountPersistent" class="h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                        <span class="ml-2 text-sm text-gray-700">{{T .Lang "storage.persistent_mount"}}</span>
+                    </label>
+                    <p class="mt-1 text-xs text-gray-500 ml-6">{{T .Lang "storage.persistent_mount_hint"}}</p>
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-3">
@@ -1235,6 +1244,7 @@ function showMountDiskModal(device, diskName) {
     document.getElementById('mountDiskDevice').value = device;
     document.getElementById('mountDiskDeviceDisplay').textContent = device;
     document.getElementById('mountDiskPath').value = '/mnt/' + diskName;
+    document.getElementById('mountPersistent').checked = false;
     document.getElementById('mountDiskModal').classList.remove('hidden');
 }
 function closeMountDiskModal() { document.getElementById('mountDiskModal').classList.add('hidden'); }
@@ -1243,6 +1253,7 @@ async function mountDisk(e) {
     e.preventDefault();
     const device = document.getElementById('mountDiskDevice').value;
     const mountPath = document.getElementById('mountDiskPath').value;
+    const persistent = document.getElementById('mountPersistent').checked;
 
     // Validate mount path
     if (!mountPath.startsWith('/mnt/') && !mountPath.startsWith('/media/')) {
@@ -1254,7 +1265,7 @@ async function mountDisk(e) {
         const resp = await fetch('/api/admin/storage/disk/mount', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({device, mount_path: mountPath})
+            body: JSON.stringify({device, mount_path: mountPath, persistent})
         });
         const data = await resp.json();
         if (data.success) {

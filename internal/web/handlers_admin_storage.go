@@ -1049,8 +1049,9 @@ func (s *Server) handleAdminStorageDiskMount(w http.ResponseWriter, r *http.Requ
 	}
 
 	var req struct {
-		Device    string `json:"device"`
-		MountPath string `json:"mount_path"`
+		Device     string `json:"device"`
+		MountPath  string `json:"mount_path"`
+		Persistent bool   `json:"persistent"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -1074,7 +1075,15 @@ func (s *Server) handleAdminStorageDiskMount(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	log.Printf("Mounted disk %s at %s", req.Device, req.MountPath)
+	// Add to fstab if persistent mount requested
+	if req.Persistent {
+		if err := storage.AddToFstab(req.Device, req.MountPath); err != nil {
+			// Mount succeeded, but fstab failed - log warning but don't fail the request
+			log.Printf("Warning: Mounted disk but failed to add to fstab: %v", err)
+		}
+	}
+
+	log.Printf("Mounted disk %s at %s (persistent: %v)", req.Device, req.MountPath, req.Persistent)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":    true,

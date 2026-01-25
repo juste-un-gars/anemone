@@ -743,6 +743,9 @@
   "storage.mount_path": "Mount point",
   "storage.mount_path_hint": "Must start with /mnt/ or /media/",
   "storage.disk_mounted": "Disk mounted successfully",
+  "storage.not_mounted": "(not mounted)",
+  "storage.persistent_mount": "Persistent mount (fstab)",
+  "storage.persistent_mount_hint": "Disk will be remounted automatically on startup",
 
   "storage.smart.general_info": "General Information",
   "storage.smart.disk_errors": "Disk Errors",

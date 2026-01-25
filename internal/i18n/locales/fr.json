@@ -743,6 +743,9 @@
   "storage.mount_path": "Point de montage",
   "storage.mount_path_hint": "Doit commencer par /mnt/ ou /media/",
   "storage.disk_mounted": "Disque monté avec succès",
+  "storage.not_mounted": "(non monté)",
+  "storage.persistent_mount": "Montage persistant (fstab)",
+  "storage.persistent_mount_hint": "Le disque sera remonté automatiquement au démarrage",
 
   "storage.smart.general_info": "Informations générales",
   "storage.smart.disk_errors": "Erreurs disque",

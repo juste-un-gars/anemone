@@ -732,6 +732,10 @@ $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/loop* bs=1M count
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/cat /etc/sudoers.d/anemone
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/cat /etc/sudoers.d/anemone
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/tee /etc/sudoers.d/anemone
+
+# Persistent mount (fstab modification)
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/tee -a /etc/fstab
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/tee -a /etc/fstab
 EOF
 
     chmod 440 "$SUDOERS_FILE"

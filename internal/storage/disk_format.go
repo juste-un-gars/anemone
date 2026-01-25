@@ -617,3 +617,72 @@ func MountDisk(device, mountPath string) error {
 
 	return nil
 }
+
+// AddToFstab adds a mount entry to /etc/fstab for persistent mounting
+func AddToFstab(device, mountPath string) error {
+	// Validate inputs
+	if err := ValidateDevicePath(device); err != nil {
+		return err
+	}
+	if !strings.HasPrefix(mountPath, "/mnt/") && !strings.HasPrefix(mountPath, "/media/") {
+		return fmt.Errorf("mount path must be under /mnt/ or /media/")
+	}
+
+	// Get UUID of the device (more reliable than device path)
+	cmd := exec.Command("lsblk", "-no", "UUID", device)
+	uuidOutput, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to get UUID: %w", err)
+	}
+	uuid := strings.TrimSpace(string(uuidOutput))
+	if uuid == "" {
+		return fmt.Errorf("device has no UUID")
+	}
+
+	// Get filesystem type
+	cmd = exec.Command("lsblk", "-no", "FSTYPE", device)
+	fsOutput, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to get filesystem type: %w", err)
+	}
+	fsType := strings.TrimSpace(string(fsOutput))
+	if fsType == "" {
+		return fmt.Errorf("device has no filesystem")
+	}
+
+	// Determine mount options based on filesystem
+	var options string
+	switch fsType {
+	case "vfat", "exfat":
+		// FAT filesystems - use nofail and uid/gid
+		options = "defaults,nofail,uid=1000,gid=1000"
+	default:
+		// Linux filesystems (ext4, xfs, etc.)
+		options = "defaults,nofail"
+	}
+
+	// Check if entry already exists in fstab
+	fstabContent, err := os.ReadFile("/etc/fstab")
+	if err != nil {
+		return fmt.Errorf("failed to read fstab: %w", err)
+	}
+	if strings.Contains(string(fstabContent), uuid) {
+		return nil // Already exists
+	}
+	if strings.Contains(string(fstabContent), mountPath) {
+		return fmt.Errorf("mount path %s already exists in fstab", mountPath)
+	}
+
+	// Create fstab entry
+	entry := fmt.Sprintf("\n# Anemone mount - %s\nUUID=%s %s %s %s 0 2\n", device, uuid, mountPath, fsType, options)
+
+	// Append to fstab using tee (requires sudo)
+	cmd = exec.Command("sudo", "tee", "-a", "/etc/fstab")
+	cmd.Stdin = strings.NewReader(entry)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to update fstab: %s - %w", strings.TrimSpace(string(output)), err)
+	}
+
+	log.Printf("Added fstab entry for %s (UUID=%s) at %s", device, uuid, mountPath)
+	return nil
+}
