@@ -917,6 +917,8 @@
   "usb_format.error.check_failed": "Impossible de vérifier l'état du disque",
   "usb_format.error.in_use": "Le disque est en cours d'utilisation",
   "usb_format.error.format_failed": "Échec du formatage",
+  "usb_format.universal": "universel",
+  "usb_format.go_to_storage": "Pour formater un disque, rendez-vous dans",
 
   "common.edit": "Modifier",
   "common.delete": "Supprimer",

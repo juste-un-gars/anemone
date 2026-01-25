@@ -917,6 +917,8 @@
   "usb_format.error.check_failed": "Failed to check disk status",
   "usb_format.error.in_use": "Disk is currently in use",
   "usb_format.error.format_failed": "Format failed",
+  "usb_format.universal": "universal",
+  "usb_format.go_to_storage": "To format a disk, go to",
 
   "common.edit": "Edit",
   "common.delete": "Delete",

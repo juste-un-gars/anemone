@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2-beta] - 2026-01-25
+
+### Changed
+- **Disk formatting consolidated in Storage section**: All disk formatting (ext4, XFS, exFAT, FAT32) now in one place
+- USB Backup section now links to Storage for formatting instead of duplicating the feature
+
+### Added
+- **exFAT and FAT32 options in Storage**: Can now format disks with Windows-compatible filesystems from the Storage page
+
 ## [0.11.1-beta] - 2026-01-25
 
 ### Fixed
