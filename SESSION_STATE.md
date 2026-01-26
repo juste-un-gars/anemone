@@ -22,6 +22,7 @@
 - Fixed: "Format disk" dialog was missing "Persistent mount" option
   - Now includes all three options: Mount after format, Shared access, Persistent mount
   - All checked by default for convenience
+- Note: Requires sudoers rule for `tee -a /etc/fstab` (added in install.sh, manual add needed for older installs)
 
 ---
 
