@@ -8,15 +8,18 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/juste-un-gars/anemone/internal/auth"
 	"github.com/juste-un-gars/anemone/internal/i18n"
 	"github.com/juste-un-gars/anemone/internal/incoming"
+	"github.com/juste-un-gars/anemone/internal/shares"
 	"github.com/juste-un-gars/anemone/internal/storage"
 	"github.com/juste-un-gars/anemone/internal/sync"
 	"github.com/juste-un-gars/anemone/internal/usbbackup"
+	"github.com/juste-un-gars/anemone/internal/users"
 )
 
 // handleAdminUSBBackup displays the USB backup management page
@@ -116,6 +119,37 @@ func (s *Server) handleAdminUSBBackup(w http.ResponseWriter, r *http.Request) {
 		unmountedDisks = []usbbackup.UnmountedDisk{}
 	}
 
+	// Get all shares for selection
+	type ShareWithUser struct {
+		ID       int
+		Name     string
+		UserID   int
+		Username string
+		Path     string
+		Size     string
+		SizeBytes int64
+	}
+	var sharesWithUsers []ShareWithUser
+	allShares, _ := shares.GetAll(s.db)
+	for _, sh := range allShares {
+		swu := ShareWithUser{
+			ID:     sh.ID,
+			Name:   sh.Name,
+			UserID: sh.UserID,
+			Path:   sh.Path,
+		}
+		// Get username
+		if user, err := users.GetByID(s.db, sh.UserID); err == nil {
+			swu.Username = user.Username
+		}
+		// Calculate size
+		if sizeBytes, err := usbbackup.CalculateDirSize(sh.Path); err == nil {
+			swu.SizeBytes = sizeBytes
+			swu.Size = usbbackup.FormatBytes(sizeBytes)
+		}
+		sharesWithUsers = append(sharesWithUsers, swu)
+	}
+
 	data := map[string]interface{}{
 		"Session":         session,
 		"Title":           i18n.T(lang, "usb_backup.title"),
@@ -123,6 +157,7 @@ func (s *Server) handleAdminUSBBackup(w http.ResponseWriter, r *http.Request) {
 		"Backups":         backupsWithStatus,
 		"AvailableDrives": availableDrives,
 		"UnmountedDisks":  unmountedDisks,
+		"AllShares":       sharesWithUsers,
 		"FormatBytes":     usbbackup.FormatBytes,
 		"Success":         r.URL.Query().Get("success") != "",
 		"Syncing":         r.URL.Query().Get("syncing") != "",
@@ -148,6 +183,7 @@ func (s *Server) handleAdminUSBBackupAdd(w http.ResponseWriter, r *http.Request)
 	name := strings.TrimSpace(r.FormValue("name"))
 	mountPath := strings.TrimSpace(r.FormValue("mount_path"))
 	backupPath := strings.TrimSpace(r.FormValue("backup_path"))
+	backupType := strings.TrimSpace(r.FormValue("backup_type"))
 	enabled := r.FormValue("enabled") == "on"
 	autoDetect := r.FormValue("auto_detect") == "on"
 
@@ -160,13 +196,30 @@ func (s *Server) handleAdminUSBBackupAdd(w http.ResponseWriter, r *http.Request)
 		backupPath = "anemone-backup"
 	}
 
+	// Default to full backup
+	if backupType == "" {
+		backupType = usbbackup.BackupTypeFull
+	}
+
+	// Parse selected shares (checkbox values)
+	var selectedShareIDs []int
+	if backupType == usbbackup.BackupTypeFull {
+		for _, idStr := range r.Form["selected_shares"] {
+			if id, err := strconv.Atoi(idStr); err == nil {
+				selectedShareIDs = append(selectedShareIDs, id)
+			}
+		}
+	}
+
 	backup := &usbbackup.USBBackup{
 		Name:       name,
 		MountPath:  mountPath,
 		BackupPath: backupPath,
+		BackupType: backupType,
 		Enabled:    enabled,
 		AutoDetect: autoDetect,
 	}
+	backup.SetSelectedShareIDs(selectedShareIDs)
 
 	if err := usbbackup.Create(s.db, backup); err != nil {
 		log.Printf("Error creating USB backup: %v", err)
@@ -263,12 +316,45 @@ func (s *Server) handleUSBBackupSync(w http.ResponseWriter, r *http.Request, id 
 		return
 	}
 
+	// Get data directory for config backup
+	dataDir := s.cfg.DataDir
+
 	// Run sync in background
 	go func() {
-		result, err := usbbackup.SyncAllShares(s.db, backup, masterKey, serverName)
-		if err != nil {
-			log.Printf("USB backup sync error: %v", err)
+		var result *usbbackup.SyncResult
+		var syncErr error
+
+		if backup.BackupType == usbbackup.BackupTypeConfig {
+			// Config-only backup
+			configInfo := &usbbackup.ConfigBackupInfo{
+				DataDir:  dataDir,
+				DBPath:   filepath.Join(dataDir, "db", "anemone.db"),
+				CertsDir: filepath.Join(dataDir, "certs"),
+				SMBConf:  filepath.Join(dataDir, "smb", "smb.conf"),
+			}
+			result, syncErr = usbbackup.SyncConfig(s.db, backup, configInfo, masterKey, serverName)
 		} else {
+			// Full backup (config + data)
+			// First backup config
+			configInfo := &usbbackup.ConfigBackupInfo{
+				DataDir:  dataDir,
+				DBPath:   filepath.Join(dataDir, "db", "anemone.db"),
+				CertsDir: filepath.Join(dataDir, "certs"),
+				SMBConf:  filepath.Join(dataDir, "smb", "smb.conf"),
+			}
+			configResult, _ := usbbackup.SyncConfig(s.db, backup, configInfo, masterKey, serverName)
+
+			// Then backup selected shares
+			result, syncErr = usbbackup.SyncAllShares(s.db, backup, masterKey, serverName)
+			if result != nil && configResult != nil {
+				result.FilesAdded += configResult.FilesAdded
+				result.BytesSynced += configResult.BytesSynced
+			}
+		}
+
+		if syncErr != nil {
+			log.Printf("USB backup sync error: %v", syncErr)
+		} else if result != nil {
 			log.Printf("USB backup sync completed: %d added, %d updated, %d deleted, %s",
 				result.FilesAdded, result.FilesUpdated, result.FilesDeleted,
 				usbbackup.FormatBytes(result.BytesSynced))
@@ -293,11 +379,56 @@ func (s *Server) handleUSBBackupEditForm(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
+	// Get all shares for selection
+	type ShareWithUser struct {
+		ID         int
+		Name       string
+		UserID     int
+		Username   string
+		Path       string
+		Size       string
+		SizeBytes  int64
+		IsSelected bool
+	}
+	var sharesWithUsers []ShareWithUser
+	selectedIDs := backup.GetSelectedShareIDs()
+	allShares, _ := shares.GetAll(s.db)
+	for _, sh := range allShares {
+		swu := ShareWithUser{
+			ID:     sh.ID,
+			Name:   sh.Name,
+			UserID: sh.UserID,
+			Path:   sh.Path,
+		}
+		// Get username
+		if user, err := users.GetByID(s.db, sh.UserID); err == nil {
+			swu.Username = user.Username
+		}
+		// Calculate size
+		if sizeBytes, err := usbbackup.CalculateDirSize(sh.Path); err == nil {
+			swu.SizeBytes = sizeBytes
+			swu.Size = usbbackup.FormatBytes(sizeBytes)
+		}
+		// Check if selected
+		if len(selectedIDs) == 0 {
+			swu.IsSelected = true // All selected by default
+		} else {
+			for _, selID := range selectedIDs {
+				if selID == sh.ID {
+					swu.IsSelected = true
+					break
+				}
+			}
+		}
+		sharesWithUsers = append(sharesWithUsers, swu)
+	}
+
 	data := map[string]interface{}{
 		"Session":     session,
 		"Title":       i18n.T(lang, "usb_backup.edit"),
 		"Lang":        lang,
 		"Backup":      backup,
+		"AllShares":   sharesWithUsers,
 		"FormatBytes": usbbackup.FormatBytes,
 	}
 
@@ -325,8 +456,25 @@ func (s *Server) handleUSBBackupEdit(w http.ResponseWriter, r *http.Request, id 
 	backup.Name = strings.TrimSpace(r.FormValue("name"))
 	backup.MountPath = strings.TrimSpace(r.FormValue("mount_path"))
 	backup.BackupPath = strings.TrimSpace(r.FormValue("backup_path"))
+	backup.BackupType = strings.TrimSpace(r.FormValue("backup_type"))
 	backup.Enabled = r.FormValue("enabled") == "on"
 	backup.AutoDetect = r.FormValue("auto_detect") == "on"
+
+	// Default to full backup
+	if backup.BackupType == "" {
+		backup.BackupType = usbbackup.BackupTypeFull
+	}
+
+	// Parse selected shares (checkbox values)
+	var selectedShareIDs []int
+	if backup.BackupType == usbbackup.BackupTypeFull {
+		for _, idStr := range r.Form["selected_shares"] {
+			if shareID, err := strconv.Atoi(idStr); err == nil {
+				selectedShareIDs = append(selectedShareIDs, shareID)
+			}
+		}
+	}
+	backup.SetSelectedShareIDs(selectedShareIDs)
 
 	if backup.Name == "" || backup.MountPath == "" {
 		http.Redirect(w, r, "/admin/usb-backup/"+strconv.Itoa(id)+"?error="+i18n.T(lang, "missing_fields"), http.StatusSeeOther)

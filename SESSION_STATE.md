@@ -5,7 +5,7 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.11.9-beta
+**Current Version:** v0.12.0-beta
 **Last Updated:** 2026-01-26
 
 ---
@@ -13,6 +13,26 @@
 ## Current Session
 
 **No active session** - Ready for new work
+
+---
+
+## Release v0.12.0-beta (2026-01-26) ✅
+
+### New Features - USB Backup Refactoring
+- **Backup type selection**: Choose between "Config only" or "Config + Data"
+  - **Config only**: Backs up DB, certificates, smb.conf (~10 MB) - fits on any USB drive
+  - **Config + Data**: Config + selected user shares
+- **Share selection**: Choose which shares to backup (instead of all shares)
+  - Shows share size to help estimate required space
+  - No more risk of running out of space on small USB drives
+- **Estimated size display**: See share sizes before starting backup
+
+### Technical Changes
+- New DB columns: `backup_type`, `selected_shares` in `usb_backups` table
+- New `SyncConfig()` function for config-only backups
+- `SyncAllShares()` now respects selected shares
+- New helper functions: `GetSelectedShareIDs()`, `IsShareSelected()`, `CalculateDirSize()`
+- Updated UI with backup type radio buttons and share checkboxes
 
 ---
 

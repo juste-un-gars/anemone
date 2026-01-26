@@ -106,7 +106,14 @@
 
                             <div class="ml-4">
                                 <h4 class="text-lg font-medium text-gray-900">{{.Name}}</h4>
-                                <p class="text-sm text-gray-500">{{.MountPath}}</p>
+                                <p class="text-sm text-gray-500">
+                                    {{.MountPath}}
+                                    {{if eq .BackupType "config"}}
+                                    <span class="ml-2 px-2 py-0.5 text-xs rounded bg-blue-100 text-blue-700">{{T $.Lang "usb_backup.type_config"}}</span>
+                                    {{else}}
+                                    <span class="ml-2 px-2 py-0.5 text-xs rounded bg-purple-100 text-purple-700">{{T $.Lang "usb_backup.type_full"}}</span>
+                                    {{end}}
+                                </p>
                                 {{if .IsMounted}}
                                 <p class="text-xs text-gray-400">{{.FreeSpace}} {{T $.Lang "usb_backup.free"}} / {{.TotalSpace}}</p>
                                 {{else}}
@@ -177,9 +184,9 @@
 
             {{if .AvailableDrives}}
             <div class="divide-y divide-gray-200">
-                {{range .AvailableDrives}}
+                {{range $index, $drive := .AvailableDrives}}
                 <form method="POST" action="/admin/usb-backup/add" class="p-6">
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-start justify-between">
                         <div class="flex items-center">
                             <div class="flex-shrink-0 h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
                                 <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -196,21 +203,70 @@
                             </div>
                         </div>
 
-                        <div class="flex items-center space-x-4">
-                            <input type="hidden" name="mount_path" value="{{.MountPath}}">
-                            <input type="text" name="name" placeholder="{{T $.Lang "usb_backup.name_placeholder"}}"
-                                   value="{{if .Label}}{{.Label}}{{else}}USB Backup{{end}}"
-                                   class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-purple-500 focus:border-purple-500" required>
-                            <input type="hidden" name="backup_path" value="anemone-backup">
-                            <input type="hidden" name="enabled" value="on">
-                            <input type="hidden" name="auto_detect" value="on">
-                            <button type="submit" class="px-4 py-2 text-sm font-medium text-white anemone-gradient rounded-md hover:opacity-90">
-                                {{T $.Lang "usb_backup.add"}}
-                            </button>
-                            <button type="button" onclick="ejectDisk('{{.MountPath}}')" class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200" title="{{T $.Lang "usb_backup.eject"}}">
+                        <div class="flex items-center space-x-2">
+                            <button type="button" onclick="ejectDisk('{{.MountPath}}')" class="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200" title="{{T $.Lang "usb_backup.eject"}}">
                                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
                                 </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Configuration form -->
+                    <div class="mt-4 ml-14 space-y-4">
+                        <input type="hidden" name="mount_path" value="{{.MountPath}}">
+                        <input type="hidden" name="backup_path" value="anemone-backup">
+                        <input type="hidden" name="enabled" value="on">
+                        <input type="hidden" name="auto_detect" value="on">
+
+                        <!-- Name -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">{{T $.Lang "usb_backup.name"}}</label>
+                            <input type="text" name="name" placeholder="{{T $.Lang "usb_backup.name_placeholder"}}"
+                                   value="{{if .Label}}{{.Label}}{{else}}USB Backup{{end}}"
+                                   class="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-purple-500 focus:border-purple-500" required>
+                        </div>
+
+                        <!-- Backup Type -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{T $.Lang "usb_backup.backup_type"}}</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center">
+                                    <input type="radio" name="backup_type" value="config" class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300" onchange="toggleShareSelection({{$index}}, false)">
+                                    <span class="ml-2 text-sm text-gray-700">{{T $.Lang "usb_backup.type_config"}}</span>
+                                    <span class="ml-2 text-xs text-gray-500">({{T $.Lang "usb_backup.type_config_desc"}})</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="radio" name="backup_type" value="full" class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300" checked onchange="toggleShareSelection({{$index}}, true)">
+                                    <span class="ml-2 text-sm text-gray-700">{{T $.Lang "usb_backup.type_full"}}</span>
+                                    <span class="ml-2 text-xs text-gray-500">({{T $.Lang "usb_backup.type_full_desc"}})</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Share Selection -->
+                        <div id="shareSelection{{$index}}" class="bg-gray-50 p-4 rounded-lg">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">{{T $.Lang "usb_backup.select_shares"}}</label>
+                            {{if $.AllShares}}
+                            <div class="space-y-2 max-h-48 overflow-y-auto">
+                                {{range $.AllShares}}
+                                <label class="flex items-center justify-between p-2 bg-white rounded border border-gray-200 hover:bg-gray-50">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" name="selected_shares" value="{{.ID}}" class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded" checked>
+                                        <span class="ml-2 text-sm text-gray-700">{{.Username}}/{{.Name}}</span>
+                                    </div>
+                                    <span class="text-xs text-gray-500">{{.Size}}</span>
+                                </label>
+                                {{end}}
+                            </div>
+                            {{else}}
+                            <p class="text-sm text-gray-500">{{T $.Lang "usb_backup.no_shares"}}</p>
+                            {{end}}
+                        </div>
+
+                        <div class="pt-2">
+                            <button type="submit" class="px-4 py-2 text-sm font-medium text-white anemone-gradient rounded-md hover:opacity-90">
+                                {{T $.Lang "usb_backup.add"}}
                             </button>
                         </div>
                     </div>
@@ -253,6 +309,20 @@
 </div>
 
 <script>
+function toggleShareSelection(index, show) {
+    const el = document.getElementById('shareSelection' + index);
+    if (el) {
+        el.style.display = show ? 'block' : 'none';
+        // Uncheck all shares if hiding
+        if (!show) {
+            el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        } else {
+            // Check all shares if showing
+            el.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+        }
+    }
+}
+
 async function ejectDisk(mountPath) {
     if (!confirm('{{T .Lang "usb_backup.eject_confirm"}}')) return;
 

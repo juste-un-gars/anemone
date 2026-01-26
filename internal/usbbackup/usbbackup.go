@@ -8,27 +8,36 @@ package usbbackup
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 )
 
+// BackupType constants
+const (
+	BackupTypeConfig = "config" // Config only: DB, certs, smb.conf
+	BackupTypeFull   = "full"   // Config + selected shares data
+)
+
 // USBBackup represents a USB/external drive backup configuration
 type USBBackup struct {
-	ID          int
-	Name        string     // User-friendly name (e.g., "USB Backup Drive")
-	MountPath   string     // Mount point (e.g., "/media/usb-backup")
-	BackupPath  string     // Subdirectory for backups (e.g., "anemone-backup")
-	Enabled     bool       // Whether this backup is active
-	AutoDetect  bool       // Auto-start backup when drive is mounted
-	LastSync    *time.Time // Last successful backup
-	LastStatus  string     // "success", "error", "running", "unknown"
-	LastError   string     // Last error message if any
-	FilesSynced int        // Files synced in last backup
-	BytesSynced int64      // Bytes synced in last backup
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID             int
+	Name           string     // User-friendly name (e.g., "USB Backup Drive")
+	MountPath      string     // Mount point (e.g., "/media/usb-backup")
+	BackupPath     string     // Subdirectory for backups (e.g., "anemone-backup")
+	BackupType     string     // "config" or "full"
+	SelectedShares string     // JSON array of share IDs (empty = all with sync_enabled)
+	Enabled        bool       // Whether this backup is active
+	AutoDetect     bool       // Auto-start backup when drive is mounted
+	LastSync       *time.Time // Last successful backup
+	LastStatus     string     // "success", "error", "running", "unknown"
+	LastError      string     // Last error message if any
+	FilesSynced    int        // Files synced in last backup
+	BytesSynced    int64      // Bytes synced in last backup
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // DriveInfo represents detected USB/external drive information
@@ -44,12 +53,17 @@ type DriveInfo struct {
 
 // Create creates a new USB backup configuration
 func Create(db *sql.DB, backup *USBBackup) error {
-	query := `INSERT INTO usb_backups (name, mount_path, backup_path, enabled, auto_detect,
-	          last_status, created_at, updated_at)
-	          VALUES (?, ?, ?, ?, ?, 'unknown', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+	// Default to full backup if not specified
+	if backup.BackupType == "" {
+		backup.BackupType = BackupTypeFull
+	}
+
+	query := `INSERT INTO usb_backups (name, mount_path, backup_path, backup_type, selected_shares,
+	          enabled, auto_detect, last_status, created_at, updated_at)
+	          VALUES (?, ?, ?, ?, ?, ?, ?, 'unknown', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
 
 	result, err := db.Exec(query, backup.Name, backup.MountPath, backup.BackupPath,
-		backup.Enabled, backup.AutoDetect)
+		backup.BackupType, backup.SelectedShares, backup.Enabled, backup.AutoDetect)
 	if err != nil {
 		return fmt.Errorf("failed to create USB backup: %w", err)
 	}
@@ -66,13 +80,15 @@ func Create(db *sql.DB, backup *USBBackup) error {
 // GetByID retrieves a USB backup configuration by ID
 func GetByID(db *sql.DB, id int) (*USBBackup, error) {
 	backup := &USBBackup{}
-	query := `SELECT id, name, mount_path, backup_path, enabled, auto_detect,
-	          last_sync, last_status, last_error, files_synced, bytes_synced,
+	query := `SELECT id, name, mount_path, backup_path, backup_type, selected_shares,
+	          enabled, auto_detect, last_sync, last_status, last_error, files_synced, bytes_synced,
 	          created_at, updated_at
 	          FROM usb_backups WHERE id = ?`
 
+	var backupType, selectedShares sql.NullString
 	err := db.QueryRow(query, id).Scan(
 		&backup.ID, &backup.Name, &backup.MountPath, &backup.BackupPath,
+		&backupType, &selectedShares,
 		&backup.Enabled, &backup.AutoDetect, &backup.LastSync, &backup.LastStatus,
 		&backup.LastError, &backup.FilesSynced, &backup.BytesSynced,
 		&backup.CreatedAt, &backup.UpdatedAt,
@@ -84,13 +100,22 @@ func GetByID(db *sql.DB, id int) (*USBBackup, error) {
 		return nil, fmt.Errorf("failed to get USB backup: %w", err)
 	}
 
+	// Handle nullable fields with defaults
+	backup.BackupType = BackupTypeFull
+	if backupType.Valid && backupType.String != "" {
+		backup.BackupType = backupType.String
+	}
+	if selectedShares.Valid {
+		backup.SelectedShares = selectedShares.String
+	}
+
 	return backup, nil
 }
 
 // GetAll retrieves all USB backup configurations
 func GetAll(db *sql.DB) ([]*USBBackup, error) {
-	query := `SELECT id, name, mount_path, backup_path, enabled, auto_detect,
-	          last_sync, last_status, last_error, files_synced, bytes_synced,
+	query := `SELECT id, name, mount_path, backup_path, backup_type, selected_shares,
+	          enabled, auto_detect, last_sync, last_status, last_error, files_synced, bytes_synced,
 	          created_at, updated_at
 	          FROM usb_backups ORDER BY created_at DESC`
 
@@ -103,8 +128,10 @@ func GetAll(db *sql.DB) ([]*USBBackup, error) {
 	var backups []*USBBackup
 	for rows.Next() {
 		backup := &USBBackup{}
+		var backupType, selectedShares sql.NullString
 		err := rows.Scan(
 			&backup.ID, &backup.Name, &backup.MountPath, &backup.BackupPath,
+			&backupType, &selectedShares,
 			&backup.Enabled, &backup.AutoDetect, &backup.LastSync, &backup.LastStatus,
 			&backup.LastError, &backup.FilesSynced, &backup.BytesSynced,
 			&backup.CreatedAt, &backup.UpdatedAt,
@@ -112,6 +139,16 @@ func GetAll(db *sql.DB) ([]*USBBackup, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan USB backup: %w", err)
 		}
+
+		// Handle nullable fields with defaults
+		backup.BackupType = BackupTypeFull
+		if backupType.Valid && backupType.String != "" {
+			backup.BackupType = backupType.String
+		}
+		if selectedShares.Valid {
+			backup.SelectedShares = selectedShares.String
+		}
+
 		backups = append(backups, backup)
 	}
 
@@ -120,8 +157,8 @@ func GetAll(db *sql.DB) ([]*USBBackup, error) {
 
 // GetEnabled retrieves all enabled USB backup configurations
 func GetEnabled(db *sql.DB) ([]*USBBackup, error) {
-	query := `SELECT id, name, mount_path, backup_path, enabled, auto_detect,
-	          last_sync, last_status, last_error, files_synced, bytes_synced,
+	query := `SELECT id, name, mount_path, backup_path, backup_type, selected_shares,
+	          enabled, auto_detect, last_sync, last_status, last_error, files_synced, bytes_synced,
 	          created_at, updated_at
 	          FROM usb_backups WHERE enabled = 1 ORDER BY created_at DESC`
 
@@ -134,8 +171,10 @@ func GetEnabled(db *sql.DB) ([]*USBBackup, error) {
 	var backups []*USBBackup
 	for rows.Next() {
 		backup := &USBBackup{}
+		var backupType, selectedShares sql.NullString
 		err := rows.Scan(
 			&backup.ID, &backup.Name, &backup.MountPath, &backup.BackupPath,
+			&backupType, &selectedShares,
 			&backup.Enabled, &backup.AutoDetect, &backup.LastSync, &backup.LastStatus,
 			&backup.LastError, &backup.FilesSynced, &backup.BytesSynced,
 			&backup.CreatedAt, &backup.UpdatedAt,
@@ -143,6 +182,16 @@ func GetEnabled(db *sql.DB) ([]*USBBackup, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan USB backup: %w", err)
 		}
+
+		// Handle nullable fields with defaults
+		backup.BackupType = BackupTypeFull
+		if backupType.Valid && backupType.String != "" {
+			backup.BackupType = backupType.String
+		}
+		if selectedShares.Valid {
+			backup.SelectedShares = selectedShares.String
+		}
+
 		backups = append(backups, backup)
 	}
 
@@ -152,10 +201,12 @@ func GetEnabled(db *sql.DB) ([]*USBBackup, error) {
 // Update updates a USB backup configuration
 func Update(db *sql.DB, backup *USBBackup) error {
 	query := `UPDATE usb_backups SET name = ?, mount_path = ?, backup_path = ?,
+	          backup_type = ?, selected_shares = ?,
 	          enabled = ?, auto_detect = ?, updated_at = CURRENT_TIMESTAMP
 	          WHERE id = ?`
 
 	_, err := db.Exec(query, backup.Name, backup.MountPath, backup.BackupPath,
+		backup.BackupType, backup.SelectedShares,
 		backup.Enabled, backup.AutoDetect, backup.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update USB backup: %w", err)
@@ -243,4 +294,54 @@ func CountEnabled(db *sql.DB) (int, error) {
 		return 0, fmt.Errorf("failed to count enabled USB backups: %w", err)
 	}
 	return count, nil
+}
+
+// GetSelectedShareIDs returns the list of selected share IDs from the JSON string
+// Returns empty slice if no shares are selected (meaning all shares with sync_enabled)
+func (b *USBBackup) GetSelectedShareIDs() []int {
+	if b.SelectedShares == "" {
+		return []int{}
+	}
+
+	var ids []int
+	if err := json.Unmarshal([]byte(b.SelectedShares), &ids); err != nil {
+		return []int{}
+	}
+	return ids
+}
+
+// SetSelectedShareIDs sets the selected shares from a slice of IDs
+func (b *USBBackup) SetSelectedShareIDs(ids []int) {
+	if len(ids) == 0 {
+		b.SelectedShares = ""
+		return
+	}
+
+	data, err := json.Marshal(ids)
+	if err != nil {
+		b.SelectedShares = ""
+		return
+	}
+	b.SelectedShares = string(data)
+}
+
+// IsShareSelected checks if a specific share ID is selected for backup
+// Returns true if no shares are explicitly selected (all shares mode)
+func (b *USBBackup) IsShareSelected(shareID int) bool {
+	ids := b.GetSelectedShareIDs()
+	if len(ids) == 0 {
+		return true // No selection = all shares
+	}
+
+	for _, id := range ids {
+		if id == shareID {
+			return true
+		}
+	}
+	return false
+}
+
+// IsConfigOnly returns true if this is a config-only backup
+func (b *USBBackup) IsConfigOnly() bool {
+	return b.BackupType == BackupTypeConfig
 }

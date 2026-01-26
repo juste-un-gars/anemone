@@ -48,7 +48,125 @@ type SyncResult struct {
 	Errors       []string
 }
 
-// SyncAllShares backs up all shares to the USB drive
+// ConfigBackupInfo contains paths for config backup
+type ConfigBackupInfo struct {
+	DataDir  string // Base data directory (e.g., /srv/anemone)
+	DBPath   string // Path to database file
+	CertsDir string // Path to certificates directory
+	SMBConf  string // Path to smb.conf
+}
+
+// SyncConfig backs up only the configuration (DB, certs, smb.conf)
+// This is a lightweight backup that fits on any USB drive
+func SyncConfig(db *sql.DB, backup *USBBackup, configInfo *ConfigBackupInfo, masterKey string, serverName string) (*SyncResult, error) {
+	if !backup.IsMounted() {
+		return nil, fmt.Errorf("backup drive not mounted: %s", backup.MountPath)
+	}
+
+	if err := backup.EnsureBackupDir(); err != nil {
+		return nil, err
+	}
+
+	// Update status to running
+	UpdateSyncStatus(db, backup.ID, "running", "", 0, 0)
+
+	result := &SyncResult{}
+
+	// Config backup directory
+	configDir := filepath.Join(backup.GetFullBackupPath(), "config")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		UpdateSyncStatus(db, backup.ID, "error", err.Error(), 0, 0)
+		return nil, fmt.Errorf("failed to create config backup directory: %w", err)
+	}
+
+	// 1. Backup database (encrypted)
+	if configInfo.DBPath != "" {
+		dbDest := filepath.Join(configDir, "anemone.db.enc")
+		bytesCopied, err := copyFileEncrypted(configInfo.DBPath, dbDest, masterKey)
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("database: %v", err))
+			log.Printf("⚠️  USB backup: failed to backup database: %v", err)
+		} else {
+			result.FilesAdded++
+			result.BytesSynced += bytesCopied
+			log.Printf("✅ USB backup: database backed up (%s)", FormatBytes(bytesCopied))
+		}
+	}
+
+	// 2. Backup certificates directory (encrypted)
+	if configInfo.CertsDir != "" {
+		certsDestDir := filepath.Join(configDir, "certs")
+		if err := os.MkdirAll(certsDestDir, 0755); err == nil {
+			err := filepath.Walk(configInfo.CertsDir, func(path string, info os.FileInfo, err error) error {
+				if err != nil || info.IsDir() {
+					return nil
+				}
+				relPath, _ := filepath.Rel(configInfo.CertsDir, path)
+				destPath := filepath.Join(certsDestDir, relPath+".enc")
+
+				// Ensure parent directory exists
+				os.MkdirAll(filepath.Dir(destPath), 0755)
+
+				bytesCopied, copyErr := copyFileEncrypted(path, destPath, masterKey)
+				if copyErr != nil {
+					result.Errors = append(result.Errors, fmt.Sprintf("cert %s: %v", relPath, copyErr))
+				} else {
+					result.FilesAdded++
+					result.BytesSynced += bytesCopied
+				}
+				return nil
+			})
+			if err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("certs dir: %v", err))
+			} else {
+				log.Printf("✅ USB backup: certificates backed up")
+			}
+		}
+	}
+
+	// 3. Backup smb.conf (encrypted)
+	if configInfo.SMBConf != "" {
+		if _, err := os.Stat(configInfo.SMBConf); err == nil {
+			smbDest := filepath.Join(configDir, "smb.conf.enc")
+			bytesCopied, err := copyFileEncrypted(configInfo.SMBConf, smbDest, masterKey)
+			if err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("smb.conf: %v", err))
+				log.Printf("⚠️  USB backup: failed to backup smb.conf: %v", err)
+			} else {
+				result.FilesAdded++
+				result.BytesSynced += bytesCopied
+				log.Printf("✅ USB backup: smb.conf backed up")
+			}
+		}
+	}
+
+	// Save config manifest
+	configManifest := map[string]interface{}{
+		"version":       1,
+		"backup_type":   "config",
+		"source_server": serverName,
+		"timestamp":     time.Now().Format(time.RFC3339),
+		"files_count":   result.FilesAdded,
+		"bytes_total":   result.BytesSynced,
+	}
+	manifestData, _ := json.MarshalIndent(configManifest, "", "  ")
+	manifestPath := filepath.Join(configDir, ".anemone-config-manifest.json")
+	os.WriteFile(manifestPath, manifestData, 0600)
+
+	// Update final status
+	if len(result.Errors) > 0 {
+		errMsg := strings.Join(result.Errors, "; ")
+		UpdateSyncStatus(db, backup.ID, "error", errMsg, result.FilesAdded, result.BytesSynced)
+	} else {
+		UpdateSyncStatus(db, backup.ID, "success", "", result.FilesAdded, result.BytesSynced)
+	}
+
+	log.Printf("📦 USB config backup completed: %d files, %s", result.FilesAdded, FormatBytes(result.BytesSynced))
+	return result, nil
+}
+
+// SyncAllShares backs up selected shares to the USB drive
+// Respects backup.SelectedShares - if empty, backs up all shares with sync_enabled
 func SyncAllShares(db *sql.DB, backup *USBBackup, masterKey string, serverName string) (*SyncResult, error) {
 	if !backup.IsMounted() {
 		return nil, fmt.Errorf("backup drive not mounted: %s", backup.MountPath)
@@ -61,7 +179,7 @@ func SyncAllShares(db *sql.DB, backup *USBBackup, masterKey string, serverName s
 	// Update status to running
 	UpdateSyncStatus(db, backup.ID, "running", "", 0, 0)
 
-	// Get all shares with sync enabled
+	// Get all shares
 	allShares, err := shares.GetAll(db)
 	if err != nil {
 		UpdateSyncStatus(db, backup.ID, "error", err.Error(), 0, 0)
@@ -69,11 +187,27 @@ func SyncAllShares(db *sql.DB, backup *USBBackup, masterKey string, serverName s
 	}
 
 	result := &SyncResult{}
+	selectedIDs := backup.GetSelectedShareIDs()
+	sharesBackedUp := 0
 
 	for _, share := range allShares {
-		if !share.SyncEnabled {
+		// Check if share should be backed up
+		// If selectedIDs is empty, backup all shares with sync_enabled
+		// If selectedIDs is not empty, only backup selected shares (ignore sync_enabled)
+		shouldBackup := false
+		if len(selectedIDs) == 0 {
+			// No selection = all shares with sync_enabled
+			shouldBackup = share.SyncEnabled
+		} else {
+			// Specific selection = only selected shares
+			shouldBackup = backup.IsShareSelected(share.ID)
+		}
+
+		if !shouldBackup {
 			continue
 		}
+
+		log.Printf("📂 USB backup: syncing share %s (ID: %d)", share.Name, share.ID)
 
 		shareResult, err := syncShare(db, backup, share, masterKey, serverName)
 		if err != nil {
@@ -87,6 +221,7 @@ func SyncAllShares(db *sql.DB, backup *USBBackup, masterKey string, serverName s
 		result.FilesUpdated += shareResult.FilesUpdated
 		result.FilesDeleted += shareResult.FilesDeleted
 		result.BytesSynced += shareResult.BytesSynced
+		sharesBackedUp++
 	}
 
 	// Update final status
@@ -97,6 +232,9 @@ func SyncAllShares(db *sql.DB, backup *USBBackup, masterKey string, serverName s
 	} else {
 		UpdateSyncStatus(db, backup.ID, "success", "", totalFiles, result.BytesSynced)
 	}
+
+	log.Printf("📦 USB backup completed: %d shares, %d files, %s",
+		sharesBackedUp, totalFiles, FormatBytes(result.BytesSynced))
 
 	return result, nil
 }
@@ -348,4 +486,87 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// EstimateBackupSize calculates the estimated size of a backup
+// Returns total bytes for config and data separately
+func EstimateBackupSize(db *sql.DB, backup *USBBackup, configInfo *ConfigBackupInfo) (configBytes int64, dataBytes int64, err error) {
+	// Estimate config size
+	if configInfo != nil {
+		// Database
+		if info, err := os.Stat(configInfo.DBPath); err == nil {
+			configBytes += info.Size()
+		}
+
+		// Certificates
+		if configInfo.CertsDir != "" {
+			filepath.Walk(configInfo.CertsDir, func(path string, info os.FileInfo, err error) error {
+				if err == nil && !info.IsDir() {
+					configBytes += info.Size()
+				}
+				return nil
+			})
+		}
+
+		// SMB config
+		if info, err := os.Stat(configInfo.SMBConf); err == nil {
+			configBytes += info.Size()
+		}
+	}
+
+	// Estimate data size (only if not config-only backup)
+	if backup.BackupType != BackupTypeConfig {
+		allShares, err := shares.GetAll(db)
+		if err != nil {
+			return configBytes, 0, err
+		}
+
+		selectedIDs := backup.GetSelectedShareIDs()
+
+		for _, share := range allShares {
+			// Check if share should be backed up
+			shouldBackup := false
+			if len(selectedIDs) == 0 {
+				shouldBackup = share.SyncEnabled
+			} else {
+				shouldBackup = backup.IsShareSelected(share.ID)
+			}
+
+			if !shouldBackup {
+				continue
+			}
+
+			// Calculate share size
+			shareSize, _ := CalculateDirSize(share.Path)
+			dataBytes += shareSize
+		}
+	}
+
+	return configBytes, dataBytes, nil
+}
+
+// CalculateDirSize calculates total size of files in a directory
+func CalculateDirSize(path string) (int64, error) {
+	var totalSize int64
+
+	err := filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip files we can't access
+		}
+		if info.IsDir() {
+			// Skip hidden directories
+			if strings.HasPrefix(info.Name(), ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		// Skip hidden files
+		if strings.HasPrefix(info.Name(), ".") {
+			return nil
+		}
+		totalSize += info.Size()
+		return nil
+	})
+
+	return totalSize, err
 }

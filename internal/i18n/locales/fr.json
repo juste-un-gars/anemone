@@ -923,6 +923,13 @@
   "usb_backup.eject": "Éjecter",
   "usb_backup.eject_confirm": "Voulez-vous éjecter ce disque ? Assurez-vous qu'aucune opération n'est en cours.",
   "usb_backup.ejected": "Disque éjecté avec succès. Vous pouvez le débrancher.",
+  "usb_backup.backup_type": "Type de sauvegarde",
+  "usb_backup.type_config": "Configuration seulement",
+  "usb_backup.type_config_desc": "DB, certificats, config Samba - ~10 Mo",
+  "usb_backup.type_full": "Configuration + Données",
+  "usb_backup.type_full_desc": "config + partages sélectionnés",
+  "usb_backup.select_shares": "Partages à sauvegarder",
+  "usb_backup.no_shares": "Aucun partage disponible",
 
   "usb_format.title": "Formater un disque",
   "usb_format.description": "Disques non montés détectés. Formatez-les pour les utiliser avec Anemone.",

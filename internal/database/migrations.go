@@ -368,35 +368,71 @@ func migrateUSBBackupsTable(db *sql.DB) error {
 	// Check if table exists
 	var tableName string
 	err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='usb_backups'").Scan(&tableName)
-	if err == nil {
-		// Table exists, nothing to do
+	if err != nil {
+		// Table doesn't exist, create it with all columns
+		query := `CREATE TABLE usb_backups (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT UNIQUE NOT NULL,
+			mount_path TEXT NOT NULL,
+			backup_path TEXT DEFAULT 'anemone-backup',
+			backup_type TEXT DEFAULT 'full',
+			selected_shares TEXT DEFAULT '',
+			enabled BOOLEAN DEFAULT 1,
+			auto_detect BOOLEAN DEFAULT 1,
+			last_sync DATETIME,
+			last_status TEXT DEFAULT 'unknown',
+			last_error TEXT DEFAULT '',
+			files_synced INTEGER DEFAULT 0,
+			bytes_synced INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`
+
+		if _, err := db.Exec(query); err != nil {
+			return fmt.Errorf("failed to create usb_backups table: %w", err)
+		}
+
+		// Create index for quick lookups
+		if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_usb_backups_enabled ON usb_backups(enabled)"); err != nil {
+			return fmt.Errorf("failed to create usb_backups index: %w", err)
+		}
+
 		return nil
 	}
 
-	// Create the usb_backups table
-	query := `CREATE TABLE usb_backups (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT UNIQUE NOT NULL,
-		mount_path TEXT NOT NULL,
-		backup_path TEXT DEFAULT 'anemone-backup',
-		enabled BOOLEAN DEFAULT 1,
-		auto_detect BOOLEAN DEFAULT 1,
-		last_sync DATETIME,
-		last_status TEXT DEFAULT 'unknown',
-		last_error TEXT DEFAULT '',
-		files_synced INTEGER DEFAULT 0,
-		bytes_synced INTEGER DEFAULT 0,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	)`
+	// Table exists, check for missing columns and add them
+	rows, err := db.Query("PRAGMA table_info(usb_backups)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
 
-	if _, err := db.Exec(query); err != nil {
-		return fmt.Errorf("failed to create usb_backups table: %w", err)
+	existingColumns := make(map[string]bool)
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dfltValue sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		existingColumns[name] = true
 	}
 
-	// Create index for quick lookups
-	if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_usb_backups_enabled ON usb_backups(enabled)"); err != nil {
-		return fmt.Errorf("failed to create usb_backups index: %w", err)
+	// Add backup_type column if it doesn't exist
+	// Values: "config" (config only) or "full" (config + selected shares data)
+	if !existingColumns["backup_type"] {
+		if _, err := db.Exec("ALTER TABLE usb_backups ADD COLUMN backup_type TEXT DEFAULT 'full'"); err != nil {
+			return fmt.Errorf("failed to add backup_type column: %w", err)
+		}
+	}
+
+	// Add selected_shares column if it doesn't exist
+	// JSON array of share IDs, empty string means all shares with sync_enabled
+	if !existingColumns["selected_shares"] {
+		if _, err := db.Exec("ALTER TABLE usb_backups ADD COLUMN selected_shares TEXT DEFAULT ''"); err != nil {
+			return fmt.Errorf("failed to add selected_shares column: %w", err)
+		}
 	}
 
 	return nil

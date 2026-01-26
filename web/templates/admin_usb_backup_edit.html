@@ -85,6 +85,47 @@
                     <p class="mt-1 text-xs text-gray-500">{{T .Lang "usb_backup.backup_path_hint"}}</p>
                 </div>
 
+                <!-- Backup Type -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">{{T .Lang "usb_backup.backup_type"}}</label>
+                    <div class="space-y-2">
+                        <label class="flex items-center">
+                            <input type="radio" name="backup_type" value="config" class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                                   {{if eq .Backup.BackupType "config"}}checked{{end}} onchange="toggleShareSelection(false)">
+                            <span class="ml-2 text-sm text-gray-700">{{T .Lang "usb_backup.type_config"}}</span>
+                            <span class="ml-2 text-xs text-gray-500">({{T .Lang "usb_backup.type_config_desc"}})</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" name="backup_type" value="full" class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                                   {{if ne .Backup.BackupType "config"}}checked{{end}} onchange="toggleShareSelection(true)">
+                            <span class="ml-2 text-sm text-gray-700">{{T .Lang "usb_backup.type_full"}}</span>
+                            <span class="ml-2 text-xs text-gray-500">({{T .Lang "usb_backup.type_full_desc"}})</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Share Selection -->
+                <div id="shareSelection" class="mb-4 bg-gray-50 p-4 rounded-lg" {{if eq .Backup.BackupType "config"}}style="display:none"{{end}}>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">{{T .Lang "usb_backup.select_shares"}}</label>
+                    {{if .AllShares}}
+                    <div class="space-y-2 max-h-48 overflow-y-auto">
+                        {{range .AllShares}}
+                        <label class="flex items-center justify-between p-2 bg-white rounded border border-gray-200 hover:bg-gray-50">
+                            <div class="flex items-center">
+                                <input type="checkbox" name="selected_shares" value="{{.ID}}"
+                                       class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                                       {{if .IsSelected}}checked{{end}}>
+                                <span class="ml-2 text-sm text-gray-700">{{.Username}}/{{.Name}}</span>
+                            </div>
+                            <span class="text-xs text-gray-500">{{.Size}}</span>
+                        </label>
+                        {{end}}
+                    </div>
+                    {{else}}
+                    <p class="text-sm text-gray-500">{{T .Lang "usb_backup.no_shares"}}</p>
+                    {{end}}
+                </div>
+
                 <!-- Enabled -->
                 <div class="mb-4">
                     <label class="flex items-center">
@@ -142,5 +183,14 @@
         {{end}}
     </div>
 </div>
+
+<script>
+function toggleShareSelection(show) {
+    const el = document.getElementById('shareSelection');
+    if (el) {
+        el.style.display = show ? 'block' : 'none';
+    }
+}
+</script>
 </body>
 </html>
