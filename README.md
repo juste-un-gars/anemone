@@ -13,6 +13,8 @@
 
 - **Multi-user** with individual SMB shares
 - **P2P synchronization** with end-to-end encryption (AES-256-GCM)
+- **USB backup** to external drives with scheduling
+- **Storage management** - Format, mount, eject disks from web UI
 - **Incremental sync** - Only modified files are transferred
 - **Quotas** per user (Btrfs recommended)
 - **Trash** with configurable retention
@@ -40,6 +42,7 @@ Then open `https://localhost:8443` to complete the setup.
 | [Storage Setup](docs/storage-setup.md) | RAID, ZFS, Btrfs |
 | [User Guide](docs/user-guide.md) | Users, shares, quotas |
 | [P2P Sync](docs/p2p-sync.md) | Peers, scheduler, restore |
+| [USB Backup](docs/usb-backup.md) | Backup to USB drives |
 | [Security](docs/security.md) | Encryption, keys, architecture |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |
 | [Advanced Configuration](docs/advanced.md) | Environment variables, external drives |

@@ -149,8 +149,72 @@ Additional access to:
 - System settings
 - Updates
 
+## USB Backup
+
+Back up your server to external USB drives.
+
+### Creating a Backup
+
+1. Connect a USB drive (or use **Storage** to format one)
+2. Go to **USB Backup** (admin)
+3. Click **Add Backup**
+4. Configure name and paths
+
+### Backup Types
+
+| Type | Content | Size |
+|------|---------|------|
+| **Config only** | Database, certificates, Samba config | ~10 MB |
+| **Config + Data** | Config + selected user shares | Varies |
+
+### Automatic Scheduling
+
+1. Edit a USB backup
+2. Enable **Automatic sync**
+3. Choose frequency: interval, daily, weekly, or monthly
+
+### Manual Sync
+
+Click **Sync Now** to run immediately.
+
+See [USB Backup Guide](usb-backup.md) for complete documentation.
+
+## Storage Management
+
+Manage disks directly from the web interface.
+
+### Formatting a Disk
+
+1. Go to **Storage** (admin)
+2. Find unformatted or unmounted disk
+3. Click **Format**
+4. Choose filesystem:
+   - **ext4** - Linux (best performance)
+   - **XFS** - Linux (large files)
+   - **exFAT** - Windows/Mac/Linux compatible
+   - **FAT32** - Universal (4 GB file limit)
+
+### Mounting a Disk
+
+1. Go to **Storage**
+2. Click **Mount** on an unmounted disk
+3. Choose mount path (e.g., `/mnt/backup-drive`)
+4. Options:
+   - **Shared access** - All users can read/write
+   - **Persistent mount** - Survives reboots (fstab)
+
+### Ejecting Safely
+
+Always eject before disconnecting:
+
+1. Go to **Storage** or **USB Backup**
+2. Click **Eject** or **Unmount**
+3. Wait for confirmation
+4. Remove the drive
+
 ## See Also
 
+- [USB Backup](usb-backup.md) - Complete USB backup guide
 - [P2P Sync](p2p-sync.md) - Backups between servers
 - [Security](security.md) - Encryption keys
 - [Troubleshooting](troubleshooting.md) - SMB share issues

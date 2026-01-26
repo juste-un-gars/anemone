@@ -33,12 +33,15 @@ Server A                     Server B
 
 1. Go to **Synchronization** (admin)
 2. Enable automatic sync
-3. Choose interval:
-   - 30 minutes
-   - 1 hour
-   - 2 hours
-   - 6 hours
-   - Fixed time (e.g., 11:00 PM)
+3. Choose frequency mode:
+
+| Mode | Options |
+|------|---------|
+| **Interval** | 15min, 30min, 1h, 2h, 4h, 8h, 12h, 24h |
+| **Daily** | Every day at specified time (HH:MM) |
+| **Weekly** | Every week on specified day and time |
+| **Monthly** | Every month on specified day (1-28) and time |
+
 4. Save
 
 ## Manual Sync

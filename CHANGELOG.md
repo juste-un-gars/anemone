@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0-beta] - 2026-01-26
+
+### Added
+
+#### USB Backup Automatic Scheduling
+- **Automatic sync scheduling**: Schedule USB backups to run automatically at configured intervals
+- **Interval mode**: Every 15min, 30min, 1h, 2h, 4h, 8h, 12h, or 24h
+- **Daily mode**: Every day at a specific time (HH:MM)
+- **Weekly mode**: Every week on a specific day and time
+- **Monthly mode**: Every month on a specific day (1-28) and time
+- **Schedule configuration UI**: New section in USB backup edit form with enable/disable toggle, frequency selector, time picker, and day selectors
+- **New template functions**: Added `deref` and `iterate` functions for schedule UI
+
+### Changed
+- New database columns for schedule: `sync_enabled`, `sync_frequency`, `sync_time`, `sync_day_of_week`, `sync_day_of_month`, `sync_interval_minutes`
+- New scheduler runs every minute to check for enabled backups
+
+## [0.12.0-beta] - 2026-01-26
+
+### Added
+
+#### USB Backup Refactoring
+- **Backup type selection**: Choose between "Config only" or "Config + Data"
+  - **Config only**: Backs up DB, certificates, smb.conf (~10 MB) - fits on any USB drive
+  - **Config + Data**: Config plus selected user shares
+- **Share selection**: Choose which shares to backup instead of all shares
+- **Estimated size display**: Shows share sizes to help estimate required space
+
+### Changed
+- New database columns: `backup_type`, `selected_shares` in `usb_backups` table
+- New `SyncConfig()` function for config-only backups
+- `SyncAllShares()` now respects selected shares
+
+## [0.11.9-beta] - 2026-01-26
+
+### Fixed
+- **USB drives not detected on NVMe systems**: Fixed detection that was hardcoded to exclude `/dev/sda*` assuming it's the system disk
+  - Now dynamically detects the system disk via `findmnt /`
+  - Any disk mounted in `/mnt/`, `/media/`, or `/run/media/` is now correctly detected
+
+## [0.11.8-beta] - 2026-01-26
+
+### Fixed
+- **Format disk dialog missing options**: Added "Persistent mount" option to format dialog
+  - Now includes all three options: Mount after format, Shared access, Persistent mount
+  - All checked by default for convenience
+- Note: Requires sudoers rule for `tee -a /etc/fstab` (added in install.sh, manual add needed for older installs)
+
+## [0.11.7-beta] - 2026-01-26
+
+### Added
+- **Shared access option for disk mount**: New checkbox to allow all users read/write access to mounted disks
+  - Available in both "Mount disk" and "Format disk" dialogs
+  - Uses `umask=000` for FAT/exFAT, `chmod 777` for ext4/XFS
+  - Checked by default for convenience
+
+### Fixed
+- **Persistent mount UID/GID hardcoded**: fstab entries now use actual user UID/GID instead of hardcoded 1000:1000
+- **Trash listing showing parent directories**: Now shows actual deleted files with full relative path
+  - Previously showed parent directories instead of files due to Samba keeptree=yes
+  - Restore now works correctly to original location
+
+## [0.11.5-beta] - 2026-01-25
+
+### Added
+
+#### Mount Disk Feature
+- **Mount button for unmounted disks**: New "Mount" button for formatted but unmounted disks
+- **Mount path selection dialog**: Dialog with validation for mount path selection
+- **Persistent mount option**: Adds entry to /etc/fstab using UUID for automatic mounting on boot
+- **FAT/exFAT support**: Proper uid/gid options for FAT filesystem mounting
+
+### Changed
+- **Combined columns in Physical Disks table**: Merged Filesystem and Status columns to reduce table width
+  - Mounted disks show: mount point + (filesystem type)
+  - Unmounted formatted disks show: filesystem badge + "(not mounted)"
+
+### Fixed
+- **Mount point directory cleanup**: Mount point directory now removed after unmount
+- **Missing sudoers rules**: Added rules for mount with options, rmdir, and fstab management
+
 ## [0.11.4-beta] - 2026-01-25
 
 ### Added
@@ -230,7 +311,18 @@ https://github.com/juste-un-gars/anemone
 
 ---
 
-[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.10.0-beta...HEAD
+[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.13.0-beta...HEAD
+[0.13.0-beta]: https://github.com/juste-un-gars/anemone/compare/v0.12.0-beta...v0.13.0-beta
+[0.12.0-beta]: https://github.com/juste-un-gars/anemone/compare/v0.11.9-beta...v0.12.0-beta
+[0.11.9-beta]: https://github.com/juste-un-gars/anemone/compare/v0.11.8-beta...v0.11.9-beta
+[0.11.8-beta]: https://github.com/juste-un-gars/anemone/compare/v0.11.7-beta...v0.11.8-beta
+[0.11.7-beta]: https://github.com/juste-un-gars/anemone/compare/v0.11.5-beta...v0.11.7-beta
+[0.11.5-beta]: https://github.com/juste-un-gars/anemone/compare/v0.11.4-beta...v0.11.5-beta
+[0.11.4-beta]: https://github.com/juste-un-gars/anemone/compare/v0.11.3-beta...v0.11.4-beta
+[0.11.3-beta]: https://github.com/juste-un-gars/anemone/compare/v0.11.2-beta...v0.11.3-beta
+[0.11.2-beta]: https://github.com/juste-un-gars/anemone/compare/v0.11.1-beta...v0.11.2-beta
+[0.11.1-beta]: https://github.com/juste-un-gars/anemone/compare/v0.11.0-beta...v0.11.1-beta
+[0.11.0-beta]: https://github.com/juste-un-gars/anemone/compare/v0.10.0-beta...v0.11.0-beta
 [0.10.0-beta]: https://github.com/juste-un-gars/anemone/releases/tag/v0.10.0-beta
 [0.9.17-beta]: https://github.com/juste-un-gars/anemone/releases/tag/v0.9.17-beta
 [0.9.16-beta]: https://github.com/juste-un-gars/anemone/releases/tag/v0.9.16-beta

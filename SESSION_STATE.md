@@ -16,64 +16,43 @@
 
 ---
 
-## Next Session: Documentation Update
+## Completed: Documentation Update (2026-01-26)
 
-### Objectif
-Mettre à jour toute la documentation qui est obsolète depuis les releases v0.11.5 à v0.13.0.
+### Tâches complétées
 
-### Tâches prioritaires
+#### 1. CHANGELOG.md ✅
+- [x] v0.11.5-beta - Mount Disk + Persistent fstab
+- [x] v0.11.7-beta - Shared access option, UID/GID fix, Trash fix
+- [x] v0.11.8-beta - Format disk dialog fix
+- [x] v0.11.9-beta - USB drives on NVMe systems
+- [x] v0.12.0-beta - USB Backup refactoring (backup type, share selection)
+- [x] v0.13.0-beta - USB Backup automatic scheduling
+- [x] Liens de comparaison mis à jour
 
-#### 1. CHANGELOG.md (URGENT)
-Le fichier s'arrête à v0.11.4-beta. Ajouter :
-- [ ] v0.11.5-beta - Mount Disk + Persistent fstab
-- [ ] v0.11.7-beta - Shared access option, UID/GID fix, Trash fix
-- [ ] v0.11.8-beta - Format disk dialog fix
-- [ ] v0.11.9-beta - USB drives on NVMe systems
-- [ ] v0.12.0-beta - USB Backup refactoring (backup type, share selection)
-- [ ] v0.13.0-beta - USB Backup automatic scheduling
-- [ ] Mettre à jour les liens de comparaison en bas du fichier
+#### 2. docs/usb-backup.md ✅ (nouveau fichier)
+- [x] Introduction et cas d'usage
+- [x] Détection des disques USB
+- [x] Configuration d'un backup (nom, mount path, backup path)
+- [x] Types de backup (Config only vs Config + Data)
+- [x] Sélection des shares à sauvegarder
+- [x] Planification automatique (interval/daily/weekly/monthly)
+- [x] Synchronisation manuelle
+- [x] Éjection sécurisée
+- [x] Dépannage
 
-#### 2. docs/usb-backup.md (NOUVEAU FICHIER)
-Créer une documentation complète pour USB Backup :
-- [ ] Introduction et cas d'usage
-- [ ] Détection des disques USB
-- [ ] Configuration d'un backup (nom, mount path, backup path)
-- [ ] Types de backup (Config only vs Config + Data)
-- [ ] Sélection des shares à sauvegarder
-- [ ] Planification automatique (interval/daily/weekly/monthly)
-- [ ] Synchronisation manuelle
-- [ ] Éjection sécurisée
-- [ ] Dépannage
+#### 3. docs/user-guide.md ✅
+- [x] USB Backup (résumé avec lien vers docs/usb-backup.md)
+- [x] Storage management (formatage, mount/unmount)
 
-#### 3. docs/user-guide.md
-Ajouter sections :
-- [ ] USB Backup (résumé avec lien vers docs/usb-backup.md)
-- [ ] Storage management (formatage, mount/unmount)
+#### 4. README.md ✅
+- [x] "USB Backup" et "Storage management" dans Features
+- [x] Lien vers docs/usb-backup.md dans la table Documentation
 
-#### 4. README.md
-- [ ] Ajouter "USB Backup" et "Storage management" dans Features
-- [ ] Ajouter lien vers docs/usb-backup.md dans la table Documentation
+#### 5. docs/README.md ✅
+- [x] Lien vers usb-backup.md dans la section Guides
 
-#### 5. docs/README.md
-- [ ] Ajouter lien vers usb-backup.md dans la section Guides
-
-#### 6. docs/p2p-sync.md (mineur)
-- [ ] Mettre à jour la section Scheduler avec les nouvelles options (daily/weekly/monthly)
-
-### Fichiers à modifier
-| Fichier | Action |
-|---------|--------|
-| CHANGELOG.md | Ajouter 6 versions manquantes |
-| docs/usb-backup.md | Créer (nouveau) |
-| docs/user-guide.md | Ajouter 2 sections |
-| README.md | Ajouter features + lien |
-| docs/README.md | Ajouter lien |
-| docs/p2p-sync.md | Mise à jour mineure |
-
-### Notes
-- Utiliser SESSION_STATE.md comme source pour les release notes
-- Garder le style cohérent avec la documentation existante
-- Documentation bilingue non requise (docs en anglais uniquement)
+#### 6. docs/p2p-sync.md ✅
+- [x] Section Scheduler mise à jour avec les nouvelles options (daily/weekly/monthly)
 
 ---
 

@@ -11,6 +11,7 @@ Welcome to the Anemone documentation, a multi-user NAS with P2P encrypted synchr
 ### Usage
 - [User Guide](user-guide.md) - Users, shares, quotas, trash
 - [P2P Sync](p2p-sync.md) - Peer configuration and restore
+- [USB Backup](usb-backup.md) - Backup to external USB drives
 
 ### Administration
 - [Security](security.md) - Encryption, keys, authentication
