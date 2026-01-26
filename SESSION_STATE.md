@@ -5,14 +5,22 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.11.5-beta
-**Last Updated:** 2026-01-25
+**Current Version:** v0.11.6-beta
+**Last Updated:** 2026-01-26
 
 ---
 
 ## Current Session
 
 **No active session** - Ready for new work
+
+---
+
+## Release v0.11.6-beta (2026-01-26) ✅
+
+### Bug Fixes
+- Fixed: Persistent mount (fstab) used hardcoded uid=1000,gid=1000 instead of actual user UID/GID
+  - FAT32/exFAT disks mounted via fstab now use the correct user permissions
 
 ---
 

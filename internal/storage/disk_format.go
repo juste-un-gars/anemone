@@ -651,11 +651,15 @@ func AddToFstab(device, mountPath string) error {
 	}
 
 	// Determine mount options based on filesystem
+	// Get current user's UID and GID for mount options
+	uid := os.Getuid()
+	gid := os.Getgid()
+
 	var options string
 	switch fsType {
 	case "vfat", "exfat":
-		// FAT filesystems - use nofail and uid/gid
-		options = "defaults,nofail,uid=1000,gid=1000"
+		// FAT filesystems - use nofail and uid/gid for proper permissions
+		options = fmt.Sprintf("defaults,nofail,uid=%d,gid=%d", uid, gid)
 	default:
 		// Linux filesystems (ext4, xfs, etc.)
 		options = "defaults,nofail"
