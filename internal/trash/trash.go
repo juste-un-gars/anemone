@@ -26,8 +26,9 @@ type TrashItem struct {
 	IsDir        bool      // True if this is a directory
 }
 
-// ListTrashItems scans a share's .trash directory and returns all items (files and directories)
-// Only returns top-level items to avoid showing files inside deleted directories twice
+// ListTrashItems scans a share's .trash directory and returns all deleted files
+// With keeptree=yes, Samba preserves directory structure, so we walk recursively
+// to find the actual deleted files and return them with their relative paths
 func ListTrashItems(sharePath, username string) ([]*TrashItem, error) {
 	trashPath := filepath.Join(sharePath, ".trash", username)
 
@@ -38,37 +39,45 @@ func ListTrashItems(sharePath, username string) ([]*TrashItem, error) {
 
 	var items []*TrashItem
 
-	// Read directory entries (only first level)
-	entries, err := os.ReadDir(trashPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read trash directory: %w", err)
-	}
-
-	for _, entry := range entries {
-		info, err := entry.Info()
+	// Walk recursively to find all files (not directories)
+	err := filepath.Walk(trashPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			continue // Skip entries we can't read
+			return nil // Skip errors, continue walking
 		}
 
-		path := filepath.Join(trashPath, entry.Name())
+		// Skip the root trash directory itself
+		if path == trashPath {
+			return nil
+		}
 
-		// Calculate size (for directories, walk and sum all files)
-		size := info.Size()
-		if entry.IsDir() {
-			size = calculateDirSize(path)
+		// Skip directories - we only want files
+		// The directories are just structure from keeptree=yes
+		if info.IsDir() {
+			return nil
+		}
+
+		// Calculate relative path from trash root
+		relPath, err := filepath.Rel(trashPath, path)
+		if err != nil {
+			return nil // Skip if we can't get relative path
 		}
 
 		item := &TrashItem{
-			Name:         entry.Name(),
-			RelativePath: entry.Name(),
+			Name:         info.Name(),
+			RelativePath: relPath,
 			TrashedPath:  path,
-			Size:         size,
+			Size:         info.Size(),
 			ModTime:      info.ModTime(),
 			TrashedAt:    info.ModTime(), // Samba recycle touches the file
-			IsDir:        entry.IsDir(),
+			IsDir:        false,
 		}
 
 		items = append(items, item)
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to scan trash directory: %w", err)
 	}
 
 	return items, nil

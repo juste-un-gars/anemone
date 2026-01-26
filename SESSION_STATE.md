@@ -21,6 +21,9 @@
 ### Bug Fixes
 - Fixed: Persistent mount (fstab) used hardcoded uid=1000,gid=1000 instead of actual user UID/GID
   - FAT32/exFAT disks mounted via fstab now use the correct user permissions
+- Fixed: Trash listing now shows actual deleted files with full relative path
+  - Previously showed parent directories instead of files (due to Samba keeptree=yes)
+  - Restore now works correctly to original location
 
 ---
 
