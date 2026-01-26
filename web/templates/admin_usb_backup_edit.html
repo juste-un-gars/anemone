@@ -136,13 +136,104 @@
                 </div>
 
                 <!-- Auto Detect -->
-                <div class="mb-6">
+                <div class="mb-4">
                     <label class="flex items-center">
                         <input type="checkbox" name="auto_detect" {{if .Backup.AutoDetect}}checked{{end}}
                                class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded">
                         <span class="ml-2 text-sm text-gray-700">{{T .Lang "usb_backup.auto_detect"}}</span>
                     </label>
                     <p class="ml-6 text-xs text-gray-500">{{T .Lang "usb_backup.auto_detect_hint"}}</p>
+                </div>
+
+                <!-- Automatic Sync Schedule -->
+                <div class="mb-6 border-t pt-4 mt-4">
+                    <h3 class="text-sm font-medium text-gray-700 mb-3">{{T .Lang "usb_backup.schedule_title"}}</h3>
+
+                    <!-- Sync Enabled -->
+                    <div class="mb-4">
+                        <label class="flex items-center">
+                            <input type="checkbox" name="sync_enabled" id="sync_enabled" {{if .Backup.SyncEnabled}}checked{{end}}
+                                   class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                                   onchange="toggleScheduleOptions(this.checked)">
+                            <span class="ml-2 text-sm text-gray-700">{{T .Lang "usb_backup.sync_enabled"}}</span>
+                        </label>
+                        <p class="ml-6 text-xs text-gray-500">{{T .Lang "usb_backup.sync_enabled_hint"}}</p>
+                    </div>
+
+                    <!-- Schedule Options (shown when sync_enabled) -->
+                    <div id="scheduleOptions" class="ml-6 space-y-4" {{if not .Backup.SyncEnabled}}style="display:none"{{end}}>
+                        <!-- Sync Frequency -->
+                        <div>
+                            <label for="sync_frequency" class="block text-sm font-medium text-gray-700 mb-1">
+                                {{T .Lang "usb_backup.sync_frequency"}}
+                            </label>
+                            <select id="sync_frequency" name="sync_frequency"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500"
+                                    onchange="updateScheduleFields()">
+                                <option value="interval" {{if eq .Backup.SyncFrequency "interval"}}selected{{end}}>{{T .Lang "usb_backup.freq_interval"}}</option>
+                                <option value="daily" {{if eq .Backup.SyncFrequency "daily"}}selected{{end}}>{{T .Lang "usb_backup.freq_daily"}}</option>
+                                <option value="weekly" {{if eq .Backup.SyncFrequency "weekly"}}selected{{end}}>{{T .Lang "usb_backup.freq_weekly"}}</option>
+                                <option value="monthly" {{if eq .Backup.SyncFrequency "monthly"}}selected{{end}}>{{T .Lang "usb_backup.freq_monthly"}}</option>
+                            </select>
+                        </div>
+
+                        <!-- Interval Minutes (for interval mode) -->
+                        <div id="intervalField" {{if ne .Backup.SyncFrequency "interval"}}style="display:none"{{end}}>
+                            <label for="sync_interval_minutes" class="block text-sm font-medium text-gray-700 mb-1">
+                                {{T .Lang "usb_backup.interval_minutes"}}
+                            </label>
+                            <select id="sync_interval_minutes" name="sync_interval_minutes"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                                <option value="15" {{if eq .Backup.SyncIntervalMinutes 15}}selected{{end}}>15 min</option>
+                                <option value="30" {{if eq .Backup.SyncIntervalMinutes 30}}selected{{end}}>30 min</option>
+                                <option value="60" {{if or (eq .Backup.SyncIntervalMinutes 60) (eq .Backup.SyncIntervalMinutes 0)}}selected{{end}}>1 {{T .Lang "common.hour"}}</option>
+                                <option value="120" {{if eq .Backup.SyncIntervalMinutes 120}}selected{{end}}>2 {{T .Lang "common.hours"}}</option>
+                                <option value="240" {{if eq .Backup.SyncIntervalMinutes 240}}selected{{end}}>4 {{T .Lang "common.hours"}}</option>
+                                <option value="480" {{if eq .Backup.SyncIntervalMinutes 480}}selected{{end}}>8 {{T .Lang "common.hours"}}</option>
+                                <option value="720" {{if eq .Backup.SyncIntervalMinutes 720}}selected{{end}}>12 {{T .Lang "common.hours"}}</option>
+                                <option value="1440" {{if eq .Backup.SyncIntervalMinutes 1440}}selected{{end}}>24 {{T .Lang "common.hours"}}</option>
+                            </select>
+                        </div>
+
+                        <!-- Sync Time (for daily/weekly/monthly) -->
+                        <div id="timeField" {{if eq .Backup.SyncFrequency "interval"}}style="display:none"{{end}}>
+                            <label for="sync_time" class="block text-sm font-medium text-gray-700 mb-1">
+                                {{T .Lang "usb_backup.sync_time"}}
+                            </label>
+                            <input type="time" id="sync_time" name="sync_time" value="{{.Backup.SyncTime}}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                        </div>
+
+                        <!-- Day of Week (for weekly) -->
+                        <div id="weekdayField" {{if ne .Backup.SyncFrequency "weekly"}}style="display:none"{{end}}>
+                            <label for="sync_day_of_week" class="block text-sm font-medium text-gray-700 mb-1">
+                                {{T .Lang "usb_backup.day_of_week"}}
+                            </label>
+                            <select id="sync_day_of_week" name="sync_day_of_week"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                                <option value="0" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 0)}}selected{{end}}>{{T .Lang "common.sunday"}}</option>
+                                <option value="1" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 1)}}selected{{end}}>{{T .Lang "common.monday"}}</option>
+                                <option value="2" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 2)}}selected{{end}}>{{T .Lang "common.tuesday"}}</option>
+                                <option value="3" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 3)}}selected{{end}}>{{T .Lang "common.wednesday"}}</option>
+                                <option value="4" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 4)}}selected{{end}}>{{T .Lang "common.thursday"}}</option>
+                                <option value="5" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 5)}}selected{{end}}>{{T .Lang "common.friday"}}</option>
+                                <option value="6" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 6)}}selected{{end}}>{{T .Lang "common.saturday"}}</option>
+                            </select>
+                        </div>
+
+                        <!-- Day of Month (for monthly) -->
+                        <div id="monthdayField" {{if ne .Backup.SyncFrequency "monthly"}}style="display:none"{{end}}>
+                            <label for="sync_day_of_month" class="block text-sm font-medium text-gray-700 mb-1">
+                                {{T .Lang "usb_backup.day_of_month"}}
+                            </label>
+                            <select id="sync_day_of_month" name="sync_day_of_month"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                                {{range $i := iterate 1 28}}
+                                <option value="{{$i}}" {{if and $.Backup.SyncDayOfMonth (eq (deref $.Backup.SyncDayOfMonth) $i)}}selected{{end}}>{{$i}}</option>
+                                {{end}}
+                            </select>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Buttons -->
@@ -190,6 +281,21 @@ function toggleShareSelection(show) {
     if (el) {
         el.style.display = show ? 'block' : 'none';
     }
+}
+
+function toggleScheduleOptions(show) {
+    const el = document.getElementById('scheduleOptions');
+    if (el) {
+        el.style.display = show ? 'block' : 'none';
+    }
+}
+
+function updateScheduleFields() {
+    const freq = document.getElementById('sync_frequency').value;
+    document.getElementById('intervalField').style.display = freq === 'interval' ? 'block' : 'none';
+    document.getElementById('timeField').style.display = freq !== 'interval' ? 'block' : 'none';
+    document.getElementById('weekdayField').style.display = freq === 'weekly' ? 'block' : 'none';
+    document.getElementById('monthdayField').style.display = freq === 'monthly' ? 'block' : 'none';
 }
 </script>
 </body>

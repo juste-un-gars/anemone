@@ -20,6 +20,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/tls"
 	"github.com/juste-un-gars/anemone/internal/trash"
 	"github.com/juste-un-gars/anemone/internal/updater"
+	"github.com/juste-un-gars/anemone/internal/usbbackup"
 	"github.com/juste-un-gars/anemone/internal/usermanifest"
 	"github.com/juste-un-gars/anemone/internal/web"
 )
@@ -74,6 +75,9 @@ func main() {
 
 	// Start automatic server backup scheduler (daily at 4 AM)
 	serverbackup.StartScheduler(db, cfg.DataDir)
+
+	// Start automatic USB backup scheduler
+	usbbackup.StartScheduler(db, cfg.DataDir)
 
 	// Start automatic trash cleanup scheduler (daily at 3 AM)
 	trash.StartCleanupScheduler(db, func() (int, error) {

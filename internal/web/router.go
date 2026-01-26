@@ -175,6 +175,19 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		}
 		return *ptr
 	}
+	funcMap["deref"] = func(ptr *int) int {
+		if ptr == nil {
+			return 0
+		}
+		return *ptr
+	}
+	funcMap["iterate"] = func(start, end int) []int {
+		var result []int
+		for i := start; i <= end; i++ {
+			result = append(result, i)
+		}
+		return result
+	}
 
 	templates := template.Must(template.New("").Funcs(funcMap).ParseGlob(filepath.Join("web", "templates", "*.html")))
 

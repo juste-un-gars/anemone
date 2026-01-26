@@ -5,7 +5,7 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.12.0-beta
+**Current Version:** v0.13.0-beta
 **Last Updated:** 2026-01-26
 
 ---
@@ -13,6 +13,31 @@
 ## Current Session
 
 **No active session** - Ready for new work
+
+---
+
+## Release v0.13.0-beta (2026-01-26) ✅
+
+### New Features - USB Backup Automatic Scheduling
+- **Automatic sync scheduling**: Schedule USB backups to run automatically
+  - **Interval mode**: Every 15min, 30min, 1h, 2h, 4h, 8h, 12h, or 24h
+  - **Daily mode**: Every day at a specific time (HH:MM)
+  - **Weekly mode**: Every week on a specific day and time
+  - **Monthly mode**: Every month on a specific day (1-28) and time
+- **Schedule configuration UI**: New section in USB backup edit form
+  - Enable/disable toggle for automatic sync
+  - Frequency selector with conditional fields
+  - Time picker for daily/weekly/monthly modes
+  - Day selector for weekly/monthly modes
+
+### Technical Changes
+- New DB columns: `sync_enabled`, `sync_frequency`, `sync_time`, `sync_day_of_week`, `sync_day_of_month`, `sync_interval_minutes`
+- New `USBBackup.ShouldSync()` function for schedule evaluation
+- New `StartScheduler(db, dataDir)` in `internal/usbbackup/scheduler.go`
+- Scheduler runs every minute, checks all enabled backups
+- Updated `Create`, `Update`, `GetByID`, `GetAll`, `GetEnabled` functions
+- New template functions: `deref`, `iterate`
+- New i18n keys for schedule UI (FR + EN)
 
 ---
 

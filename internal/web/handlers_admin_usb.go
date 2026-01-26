@@ -460,6 +460,43 @@ func (s *Server) handleUSBBackupEdit(w http.ResponseWriter, r *http.Request, id 
 	backup.Enabled = r.FormValue("enabled") == "on"
 	backup.AutoDetect = r.FormValue("auto_detect") == "on"
 
+	// Schedule fields
+	backup.SyncEnabled = r.FormValue("sync_enabled") == "on"
+	backup.SyncFrequency = strings.TrimSpace(r.FormValue("sync_frequency"))
+	backup.SyncTime = strings.TrimSpace(r.FormValue("sync_time"))
+
+	// Parse day of week (0-6)
+	if dowStr := r.FormValue("sync_day_of_week"); dowStr != "" {
+		if dow, err := strconv.Atoi(dowStr); err == nil {
+			backup.SyncDayOfWeek = &dow
+		}
+	}
+
+	// Parse day of month (1-31)
+	if domStr := r.FormValue("sync_day_of_month"); domStr != "" {
+		if dom, err := strconv.Atoi(domStr); err == nil {
+			backup.SyncDayOfMonth = &dom
+		}
+	}
+
+	// Parse interval minutes
+	if intervalStr := r.FormValue("sync_interval_minutes"); intervalStr != "" {
+		if interval, err := strconv.Atoi(intervalStr); err == nil {
+			backup.SyncIntervalMinutes = interval
+		}
+	}
+
+	// Defaults for schedule
+	if backup.SyncFrequency == "" {
+		backup.SyncFrequency = "daily"
+	}
+	if backup.SyncTime == "" {
+		backup.SyncTime = "23:00"
+	}
+	if backup.SyncIntervalMinutes == 0 {
+		backup.SyncIntervalMinutes = 60
+	}
+
 	// Default to full backup
 	if backup.BackupType == "" {
 		backup.BackupType = usbbackup.BackupTypeFull

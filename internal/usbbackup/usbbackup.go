@@ -38,6 +38,14 @@ type USBBackup struct {
 	BytesSynced    int64      // Bytes synced in last backup
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+
+	// Scheduling fields
+	SyncEnabled         bool   // Enable automatic sync
+	SyncFrequency       string // "daily", "weekly", "monthly", "interval"
+	SyncTime            string // "HH:MM" format for daily/weekly/monthly
+	SyncDayOfWeek       *int   // 0-6 (0=Sunday) for weekly
+	SyncDayOfMonth      *int   // 1-31 for monthly
+	SyncIntervalMinutes int    // Interval in minutes for interval mode
 }
 
 // DriveInfo represents detected USB/external drive information
@@ -57,13 +65,27 @@ func Create(db *sql.DB, backup *USBBackup) error {
 	if backup.BackupType == "" {
 		backup.BackupType = BackupTypeFull
 	}
+	// Default sync frequency
+	if backup.SyncFrequency == "" {
+		backup.SyncFrequency = "daily"
+	}
+	if backup.SyncTime == "" {
+		backup.SyncTime = "23:00"
+	}
+	if backup.SyncIntervalMinutes == 0 {
+		backup.SyncIntervalMinutes = 60
+	}
 
 	query := `INSERT INTO usb_backups (name, mount_path, backup_path, backup_type, selected_shares,
-	          enabled, auto_detect, last_status, created_at, updated_at)
-	          VALUES (?, ?, ?, ?, ?, ?, ?, 'unknown', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+	          enabled, auto_detect, sync_enabled, sync_frequency, sync_time,
+	          sync_day_of_week, sync_day_of_month, sync_interval_minutes,
+	          last_status, created_at, updated_at)
+	          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unknown', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
 
 	result, err := db.Exec(query, backup.Name, backup.MountPath, backup.BackupPath,
-		backup.BackupType, backup.SelectedShares, backup.Enabled, backup.AutoDetect)
+		backup.BackupType, backup.SelectedShares, backup.Enabled, backup.AutoDetect,
+		backup.SyncEnabled, backup.SyncFrequency, backup.SyncTime,
+		backup.SyncDayOfWeek, backup.SyncDayOfMonth, backup.SyncIntervalMinutes)
 	if err != nil {
 		return fmt.Errorf("failed to create USB backup: %w", err)
 	}
@@ -82,15 +104,18 @@ func GetByID(db *sql.DB, id int) (*USBBackup, error) {
 	backup := &USBBackup{}
 	query := `SELECT id, name, mount_path, backup_path, backup_type, selected_shares,
 	          enabled, auto_detect, last_sync, last_status, last_error, files_synced, bytes_synced,
+	          sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month, sync_interval_minutes,
 	          created_at, updated_at
 	          FROM usb_backups WHERE id = ?`
 
-	var backupType, selectedShares sql.NullString
+	var backupType, selectedShares, syncFrequency, syncTime sql.NullString
+	var syncDayOfWeek, syncDayOfMonth, syncIntervalMinutes sql.NullInt64
 	err := db.QueryRow(query, id).Scan(
 		&backup.ID, &backup.Name, &backup.MountPath, &backup.BackupPath,
 		&backupType, &selectedShares,
 		&backup.Enabled, &backup.AutoDetect, &backup.LastSync, &backup.LastStatus,
 		&backup.LastError, &backup.FilesSynced, &backup.BytesSynced,
+		&backup.SyncEnabled, &syncFrequency, &syncTime, &syncDayOfWeek, &syncDayOfMonth, &syncIntervalMinutes,
 		&backup.CreatedAt, &backup.UpdatedAt,
 	)
 	if err != nil {
@@ -109,6 +134,28 @@ func GetByID(db *sql.DB, id int) (*USBBackup, error) {
 		backup.SelectedShares = selectedShares.String
 	}
 
+	// Handle scheduling fields with defaults
+	backup.SyncFrequency = "daily"
+	if syncFrequency.Valid && syncFrequency.String != "" {
+		backup.SyncFrequency = syncFrequency.String
+	}
+	backup.SyncTime = "23:00"
+	if syncTime.Valid && syncTime.String != "" {
+		backup.SyncTime = syncTime.String
+	}
+	if syncDayOfWeek.Valid {
+		dow := int(syncDayOfWeek.Int64)
+		backup.SyncDayOfWeek = &dow
+	}
+	if syncDayOfMonth.Valid {
+		dom := int(syncDayOfMonth.Int64)
+		backup.SyncDayOfMonth = &dom
+	}
+	backup.SyncIntervalMinutes = 60
+	if syncIntervalMinutes.Valid {
+		backup.SyncIntervalMinutes = int(syncIntervalMinutes.Int64)
+	}
+
 	return backup, nil
 }
 
@@ -116,6 +163,7 @@ func GetByID(db *sql.DB, id int) (*USBBackup, error) {
 func GetAll(db *sql.DB) ([]*USBBackup, error) {
 	query := `SELECT id, name, mount_path, backup_path, backup_type, selected_shares,
 	          enabled, auto_detect, last_sync, last_status, last_error, files_synced, bytes_synced,
+	          sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month, sync_interval_minutes,
 	          created_at, updated_at
 	          FROM usb_backups ORDER BY created_at DESC`
 
@@ -128,12 +176,14 @@ func GetAll(db *sql.DB) ([]*USBBackup, error) {
 	var backups []*USBBackup
 	for rows.Next() {
 		backup := &USBBackup{}
-		var backupType, selectedShares sql.NullString
+		var backupType, selectedShares, syncFrequency, syncTime sql.NullString
+		var syncDayOfWeek, syncDayOfMonth, syncIntervalMinutes sql.NullInt64
 		err := rows.Scan(
 			&backup.ID, &backup.Name, &backup.MountPath, &backup.BackupPath,
 			&backupType, &selectedShares,
 			&backup.Enabled, &backup.AutoDetect, &backup.LastSync, &backup.LastStatus,
 			&backup.LastError, &backup.FilesSynced, &backup.BytesSynced,
+			&backup.SyncEnabled, &syncFrequency, &syncTime, &syncDayOfWeek, &syncDayOfMonth, &syncIntervalMinutes,
 			&backup.CreatedAt, &backup.UpdatedAt,
 		)
 		if err != nil {
@@ -147,6 +197,28 @@ func GetAll(db *sql.DB) ([]*USBBackup, error) {
 		}
 		if selectedShares.Valid {
 			backup.SelectedShares = selectedShares.String
+		}
+
+		// Handle scheduling fields with defaults
+		backup.SyncFrequency = "daily"
+		if syncFrequency.Valid && syncFrequency.String != "" {
+			backup.SyncFrequency = syncFrequency.String
+		}
+		backup.SyncTime = "23:00"
+		if syncTime.Valid && syncTime.String != "" {
+			backup.SyncTime = syncTime.String
+		}
+		if syncDayOfWeek.Valid {
+			dow := int(syncDayOfWeek.Int64)
+			backup.SyncDayOfWeek = &dow
+		}
+		if syncDayOfMonth.Valid {
+			dom := int(syncDayOfMonth.Int64)
+			backup.SyncDayOfMonth = &dom
+		}
+		backup.SyncIntervalMinutes = 60
+		if syncIntervalMinutes.Valid {
+			backup.SyncIntervalMinutes = int(syncIntervalMinutes.Int64)
 		}
 
 		backups = append(backups, backup)
@@ -159,6 +231,7 @@ func GetAll(db *sql.DB) ([]*USBBackup, error) {
 func GetEnabled(db *sql.DB) ([]*USBBackup, error) {
 	query := `SELECT id, name, mount_path, backup_path, backup_type, selected_shares,
 	          enabled, auto_detect, last_sync, last_status, last_error, files_synced, bytes_synced,
+	          sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month, sync_interval_minutes,
 	          created_at, updated_at
 	          FROM usb_backups WHERE enabled = 1 ORDER BY created_at DESC`
 
@@ -171,12 +244,14 @@ func GetEnabled(db *sql.DB) ([]*USBBackup, error) {
 	var backups []*USBBackup
 	for rows.Next() {
 		backup := &USBBackup{}
-		var backupType, selectedShares sql.NullString
+		var backupType, selectedShares, syncFrequency, syncTime sql.NullString
+		var syncDayOfWeek, syncDayOfMonth, syncIntervalMinutes sql.NullInt64
 		err := rows.Scan(
 			&backup.ID, &backup.Name, &backup.MountPath, &backup.BackupPath,
 			&backupType, &selectedShares,
 			&backup.Enabled, &backup.AutoDetect, &backup.LastSync, &backup.LastStatus,
 			&backup.LastError, &backup.FilesSynced, &backup.BytesSynced,
+			&backup.SyncEnabled, &syncFrequency, &syncTime, &syncDayOfWeek, &syncDayOfMonth, &syncIntervalMinutes,
 			&backup.CreatedAt, &backup.UpdatedAt,
 		)
 		if err != nil {
@@ -192,6 +267,28 @@ func GetEnabled(db *sql.DB) ([]*USBBackup, error) {
 			backup.SelectedShares = selectedShares.String
 		}
 
+		// Handle scheduling fields with defaults
+		backup.SyncFrequency = "daily"
+		if syncFrequency.Valid && syncFrequency.String != "" {
+			backup.SyncFrequency = syncFrequency.String
+		}
+		backup.SyncTime = "23:00"
+		if syncTime.Valid && syncTime.String != "" {
+			backup.SyncTime = syncTime.String
+		}
+		if syncDayOfWeek.Valid {
+			dow := int(syncDayOfWeek.Int64)
+			backup.SyncDayOfWeek = &dow
+		}
+		if syncDayOfMonth.Valid {
+			dom := int(syncDayOfMonth.Int64)
+			backup.SyncDayOfMonth = &dom
+		}
+		backup.SyncIntervalMinutes = 60
+		if syncIntervalMinutes.Valid {
+			backup.SyncIntervalMinutes = int(syncIntervalMinutes.Int64)
+		}
+
 		backups = append(backups, backup)
 	}
 
@@ -202,12 +299,18 @@ func GetEnabled(db *sql.DB) ([]*USBBackup, error) {
 func Update(db *sql.DB, backup *USBBackup) error {
 	query := `UPDATE usb_backups SET name = ?, mount_path = ?, backup_path = ?,
 	          backup_type = ?, selected_shares = ?,
-	          enabled = ?, auto_detect = ?, updated_at = CURRENT_TIMESTAMP
+	          enabled = ?, auto_detect = ?,
+	          sync_enabled = ?, sync_frequency = ?, sync_time = ?,
+	          sync_day_of_week = ?, sync_day_of_month = ?, sync_interval_minutes = ?,
+	          updated_at = CURRENT_TIMESTAMP
 	          WHERE id = ?`
 
 	_, err := db.Exec(query, backup.Name, backup.MountPath, backup.BackupPath,
 		backup.BackupType, backup.SelectedShares,
-		backup.Enabled, backup.AutoDetect, backup.ID)
+		backup.Enabled, backup.AutoDetect,
+		backup.SyncEnabled, backup.SyncFrequency, backup.SyncTime,
+		backup.SyncDayOfWeek, backup.SyncDayOfMonth, backup.SyncIntervalMinutes,
+		backup.ID)
 	if err != nil {
 		return fmt.Errorf("failed to update USB backup: %w", err)
 	}
@@ -344,4 +447,95 @@ func (b *USBBackup) IsShareSelected(shareID int) bool {
 // IsConfigOnly returns true if this is a config-only backup
 func (b *USBBackup) IsConfigOnly() bool {
 	return b.BackupType == BackupTypeConfig
+}
+
+// ShouldSync determines if this USB backup should be synchronized based on its schedule
+func (b *USBBackup) ShouldSync() bool {
+	// Check if backup and sync are enabled
+	if !b.Enabled || !b.SyncEnabled {
+		return false
+	}
+
+	// Check if drive is mounted
+	if !b.IsMounted() {
+		return false
+	}
+
+	// First sync ever
+	if b.LastSync == nil {
+		return true
+	}
+
+	now := time.Now()
+	lastSync := *b.LastSync
+
+	// Parse sync time (format: "HH:MM")
+	var syncHour, syncMinute int
+	fmt.Sscanf(b.SyncTime, "%d:%d", &syncHour, &syncMinute)
+
+	switch b.SyncFrequency {
+	case "interval":
+		// Interval-based sync: check if enough time has passed since last sync
+		if b.SyncIntervalMinutes <= 0 {
+			return false
+		}
+
+		interval := time.Duration(b.SyncIntervalMinutes) * time.Minute
+		return now.Sub(lastSync) >= interval
+
+	case "daily":
+		// Daily sync: check if we've passed the sync time today and haven't synced today
+		lastSyncDate := lastSync.Format("2006-01-02")
+		todayDate := now.Format("2006-01-02")
+
+		// If last sync was on a different day and we've passed the sync time
+		if lastSyncDate != todayDate && (now.Hour() > syncHour || (now.Hour() == syncHour && now.Minute() >= syncMinute)) {
+			return true
+		}
+		return false
+
+	case "weekly":
+		// Weekly sync: check if we're on the right day of week and past sync time
+		if b.SyncDayOfWeek == nil {
+			return false
+		}
+
+		currentDayOfWeek := int(now.Weekday()) // 0=Sunday, 1=Monday, ..., 6=Saturday
+		if currentDayOfWeek != *b.SyncDayOfWeek {
+			return false
+		}
+
+		// Check if we've passed the sync time today
+		if now.Hour() < syncHour || (now.Hour() == syncHour && now.Minute() < syncMinute) {
+			return false
+		}
+
+		// Check if last sync was before today
+		lastSyncDate := lastSync.Format("2006-01-02")
+		todayDate := now.Format("2006-01-02")
+		return lastSyncDate != todayDate
+
+	case "monthly":
+		// Monthly sync: check if we're on the right day of month and past sync time
+		if b.SyncDayOfMonth == nil {
+			return false
+		}
+
+		if now.Day() != *b.SyncDayOfMonth {
+			return false
+		}
+
+		// Check if we've passed the sync time today
+		if now.Hour() < syncHour || (now.Hour() == syncHour && now.Minute() < syncMinute) {
+			return false
+		}
+
+		// Check if last sync was before today
+		lastSyncDate := lastSync.Format("2006-01-02")
+		todayDate := now.Format("2006-01-02")
+		return lastSyncDate != todayDate
+
+	default:
+		return false
+	}
 }

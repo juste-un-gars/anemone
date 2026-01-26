@@ -435,5 +435,37 @@ func migrateUSBBackupsTable(db *sql.DB) error {
 		}
 	}
 
+	// Add scheduling columns for automatic sync
+	if !existingColumns["sync_enabled"] {
+		if _, err := db.Exec("ALTER TABLE usb_backups ADD COLUMN sync_enabled BOOLEAN DEFAULT 0"); err != nil {
+			return fmt.Errorf("failed to add sync_enabled column: %w", err)
+		}
+	}
+	if !existingColumns["sync_frequency"] {
+		if _, err := db.Exec("ALTER TABLE usb_backups ADD COLUMN sync_frequency TEXT DEFAULT 'daily'"); err != nil {
+			return fmt.Errorf("failed to add sync_frequency column: %w", err)
+		}
+	}
+	if !existingColumns["sync_time"] {
+		if _, err := db.Exec("ALTER TABLE usb_backups ADD COLUMN sync_time TEXT DEFAULT '23:00'"); err != nil {
+			return fmt.Errorf("failed to add sync_time column: %w", err)
+		}
+	}
+	if !existingColumns["sync_day_of_week"] {
+		if _, err := db.Exec("ALTER TABLE usb_backups ADD COLUMN sync_day_of_week INTEGER"); err != nil {
+			return fmt.Errorf("failed to add sync_day_of_week column: %w", err)
+		}
+	}
+	if !existingColumns["sync_day_of_month"] {
+		if _, err := db.Exec("ALTER TABLE usb_backups ADD COLUMN sync_day_of_month INTEGER"); err != nil {
+			return fmt.Errorf("failed to add sync_day_of_month column: %w", err)
+		}
+	}
+	if !existingColumns["sync_interval_minutes"] {
+		if _, err := db.Exec("ALTER TABLE usb_backups ADD COLUMN sync_interval_minutes INTEGER DEFAULT 60"); err != nil {
+			return fmt.Errorf("failed to add sync_interval_minutes column: %w", err)
+		}
+	}
+
 	return nil
 }
