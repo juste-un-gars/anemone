@@ -5,7 +5,7 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.11.7-beta
+**Current Version:** v0.11.8-beta
 **Last Updated:** 2026-01-26
 
 ---
@@ -13,6 +13,15 @@
 ## Current Session
 
 **No active session** - Ready for new work
+
+---
+
+## Release v0.11.8-beta (2026-01-26) ✅
+
+### Bug Fixes
+- Fixed: "Format disk" dialog was missing "Persistent mount" option
+  - Now includes all three options: Mount after format, Shared access, Persistent mount
+  - All checked by default for convenience
 
 ---
 

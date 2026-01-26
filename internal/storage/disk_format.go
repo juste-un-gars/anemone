@@ -20,6 +20,7 @@ type FormatOptions struct {
 	Mount        bool   `json:"mount"`         // Mount after formatting
 	MountPath    string `json:"mount_path"`    // Mount point (e.g., /mnt/sda)
 	SharedAccess bool   `json:"shared_access"` // All users can read/write (for mount)
+	Persistent   bool   `json:"persistent"`    // Add to fstab for persistent mount
 }
 
 // WipeOptions contains options for wiping a disk

@@ -623,6 +623,13 @@
                         </label>
                         <p class="mt-1 text-xs text-gray-500 ml-6">{{T .Lang "storage.shared_access_hint"}}</p>
                     </div>
+                    <div id="formatPersistentContainer">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="formatPersistent" checked class="h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                            <span class="ml-2 text-sm text-gray-700">{{T .Lang "storage.persistent_mount"}}</span>
+                        </label>
+                        <p class="mt-1 text-xs text-gray-500 ml-6">{{T .Lang "storage.persistent_mount_hint"}}</p>
+                    </div>
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-3">
@@ -1218,8 +1225,10 @@ function showFormatDiskModal(device) {
     document.getElementById('formatMountPath').value = '/mnt/' + diskName;
     document.getElementById('formatMount').checked = true;
     document.getElementById('formatSharedAccess').checked = true;
+    document.getElementById('formatPersistent').checked = true;
     document.getElementById('mountPathContainer').style.display = 'block';
     document.getElementById('formatSharedAccessContainer').style.display = 'block';
+    document.getElementById('formatPersistentContainer').style.display = 'block';
     document.getElementById('formatDiskModal').classList.remove('hidden');
 }
 function closeFormatDiskModal() { document.getElementById('formatDiskModal').classList.add('hidden'); }
@@ -1227,6 +1236,7 @@ function toggleMountPath() {
     const checked = document.getElementById('formatMount').checked;
     document.getElementById('mountPathContainer').style.display = checked ? 'block' : 'none';
     document.getElementById('formatSharedAccessContainer').style.display = checked ? 'block' : 'none';
+    document.getElementById('formatPersistentContainer').style.display = checked ? 'block' : 'none';
 }
 
 async function formatDisk(e) {
@@ -1237,6 +1247,7 @@ async function formatDisk(e) {
     const mount = document.getElementById('formatMount').checked;
     const mountPath = mount ? document.getElementById('formatMountPath').value : '';
     const sharedAccess = mount ? document.getElementById('formatSharedAccess').checked : false;
+    const persistent = mount ? document.getElementById('formatPersistent').checked : false;
 
     // Validate mount path if mounting is requested
     if (mount && mountPath) {
@@ -1252,7 +1263,7 @@ async function formatDisk(e) {
             const resp = await fetch('/api/admin/storage/disk/format', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
-                body: JSON.stringify({device, filesystem, label, force: true, mount, mount_path: mountPath, shared_access: sharedAccess})
+                body: JSON.stringify({device, filesystem, label, force: true, mount, mount_path: mountPath, shared_access: sharedAccess, persistent})
             });
             const data = await resp.json();
             if (data.success) { alert('{{T .Lang "storage.disk_formatted"}}'); closeFormatDiskModal(); location.reload(); }

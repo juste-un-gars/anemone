@@ -968,12 +968,23 @@ func (s *Server) handleAdminStorageDiskFormat(w http.ResponseWriter, r *http.Req
 
 	// Mount the disk if requested
 	var mountError string
+	var fstabError string
 	if req.Mount && req.MountPath != "" {
 		if err := storage.MountDisk(req.Device, req.MountPath, req.SharedAccess); err != nil {
 			log.Printf("Warning: Failed to mount disk %s at %s: %v", req.Device, req.MountPath, err)
 			mountError = err.Error()
 		} else {
 			log.Printf("Mounted disk %s at %s (shared: %v)", req.Device, req.MountPath, req.SharedAccess)
+
+			// Add to fstab if persistent mount requested
+			if req.Persistent {
+				if err := storage.AddToFstab(req.Device, req.MountPath, req.SharedAccess); err != nil {
+					log.Printf("Warning: Failed to add to fstab: %v", err)
+					fstabError = err.Error()
+				} else {
+					log.Printf("Added to fstab: %s at %s", req.Device, req.MountPath)
+				}
+			}
 		}
 	}
 
@@ -986,6 +997,9 @@ func (s *Server) handleAdminStorageDiskFormat(w http.ResponseWriter, r *http.Req
 	}
 	if mountError != "" {
 		response["mount_error"] = mountError
+	}
+	if fstabError != "" {
+		response["fstab_error"] = fstabError
 	}
 	json.NewEncoder(w).Encode(response)
 }
