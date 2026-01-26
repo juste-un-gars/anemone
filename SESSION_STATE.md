@@ -5,7 +5,7 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.11.8-beta
+**Current Version:** v0.11.9-beta
 **Last Updated:** 2026-01-26
 
 ---
@@ -13,6 +13,17 @@
 ## Current Session
 
 **No active session** - Ready for new work
+
+---
+
+## Release v0.11.9-beta (2026-01-26) ✅
+
+### Bug Fixes
+- Fixed: USB drives not detected in "USB Backup" section on NVMe systems
+  - The code was hardcoded to exclude `/dev/sda*` assuming it's always the system disk
+  - On NVMe systems, the OS is on `/dev/nvme0n1` and USB drives appear as `/dev/sda`
+  - Now dynamically detects the system disk via `findmnt /`
+  - Any disk mounted in `/mnt/`, `/media/`, or `/run/media/` is now correctly detected
 
 ---
 

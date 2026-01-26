@@ -69,20 +69,6 @@ func isExternalDrive(device, mountPoint, fsType string) bool {
 		return false
 	}
 
-	// Skip system partitions
-	systemMounts := []string{"/", "/boot", "/home", "/var", "/tmp", "/usr", "/opt"}
-	for _, sys := range systemMounts {
-		if mountPoint == sys {
-			return false
-		}
-	}
-
-	// Skip internal system devices (typically sda on most systems)
-	// But allow sdb, sdc, etc. and nvme secondary drives
-	if strings.HasPrefix(device, "/dev/sda") {
-		return false
-	}
-
 	// Skip virtual filesystems
 	virtualFS := []string{"tmpfs", "devtmpfs", "sysfs", "proc", "cgroup", "overlay", "squashfs"}
 	for _, vfs := range virtualFS {
@@ -91,7 +77,16 @@ func isExternalDrive(device, mountPoint, fsType string) bool {
 		}
 	}
 
-	// Common external drive mount points
+	// Skip system partitions (regardless of device name)
+	systemMounts := []string{"/", "/boot", "/boot/efi", "/home", "/var", "/tmp", "/usr", "/opt"}
+	for _, sys := range systemMounts {
+		if mountPoint == sys {
+			return false
+		}
+	}
+
+	// Accept drives mounted in common external mount points
+	// This works regardless of device name (sda, sdb, nvme, etc.)
 	externalPaths := []string{"/media/", "/mnt/", "/run/media/"}
 	for _, prefix := range externalPaths {
 		if strings.HasPrefix(mountPoint, prefix) {
@@ -99,15 +94,44 @@ func isExternalDrive(device, mountPoint, fsType string) bool {
 		}
 	}
 
-	// USB drives on /dev/sd[b-z] are usually external
-	if len(device) >= 8 && strings.HasPrefix(device, "/dev/sd") {
-		letter := device[7]
-		if letter >= 'b' && letter <= 'z' {
-			return true
+	return false
+}
+
+// getSystemDisk returns the base disk name containing the root filesystem
+// e.g., "nvme0n1" or "sda"
+func getSystemDisk() string {
+	// Find device mounted at /
+	cmd := exec.Command("findmnt", "-n", "-o", "SOURCE", "/")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+
+	device := strings.TrimSpace(string(output))
+	// e.g., /dev/nvme0n1p3 or /dev/sda1
+
+	// Extract base disk name
+	baseName := filepath.Base(device)
+
+	// Handle NVMe: nvme0n1p3 -> nvme0n1
+	if strings.HasPrefix(baseName, "nvme") {
+		if idx := strings.LastIndex(baseName, "p"); idx > 0 {
+			return baseName[:idx]
+		}
+		return baseName
+	}
+
+	// Handle sd*: sda1 -> sda
+	if strings.HasPrefix(baseName, "sd") {
+		// Remove trailing digits (partition number)
+		for i := len(baseName) - 1; i >= 0; i-- {
+			if baseName[i] < '0' || baseName[i] > '9' {
+				return baseName[:i+1]
+			}
 		}
 	}
 
-	return false
+	return baseName
 }
 
 // isRemovableDevice checks if a device is marked as removable
@@ -212,6 +236,9 @@ type UnmountedDisk struct {
 func DetectUnmountedDisks() ([]UnmountedDisk, error) {
 	var disks []UnmountedDisk
 
+	// First, detect the system disk (the one containing / or /boot)
+	systemDisk := getSystemDisk()
+
 	// Get all block devices with details
 	cmd := exec.Command("lsblk", "-d", "-n", "-b", "-o", "NAME,SIZE,MODEL,TYPE,RM,FSTYPE")
 	output, err := cmd.Output()
@@ -235,28 +262,31 @@ func DetectUnmountedDisks() ([]UnmountedDisk, error) {
 			continue
 		}
 
-		// Skip system disk (sda)
-		if name == "sda" {
-			continue
-		}
-
-		// Skip non-removable disks unless they look like external drives
-		// (sdb, sdc, etc. are often external even if not marked removable)
-		isRemovable := removable == "1"
-		isLikelyExternal := false
-		if strings.HasPrefix(name, "sd") && len(name) >= 3 {
-			letter := name[2]
-			if letter >= 'b' && letter <= 'z' {
-				isLikelyExternal = true
-			}
-		}
-
-		if !isRemovable && !isLikelyExternal {
+		// Skip system disk (dynamically detected)
+		if name == systemDisk {
 			continue
 		}
 
 		// Skip loop devices
 		if strings.HasPrefix(name, "loop") {
+			continue
+		}
+
+		// Skip zram devices
+		if strings.HasPrefix(name, "zram") {
+			continue
+		}
+
+		// Skip CD/DVD drives
+		if strings.HasPrefix(name, "sr") {
+			continue
+		}
+
+		// Include removable disks or sd* devices (likely external on NVMe systems)
+		isRemovable := removable == "1"
+		isSDDevice := strings.HasPrefix(name, "sd")
+
+		if !isRemovable && !isSDDevice {
 			continue
 		}
 
