@@ -5,7 +5,7 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.11.6-beta
+**Current Version:** v0.11.7-beta
 **Last Updated:** 2026-01-26
 
 ---
@@ -16,7 +16,13 @@
 
 ---
 
-## Release v0.11.6-beta (2026-01-26) ✅
+## Release v0.11.7-beta (2026-01-26) ✅
+
+### New Features
+- **Shared access option for disk mount** - New checkbox to allow all users read/write access
+  - Available in both "Mount disk" and "Format disk" dialogs
+  - Uses `umask=000` for FAT/exFAT, `chmod 777` for ext4/XFS
+  - Checked by default for convenience
 
 ### Bug Fixes
 - Fixed: Persistent mount (fstab) used hardcoded uid=1000,gid=1000 instead of actual user UID/GID

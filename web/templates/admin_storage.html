@@ -606,13 +606,22 @@
                     <label class="block text-sm font-medium text-gray-700">{{T .Lang "storage.label"}}</label>
                     <input type="text" id="formatLabel" maxlength="12" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md">
                 </div>
-                <div class="border-t pt-4">
-                    <label class="flex items-center">
-                        <input type="checkbox" id="formatMount" checked class="h-4 w-4 text-indigo-600 border-gray-300 rounded" onchange="toggleMountPath()">
-                        <span class="ml-2 text-sm text-gray-700">{{T .Lang "storage.mount_after_format"}}</span>
-                    </label>
-                    <div id="mountPathContainer" class="mt-2">
-                        <input type="text" id="formatMountPath" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono" placeholder="/mnt/sda">
+                <div class="border-t pt-4 space-y-3">
+                    <div>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="formatMount" checked class="h-4 w-4 text-indigo-600 border-gray-300 rounded" onchange="toggleMountPath()">
+                            <span class="ml-2 text-sm text-gray-700">{{T .Lang "storage.mount_after_format"}}</span>
+                        </label>
+                        <div id="mountPathContainer" class="mt-2">
+                            <input type="text" id="formatMountPath" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono" placeholder="/mnt/sda">
+                        </div>
+                    </div>
+                    <div id="formatSharedAccessContainer">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="formatSharedAccess" checked class="h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                            <span class="ml-2 text-sm text-gray-700">{{T .Lang "storage.shared_access"}}</span>
+                        </label>
+                        <p class="mt-1 text-xs text-gray-500 ml-6">{{T .Lang "storage.shared_access_hint"}}</p>
                     </div>
                 </div>
             </div>
@@ -645,12 +654,21 @@
                     <input type="text" id="mountDiskPath" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md text-sm font-mono" placeholder="/mnt/sda">
                     <p class="mt-1 text-xs text-gray-500">{{T .Lang "storage.mount_path_hint"}}</p>
                 </div>
-                <div class="border-t pt-4">
-                    <label class="flex items-center">
-                        <input type="checkbox" id="mountPersistent" class="h-4 w-4 text-indigo-600 border-gray-300 rounded">
-                        <span class="ml-2 text-sm text-gray-700">{{T .Lang "storage.persistent_mount"}}</span>
-                    </label>
-                    <p class="mt-1 text-xs text-gray-500 ml-6">{{T .Lang "storage.persistent_mount_hint"}}</p>
+                <div class="border-t pt-4 space-y-3">
+                    <div>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="mountSharedAccess" checked class="h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                            <span class="ml-2 text-sm text-gray-700">{{T .Lang "storage.shared_access"}}</span>
+                        </label>
+                        <p class="mt-1 text-xs text-gray-500 ml-6">{{T .Lang "storage.shared_access_hint"}}</p>
+                    </div>
+                    <div>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="mountPersistent" class="h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                            <span class="ml-2 text-sm text-gray-700">{{T .Lang "storage.persistent_mount"}}</span>
+                        </label>
+                        <p class="mt-1 text-xs text-gray-500 ml-6">{{T .Lang "storage.persistent_mount_hint"}}</p>
+                    </div>
                 </div>
             </div>
             <div class="mt-6 flex justify-end space-x-3">
@@ -1199,13 +1217,16 @@ function showFormatDiskModal(device) {
     const diskName = device.replace('/dev/', '');
     document.getElementById('formatMountPath').value = '/mnt/' + diskName;
     document.getElementById('formatMount').checked = true;
+    document.getElementById('formatSharedAccess').checked = true;
     document.getElementById('mountPathContainer').style.display = 'block';
+    document.getElementById('formatSharedAccessContainer').style.display = 'block';
     document.getElementById('formatDiskModal').classList.remove('hidden');
 }
 function closeFormatDiskModal() { document.getElementById('formatDiskModal').classList.add('hidden'); }
 function toggleMountPath() {
     const checked = document.getElementById('formatMount').checked;
     document.getElementById('mountPathContainer').style.display = checked ? 'block' : 'none';
+    document.getElementById('formatSharedAccessContainer').style.display = checked ? 'block' : 'none';
 }
 
 async function formatDisk(e) {
@@ -1215,6 +1236,7 @@ async function formatDisk(e) {
     const label = document.getElementById('formatLabel').value;
     const mount = document.getElementById('formatMount').checked;
     const mountPath = mount ? document.getElementById('formatMountPath').value : '';
+    const sharedAccess = mount ? document.getElementById('formatSharedAccess').checked : false;
 
     // Validate mount path if mounting is requested
     if (mount && mountPath) {
@@ -1230,7 +1252,7 @@ async function formatDisk(e) {
             const resp = await fetch('/api/admin/storage/disk/format', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
-                body: JSON.stringify({device, filesystem, label, force: true, mount, mount_path: mountPath})
+                body: JSON.stringify({device, filesystem, label, force: true, mount, mount_path: mountPath, shared_access: sharedAccess})
             });
             const data = await resp.json();
             if (data.success) { alert('{{T .Lang "storage.disk_formatted"}}'); closeFormatDiskModal(); location.reload(); }
@@ -1244,6 +1266,7 @@ function showMountDiskModal(device, diskName) {
     document.getElementById('mountDiskDevice').value = device;
     document.getElementById('mountDiskDeviceDisplay').textContent = device;
     document.getElementById('mountDiskPath').value = '/mnt/' + diskName;
+    document.getElementById('mountSharedAccess').checked = true;
     document.getElementById('mountPersistent').checked = false;
     document.getElementById('mountDiskModal').classList.remove('hidden');
 }
@@ -1253,6 +1276,7 @@ async function mountDisk(e) {
     e.preventDefault();
     const device = document.getElementById('mountDiskDevice').value;
     const mountPath = document.getElementById('mountDiskPath').value;
+    const sharedAccess = document.getElementById('mountSharedAccess').checked;
     const persistent = document.getElementById('mountPersistent').checked;
 
     // Validate mount path
@@ -1265,7 +1289,7 @@ async function mountDisk(e) {
         const resp = await fetch('/api/admin/storage/disk/mount', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({device, mount_path: mountPath, persistent})
+            body: JSON.stringify({device, mount_path: mountPath, shared_access: sharedAccess, persistent})
         });
         const data = await resp.json();
         if (data.success) {

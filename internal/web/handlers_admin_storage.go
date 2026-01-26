@@ -969,11 +969,11 @@ func (s *Server) handleAdminStorageDiskFormat(w http.ResponseWriter, r *http.Req
 	// Mount the disk if requested
 	var mountError string
 	if req.Mount && req.MountPath != "" {
-		if err := storage.MountDisk(req.Device, req.MountPath); err != nil {
+		if err := storage.MountDisk(req.Device, req.MountPath, req.SharedAccess); err != nil {
 			log.Printf("Warning: Failed to mount disk %s at %s: %v", req.Device, req.MountPath, err)
 			mountError = err.Error()
 		} else {
-			log.Printf("Mounted disk %s at %s", req.Device, req.MountPath)
+			log.Printf("Mounted disk %s at %s (shared: %v)", req.Device, req.MountPath, req.SharedAccess)
 		}
 	}
 
@@ -1049,9 +1049,10 @@ func (s *Server) handleAdminStorageDiskMount(w http.ResponseWriter, r *http.Requ
 	}
 
 	var req struct {
-		Device     string `json:"device"`
-		MountPath  string `json:"mount_path"`
-		Persistent bool   `json:"persistent"`
+		Device       string `json:"device"`
+		MountPath    string `json:"mount_path"`
+		Persistent   bool   `json:"persistent"`
+		SharedAccess bool   `json:"shared_access"` // If true, all users can read/write
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.Header().Set("Content-Type", "application/json")
@@ -1067,7 +1068,7 @@ func (s *Server) handleAdminStorageDiskMount(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if err := storage.MountDisk(req.Device, req.MountPath); err != nil {
+	if err := storage.MountDisk(req.Device, req.MountPath, req.SharedAccess); err != nil {
 		log.Printf("Error mounting disk %s at %s: %v", req.Device, req.MountPath, err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
@@ -1077,13 +1078,13 @@ func (s *Server) handleAdminStorageDiskMount(w http.ResponseWriter, r *http.Requ
 
 	// Add to fstab if persistent mount requested
 	if req.Persistent {
-		if err := storage.AddToFstab(req.Device, req.MountPath); err != nil {
+		if err := storage.AddToFstab(req.Device, req.MountPath, req.SharedAccess); err != nil {
 			// Mount succeeded, but fstab failed - log warning but don't fail the request
 			log.Printf("Warning: Mounted disk but failed to add to fstab: %v", err)
 		}
 	}
 
-	log.Printf("Mounted disk %s at %s (persistent: %v)", req.Device, req.MountPath, req.Persistent)
+	log.Printf("Mounted disk %s at %s (persistent: %v, shared: %v)", req.Device, req.MountPath, req.Persistent, req.SharedAccess)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":    true,

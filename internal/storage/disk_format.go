@@ -13,12 +13,13 @@ import (
 
 // FormatOptions contains options for formatting a disk
 type FormatOptions struct {
-	Device     string `json:"device"`      // Device path (e.g., /dev/sdb)
-	Filesystem string `json:"filesystem"`  // ext4, xfs, fat32, exfat
-	Label      string `json:"label"`       // Volume label (optional)
-	Force      bool   `json:"force"`       // Force format even if device has data
-	Mount      bool   `json:"mount"`       // Mount after formatting
-	MountPath  string `json:"mount_path"`  // Mount point (e.g., /mnt/sda)
+	Device       string `json:"device"`        // Device path (e.g., /dev/sdb)
+	Filesystem   string `json:"filesystem"`    // ext4, xfs, fat32, exfat
+	Label        string `json:"label"`         // Volume label (optional)
+	Force        bool   `json:"force"`         // Force format even if device has data
+	Mount        bool   `json:"mount"`         // Mount after formatting
+	MountPath    string `json:"mount_path"`    // Mount point (e.g., /mnt/sda)
+	SharedAccess bool   `json:"shared_access"` // All users can read/write (for mount)
 }
 
 // WipeOptions contains options for wiping a disk
@@ -555,7 +556,8 @@ func UnmountDisk(mountPath string, eject bool) error {
 }
 
 // MountDisk mounts a disk at the specified mount point
-func MountDisk(device, mountPath string) error {
+// If sharedAccess is true, the disk will be accessible by all users (read/write)
+func MountDisk(device, mountPath string, sharedAccess bool) error {
 	if err := ValidateDevicePath(device); err != nil {
 		return err
 	}
@@ -587,16 +589,22 @@ func MountDisk(device, mountPath string) error {
 	fsOutput, _ := cmd.Output()
 	fsType := strings.TrimSpace(string(fsOutput))
 
-	// Get current user's UID and GID for mount options
-	uid := fmt.Sprintf("%d", os.Getuid())
-	gid := fmt.Sprintf("%d", os.Getgid())
-
 	// Mount the disk with appropriate options based on filesystem
 	var mountCmd *exec.Cmd
 	switch fsType {
 	case "vfat", "exfat":
-		// FAT filesystems need uid/gid options at mount time
-		mountCmd = exec.Command("sudo", "mount", "-o", fmt.Sprintf("uid=%s,gid=%s", uid, gid), device, mountPath)
+		// FAT filesystems need uid/gid and umask options at mount time
+		var mountOpts string
+		if sharedAccess {
+			// Shared access: all users can read/write (umask=000 = rwxrwxrwx)
+			mountOpts = "umask=000"
+		} else {
+			// Private access: only anemone process user can read/write
+			uid := fmt.Sprintf("%d", os.Getuid())
+			gid := fmt.Sprintf("%d", os.Getgid())
+			mountOpts = fmt.Sprintf("uid=%s,gid=%s", uid, gid)
+		}
+		mountCmd = exec.Command("sudo", "mount", "-o", mountOpts, device, mountPath)
 	default:
 		// For ext4, xfs, etc. - mount normally
 		mountCmd = exec.Command("sudo", "mount", device, mountPath)
@@ -606,12 +614,20 @@ func MountDisk(device, mountPath string) error {
 		return fmt.Errorf("failed to mount disk: %s - %w", strings.TrimSpace(string(output)), err)
 	}
 
-	// For native Linux filesystems (ext4, xfs), change ownership after mounting
+	// For native Linux filesystems (ext4, xfs), set permissions after mounting
 	if fsType != "vfat" && fsType != "exfat" && fsType != "" {
-		cmd = exec.Command("sudo", "chown", fmt.Sprintf("%s:%s", uid, gid), mountPath)
+		if sharedAccess {
+			// Shared access: make directory world-writable
+			cmd = exec.Command("sudo", "chmod", "777", mountPath)
+		} else {
+			// Private access: set ownership to anemone process user
+			uid := fmt.Sprintf("%d", os.Getuid())
+			gid := fmt.Sprintf("%d", os.Getgid())
+			cmd = exec.Command("sudo", "chown", fmt.Sprintf("%s:%s", uid, gid), mountPath)
+		}
 		if output, err := cmd.CombinedOutput(); err != nil {
 			// Non-fatal, just log warning
-			return fmt.Errorf("mounted but failed to set ownership: %s - %w", strings.TrimSpace(string(output)), err)
+			return fmt.Errorf("mounted but failed to set permissions: %s - %w", strings.TrimSpace(string(output)), err)
 		}
 	}
 
@@ -619,7 +635,8 @@ func MountDisk(device, mountPath string) error {
 }
 
 // AddToFstab adds a mount entry to /etc/fstab for persistent mounting
-func AddToFstab(device, mountPath string) error {
+// If sharedAccess is true, the disk will be accessible by all users after reboot
+func AddToFstab(device, mountPath string, sharedAccess bool) error {
 	// Validate inputs
 	if err := ValidateDevicePath(device); err != nil {
 		return err
@@ -650,16 +667,19 @@ func AddToFstab(device, mountPath string) error {
 		return fmt.Errorf("device has no filesystem")
 	}
 
-	// Determine mount options based on filesystem
-	// Get current user's UID and GID for mount options
-	uid := os.Getuid()
-	gid := os.Getgid()
-
+	// Determine mount options based on filesystem and access mode
 	var options string
 	switch fsType {
 	case "vfat", "exfat":
-		// FAT filesystems - use nofail and uid/gid for proper permissions
-		options = fmt.Sprintf("defaults,nofail,uid=%d,gid=%d", uid, gid)
+		if sharedAccess {
+			// Shared access: all users can read/write (umask=000)
+			options = "defaults,nofail,umask=000"
+		} else {
+			// Private access: only anemone process user
+			uid := os.Getuid()
+			gid := os.Getgid()
+			options = fmt.Sprintf("defaults,nofail,uid=%d,gid=%d", uid, gid)
+		}
 	default:
 		// Linux filesystems (ext4, xfs, etc.)
 		options = "defaults,nofail"

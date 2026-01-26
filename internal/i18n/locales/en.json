@@ -744,6 +744,8 @@
   "storage.mount_path_hint": "Must start with /mnt/ or /media/",
   "storage.disk_mounted": "Disk mounted successfully",
   "storage.not_mounted": "(not mounted)",
+  "storage.shared_access": "Shared access (all users)",
+  "storage.shared_access_hint": "All system users can read and write to this disk",
   "storage.persistent_mount": "Persistent mount (fstab)",
   "storage.persistent_mount_hint": "Disk will be remounted automatically on startup",
 
