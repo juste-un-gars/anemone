@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.2-beta] - 2026-01-30
+
+### Changed
+
+#### Code Refactoring
+- **Split large files**: Refactored 4 files exceeding 800 lines to comply with CLAUDE.md guidelines
+  - `sync.go` (1273→431 lines): Extracted `sync_incremental.go` (606) and `sync_archive.go` (279)
+  - `handlers_admin_storage.go` (1152→246 lines): Extracted `handlers_admin_storage_zfs.go` (682) and `handlers_admin_storage_disk.go` (259)
+  - `handlers_restore.go` (1002→794 lines): Extracted `handlers_restore_warning.go` (221)
+  - `handlers_sync_api.go` (915→574 lines): Extracted `handlers_sync_api_read.go` (361)
+- All source files now comply with the <800 lines guideline for better maintainability
+
 ## [0.13.1-beta] - 2026-01-30
 
 ### Added

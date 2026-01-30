@@ -5,7 +5,7 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.13.1-beta
+**Current Version:** v0.13.2-beta
 **Last Updated:** 2026-01-30
 
 ---
@@ -20,15 +20,13 @@
 
 ---
 
-## Release v0.13.1-beta (2026-01-30) ✅
+## Release v0.13.2-beta (2026-01-30) ✅
 
-### Logging System - Validated ✅
-- https://github.com/juste-un-gars/anemone/releases/tag/v0.13.1-beta
-- Admin logs UI, changement de niveau, rotation fichiers - **OK**
+### File Refactoring
+- https://github.com/juste-un-gars/anemone/releases/tag/v0.13.2-beta
+- 4 fichiers > 800 lignes refactorisés pour conformité CLAUDE.md
 
-### File Refactoring (Session 5) ✅
-
-4 fichiers > 800 lignes refactorisés :
+4 fichiers refactorisés :
 
 | Fichier original | Avant | Après | Nouveaux fichiers |
 |-----------------|-------|-------|-------------------|
