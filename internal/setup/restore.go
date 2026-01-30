@@ -170,6 +170,13 @@ func ExecuteRestore(serverBackup *backup.ServerBackup, opts RestoreOptions) erro
 		}
 	}
 
+	// 6. Restore wireguard_config
+	if serverBackup.WireGuard != nil {
+		if err := restoreWireGuard(tx, serverBackup.WireGuard); err != nil {
+			return fmt.Errorf("failed to restore wireguard config: %w", err)
+		}
+	}
+
 	// Commit transaction
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
@@ -403,6 +410,21 @@ func restoreSyncConfig(tx *sql.Tx, cfg *backup.SyncConfig) error {
 		cfg.ID, cfg.Enabled, cfg.Interval, cfg.FixedHour, lastSync,
 	)
 	return err
+}
+
+func restoreWireGuard(tx *sql.Tx, wg *backup.WireGuardBackup) error {
+	_, err := tx.Exec(
+		`INSERT INTO wireguard_config (id, name, private_key, address, dns, peer_public_key,
+			peer_endpoint, allowed_ips, persistent_keepalive, enabled, auto_start, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		wg.ID, wg.Name, wg.PrivateKey, wg.Address, nullString(wg.DNS), wg.PeerPublicKey,
+		wg.PeerEndpoint, wg.AllowedIPs, wg.PersistentKeepalive, wg.Enabled, wg.AutoStart,
+		wg.CreatedAt, wg.UpdatedAt,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to restore wireguard config: %w", err)
+	}
+	return nil
 }
 
 // Helper functions

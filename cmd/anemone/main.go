@@ -25,6 +25,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/usbbackup"
 	"github.com/juste-un-gars/anemone/internal/usermanifest"
 	"github.com/juste-un-gars/anemone/internal/web"
+	wgpkg "github.com/juste-un-gars/anemone/internal/wireguard"
 )
 
 func main() {
@@ -104,6 +105,11 @@ func main() {
 
 	// Start automatic USB backup scheduler
 	usbbackup.StartScheduler(db, cfg.DataDir)
+
+	// Auto-connect WireGuard VPN if configured
+	if err := wgpkg.AutoConnect(db); err != nil {
+		logger.Warn("WireGuard auto-connect failed", "error", err)
+	}
 
 	// Start automatic trash cleanup scheduler (daily at 3 AM)
 	trash.StartCleanupScheduler(db, func() (int, error) {

@@ -190,6 +190,11 @@ func Migrate(db *sql.DB) error {
 		return fmt.Errorf("usb_backups table migration failed: %w", err)
 	}
 
+	// Migration pour créer la table wireguard_config
+	if err := migrateWireGuardTable(db); err != nil {
+		return fmt.Errorf("wireguard_config table migration failed: %w", err)
+	}
+
 	return nil
 }
 
@@ -464,6 +469,37 @@ func migrateUSBBackupsTable(db *sql.DB) error {
 	if !existingColumns["sync_interval_minutes"] {
 		if _, err := db.Exec("ALTER TABLE usb_backups ADD COLUMN sync_interval_minutes INTEGER DEFAULT 60"); err != nil {
 			return fmt.Errorf("failed to add sync_interval_minutes column: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// migrateWireGuardTable creates the wireguard_config table if it doesn't exist
+func migrateWireGuardTable(db *sql.DB) error {
+	// Check if table exists
+	var tableName string
+	err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='wireguard_config'").Scan(&tableName)
+	if err != nil {
+		// Table doesn't exist, create it
+		query := `CREATE TABLE wireguard_config (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT DEFAULT 'wg0',
+			private_key TEXT,
+			address TEXT,
+			dns TEXT,
+			peer_public_key TEXT,
+			peer_endpoint TEXT,
+			allowed_ips TEXT DEFAULT '0.0.0.0/0',
+			persistent_keepalive INTEGER DEFAULT 25,
+			enabled INTEGER DEFAULT 0,
+			auto_start INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`
+
+		if _, err := db.Exec(query); err != nil {
+			return fmt.Errorf("failed to create wireguard_config table: %w", err)
 		}
 	}
 

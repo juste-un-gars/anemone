@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{T .Lang "wireguard.title"}} - Anemone</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/dashboard" class="text-2xl font-bold text-gray-900">
+                        🪸 Anemone - {{ServerName}}
+                    </a>
+                    <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                        {{T .Lang "users.role.admin"}}
+                    </span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700">{{.Session.Username}}</span>
+                    <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
+                        {{T .Lang "dashboard.logout"}}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <a href="/dashboard" class="text-sm text-indigo-600 hover:text-indigo-900 mb-4 inline-flex items-center">
+                <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                {{T .Lang "common.back"}}
+            </a>
+            <h2 class="text-3xl font-bold text-gray-900 mt-2">
+                🔒 {{T .Lang "wireguard.title"}}
+            </h2>
+        </div>
+
+        {{if .Success}}
+        <div class="mb-6 bg-green-50 border-l-4 border-green-400 p-4">
+            <p class="text-sm text-green-700">{{.Success}}</p>
+        </div>
+        {{end}}
+
+        {{if .Error}}
+        <div class="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
+            <p class="text-sm text-red-700">{{.Error}}</p>
+        </div>
+        {{end}}
+
+        {{if not .Installed}}
+        <!-- WireGuard Not Installed -->
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+            <div class="flex items-start">
+                <svg class="h-6 w-6 text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-yellow-800">
+                        {{T .Lang "wireguard.not_installed"}}
+                    </h3>
+                    <p class="mt-2 text-sm text-yellow-700">
+                        {{T .Lang "wireguard.not_installed.help"}}
+                    </p>
+                    <div class="mt-4">
+                        <code class="text-xs bg-yellow-100 px-2 py-1 rounded">
+                            sudo dnf install wireguard-tools
+                        </code>
+                        <span class="text-xs text-yellow-600 mx-2">ou</span>
+                        <code class="text-xs bg-yellow-100 px-2 py-1 rounded">
+                            sudo apt install wireguard-tools
+                        </code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{else if not .Config}}
+        <!-- No Configuration -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <div class="text-center py-8">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <h3 class="mt-4 text-lg font-medium text-gray-900">
+                    {{T .Lang "wireguard.not_configured"}}
+                </h3>
+                <p class="mt-2 text-sm text-gray-500">
+                    {{T .Lang "wireguard.not_configured.help"}}
+                </p>
+                <div class="mt-6">
+                    <button type="button" onclick="document.getElementById('importModal').classList.remove('hidden')"
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
+                        <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        {{T .Lang "wireguard.import"}}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {{else}}
+        <!-- Configuration Display -->
+        <div class="bg-white shadow rounded-lg overflow-hidden">
+            <!-- Status Header -->
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div class="flex items-center">
+                    <span class="text-sm font-medium text-gray-700 mr-3">{{T .Lang "wireguard.status"}}:</span>
+                    {{if and .Status .Status.Connected}}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span class="w-2 h-2 mr-1.5 bg-green-400 rounded-full animate-pulse"></span>
+                        {{T .Lang "wireguard.status.connected"}}
+                    </span>
+                    {{else}}
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        <span class="w-2 h-2 mr-1.5 bg-gray-400 rounded-full"></span>
+                        {{T .Lang "wireguard.status.disconnected"}}
+                    </span>
+                    {{end}}
+                </div>
+                <div class="flex space-x-2">
+                    {{if and .Status .Status.Connected}}
+                    <form method="POST" action="/admin/wireguard/disconnect" class="inline">
+                        <button type="submit" class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">
+                            {{T .Lang "wireguard.disconnect"}}
+                        </button>
+                    </form>
+                    {{else}}
+                    <form method="POST" action="/admin/wireguard/connect" class="inline">
+                        <button type="submit" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-white anemone-gradient hover:opacity-90">
+                            {{T .Lang "wireguard.connect"}}
+                        </button>
+                    </form>
+                    {{end}}
+                </div>
+            </div>
+
+            {{if and .Status .Status.Connected}}
+            <!-- Connection Stats (only when connected) -->
+            <div class="px-6 py-4 border-b border-gray-200 bg-green-50">
+                <dl class="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-3">
+                    {{if .Status.LatestHandshake}}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500">{{T .Lang "wireguard.status.handshake"}}</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{.Status.LatestHandshake}}</dd>
+                    </div>
+                    {{end}}
+                    {{if .Status.TransferRx}}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500">{{T .Lang "wireguard.status.received"}}</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{.Status.TransferRx}}</dd>
+                    </div>
+                    {{end}}
+                    {{if .Status.TransferTx}}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500">{{T .Lang "wireguard.status.sent"}}</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{.Status.TransferTx}}</dd>
+                    </div>
+                    {{end}}
+                </dl>
+            </div>
+            {{end}}
+
+            <!-- Interface Section -->
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h4 class="text-sm font-medium text-gray-900 mb-3">{{T .Lang "wireguard.interface"}}</h4>
+                <dl class="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500">{{T .Lang "wireguard.interface"}}</dt>
+                        <dd class="mt-1 text-sm text-gray-900 font-mono">{{.Config.Name}}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500">{{T .Lang "wireguard.address"}}</dt>
+                        <dd class="mt-1 text-sm text-gray-900 font-mono">{{.Config.Address}}</dd>
+                    </div>
+                    {{if .Config.DNS}}
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500">{{T .Lang "wireguard.dns"}}</dt>
+                        <dd class="mt-1 text-sm text-gray-900 font-mono">{{.Config.DNS}}</dd>
+                    </div>
+                    {{end}}
+                </dl>
+            </div>
+
+            <!-- Peer Section -->
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h4 class="text-sm font-medium text-gray-900 mb-3">{{T .Lang "wireguard.peer"}}</h4>
+                <dl class="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+                    <div class="sm:col-span-2">
+                        <dt class="text-xs font-medium text-gray-500">{{T .Lang "wireguard.peer.endpoint"}}</dt>
+                        <dd class="mt-1 text-sm text-gray-900 font-mono">{{.Config.PeerEndpoint}}</dd>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <dt class="text-xs font-medium text-gray-500">{{T .Lang "wireguard.peer.public_key"}}</dt>
+                        <dd class="mt-1 text-sm text-gray-900 font-mono text-xs break-all">{{.Config.PeerPublicKey}}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500">{{T .Lang "wireguard.peer.allowed_ips"}}</dt>
+                        <dd class="mt-1 text-sm text-gray-900 font-mono">{{.Config.AllowedIPs}}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium text-gray-500">{{T .Lang "wireguard.peer.keepalive"}}</dt>
+                        <dd class="mt-1 text-sm text-gray-900">{{.Config.PersistentKeepalive}}s</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <!-- Options Section -->
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h4 class="text-sm font-medium text-gray-900 mb-3">{{T .Lang "wireguard.options"}}</h4>
+                <form method="POST" action="/admin/wireguard/options" class="flex items-center">
+                    <label class="flex items-center">
+                        <input type="checkbox" name="auto_start" value="1" {{if .Config.AutoStart}}checked{{end}}
+                               onchange="this.form.submit()"
+                               class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded">
+                        <span class="ml-2 text-sm text-gray-700">{{T .Lang "wireguard.auto_start"}}</span>
+                    </label>
+                    <span class="ml-2 text-xs text-gray-500">{{T .Lang "wireguard.auto_start.help"}}</span>
+                </form>
+            </div>
+
+            <!-- Actions -->
+            <div class="px-6 py-4 bg-gray-50 flex justify-between">
+                <button type="button" onclick="document.getElementById('importModal').classList.remove('hidden')"
+                        class="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    {{T .Lang "wireguard.import"}}
+                </button>
+                <button type="button" onclick="if(confirm('{{T .Lang \"wireguard.delete.confirm\"}}')) document.getElementById('deleteForm').submit()"
+                        class="inline-flex items-center px-3 py-2 border border-red-300 text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50">
+                    {{T .Lang "wireguard.delete"}}
+                </button>
+                <form id="deleteForm" method="POST" action="/admin/wireguard/delete" class="hidden"></form>
+            </div>
+        </div>
+        {{end}}
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div id="importModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
+        <form method="POST" action="/admin/wireguard/import">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h3 class="text-lg font-medium text-gray-900">{{T .Lang "wireguard.import.title"}}</h3>
+                <p class="mt-1 text-sm text-gray-500">{{T .Lang "wireguard.import.help"}}</p>
+            </div>
+            <div class="px-6 py-4">
+                <textarea name="config" rows="12" required
+                          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm font-mono text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="{{T .Lang "wireguard.import.placeholder"}}"></textarea>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 flex justify-end space-x-3 rounded-b-lg">
+                <button type="button" onclick="document.getElementById('importModal').classList.add('hidden')"
+                        class="px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                    {{T .Lang "wireguard.cancel"}}
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white anemone-gradient hover:opacity-90">
+                    {{T .Lang "wireguard.import"}}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+</body>
+</html>

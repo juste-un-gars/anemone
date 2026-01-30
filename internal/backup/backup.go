@@ -22,14 +22,15 @@ import (
 
 // ServerBackup represents the complete server configuration
 type ServerBackup struct {
-	Version       string          `json:"version"`
-	ExportedAt    time.Time       `json:"exported_at"`
-	ServerName    string          `json:"server_name"`
-	SystemConfig  []ConfigItem    `json:"system_config"`
-	Users         []UserBackup    `json:"users"`
-	Shares        []ShareBackup   `json:"shares"`
-	Peers         []PeerBackup    `json:"peers"`
-	SyncConfig    *SyncConfig     `json:"sync_config"`
+	Version       string           `json:"version"`
+	ExportedAt    time.Time        `json:"exported_at"`
+	ServerName    string           `json:"server_name"`
+	SystemConfig  []ConfigItem     `json:"system_config"`
+	Users         []UserBackup     `json:"users"`
+	Shares        []ShareBackup    `json:"shares"`
+	Peers         []PeerBackup     `json:"peers"`
+	SyncConfig    *SyncConfig      `json:"sync_config"`
+	WireGuard     *WireGuardBackup `json:"wireguard,omitempty"`
 }
 
 // ConfigItem represents a key-value pair from system_config
@@ -95,6 +96,23 @@ type SyncConfig struct {
 	Interval  string     `json:"interval"`
 	FixedHour int        `json:"fixed_hour"`
 	LastSync  *time.Time `json:"last_sync"`
+}
+
+// WireGuardBackup represents a WireGuard VPN configuration
+type WireGuardBackup struct {
+	ID                  int       `json:"id"`
+	Name                string    `json:"name"`
+	PrivateKey          string    `json:"private_key"`
+	Address             string    `json:"address"`
+	DNS                 string    `json:"dns"`
+	PeerPublicKey       string    `json:"peer_public_key"`
+	PeerEndpoint        string    `json:"peer_endpoint"`
+	AllowedIPs          string    `json:"allowed_ips"`
+	PersistentKeepalive int       `json:"persistent_keepalive"`
+	Enabled             bool      `json:"enabled"`
+	AutoStart           bool      `json:"auto_start"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // ExportConfiguration exports the complete server configuration to JSON
@@ -242,6 +260,45 @@ func ExportConfiguration(db *sql.DB, serverName string) (*ServerBackup, error) {
 			syncConfig.LastSync = &lastSync.Time
 		}
 		backup.SyncConfig = &syncConfig
+	}
+
+	// Export wireguard_config
+	var wgConfig WireGuardBackup
+	var wgDNS, wgPeerPubKey, wgPeerEndpoint, wgAllowedIPs sql.NullString
+	var wgPrivateKey, wgAddress sql.NullString
+	var wgCreatedAt, wgUpdatedAt sql.NullTime
+	err = db.QueryRow(`SELECT id, name, private_key, address, dns, peer_public_key, peer_endpoint,
+		allowed_ips, persistent_keepalive, enabled, auto_start, created_at, updated_at
+		FROM wireguard_config LIMIT 1`).
+		Scan(&wgConfig.ID, &wgConfig.Name, &wgPrivateKey, &wgAddress, &wgDNS,
+			&wgPeerPubKey, &wgPeerEndpoint, &wgAllowedIPs, &wgConfig.PersistentKeepalive,
+			&wgConfig.Enabled, &wgConfig.AutoStart, &wgCreatedAt, &wgUpdatedAt)
+	if err == nil {
+		if wgPrivateKey.Valid {
+			wgConfig.PrivateKey = wgPrivateKey.String
+		}
+		if wgAddress.Valid {
+			wgConfig.Address = wgAddress.String
+		}
+		if wgDNS.Valid {
+			wgConfig.DNS = wgDNS.String
+		}
+		if wgPeerPubKey.Valid {
+			wgConfig.PeerPublicKey = wgPeerPubKey.String
+		}
+		if wgPeerEndpoint.Valid {
+			wgConfig.PeerEndpoint = wgPeerEndpoint.String
+		}
+		if wgAllowedIPs.Valid {
+			wgConfig.AllowedIPs = wgAllowedIPs.String
+		}
+		if wgCreatedAt.Valid {
+			wgConfig.CreatedAt = wgCreatedAt.Time
+		}
+		if wgUpdatedAt.Valid {
+			wgConfig.UpdatedAt = wgUpdatedAt.Time
+		}
+		backup.WireGuard = &wgConfig
 	}
 
 	return backup, nil

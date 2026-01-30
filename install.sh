@@ -561,6 +561,20 @@ install_storage_tools() {
     log_info "Storage tools ready"
 }
 
+install_wireguard() {
+    # WireGuard VPN tools (optional)
+    if ! command -v wg &> /dev/null; then
+        log_info "Installing WireGuard tools (optional)..."
+        if [ "$PKG_MANAGER" = "dnf" ]; then
+            dnf install -y wireguard-tools && log_info "WireGuard tools installed" || log_warn "WireGuard installation failed (optional)"
+        elif [ "$PKG_MANAGER" = "apt" ]; then
+            apt install -y wireguard-tools && log_info "WireGuard tools installed" || log_warn "WireGuard installation failed (optional)"
+        fi
+    else
+        log_info "WireGuard tools already installed"
+    fi
+}
+
 build_binary() {
     log_info "Building Anemone..."
 
@@ -727,6 +741,18 @@ $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/sd* bs=1M count=1
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/nvme* bs=1M count=1 *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/vd* bs=1M count=1 *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /bin/dd if=/dev/zero of=/dev/loop* bs=1M count=1 *
+
+# WireGuard VPN
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/wg-quick up *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/wg-quick down *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/wg show *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/wg
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/tee /etc/wireguard/*.conf
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/tee /etc/wireguard/*.conf
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/chmod 600 /etc/wireguard/*.conf
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/chmod 600 /etc/wireguard/*.conf
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/rm -f /etc/wireguard/*.conf
+$SERVICE_USER ALL=(ALL) NOPASSWD: /bin/rm -f /etc/wireguard/*.conf
 
 # Setup wizard - update sudoers when custom path is used
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/cat /etc/sudoers.d/anemone
@@ -951,6 +977,7 @@ main() {
 
         log_step "3/8 Installing storage tools..."
         install_storage_tools
+        install_wireguard
 
         log_step "4/8 Building Anemone..."
         build_binary

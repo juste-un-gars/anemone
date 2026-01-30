@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.3-beta] - 2026-01-30
+
+### Added
+
+#### WireGuard VPN Client Integration
+- **New WireGuard management**: Configure VPN connection to access remote peers
+- **Import .conf files**: Paste WireGuard configuration from your VPN provider
+- **Connection control**: Connect/disconnect VPN directly from web interface
+- **Auto-start option**: Automatically connect VPN when Anemone starts
+- **Live status display**: Shows connection status, last handshake, and data transfer stats
+- **Backup/Restore support**: WireGuard configuration included in server backups
+
+### Technical
+- New package: `internal/wireguard/` with config management, parser, and status
+- New admin page: `/admin/wireguard` for VPN configuration
+- New database table: `wireguard_config` for storing VPN settings
+- Updated `install.sh`: Optional installation of `wireguard-tools`
+- Added sudoers rules for `wg-quick up/down`, config file management
+- i18n: Added French and English translations for WireGuard UI
+
 ## [0.13.2-beta] - 2026-01-30
 
 ### Changed

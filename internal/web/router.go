@@ -252,6 +252,14 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/admin/logs/level", auth.RequireAdmin(server.handleAdminLogsLevel))
 	mux.HandleFunc("/admin/logs/download", auth.RequireAdmin(server.handleAdminLogsDownload))
 
+	// Admin routes - WireGuard VPN
+	mux.HandleFunc("/admin/wireguard", auth.RequireAdmin(server.handleAdminWireGuard))
+	mux.HandleFunc("/admin/wireguard/import", auth.RequireAdmin(server.handleAdminWireGuardImport))
+	mux.HandleFunc("/admin/wireguard/delete", auth.RequireAdmin(server.handleAdminWireGuardDelete))
+	mux.HandleFunc("/admin/wireguard/options", auth.RequireAdmin(server.handleAdminWireGuardOptions))
+	mux.HandleFunc("/admin/wireguard/connect", auth.RequireAdmin(server.handleAdminWireGuardConnect))
+	mux.HandleFunc("/admin/wireguard/disconnect", auth.RequireAdmin(server.handleAdminWireGuardDisconnect))
+
 	// Admin routes - Sync
 	mux.HandleFunc("/admin/sync", auth.RequireAdmin(server.handleAdminSync))
 	mux.HandleFunc("/admin/sync/config", auth.RequireAdmin(server.handleAdminSyncConfig))

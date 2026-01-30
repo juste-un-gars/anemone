@@ -5,38 +5,114 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.13.2-beta
+**Current Version:** v0.13.3-beta
 **Last Updated:** 2026-01-30
 
 ---
 
 ## Current Session
 
-**Session 5: Audit CLAUDE.md** - Completed ✅
+**Session 6: WireGuard Integration** - Complete ✅
 
 ---
 
-## Next Session: WireGuard Integration
+## Session 6: WireGuard Integration
 
-**Objectif:** Ajouter le support WireGuard pour VPN entre peers
+**Date:** 2026-01-30
+**Objectif:** Ajouter le support WireGuard pour VPN entre peers Anemone
+**Status:** In Progress 🔄
 
-### Tâches planifiées
+### Contexte WireGuard
 
-1. **Installation script (`install.sh`)**
-   - Proposer l'installation de WireGuard au début du script
-   - Installer `wireguard-tools` si accepté
+WireGuard est un VPN moderne, simple et performant:
+- Utilise des paires de clés publiques/privées (comme SSH)
+- Configuration minimaliste (vs OpenVPN)
+- Intégré au kernel Linux depuis 5.6
+- Idéal pour connecter des peers Anemone à travers Internet
 
-2. **Dashboard Admin**
-   - Nouvelle tuile "WireGuard" dans le dashboard admin
-   - Interface pour gérer la configuration WireGuard
+### Modules planifiés
 
-3. **Fonctionnalités à définir**
-   - Génération de clés (privée/publique)
-   - Configuration des peers VPN
-   - Statut de connexion
-   - Import/export de configuration `.conf`
+| # | Module | Objectif | Status |
+|---|--------|----------|--------|
+| 1 | **Infrastructure DB** | Table `wireguard_config`, migration, struct Go, CRUD | ✅ Done |
+| 2 | **install.sh** | Installation optionnelle wireguard-tools | ✅ Done |
+| 3 | **UI Dashboard + Routes** | Tuile admin, handlers, template | ✅ Done |
+| 4 | **Import .conf** | Parser fichier et stocker en DB | ✅ Done |
+| 5 | **Édition manuelle** | Formulaire pour modifier les champs | ⏭️ Skip (réimport) |
+| 6 | **Activation** | `wg-quick up/down`, toggle ON/OFF | ✅ Done |
+| 7 | **Auto-start** | Lancer au démarrage d'Anemone si configuré | ✅ Done |
+| 8 | **Statut** | Afficher état connexion | ✅ Done |
+| 9 | **Backup/Restore** | Intégration avec sauvegarde/restauration | ✅ Done |
 
-**Pour démarrer:** `"session wireguard"` ou `"continue"`
+### Architecture prévue
+
+```
+internal/wireguard/
+├── wireguard.go        # Struct WireGuardConfig, CRUD DB
+└── config.go           # Génération fichier .conf pour wg-quick
+
+web/templates/
+└── admin_wireguard.html  # Interface admin
+
+internal/web/
+└── handlers_admin_wireguard.go  # Handlers HTTP
+```
+
+### Schéma DB (client only)
+
+```sql
+CREATE TABLE wireguard_config (
+    id INTEGER PRIMARY KEY,
+    name TEXT DEFAULT 'wg0',
+    -- Interface
+    private_key TEXT,
+    address TEXT,
+    dns TEXT,
+    -- Peer (serveur)
+    peer_public_key TEXT,
+    peer_endpoint TEXT,
+    allowed_ips TEXT,
+    persistent_keepalive INTEGER DEFAULT 25,
+    -- Options
+    enabled INTEGER DEFAULT 0,
+    auto_start INTEGER DEFAULT 0,
+    created_at DATETIME,
+    updated_at DATETIME
+);
+```
+
+### Current Module
+
+**Working on:** Session Complete
+**Progress:** ✅ All modules done
+
+### Files Modified
+- `internal/database/migrations.go` - Ajout `migrateWireGuardTable()`
+- `internal/wireguard/wireguard.go` - Nouveau package avec struct Config et CRUD
+- `internal/wireguard/parser.go` - Parser pour fichiers .conf
+- `internal/wireguard/conffile.go` - Génération fichier .conf, Connect/Disconnect
+- `cmd/anemone/main.go` - Appel AutoConnect au démarrage
+- `internal/wireguard/status.go` - Récupération statut détaillé (handshake, transfer)
+- `internal/backup/backup.go` - Ajout WireGuardBackup struct + export
+- `internal/setup/restore.go` - Ajout restoreWireGuard()
+- `install.sh` - Ajout `install_wireguard()` + règles sudoers wg-quick
+- `web/templates/dashboard_admin.html` - Ajout tuile WireGuard
+- `internal/i18n/locales/en.json` - Traductions WireGuard (EN)
+- `internal/i18n/locales/fr.json` - Traductions WireGuard (FR)
+- `internal/web/handlers_admin_wireguard.go` - Handlers WireGuard
+- `internal/web/router.go` - Route `/admin/wireguard`
+- `web/templates/admin_wireguard.html` - Template page WireGuard
+
+### Décisions techniques
+
+| Décision | Choix | Raison |
+|----------|-------|--------|
+| Génération clés | `wg genkey` / `wg pubkey` | Standard WireGuard, sécurisé |
+| Port par défaut | 51820 | Standard WireGuard |
+| Réseau VPN | 10.0.0.0/24 | Plage privée non-routable |
+| Stockage clés | DB chiffrée (comme sync keys) | Cohérent avec le reste |
+
+**Pour démarrer Module 1:** Attente validation du plan
 
 ---
 
@@ -401,6 +477,8 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 6 | WireGuard Integration | 2026-01-30 | Complete ✅ |
+| 5 | Audit CLAUDE.md + Refactoring | 2026-01-30 | Completed ✅ |
 | 77 | Mount Disk + Persistent fstab | 2026-01-25 | Completed ✅ |
 | 76 | USB Format + NVMe SMART Fix | 2026-01-25 | Completed ✅ |
 | 75 | Release v0.10.0-beta | 2026-01-24 | Completed ✅ |
