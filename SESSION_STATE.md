@@ -20,6 +20,14 @@
 
 ---
 
+## Release v0.13.1-beta (2026-01-30) ✅
+
+### Logging System - Released for testing
+- https://github.com/juste-un-gars/anemone/releases/tag/v0.13.1-beta
+- **À tester:** Admin logs UI, changement de niveau, rotation fichiers
+
+---
+
 ## Completed Today (2026-01-30): Logging System ✅
 
 ### Session 4 - Migration logs ✅
