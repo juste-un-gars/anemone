@@ -81,6 +81,10 @@ CREATE TABLE wireguard_config (
 );
 ```
 
+### Release
+
+**v0.13.3-beta** released: https://github.com/juste-un-gars/anemone/releases/tag/v0.13.3-beta
+
 ### Current Module
 
 **Working on:** Session Complete
