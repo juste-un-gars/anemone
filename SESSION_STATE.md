@@ -12,19 +12,32 @@
 
 ## Current Session
 
-**Session 5: Audit CLAUDE.md** - En attente de validation logging
+**Session 5: Audit CLAUDE.md** - Completed ✅
 
-**Prochaines étapes:**
-1. Tester logging system (v0.13.1-beta)
-2. Si OK → Refactoring des fichiers > 800 lignes
+**Résultat:**
+- Logging system validé (v0.13.1-beta)
+- Refactoring des 4 fichiers > 800 lignes terminé
 
 ---
 
 ## Release v0.13.1-beta (2026-01-30) ✅
 
-### Logging System - Released for testing
+### Logging System - Validated ✅
 - https://github.com/juste-un-gars/anemone/releases/tag/v0.13.1-beta
-- **À tester:** Admin logs UI, changement de niveau, rotation fichiers
+- Admin logs UI, changement de niveau, rotation fichiers - **OK**
+
+### File Refactoring (Session 5) ✅
+
+4 fichiers > 800 lignes refactorisés :
+
+| Fichier original | Avant | Après | Nouveaux fichiers |
+|-----------------|-------|-------|-------------------|
+| sync.go | 1273 | 431 | sync_incremental.go (606), sync_archive.go (279) |
+| handlers_admin_storage.go | 1152 | 246 | handlers_admin_storage_zfs.go (682), handlers_admin_storage_disk.go (259) |
+| handlers_restore.go | 1002 | 794 | handlers_restore_warning.go (221) |
+| handlers_sync_api.go | 915 | 574 | handlers_sync_api_read.go (361) |
+
+Tous les fichiers sont maintenant conformes aux guidelines CLAUDE.md (< 800 lignes)
 
 ---
 
@@ -93,7 +106,7 @@
 | 2 | **Config + DB** | Variables LOG_*, init dans main.go | ✅ Done |
 | 3 | **UI Admin Logs** | Page `/admin/logs` : changer niveau, télécharger fichiers | ✅ Done |
 | 4 | **Migration logs** | Migrer ~40 fichiers `log.` → `logger.` | ✅ Done |
-| 5 | **Audit CLAUDE.md** | Vérifier conformité code vs nouvelles règles | ⏳ Next |
+| 5 | **Audit CLAUDE.md** | Vérifier conformité code vs nouvelles règles + refactoring | ✅ Done |
 
 ### Format logs prévu
 
