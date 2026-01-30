@@ -5,11 +5,11 @@
 package web
 
 import (
-	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/juste-un-gars/anemone/internal/auth"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"github.com/juste-un-gars/anemone/internal/syncauth"
 	"github.com/juste-un-gars/anemone/internal/sysconfig"
 )
@@ -26,25 +26,25 @@ func (s *Server) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 	// Check if sync auth password is configured
 	isConfigured, err := syncauth.IsConfigured(s.db)
 	if err != nil {
-		log.Printf("Error checking sync auth config: %v", err)
+		logger.Error("Error checking sync auth config", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
 	data := struct {
-		Lang          string
-		Session       *auth.Session
-		IsConfigured  bool
-		Success       string
-		Error         string
+		Lang         string
+		Session      *auth.Session
+		IsConfigured bool
+		Success      string
+		Error        string
 	}{
-		Lang:          lang,
-		Session:       session,
-		IsConfigured:  isConfigured,
+		Lang:         lang,
+		Session:      session,
+		IsConfigured: isConfigured,
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
-		log.Printf("Error rendering admin settings template: %v", err)
+		logger.Error("Error rendering admin settings template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -71,19 +71,19 @@ func (s *Server) handleAdminSettingsSyncPassword(w http.ResponseWriter, r *http.
 	if password == "" || len(password) < 8 {
 		isConfigured, _ := syncauth.IsConfigured(s.db)
 		data := struct {
-			Lang          string
-			Session       *auth.Session
-			IsConfigured  bool
-			Success       string
-			Error         string
+			Lang         string
+			Session      *auth.Session
+			IsConfigured bool
+			Success      string
+			Error        string
 		}{
-			Lang:          lang,
-			Session:       session,
-			IsConfigured:  isConfigured,
-			Error:         "Le mot de passe doit contenir au moins 8 caractères",
+			Lang:         lang,
+			Session:      session,
+			IsConfigured: isConfigured,
+			Error:        "Le mot de passe doit contenir au moins 8 caractères",
 		}
 		if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
-			log.Printf("Error rendering admin settings template: %v", err)
+			logger.Error("Error rendering admin settings template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 		return
@@ -92,19 +92,19 @@ func (s *Server) handleAdminSettingsSyncPassword(w http.ResponseWriter, r *http.
 	if password != passwordConfirm {
 		isConfigured, _ := syncauth.IsConfigured(s.db)
 		data := struct {
-			Lang          string
-			Session       *auth.Session
-			IsConfigured  bool
-			Success       string
-			Error         string
+			Lang         string
+			Session      *auth.Session
+			IsConfigured bool
+			Success      string
+			Error        string
 		}{
-			Lang:          lang,
-			Session:       session,
-			IsConfigured:  isConfigured,
-			Error:         "Les mots de passe ne correspondent pas",
+			Lang:         lang,
+			Session:      session,
+			IsConfigured: isConfigured,
+			Error:        "Les mots de passe ne correspondent pas",
 		}
 		if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
-			log.Printf("Error rendering admin settings template: %v", err)
+			logger.Error("Error rendering admin settings template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 		return
@@ -112,45 +112,45 @@ func (s *Server) handleAdminSettingsSyncPassword(w http.ResponseWriter, r *http.
 
 	// Set password
 	if err := syncauth.SetSyncAuthPassword(s.db, password); err != nil {
-		log.Printf("Error setting sync auth password: %v", err)
+		logger.Error("Error setting sync auth password", "error", err)
 		isConfigured, _ := syncauth.IsConfigured(s.db)
 		data := struct {
-			Lang          string
-			Session       *auth.Session
-			IsConfigured  bool
-			Success       string
-			Error         string
+			Lang         string
+			Session      *auth.Session
+			IsConfigured bool
+			Success      string
+			Error        string
 		}{
-			Lang:          lang,
-			Session:       session,
-			IsConfigured:  isConfigured,
-			Error:         "Erreur lors de la configuration du mot de passe",
+			Lang:         lang,
+			Session:      session,
+			IsConfigured: isConfigured,
+			Error:        "Erreur lors de la configuration du mot de passe",
 		}
 		if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
-			log.Printf("Error rendering admin settings template: %v", err)
+			logger.Error("Error rendering admin settings template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 		return
 	}
 
 	// Success
-	log.Printf("Admin %s configured sync auth password", session.Username)
+	logger.Info("Admin configured sync auth password", "admin", session.Username)
 	isConfigured, _ := syncauth.IsConfigured(s.db)
 	data := struct {
-		Lang          string
-		Session       *auth.Session
-		IsConfigured  bool
-		Success       string
-		Error         string
+		Lang         string
+		Session      *auth.Session
+		IsConfigured bool
+		Success      string
+		Error        string
 	}{
-		Lang:          lang,
-		Session:       session,
-		IsConfigured:  isConfigured,
-		Success:       "Mot de passe de synchronisation configuré avec succès",
+		Lang:         lang,
+		Session:      session,
+		IsConfigured: isConfigured,
+		Success:      "Mot de passe de synchronisation configuré avec succès",
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
-		log.Printf("Error rendering admin settings template: %v", err)
+		logger.Error("Error rendering admin settings template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -169,25 +169,25 @@ func (s *Server) handleAdminSettingsTrash(w http.ResponseWriter, r *http.Request
 		// Get current retention days
 		retentionDays, err := sysconfig.GetTrashRetentionDays(s.db)
 		if err != nil {
-			log.Printf("Error getting trash retention days: %v", err)
+			logger.Error("Error getting trash retention days", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
 
 		data := struct {
-			Lang           string
-			Session        *auth.Session
-			RetentionDays  int
-			Success        string
-			Error          string
+			Lang          string
+			Session       *auth.Session
+			RetentionDays int
+			Success       string
+			Error         string
 		}{
-			Lang:           lang,
-			Session:        session,
-			RetentionDays:  retentionDays,
+			Lang:          lang,
+			Session:       session,
+			RetentionDays: retentionDays,
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "admin_settings_trash.html", data); err != nil {
-			log.Printf("Error rendering admin settings trash template: %v", err)
+			logger.Error("Error rendering admin settings trash template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 		return
@@ -203,19 +203,19 @@ func (s *Server) handleAdminSettingsTrash(w http.ResponseWriter, r *http.Request
 		if err != nil || retentionDays < 0 {
 			currentRetentionDays, _ := sysconfig.GetTrashRetentionDays(s.db)
 			data := struct {
-				Lang           string
-				Session        *auth.Session
-				RetentionDays  int
-				Success        string
-				Error          string
+				Lang          string
+				Session       *auth.Session
+				RetentionDays int
+				Success       string
+				Error         string
 			}{
-				Lang:           lang,
-				Session:        session,
-				RetentionDays:  currentRetentionDays,
-				Error:          "La durée de rétention doit être un nombre positif",
+				Lang:          lang,
+				Session:       session,
+				RetentionDays: currentRetentionDays,
+				Error:         "La durée de rétention doit être un nombre positif",
 			}
 			if err := s.templates.ExecuteTemplate(w, "admin_settings_trash.html", data); err != nil {
-				log.Printf("Error rendering admin settings trash template: %v", err)
+				logger.Error("Error rendering admin settings trash template", "error", err)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			}
 			return
@@ -223,44 +223,44 @@ func (s *Server) handleAdminSettingsTrash(w http.ResponseWriter, r *http.Request
 
 		// Update retention days
 		if err := sysconfig.SetTrashRetentionDays(s.db, retentionDays); err != nil {
-			log.Printf("Error setting trash retention days: %v", err)
+			logger.Error("Error setting trash retention days", "error", err)
 			currentRetentionDays, _ := sysconfig.GetTrashRetentionDays(s.db)
 			data := struct {
-				Lang           string
-				Session        *auth.Session
-				RetentionDays  int
-				Success        string
-				Error          string
+				Lang          string
+				Session       *auth.Session
+				RetentionDays int
+				Success       string
+				Error         string
 			}{
-				Lang:           lang,
-				Session:        session,
-				RetentionDays:  currentRetentionDays,
-				Error:          "Erreur lors de la mise à jour de la durée de rétention",
+				Lang:          lang,
+				Session:       session,
+				RetentionDays: currentRetentionDays,
+				Error:         "Erreur lors de la mise à jour de la durée de rétention",
 			}
 			if err := s.templates.ExecuteTemplate(w, "admin_settings_trash.html", data); err != nil {
-				log.Printf("Error rendering admin settings trash template: %v", err)
+				logger.Error("Error rendering admin settings trash template", "error", err)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			}
 			return
 		}
 
 		// Success
-		log.Printf("Admin %s updated trash retention days to %d", session.Username, retentionDays)
+		logger.Info("Admin updated trash retention days", "admin", session.Username, "days", retentionDays)
 		data := struct {
-			Lang           string
-			Session        *auth.Session
-			RetentionDays  int
-			Success        string
-			Error          string
+			Lang          string
+			Session       *auth.Session
+			RetentionDays int
+			Success       string
+			Error         string
 		}{
-			Lang:           lang,
-			Session:        session,
-			RetentionDays:  retentionDays,
-			Success:        "Durée de rétention mise à jour avec succès",
+			Lang:          lang,
+			Session:       session,
+			RetentionDays: retentionDays,
+			Success:       "Durée de rétention mise à jour avec succès",
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "admin_settings_trash.html", data); err != nil {
-			log.Printf("Error rendering admin settings trash template: %v", err)
+			logger.Error("Error rendering admin settings trash template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 		return
@@ -268,4 +268,3 @@ func (s *Server) handleAdminSettingsTrash(w http.ResponseWriter, r *http.Request
 
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 }
-

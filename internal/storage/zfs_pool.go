@@ -43,7 +43,7 @@ func ValidatePoolName(name string) error {
 		return fmt.Errorf("invalid pool name: must start with a letter and contain only alphanumerics, underscore, hyphen, period, or colon")
 	}
 	// Reserved names
-	reserved := []string{"mirror", "raidz", "raidz1", "raidz2", "raidz3", "spare", "log", "cache"}
+	reserved := []string{"mirror", "raidz", "raidz1", "raidz2", "raidz3", "spare", "github.com/juste-un-gars/anemone/internal/logger", "cache"}
 	for _, r := range reserved {
 		if name == r {
 			return fmt.Errorf("'%s' is a reserved name", name)
@@ -380,7 +380,7 @@ func AddVDev(opts AddVDevOptions) error {
 	}
 
 	// Validate vdev type
-	validTypes := []string{"", "stripe", "mirror", "raidz1", "raidz2", "raidz3", "spare", "log", "cache"}
+	validTypes := []string{"", "stripe", "mirror", "raidz1", "raidz2", "raidz3", "spare", "github.com/juste-un-gars/anemone/internal/logger", "cache"}
 	typeValid := false
 	for _, t := range validTypes {
 		if opts.VDevType == t {

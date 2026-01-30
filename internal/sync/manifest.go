@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,12 +76,12 @@ func BuildManifest(sourceDir string, userID int, shareName string, sourceServer 
 	cacheFile := filepath.Join(sourceDir, ".anemone-local-manifest.json")
 	cachedManifest, err := LoadLocalManifestCache(cacheFile)
 	if err != nil {
-		log.Printf("⚠️  Warning: failed to load manifest cache: %v (will do full scan)", err)
+		logger.Info("⚠️  Warning: failed to load manifest cache: %v (will do full scan)", err)
 		cachedManifest = nil
 	}
 
 	if cachedManifest != nil {
-		log.Printf("📦 Loaded cached manifest with %d files", len(cachedManifest.Files))
+		logger.Info("📦 Loaded cached manifest with %d files", len(cachedManifest.Files))
 	}
 
 	manifest := &SyncManifest{
@@ -97,7 +97,7 @@ func BuildManifest(sourceDir string, userID int, shareName string, sourceServer 
 	lastLoggedCount := 0
 	checksumCalculated := 0
 	checksumReused := 0
-	log.Printf("🔍 Building manifest for share '%s' (user %d)...", shareName, userID)
+	logger.Info("🔍 Building manifest for share '%s' (user %d)...", shareName, userID)
 
 	err = filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -171,7 +171,7 @@ func BuildManifest(sourceDir string, userID int, shareName string, sourceServer 
 
 		// Log progress every 1000 files
 		if fileCount-lastLoggedCount >= 1000 {
-			log.Printf("   📊 Manifest progress: %d files scanned (%d checksums calculated, %d reused from cache)...",
+			logger.Info("   📊 Manifest progress: %d files scanned (%d checksums calculated, %d reused from cache)...",
 				fileCount, checksumCalculated, checksumReused)
 			lastLoggedCount = fileCount
 		}
@@ -183,15 +183,15 @@ func BuildManifest(sourceDir string, userID int, shareName string, sourceServer 
 		return nil, fmt.Errorf("failed to scan directory: %w", err)
 	}
 
-	log.Printf("✅ Manifest built: %d files indexed (%d checksums calculated, %d reused from cache)",
+	logger.Info("✅ Manifest built: %d files indexed (%d checksums calculated, %d reused from cache)",
 		fileCount, checksumCalculated, checksumReused)
 
 	// Save manifest cache for next sync
 	if err := SaveLocalManifestCache(manifest, cacheFile); err != nil {
-		log.Printf("⚠️  Warning: failed to save manifest cache: %v", err)
+		logger.Info("⚠️  Warning: failed to save manifest cache: %v", err)
 		// Don't fail the sync, just log the warning
 	} else {
-		log.Printf("💾 Manifest cache saved to %s", cacheFile)
+		logger.Info("💾 Manifest cache saved to %s", cacheFile)
 	}
 
 	return manifest, nil

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{T .Lang "admin.logs.title"}} - Anemone</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/dashboard" class="text-2xl font-bold text-gray-900">
+                        🪸 Anemone - {{ServerName}}
+                    </a>
+                    <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                        {{T .Lang "users.role.admin"}}
+                    </span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700">{{.Session.Username}}</span>
+                    <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
+                        {{T .Lang "dashboard.logout"}}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <a href="/dashboard" class="text-sm text-indigo-600 hover:text-indigo-900 mb-4 inline-flex items-center">
+                <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                {{T .Lang "admin.logs.back_dashboard"}}
+            </a>
+            <h2 class="text-3xl font-bold text-gray-900 mt-2">
+                📋 {{T .Lang "admin.logs.title"}}
+            </h2>
+            <p class="mt-2 text-sm text-gray-600">
+                {{T .Lang "admin.logs.description"}}
+            </p>
+        </div>
+
+        {{if .Success}}
+        <div class="mb-6 bg-green-50 border-l-4 border-green-400 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-green-700">{{.Success}}</p>
+                </div>
+            </div>
+        </div>
+        {{end}}
+
+        {{if .Error}}
+        <div class="mb-6 bg-red-50 border-l-4 border-red-400 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-red-700">{{.Error}}</p>
+                </div>
+            </div>
+        </div>
+        {{end}}
+
+        <!-- Log Level Configuration -->
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">
+                {{T .Lang "admin.logs.level_title"}}
+            </h3>
+            <p class="text-sm text-gray-600 mb-4">
+                {{T .Lang "admin.logs.level_description"}}
+            </p>
+
+            <form method="POST" action="/admin/logs/level" class="space-y-4">
+                <div class="flex flex-wrap gap-3">
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="level" value="debug"
+                               class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                               {{if eq .CurrentLevel "debug"}}checked{{end}}>
+                        <span class="ml-2 text-sm font-medium text-gray-700">
+                            <span class="px-2 py-1 text-xs rounded bg-gray-100 text-gray-800">DEBUG</span>
+                        </span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="level" value="info"
+                               class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                               {{if eq .CurrentLevel "info"}}checked{{end}}>
+                        <span class="ml-2 text-sm font-medium text-gray-700">
+                            <span class="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">INFO</span>
+                        </span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="level" value="warn"
+                               class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                               {{if eq .CurrentLevel "warn"}}checked{{end}}>
+                        <span class="ml-2 text-sm font-medium text-gray-700">
+                            <span class="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800">WARN</span>
+                        </span>
+                    </label>
+                    <label class="inline-flex items-center">
+                        <input type="radio" name="level" value="error"
+                               class="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300"
+                               {{if eq .CurrentLevel "error"}}checked{{end}}>
+                        <span class="ml-2 text-sm font-medium text-gray-700">
+                            <span class="px-2 py-1 text-xs rounded bg-red-100 text-red-800">ERROR</span>
+                        </span>
+                    </label>
+                </div>
+
+                <div class="text-sm text-gray-500">
+                    <p><strong>DEBUG:</strong> {{T .Lang "admin.logs.level_debug"}}</p>
+                    <p><strong>INFO:</strong> {{T .Lang "admin.logs.level_info"}}</p>
+                    <p><strong>WARN:</strong> {{T .Lang "admin.logs.level_warn"}}</p>
+                    <p><strong>ERROR:</strong> {{T .Lang "admin.logs.level_error"}}</p>
+                </div>
+
+                <div class="flex justify-end">
+                    <button type="submit" class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white anemone-gradient hover:opacity-90">
+                        {{T .Lang "admin.logs.save_level"}}
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Log Files -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">
+                {{T .Lang "admin.logs.files_title"}}
+            </h3>
+
+            {{if .LogFiles}}
+            <div class="overflow-hidden">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "admin.logs.file_name"}}
+                            </th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "admin.logs.file_date"}}
+                            </th>
+                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "admin.logs.file_size"}}
+                            </th>
+                            <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                {{T .Lang "admin.logs.actions"}}
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        {{range .LogFiles}}
+                        <tr>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {{.Name}}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                {{.Date.Format "2006-01-02"}}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                {{.FormatSize}}
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                                <a href="/admin/logs/download?file={{.Name}}"
+                                   class="text-indigo-600 hover:text-indigo-900 inline-flex items-center">
+                                    <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    {{T $.Lang "admin.logs.download"}}
+                                </a>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+            </div>
+            {{else}}
+            <div class="text-center py-8 text-gray-500">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p class="mt-2">{{T .Lang "admin.logs.no_files"}}</p>
+            </div>
+            {{end}}
+        </div>
+
+        <!-- Info Box -->
+        <div class="mt-6 bg-blue-50 border-l-4 border-blue-400 p-4">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h4 class="text-sm font-medium text-blue-800">{{T .Lang "admin.logs.info_title"}}</h4>
+                    <div class="mt-2 text-sm text-blue-700 space-y-1">
+                        <p>• {{T .Lang "admin.logs.info_1"}}</p>
+                        <p>• {{T .Lang "admin.logs.info_2"}}</p>
+                        <p>• {{T .Lang "admin.logs.info_3"}}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

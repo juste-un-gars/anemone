@@ -7,7 +7,7 @@ package web
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"net/http"
 	"strconv"
 	"strings"
@@ -30,7 +30,7 @@ func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
 	// Get all peers
 	peersList, err := peers.GetAll(s.db)
 	if err != nil {
-		log.Printf("Error getting peers: %v", err)
+		logger.Info("Error getting peers: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -58,7 +58,7 @@ func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := s.db.Query(query)
 	if err != nil {
-		log.Printf("Error getting recent syncs: %v", err)
+		logger.Info("Error getting recent syncs: %v", err)
 		// Continue with empty list
 	}
 
@@ -69,7 +69,7 @@ func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
 			var rs RecentSync
 			var startedAtStr, completedAtStr sql.NullString
 			if err := rows.Scan(&rs.Username, &rs.PeerName, &startedAtStr, &completedAtStr, &rs.Status, &rs.FilesSynced, &rs.BytesSynced); err != nil {
-				log.Printf("Error scanning sync log: %v", err)
+				logger.Info("Error scanning sync log: %v", err)
 				continue
 			}
 			// Parse SQLite datetime strings (try multiple formats)
@@ -105,7 +105,7 @@ func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
 	for _, peer := range peersList {
 		hasRunning, err := sync.HasRunningSyncForPeer(s.db, peer.ID)
 		if err != nil {
-			log.Printf("Error checking running sync for peer %d: %v", peer.ID, err)
+			logger.Info("Error checking running sync for peer %d: %v", peer.ID, err)
 			continue
 		}
 		if hasRunning {
@@ -138,7 +138,7 @@ func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_peers.html", data); err != nil {
-		log.Printf("Error rendering peers template: %v", err)
+		logger.Info("Error rendering peers template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -166,7 +166,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
-			log.Printf("Error rendering peers add template: %v", err)
+			logger.Info("Error rendering peers add template: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -203,7 +203,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 				Error:   "Le nom et l'adresse sont requis",
 			}
 			if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
-				log.Printf("Error rendering peers add template: %v", err)
+				logger.Info("Error rendering peers add template: %v", err)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			}
 			return
@@ -227,7 +227,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 					Error:   "Port invalide",
 				}
 				if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
-					log.Printf("Error rendering peers add template: %v", err)
+					logger.Info("Error rendering peers add template: %v", err)
 					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				}
 				return
@@ -281,7 +281,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 		// Get master key for password encryption
 		var masterKey string
 		if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
-			log.Printf("Error getting master key: %v", err)
+			logger.Info("Error getting master key: %v", err)
 			data := struct {
 				Lang    string
 				Title   string
@@ -294,7 +294,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 				Error:   "Erreur système",
 			}
 			if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
-				log.Printf("Error rendering peers add template: %v", err)
+				logger.Info("Error rendering peers add template: %v", err)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			}
 			return
@@ -310,7 +310,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 		if password != "" {
 			encrypted, err := peers.EncryptPeerPassword(password, masterKey)
 			if err != nil {
-				log.Printf("Error encrypting peer password: %v", err)
+				logger.Info("Error encrypting peer password: %v", err)
 				data := struct {
 					Lang    string
 					Title   string
@@ -323,7 +323,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 					Error:   "Erreur lors du chiffrement du mot de passe",
 				}
 				if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
-					log.Printf("Error rendering peers add template: %v", err)
+					logger.Info("Error rendering peers add template: %v", err)
 					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				}
 				return
@@ -348,7 +348,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := peers.Create(s.db, peer); err != nil {
-			log.Printf("Error creating peer: %v", err)
+			logger.Info("Error creating peer: %v", err)
 			data := struct {
 				Lang    string
 				Title   string
@@ -361,13 +361,13 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 				Error:   fmt.Sprintf("Erreur lors de la création du pair: %v", err),
 			}
 			if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
-				log.Printf("Error rendering peers add template: %v", err)
+				logger.Info("Error rendering peers add template: %v", err)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			}
 			return
 		}
 
-		log.Printf("Created peer: %s (ID: %d)", peer.Name, peer.ID)
+		logger.Info("Created peer: %s (ID: %d)", peer.Name, peer.ID)
 		http.Redirect(w, r, "/admin/peers", http.StatusSeeOther)
 		return
 	}
@@ -410,7 +410,7 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 
 		peer, err := peers.GetByID(s.db, peerID)
 		if err != nil {
-			log.Printf("Error getting peer: %v", err)
+			logger.Info("Error getting peer: %v", err)
 			http.Error(w, "Peer not found", http.StatusNotFound)
 			return
 		}
@@ -428,7 +428,7 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "admin_peers_edit.html", data); err != nil {
-			log.Printf("Template error: %v", err)
+			logger.Info("Template error: %v", err)
 			http.Error(w, "Template error", http.StatusInternalServerError)
 		}
 		return
@@ -454,7 +454,7 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 		// Get existing peer
 		peer, err := peers.GetByID(s.db, peerID)
 		if err != nil {
-			log.Printf("Error getting peer: %v", err)
+			logger.Info("Error getting peer: %v", err)
 			http.Redirect(w, r, "/admin/peers?error=Peer+not+found", http.StatusSeeOther)
 			return
 		}
@@ -462,7 +462,7 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 		// Get master key for password encryption
 		var masterKey string
 		if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
-			log.Printf("Error getting master key: %v", err)
+			logger.Info("Error getting master key: %v", err)
 			http.Redirect(w, r, fmt.Sprintf("/admin/peers/%d/edit?error=System+configuration+error", peerID), http.StatusSeeOther)
 			return
 		}
@@ -484,7 +484,7 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 			// Encrypt new password before storing
 			encrypted, err := peers.EncryptPeerPassword(password, masterKey)
 			if err != nil {
-				log.Printf("Error encrypting peer password: %v", err)
+				logger.Info("Error encrypting peer password: %v", err)
 				http.Redirect(w, r, fmt.Sprintf("/admin/peers/%d/edit?error=Failed+to+encrypt+password", peerID), http.StatusSeeOther)
 				return
 			}
@@ -560,12 +560,12 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 
 		// Save to database
 		if err := peers.Update(s.db, peer); err != nil {
-			log.Printf("Error updating peer: %v", err)
+			logger.Info("Error updating peer: %v", err)
 			http.Redirect(w, r, fmt.Sprintf("/admin/peers/%d/edit?error=Failed+to+update+peer", peerID), http.StatusSeeOther)
 			return
 		}
 
-		log.Printf("Admin %s updated peer ID %d: %s", session.Username, peerID, peer.Name)
+		logger.Info("Admin %s updated peer ID %d: %s", session.Username, peerID, peer.Name)
 		http.Redirect(w, r, "/admin/peers", http.StatusSeeOther)
 		return
 
@@ -576,12 +576,12 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 		}
 
 		if err := peers.Delete(s.db, peerID); err != nil {
-			log.Printf("Error deleting peer: %v", err)
+			logger.Info("Error deleting peer: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
 
-		log.Printf("Deleted peer ID: %d", peerID)
+		logger.Info("Deleted peer ID: %d", peerID)
 		w.WriteHeader(http.StatusOK)
 		return
 
@@ -593,7 +593,7 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 
 		peer, err := peers.GetByID(s.db, peerID)
 		if err != nil {
-			log.Printf("Error getting peer: %v", err)
+			logger.Info("Error getting peer: %v", err)
 			http.Error(w, "Peer not found", http.StatusNotFound)
 			return
 		}
@@ -601,14 +601,14 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 		// Get master key for password decryption
 		var masterKey string
 		if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
-			log.Printf("Error getting master key: %v", err)
+			logger.Info("Error getting master key: %v", err)
 			http.Error(w, "System configuration error", http.StatusInternalServerError)
 			return
 		}
 
 		online, err := peers.TestConnection(peer, masterKey)
 		if err != nil {
-			log.Printf("Error testing peer connection: %v", err)
+			logger.Info("Error testing peer connection: %v", err)
 		}
 
 		status := "offline"
@@ -618,7 +618,7 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 
 		// Update peer status
 		if err := peers.UpdateStatus(s.db, peerID, status); err != nil {
-			log.Printf("Error updating peer status: %v", err)
+			logger.Info("Error updating peer status: %v", err)
 		}
 
 		// Return JSON response
@@ -662,6 +662,6 @@ func parseSQLiteDateTime(s string) time.Time {
 	}
 
 	// Log error if no format worked
-	log.Printf("Warning: Could not parse datetime string: %q", s)
+	logger.Info("Warning: Could not parse datetime string: %q", s)
 	return time.Time{}
 }

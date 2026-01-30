@@ -7,7 +7,7 @@ package setup
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -191,7 +191,7 @@ func ExecuteRestore(serverBackup *backup.ServerBackup, opts RestoreOptions) erro
 		if len(u.PasswordEncrypted) > 0 && masterKey != "" {
 			decrypted, err := crypto.DecryptPassword(u.PasswordEncrypted, masterKey)
 			if err != nil {
-				log.Printf("Warning: could not decrypt password for user %s: %v", u.Username, err)
+				logger.Info("Warning: could not decrypt password for user %s: %v", u.Username, err)
 				// Continue without SMB setup for this user
 				continue
 			}
@@ -203,22 +203,22 @@ func ExecuteRestore(serverBackup *backup.ServerBackup, opts RestoreOptions) erro
 			// This fixes any potential mismatch between password_hash and password_encrypted
 			newHash, err := crypto.HashPassword(plainPassword)
 			if err != nil {
-				log.Printf("Warning: failed to hash password for user %s: %v", u.Username, err)
+				logger.Info("Warning: failed to hash password for user %s: %v", u.Username, err)
 			} else {
 				_, err = db.Exec("UPDATE users SET password_hash = ? WHERE id = ?", newHash, u.ID)
 				if err != nil {
-					log.Printf("Warning: failed to update password_hash for user %s: %v", u.Username, err)
+					logger.Info("Warning: failed to update password_hash for user %s: %v", u.Username, err)
 				} else {
-					log.Printf("Updated password_hash for user: %s", u.Username)
+					logger.Info("Updated password_hash for user: %s", u.Username)
 				}
 			}
 
 			// Create system user and set SMB password
 			if err := smb.AddSMBUser(u.Username, plainPassword); err != nil {
-				log.Printf("Warning: failed to create SMB user %s: %v", u.Username, err)
+				logger.Info("Warning: failed to create SMB user %s: %v", u.Username, err)
 				// Continue - user can reset password later
 			} else {
-				log.Printf("Created system user and SMB account for: %s", u.Username)
+				logger.Info("Created system user and SMB account for: %s", u.Username)
 			}
 		}
 	}
@@ -235,7 +235,7 @@ func ExecuteRestore(serverBackup *backup.ServerBackup, opts RestoreOptions) erro
 
 		// Create directory if it doesn't exist
 		if err := os.MkdirAll(path, 0755); err != nil {
-			log.Printf("Warning: failed to create share directory %s: %v", path, err)
+			logger.Info("Warning: failed to create share directory %s: %v", path, err)
 			continue
 		}
 
@@ -251,17 +251,17 @@ func ExecuteRestore(serverBackup *backup.ServerBackup, opts RestoreOptions) erro
 		// Set ownership (requires the system user to exist)
 		if username != "" {
 			if err := setDirectoryOwnership(path, username); err != nil {
-				log.Printf("Warning: failed to set ownership for %s: %v", path, err)
+				logger.Info("Warning: failed to set ownership for %s: %v", path, err)
 			}
 		}
 
 		// Create .trash directory
 		trashDir := filepath.Join(path, ".trash", username)
 		if err := os.MkdirAll(trashDir, 0755); err != nil {
-			log.Printf("Warning: failed to create trash directory %s: %v", trashDir, err)
+			logger.Info("Warning: failed to create trash directory %s: %v", trashDir, err)
 		}
 
-		log.Printf("Created share directory: %s", path)
+		logger.Info("Created share directory: %s", path)
 	}
 
 	// 8. Regenerate Samba configuration
@@ -278,16 +278,16 @@ func ExecuteRestore(serverBackup *backup.ServerBackup, opts RestoreOptions) erro
 	}
 
 	if err := smb.GenerateConfig(db, smbCfg); err != nil {
-		log.Printf("Warning: failed to generate Samba config: %v", err)
+		logger.Info("Warning: failed to generate Samba config: %v", err)
 	} else {
-		log.Printf("Generated Samba configuration")
+		logger.Info("Generated Samba configuration")
 	}
 
 	// 9. Reload Samba
 	if err := smb.ReloadConfig(); err != nil {
-		log.Printf("Warning: failed to reload Samba: %v", err)
+		logger.Info("Warning: failed to reload Samba: %v", err)
 	} else {
-		log.Printf("Reloaded Samba configuration")
+		logger.Info("Reloaded Samba configuration")
 	}
 
 	return nil

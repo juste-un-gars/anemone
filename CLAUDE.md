@@ -2,6 +2,22 @@
 
 This file provides guidance to Claude Code when working with code in this repository.
 
+---
+
+## QUICK REFERENCE - READ FIRST
+
+**Critical rules that apply to EVERY session:**
+
+1. **Incremental only** - Max 150 lines per iteration, STOP for validation
+2. **No hardcoding** - No secrets, paths, credentials in code (use env/config)
+3. **Security audit** - MANDATORY before "project complete" status
+4. **Stop points** - Wait for "OK"/"validated" after each module
+5. **Read first** - Always read CLAUDE.md and SESSION_STATE.md before starting
+
+**If unsure, read the relevant section below.**
+
+---
+
 **Key Documentation Files:**
 - **[CLAUDE.md](CLAUDE.md)** - Project overview, philosophy, session management
 - **[SESSION_STATE.md](SESSION_STATE.md)** - Current session status and recent work
@@ -59,16 +75,45 @@ Waiting for your validation before continuing.
 
 ### Code Hygiene Rules (MANDATORY)
 
+**Goal: Application must be portable and deployable anywhere without code changes.**
+
 **NEVER hardcode in source files:**
 - Passwords, API keys, tokens, secrets
-- Database credentials
+- Database credentials or connection strings
 - Absolute paths (`/home/user/...`)
-- IP addresses, server names (production)
+- IP addresses, hostnames, ports (production)
+- Email addresses, usernames for services
+- Environment-specific URLs (dev, staging, prod)
 
 **ALWAYS use instead:**
 - Environment variables (`.env` files, never committed)
 - Configuration files (with `.example` templates)
 - Relative paths or configurable base paths (`cfg.DataDir`, `cfg.IncomingDir`, etc.)
+
+**Portability Checklist:**
+- [ ] App starts with only environment configuration (no code edits)
+- [ ] All paths relative or from config (`ANEMONE_DATA_DIR`)
+- [ ] Database path from config
+- [ ] External service URLs from config
+- [ ] Port configurable (`ANEMONE_PORT`)
+
+**Config Pattern (Go):**
+```go
+// internal/config/config.go
+type Config struct {
+    DataDir     string // from ANEMONE_DATA_DIR or default
+    Port        int    // from ANEMONE_PORT or 8080
+    LogLevel    string // from ANEMONE_LOG_LEVEL or "info"
+}
+
+func Load() *Config {
+    return &Config{
+        DataDir:  getEnv("ANEMONE_DATA_DIR", "/srv/anemone"),
+        Port:     getEnvInt("ANEMONE_PORT", 8080),
+        LogLevel: getEnv("ANEMONE_LOG_LEVEL", "info"),
+    }
+}
+```
 
 ### Development Order
 
@@ -76,6 +121,27 @@ Waiting for your validation before continuing.
 2. **Test foundation** — Don't continue if broken
 3. **Core features** — One by one, tested
 4. **Advanced features** — Only after core works
+
+### File Size Guidelines
+
+**Target sizes (lines of code):**
+- **< 300** : ideal
+- **300-500** : acceptable
+- **500-800** : consider splitting
+- **> 800** : must split
+
+**When to split a file:**
+- Multiple unrelated concerns in the same file
+- Hard to find functions/methods
+- File has too many responsibilities
+
+**Naming convention for split files:**
+```
+app.go           → Core struct, New(), Run(), Shutdown()
+app_jobs.go      → Job-related methods
+app_sync.go      → Sync-related methods
+app_settings.go  → Config/settings methods
+```
 
 ---
 
@@ -162,6 +228,19 @@ sudo systemctl reload smbd
 - **.claude/sessions/SESSION_XXX_[name].md** — Detailed session logs
 
 **Naming:** `SESSION_001_project_setup.md`
+
+### SESSION_STATE.md Header (Required)
+
+SESSION_STATE.md **must** start with this reminder block:
+
+```markdown
+# Anemone - Session State
+
+> **Claude : Appliquer le protocole de session (CLAUDE.md)**
+> - Créer/mettre à jour la session en temps réel
+> - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
+> - Ne pas continuer sans validation utilisateur
+```
 
 ### Session Template
 
@@ -250,6 +329,7 @@ sudo systemctl reload smbd
 - [ ] Input validated
 - [ ] No hardcoded secrets, paths, or credentials
 - [ ] Parameterized queries (SQL)
+- [ ] Output encoded (XSS)
 
 ### 4. User Confirmation
 
@@ -292,22 +372,29 @@ Add new strings to both `internal/i18n/locales/fr.json` and `en.json`.
 
 **MANDATORY before any deployment or "project complete" status.**
 
+Plan this phase from the start — it's not optional.
+
 ### Security Audit Checklist
 
 #### 1. Code Review (Full Scan)
 - [ ] No hardcoded secrets (API keys, passwords, tokens)
 - [ ] No hardcoded paths (use configurable: `cfg.DataDir`, `cfg.IncomingDir`)
+- [ ] No hardcoded credentials or connection strings
 - [ ] No sensitive data in logs
 - [ ] All user inputs validated and sanitized
+- [ ] No debug/dev code left in production
 
 #### 2. OWASP Top 10 Check
 - [ ] **Injection** — SQL parameterized, OS command injection protected
 - [ ] **Broken Auth** — Strong passwords, session management
 - [ ] **Sensitive Data Exposure** — Encryption at rest and in transit (HTTPS)
+- [ ] **XXE** — XML parsing secured (if applicable)
 - [ ] **Broken Access Control** — Authorization verified on all routes
-- [ ] **Security Misconfiguration** — Default credentials removed
+- [ ] **Security Misconfiguration** — Default credentials removed, error messages generic
 - [ ] **XSS** — Output encoding in templates
-- [ ] **Vulnerable Components** — Dependencies updated
+- [ ] **Insecure Deserialization** — Untrusted data not deserialized
+- [ ] **Vulnerable Components** — Dependencies updated, no known CVEs
+- [ ] **Insufficient Logging** — Security events logged, logs protected
 
 #### 3. Dependency Audit
 ```bash
@@ -315,6 +402,42 @@ Add new strings to both `internal/i18n/locales/fr.json` and `en.json`.
 go list -m -u all          # Check for updates
 govulncheck ./...          # Check for vulnerabilities
 ```
+- [ ] All critical/high vulnerabilities addressed
+- [ ] Outdated packages updated or justified
+
+#### 4. Online Vulnerability Research
+- [ ] Search CVE databases for stack components
+- [ ] Check GitHub security advisories for dependencies
+- [ ] Review recent security news for frameworks used
+
+**Resources:**
+- https://cve.mitre.org
+- https://nvd.nist.gov
+- https://github.com/advisories
+- https://pkg.go.dev/vuln
+
+#### 5. Logging Security
+- [ ] No passwords, tokens, API keys, secrets in logs
+- [ ] No credit card numbers, SSNs, personal IDs in logs
+- [ ] Session tokens not logged (only hash/ID if needed)
+- [ ] Full request/response bodies not logged if sensitive
+- [ ] Log files not publicly accessible
+- [ ] Production uses INFO or WARN level (not DEBUG)
+- [ ] Security events are logged (auth failures, injection attempts)
+
+#### 6. Configuration Security
+- [ ] HTTPS enforced
+- [ ] Security headers present (HSTS, CSP, X-Frame-Options, etc.)
+- [ ] Cookies secured (HttpOnly, Secure, SameSite)
+- [ ] Error pages don't leak stack traces
+- [ ] Admin interfaces protected
+
+### Post-Audit Actions
+
+1. **Critical/High issues** → Fix immediately, re-test
+2. **Medium issues** → Fix before launch or document accepted risk
+3. **Low issues** → Add to backlog
+4. **Re-run audit** after fixes
 
 ---
 
@@ -347,6 +470,9 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
 | `new session: [name]` | Start new session |
 | `save progress` | Update session file |
 | `validate` | Mark current module as validated |
+| `show plan` | Display remaining modules |
+| `security audit` | Run full pre-launch security checklist |
+| `dependency check` | Audit dependencies for vulnerabilities |
 
 ### Build & Test
 ```bash
@@ -373,5 +499,5 @@ sudo systemctl restart anemone
 
 ---
 
-**Last Updated:** 2026-01-21
-**Version:** 2.0.0
+**Last Updated:** 2026-01-30
+**Version:** 3.0.0

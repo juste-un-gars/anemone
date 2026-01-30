@@ -5,14 +5,109 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.13.0-beta
-**Last Updated:** 2026-01-26
+**Current Version:** v0.13.1-beta
+**Last Updated:** 2026-01-30
 
 ---
 
 ## Current Session
 
-**No active session** - Ready for new work
+**Session 5: Audit CLAUDE.md** - En attente de validation logging
+
+**Prochaines étapes:**
+1. Tester logging system (v0.13.1-beta)
+2. Si OK → Refactoring des fichiers > 800 lignes
+
+---
+
+## Completed Today (2026-01-30): Logging System ✅
+
+### Session 4 - Migration logs ✅
+
+- Migrated ~40 files from `log` → `logger` package
+- All web handlers now use `logger.Info/Warn/Error`
+- All internal packages migrated
+- Only 2 `log.Fatalf` remain in main.go (before logger init - intentional)
+- Build verified, all tests pass
+
+## Completed: Session 3 - UI Admin Logs (2026-01-30) ✅
+
+- Created `internal/web/handlers_admin_logs.go` - Handlers for log management page
+- Created `web/templates/admin_logs.html` - Template with level selector + file list
+- Added routes `/admin/logs`, `/admin/logs/level`, `/admin/logs/download`
+- Added dashboard card for System Logs
+- Added i18n translations (FR + EN)
+- Build verified, tests pass
+
+## Completed: Session 2 - Config + DB (2026-01-30) ✅
+
+- Added `LogLevel`, `LogDir` to `internal/config/config.go`
+- Added `ANEMONE_LOG_LEVEL`, `ANEMONE_LOG_DIR` env vars
+- Added `GetLogLevel()`/`SetLogLevel()` to `internal/sysconfig/sysconfig.go`
+- Initialized logger in `cmd/anemone/main.go` (early init + DB level update)
+- Build verified
+
+## Completed: Session 1 - Logger Infrastructure (2026-01-30) ✅
+
+- Created `internal/logger/logger.go` - Core logger with slog
+- Created `internal/logger/rotation.go` - Daily rotation with retention
+- Created `internal/logger/logger_test.go` - Unit tests
+- All tests pass (5/5), build verified
+
+---
+
+## Planned: Logging System + Audit
+
+### Context (2026-01-30)
+
+- Mis à jour CLAUDE.md v2.0.0 → v3.0.0 (ajout Quick Reference, File Size Guidelines, Security Audit amélioré)
+- Exploration du code : 622 occurrences de `log.` à migrer, aucun système de niveaux
+- Décisions techniques prises (voir ci-dessous)
+
+### Décisions techniques
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Package | `log/slog` (Go 1.21+ standard) |
+| Niveau défaut | WARN |
+| Rétention | 1 mois **ou** 200 Mo (premier atteint) |
+| Persistence niveau | **DB** (table settings, persiste après redémarrage) |
+| Override env | `ANEMONE_LOG_LEVEL` (priorité sur DB) |
+| Format | Texte lisible avec timestamp |
+| Rotation | Quotidienne (1 fichier/jour) |
+| Destination | stdout + fichier (`/srv/anemone/logs/`) |
+
+### Sessions planifiées
+
+| # | Session | Objectif | Status |
+|---|---------|----------|--------|
+| 1 | **Logger Infrastructure** | Créer `internal/logger/` avec slog, niveaux, rotation | ✅ Done |
+| 2 | **Config + DB** | Variables LOG_*, init dans main.go | ✅ Done |
+| 3 | **UI Admin Logs** | Page `/admin/logs` : changer niveau, télécharger fichiers | ✅ Done |
+| 4 | **Migration logs** | Migrer ~40 fichiers `log.` → `logger.` | ✅ Done |
+| 5 | **Audit CLAUDE.md** | Vérifier conformité code vs nouvelles règles | ⏳ Next |
+
+### Format logs prévu
+
+```
+2026-01-30 14:32:15 [INFO]  Starting Anemone NAS...
+2026-01-30 14:32:15 [INFO]  Loaded 12 users, 3 peers
+2026-01-30 14:32:16 [WARN]  Peer "backup-server" unreachable
+2026-01-30 14:33:01 [ERROR] Sync failed: connection timeout
+```
+
+### UI Admin prévue
+
+```
+/admin/logs
+├── Niveau actuel : [DEBUG] [INFO] [WARN ✓] [ERROR]  ← sélection
+├── Fichiers disponibles :
+│   ├── anemone-2026-01-30.log  (2.3 MB) [Télécharger]
+│   └── ...
+└── [Purger anciens logs]
+```
+
+**Pour démarrer** : `"continue session logging"` ou `"session 1: logger infrastructure"`
 
 ---
 

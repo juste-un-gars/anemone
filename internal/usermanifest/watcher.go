@@ -6,7 +6,7 @@ package usermanifest
 
 import (
 	"database/sql"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,13 +57,13 @@ func (w *Watcher) Start() error {
 	for _, share := range allShares {
 		count, err := w.addWatchRecursive(share.Path)
 		if err != nil {
-			log.Printf("⚠️  Failed to watch %s: %v", share.Path, err)
+			logger.Info("⚠️  Failed to watch %s: %v", share.Path, err)
 			continue
 		}
 		watchCount += count
 	}
 
-	log.Printf("👁️  Manifest watcher started: %d directories monitored", watchCount)
+	logger.Info("👁️  Manifest watcher started: %d directories monitored", watchCount)
 
 	// Start event processing goroutine
 	go w.processEvents()
@@ -108,7 +108,7 @@ func (w *Watcher) addWatchRecursive(root string) (int, error) {
 		}
 
 		if err := w.watcher.Add(path); err != nil {
-			log.Printf("⚠️  Cannot watch %s: %v", path, err)
+			logger.Info("⚠️  Cannot watch %s: %v", path, err)
 			return nil // Continue with other directories
 		}
 
@@ -136,7 +136,7 @@ func (w *Watcher) processEvents() {
 			if !ok {
 				return
 			}
-			log.Printf("⚠️  Watcher error: %v", err)
+			logger.Info("⚠️  Watcher error: %v", err)
 		}
 	}
 }
@@ -160,7 +160,7 @@ func (w *Watcher) handleEvent(event fsnotify.Event) {
 		info, err := os.Stat(event.Name)
 		if err == nil && info.IsDir() {
 			if err := w.watcher.Add(event.Name); err == nil {
-				log.Printf("👁️  Added watch: %s", event.Name)
+				logger.Info("👁️  Added watch: %s", event.Name)
 			}
 		}
 	}
@@ -207,7 +207,7 @@ func (w *Watcher) regenerateManifest(sharePath string) {
 	// Find share info from database
 	allShares, err := shares.GetAll(w.db)
 	if err != nil {
-		log.Printf("⚠️  Failed to get shares: %v", err)
+		logger.Info("⚠️  Failed to get shares: %v", err)
 		return
 	}
 
@@ -220,14 +220,14 @@ func (w *Watcher) regenerateManifest(sharePath string) {
 	}
 
 	if targetShare == nil {
-		log.Printf("⚠️  Share not found for path: %s", sharePath)
+		logger.Info("⚠️  Share not found for path: %s", sharePath)
 		return
 	}
 
 	shareType := determineShareType(targetShare.Name)
 	username, err := getUsername(w.db, targetShare.UserID)
 	if err != nil {
-		log.Printf("⚠️  Failed to get username: %v", err)
+		logger.Info("⚠️  Failed to get username: %v", err)
 		return
 	}
 
@@ -235,17 +235,17 @@ func (w *Watcher) regenerateManifest(sharePath string) {
 
 	manifest, err := BuildUserManifest(sharePath, targetShare.Name, shareType, username)
 	if err != nil {
-		log.Printf("⚠️  Failed to build manifest for %s: %v", targetShare.Name, err)
+		logger.Info("⚠️  Failed to build manifest for %s: %v", targetShare.Name, err)
 		return
 	}
 
 	if err := WriteManifest(manifest, sharePath); err != nil {
-		log.Printf("⚠️  Failed to write manifest for %s: %v", targetShare.Name, err)
+		logger.Info("⚠️  Failed to write manifest for %s: %v", targetShare.Name, err)
 		return
 	}
 
 	elapsed := time.Since(startTime)
-	log.Printf("👁️  Manifest updated: %s (%d files, %s) in %v",
+	logger.Info("👁️  Manifest updated: %s (%d files, %s) in %v",
 		targetShare.Name, manifest.FileCount, FormatSize(manifest.TotalSize), elapsed.Round(time.Millisecond))
 }
 
@@ -255,7 +255,7 @@ func (w *Watcher) AddShareWatch(sharePath string) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("👁️  Added %d watches for new share: %s", count, sharePath)
+	logger.Info("👁️  Added %d watches for new share: %s", count, sharePath)
 	return nil
 }
 
@@ -270,6 +270,6 @@ func (w *Watcher) RemoveShareWatch(sharePath string) error {
 	}
 	w.mu.Unlock()
 
-	log.Printf("👁️  Removed watches for share: %s", sharePath)
+	logger.Info("👁️  Removed watches for share: %s", sharePath)
 	return nil
 }

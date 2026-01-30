@@ -11,7 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -43,7 +43,7 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "restore.html", data); err != nil {
-		log.Printf("Error rendering restore template: %v", err)
+		logger.Info("Error rendering restore template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -61,7 +61,7 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 	// Get current server name to filter backups
 	currentServerName, err := sync.GetServerName(s.db)
 	if err != nil {
-		log.Printf("Error getting server name: %v", err)
+		logger.Info("Error getting server name: %v", err)
 		http.Error(w, "Failed to get server name", http.StatusInternalServerError)
 		return
 	}
@@ -69,7 +69,7 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 	// Get master key for password decryption
 	var masterKey string
 	if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
-		log.Printf("Error getting master key: %v", err)
+		logger.Info("Error getting master key: %v", err)
 		http.Error(w, "System configuration error", http.StatusInternalServerError)
 		return
 	}
@@ -77,7 +77,7 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 	// Get all configured peers
 	allPeers, err := peers.GetAll(s.db)
 	if err != nil {
-		log.Printf("Error getting peers: %v", err)
+		logger.Info("Error getting peers: %v", err)
 		http.Error(w, "Failed to get peers", http.StatusInternalServerError)
 		return
 	}
@@ -115,7 +115,7 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 		// Create request
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
-			log.Printf("Error creating request for peer %s: %v", peer.Name, err)
+			logger.Info("Error creating request for peer %s: %v", peer.Name, err)
 			continue
 		}
 
@@ -123,7 +123,7 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 		if peer.Password != nil && len(*peer.Password) > 0 {
 			peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
 			if err != nil {
-				log.Printf("Error decrypting password for peer %s: %v", peer.Name, err)
+				logger.Info("Error decrypting password for peer %s: %v", peer.Name, err)
 				continue
 			}
 			req.Header.Set("X-Sync-Password", peerPassword)
@@ -132,13 +132,13 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 		// Execute request
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Printf("Error contacting peer %s: %v", peer.Name, err)
+			logger.Info("Error contacting peer %s: %v", peer.Name, err)
 			continue
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			log.Printf("Peer %s returned status %d", peer.Name, resp.StatusCode)
+			logger.Info("Peer %s returned status %d", peer.Name, resp.StatusCode)
 			continue
 		}
 
@@ -152,7 +152,7 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 		}
 		var peerBackups []BackupInfo
 		if err := json.NewDecoder(resp.Body).Decode(&peerBackups); err != nil {
-			log.Printf("Error decoding response from peer %s: %v", peer.Name, err)
+			logger.Info("Error decoding response from peer %s: %v", peer.Name, err)
 			continue
 		}
 
@@ -176,7 +176,7 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(allBackups); err != nil {
-		log.Printf("Error encoding backups JSON: %v", err)
+		logger.Info("Error encoding backups JSON: %v", err)
 	}
 }
 
@@ -207,7 +207,7 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 	// Get peer info
 	peer, err := peers.GetByID(s.db, peerID)
 	if err != nil {
-		log.Printf("Error getting peer %d: %v", peerID, err)
+		logger.Info("Error getting peer %d: %v", peerID, err)
 		http.Error(w, "Peer not found", http.StatusNotFound)
 		return
 	}
@@ -216,7 +216,7 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 	var encryptedKey []byte
 	err = s.db.QueryRow("SELECT encryption_key_encrypted FROM users WHERE id = ?", session.UserID).Scan(&encryptedKey)
 	if err != nil {
-		log.Printf("Error getting user encryption key: %v", err)
+		logger.Info("Error getting user encryption key: %v", err)
 		http.Error(w, "Failed to get encryption key", http.StatusInternalServerError)
 		return
 	}
@@ -225,7 +225,7 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 	var masterKey string
 	err = s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
 	if err != nil {
-		log.Printf("Error reading master key: %v", err)
+		logger.Info("Error reading master key: %v", err)
 		http.Error(w, "Failed to read master key", http.StatusInternalServerError)
 		return
 	}
@@ -233,7 +233,7 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 	// Decrypt user key
 	userKey, err := crypto.DecryptKey(string(encryptedKey), masterKey)
 	if err != nil {
-		log.Printf("Error decrypting user key: %v", err)
+		logger.Info("Error decrypting user key: %v", err)
 		http.Error(w, "Failed to decrypt user key", http.StatusInternalServerError)
 		return
 	}
@@ -252,7 +252,7 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Printf("Error creating request: %v", err)
+		logger.Info("Error creating request: %v", err)
 		http.Error(w, "Failed to create request", http.StatusInternalServerError)
 		return
 	}
@@ -261,7 +261,7 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 	if peer.Password != nil && len(*peer.Password) > 0 {
 		peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
 		if err != nil {
-			log.Printf("Error decrypting peer password: %v", err)
+			logger.Info("Error decrypting peer password: %v", err)
 			http.Error(w, "Failed to decrypt peer password", http.StatusInternalServerError)
 			return
 		}
@@ -270,14 +270,14 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("Error downloading manifest from peer %s: %v", peer.Name, err)
+		logger.Info("Error downloading manifest from peer %s: %v", peer.Name, err)
 		http.Error(w, "Failed to contact peer", http.StatusInternalServerError)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("Peer %s returned status %d", peer.Name, resp.StatusCode)
+		logger.Info("Peer %s returned status %d", peer.Name, resp.StatusCode)
 		http.Error(w, "Failed to get manifest from peer", http.StatusInternalServerError)
 		return
 	}
@@ -285,7 +285,7 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 	// Read encrypted manifest
 	encryptedManifest, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("Error reading manifest response: %v", err)
+		logger.Info("Error reading manifest response: %v", err)
 		http.Error(w, "Failed to read manifest", http.StatusInternalServerError)
 		return
 	}
@@ -294,7 +294,7 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 	var decryptedBuf bytes.Buffer
 	err = crypto.DecryptStream(bytes.NewReader(encryptedManifest), &decryptedBuf, userKey)
 	if err != nil {
-		log.Printf("Error decrypting manifest: %v", err)
+		logger.Info("Error decrypting manifest: %v", err)
 		http.Error(w, "Failed to decrypt manifest", http.StatusInternalServerError)
 		return
 	}
@@ -302,7 +302,7 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 	// Parse manifest
 	var manifest sync.SyncManifest
 	if err := json.Unmarshal(decryptedBuf.Bytes(), &manifest); err != nil {
-		log.Printf("Error parsing manifest: %v", err)
+		logger.Info("Error parsing manifest: %v", err)
 		http.Error(w, "Failed to parse manifest", http.StatusInternalServerError)
 		return
 	}
@@ -312,7 +312,7 @@ func (s *Server) handleAPIRestoreFiles(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(fileTree); err != nil {
-		log.Printf("Error encoding file tree JSON: %v", err)
+		logger.Info("Error encoding file tree JSON: %v", err)
 	}
 }
 
@@ -345,7 +345,7 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 	// Get peer info
 	peer, err := peers.GetByID(s.db, peerID)
 	if err != nil {
-		log.Printf("Error getting peer %d: %v", peerID, err)
+		logger.Info("Error getting peer %d: %v", peerID, err)
 		http.Error(w, "Peer not found", http.StatusNotFound)
 		return
 	}
@@ -354,7 +354,7 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 	var encryptedKey []byte
 	err = s.db.QueryRow("SELECT encryption_key_encrypted FROM users WHERE id = ?", session.UserID).Scan(&encryptedKey)
 	if err != nil {
-		log.Printf("Error getting user encryption key: %v", err)
+		logger.Info("Error getting user encryption key: %v", err)
 		http.Error(w, "Failed to get encryption key", http.StatusInternalServerError)
 		return
 	}
@@ -363,7 +363,7 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 	var masterKey string
 	err = s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
 	if err != nil {
-		log.Printf("Error reading master key: %v", err)
+		logger.Info("Error reading master key: %v", err)
 		http.Error(w, "Failed to read master key", http.StatusInternalServerError)
 		return
 	}
@@ -371,7 +371,7 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 	// Decrypt user key
 	userKey, err := crypto.DecryptKey(string(encryptedKey), masterKey)
 	if err != nil {
-		log.Printf("Error decrypting user key: %v", err)
+		logger.Info("Error decrypting user key: %v", err)
 		http.Error(w, "Failed to decrypt user key", http.StatusInternalServerError)
 		return
 	}
@@ -385,7 +385,7 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 		"source_server": sourceServer,
 	})
 	if err != nil {
-		log.Printf("Error building URL: %v", err)
+		logger.Info("Error building URL: %v", err)
 		http.Error(w, "Failed to build request URL", http.StatusInternalServerError)
 		return
 	}
@@ -400,7 +400,7 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 
 	req, err := http.NewRequest("GET", fileURL, nil)
 	if err != nil {
-		log.Printf("Error creating request: %v", err)
+		logger.Info("Error creating request: %v", err)
 		http.Error(w, "Failed to create request", http.StatusInternalServerError)
 		return
 	}
@@ -409,7 +409,7 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 	if peer.Password != nil && len(*peer.Password) > 0 {
 		peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
 		if err != nil {
-			log.Printf("Error decrypting peer password: %v", err)
+			logger.Info("Error decrypting peer password: %v", err)
 			http.Error(w, "Failed to decrypt peer password", http.StatusInternalServerError)
 			return
 		}
@@ -418,14 +418,14 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("Error downloading file from peer %s: %v", peer.Name, err)
+		logger.Info("Error downloading file from peer %s: %v", peer.Name, err)
 		http.Error(w, "Failed to contact peer", http.StatusInternalServerError)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("Peer %s returned status %d", peer.Name, resp.StatusCode)
+		logger.Info("Peer %s returned status %d", peer.Name, resp.StatusCode)
 		http.Error(w, "Failed to get file from peer", http.StatusInternalServerError)
 		return
 	}
@@ -438,12 +438,12 @@ func (s *Server) handleAPIRestoreDownload(w http.ResponseWriter, r *http.Request
 	// Decrypt and stream file directly to response
 	err = crypto.DecryptStream(resp.Body, w, userKey)
 	if err != nil {
-		log.Printf("Error decrypting file %s: %v", filePath, err)
+		logger.Info("Error decrypting file %s: %v", filePath, err)
 		// Can't send error response here as we've already started writing
 		return
 	}
 
-	log.Printf("User %s downloaded file %s from peer %s backup %s", session.Username, filePath, peer.Name, shareName)
+	logger.Info("User %s downloaded file %s from peer %s backup %s", session.Username, filePath, peer.Name, shareName)
 }
 
 // handleAPIRestoreDownloadMultiple downloads and decrypts multiple files/folders from a remote peer as ZIP
@@ -487,7 +487,7 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 	// Get peer info
 	peer, err := peers.GetByID(s.db, peerID)
 	if err != nil {
-		log.Printf("Error getting peer %d: %v", peerID, err)
+		logger.Info("Error getting peer %d: %v", peerID, err)
 		http.Error(w, "Peer not found", http.StatusNotFound)
 		return
 	}
@@ -496,7 +496,7 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 	var encryptedKey []byte
 	err = s.db.QueryRow("SELECT encryption_key_encrypted FROM users WHERE id = ?", session.UserID).Scan(&encryptedKey)
 	if err != nil {
-		log.Printf("Error getting user encryption key: %v", err)
+		logger.Info("Error getting user encryption key: %v", err)
 		http.Error(w, "Failed to get encryption key", http.StatusInternalServerError)
 		return
 	}
@@ -505,7 +505,7 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 	var masterKey string
 	err = s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
 	if err != nil {
-		log.Printf("Error reading master key: %v", err)
+		logger.Info("Error reading master key: %v", err)
 		http.Error(w, "Failed to read master key", http.StatusInternalServerError)
 		return
 	}
@@ -513,7 +513,7 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 	// Decrypt user key
 	userKey, err := crypto.DecryptKey(string(encryptedKey), masterKey)
 	if err != nil {
-		log.Printf("Error decrypting user key: %v", err)
+		logger.Info("Error decrypting user key: %v", err)
 		http.Error(w, "Failed to decrypt user key", http.StatusInternalServerError)
 		return
 	}
@@ -548,7 +548,7 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 	if peer.Password != nil && len(*peer.Password) > 0 {
 		peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
 		if err != nil {
-			log.Printf("Error decrypting peer password: %v", err)
+			logger.Info("Error decrypting peer password: %v", err)
 			http.Error(w, "Failed to decrypt peer password", http.StatusInternalServerError)
 			return
 		}
@@ -557,14 +557,14 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 
 	manifestResp, err := client.Do(manifestReq)
 	if err != nil {
-		log.Printf("Error downloading manifest from peer %s: %v", peer.Name, err)
+		logger.Info("Error downloading manifest from peer %s: %v", peer.Name, err)
 		http.Error(w, "Failed to contact peer", http.StatusInternalServerError)
 		return
 	}
 	defer manifestResp.Body.Close()
 
 	if manifestResp.StatusCode != http.StatusOK {
-		log.Printf("Peer %s returned status %d for manifest", peer.Name, manifestResp.StatusCode)
+		logger.Info("Peer %s returned status %d for manifest", peer.Name, manifestResp.StatusCode)
 		http.Error(w, "Failed to get manifest from peer", http.StatusInternalServerError)
 		return
 	}
@@ -573,7 +573,7 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 	var manifestBuf bytes.Buffer
 	err = crypto.DecryptStream(manifestResp.Body, &manifestBuf, userKey)
 	if err != nil {
-		log.Printf("Error decrypting manifest: %v", err)
+		logger.Info("Error decrypting manifest: %v", err)
 		http.Error(w, "Failed to decrypt manifest", http.StatusInternalServerError)
 		return
 	}
@@ -582,7 +582,7 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 	var manifest sync.SyncManifest
 	err = json.Unmarshal(manifestBuf.Bytes(), &manifest)
 	if err != nil {
-		log.Printf("Error parsing manifest: %v", err)
+		logger.Info("Error parsing manifest: %v", err)
 		http.Error(w, "Failed to parse manifest", http.StatusInternalServerError)
 		return
 	}
@@ -633,13 +633,13 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 			"source_server": sourceServer,
 		})
 		if err != nil {
-			log.Printf("Error building URL for file %s: %v", filePath, err)
+			logger.Info("Error building URL for file %s: %v", filePath, err)
 			continue
 		}
 
 		fileReq, err := http.NewRequest("GET", fileURL, nil)
 		if err != nil {
-			log.Printf("Error creating request for file %s: %v", filePath, err)
+			logger.Info("Error creating request for file %s: %v", filePath, err)
 			continue
 		}
 
@@ -647,7 +647,7 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 		if peer.Password != nil && len(*peer.Password) > 0 {
 			peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
 			if err != nil {
-				log.Printf("Error decrypting peer password: %v", err)
+				logger.Info("Error decrypting peer password: %v", err)
 				continue
 			}
 			fileReq.Header.Set("X-Sync-Password", peerPassword)
@@ -655,12 +655,12 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 
 		fileResp, err := client.Do(fileReq)
 		if err != nil {
-			log.Printf("Error downloading file %s from peer %s: %v", filePath, peer.Name, err)
+			logger.Info("Error downloading file %s from peer %s: %v", filePath, peer.Name, err)
 			continue
 		}
 
 		if fileResp.StatusCode != http.StatusOK {
-			log.Printf("Peer %s returned status %d for file %s", peer.Name, fileResp.StatusCode, filePath)
+			logger.Info("Peer %s returned status %d for file %s", peer.Name, fileResp.StatusCode, filePath)
 			fileResp.Body.Close()
 			continue
 		}
@@ -671,7 +671,7 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 		fileResp.Body.Close()
 
 		if err != nil {
-			log.Printf("Error decrypting file %s: %v", filePath, err)
+			logger.Info("Error decrypting file %s: %v", filePath, err)
 			continue
 		}
 
@@ -680,18 +680,18 @@ func (s *Server) handleAPIRestoreDownloadMultiple(w http.ResponseWriter, r *http
 		zipPath := strings.TrimPrefix(filePath, "/")
 		zipEntry, err := zipWriter.Create(zipPath)
 		if err != nil {
-			log.Printf("Error creating ZIP entry for %s: %v", filePath, err)
+			logger.Info("Error creating ZIP entry for %s: %v", filePath, err)
 			continue
 		}
 
 		_, err = zipEntry.Write(decryptedBuf.Bytes())
 		if err != nil {
-			log.Printf("Error writing ZIP entry for %s: %v", filePath, err)
+			logger.Info("Error writing ZIP entry for %s: %v", filePath, err)
 			continue
 		}
 	}
 
-	log.Printf("User %s downloaded %d files from peer %s backup %s as ZIP", session.Username, len(filesToDownload), peer.Name, shareName)
+	logger.Info("User %s downloaded %d files from peer %s backup %s as ZIP", session.Username, len(filesToDownload), peer.Name, shareName)
 }
 
 // Helper functions for file tree navigation
@@ -830,7 +830,7 @@ func (s *Server) handleRestoreWarning(w http.ResponseWriter, r *http.Request) {
 		// Get master key for password decryption
 		var masterKey string
 		if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
-			log.Printf("Error getting master key: %v", err)
+			logger.Info("Error getting master key: %v", err)
 		} else {
 			client := &http.Client{
 				Transport: &http.Transport{
@@ -852,7 +852,7 @@ func (s *Server) handleRestoreWarning(w http.ResponseWriter, r *http.Request) {
 				if peer.Password != nil && len(*peer.Password) > 0 {
 					peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
 					if err != nil {
-						log.Printf("Error decrypting peer password: %v", err)
+						logger.Info("Error decrypting peer password: %v", err)
 						continue
 					}
 					req.Header.Set("X-Sync-Password", peerPassword)
@@ -904,7 +904,7 @@ func (s *Server) handleRestoreWarning(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "restore_warning.html", data); err != nil {
-		log.Printf("Error rendering restore warning template: %v", err)
+		logger.Info("Error rendering restore warning template: %v", err)
 	}
 }
 
@@ -925,12 +925,12 @@ func (s *Server) handleRestoreWarningAcknowledge(w http.ResponseWriter, r *http.
 	// Update user's restore_acknowledged flag
 	_, err := s.db.Exec("UPDATE users SET restore_acknowledged = 1 WHERE id = ?", session.UserID)
 	if err != nil {
-		log.Printf("Error updating restore_acknowledged: %v", err)
+		logger.Info("Error updating restore_acknowledged: %v", err)
 		http.Error(w, "Failed to acknowledge restore", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("User %s acknowledged server restore (manual restore)", session.Username)
+	logger.Info("User %s acknowledged server restore (manual restore)", session.Username)
 
 	// Redirect to dashboard
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
@@ -974,7 +974,7 @@ func (s *Server) handleRestoreWarningBulk(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	log.Printf("User %s starting bulk restore from peer %d share %s source %s", session.Username, peerID, shareName, sourceServer)
+	logger.Info("User %s starting bulk restore from peer %d share %s source %s", session.Username, peerID, shareName, sourceServer)
 
 	// Start bulk restore in background
 	go func() {
@@ -982,11 +982,11 @@ func (s *Server) handleRestoreWarningBulk(w http.ResponseWriter, r *http.Request
 		// For now, we'll just do the restore and mark as complete
 		err := bulkrestore.BulkRestoreFromPeer(s.db, session.UserID, peerID, shareName, sourceServer, s.cfg.DataDir, nil)
 		if err != nil {
-			log.Printf("Bulk restore failed for user %s: %v", session.Username, err)
+			logger.Info("Bulk restore failed for user %s: %v", session.Username, err)
 		} else {
 			// Mark restore as completed
 			s.db.Exec("UPDATE users SET restore_acknowledged = 1, restore_completed = 1 WHERE id = ?", session.UserID)
-			log.Printf("Bulk restore completed successfully for user %s", session.Username)
+			logger.Info("Bulk restore completed successfully for user %s", session.Username)
 		}
 	}()
 

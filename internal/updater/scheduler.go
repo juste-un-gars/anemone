@@ -6,14 +6,14 @@ package updater
 
 import (
 	"database/sql"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"time"
 )
 
 // StartUpdateChecker launches the automatic update checker in a goroutine
 // It checks for updates once per day
 func StartUpdateChecker(db *sql.DB) {
-	log.Println("🔔 Starting automatic update checker...")
+	logger.Info("🔔 Starting automatic update checker...")
 
 	// Run initial check after 1 minute (to avoid blocking startup)
 	go func() {
@@ -32,40 +32,40 @@ func StartUpdateChecker(db *sql.DB) {
 		}
 	}()
 
-	log.Println("✅ Automatic update checker started (checks every 24 hours)")
+	logger.Info("✅ Automatic update checker started (checks every 24 hours)")
 }
 
 // checkForUpdates performs the actual update check
 func checkForUpdates(db *sql.DB) {
-	log.Println("🔍 Checking for updates...")
+	logger.Info("🔍 Checking for updates...")
 
 	// Check if we already checked recently (skip if checked within last 6 hours)
 	lastCheck, err := GetLastUpdateCheck(db)
 	if err != nil {
-		log.Printf("⚠️  Failed to get last update check time: %v", err)
+		logger.Info("⚠️  Failed to get last update check time: %v", err)
 	} else if !lastCheck.IsZero() && time.Since(lastCheck) < 6*time.Hour {
-		log.Printf("⏭️  Skipping update check (last check was %v ago)", time.Since(lastCheck).Round(time.Minute))
+		logger.Info("⏭️  Skipping update check (last check was %v ago)", time.Since(lastCheck).Round(time.Minute))
 		return
 	}
 
 	// Perform the check
 	info, err := CheckUpdate()
 	if err != nil {
-		log.Printf("⚠️  Failed to check for updates: %v", err)
+		logger.Info("⚠️  Failed to check for updates: %v", err)
 		return
 	}
 
 	// Save to database
 	if err := SaveUpdateInfo(db, info); err != nil {
-		log.Printf("⚠️  Failed to save update info: %v", err)
+		logger.Info("⚠️  Failed to save update info: %v", err)
 		return
 	}
 
 	// Log result
 	if info.Available {
-		log.Printf("🎉 New version available: %s → %s", info.CurrentVersion, info.LatestVersion)
-		log.Printf("📦 Release URL: %s", info.ReleaseURL)
+		logger.Info("🎉 New version available: %s → %s", info.CurrentVersion, info.LatestVersion)
+		logger.Info("📦 Release URL: %s", info.ReleaseURL)
 	} else {
-		log.Printf("✅ You are running the latest version (%s)", info.CurrentVersion)
+		logger.Info("✅ You are running the latest version (%s)", info.CurrentVersion)
 	}
 }

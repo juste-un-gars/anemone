@@ -13,7 +13,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"math/big"
 	"net"
 	"os"
@@ -33,12 +33,12 @@ func GenerateOrLoadCertificate(cfg *CertConfig) error {
 	// Check if certificate already exists
 	if _, err := os.Stat(cfg.CertPath); err == nil {
 		if _, err := os.Stat(cfg.KeyPath); err == nil {
-			log.Printf("🔒 Using existing TLS certificate: %s", cfg.CertPath)
+			logger.Info("🔒 Using existing TLS certificate: %s", cfg.CertPath)
 			return nil
 		}
 	}
 
-	log.Println("🔐 Generating self-signed TLS certificate...")
+	logger.Info("🔐 Generating self-signed TLS certificate...")
 
 	// Create certs directory if it doesn't exist
 	certDir := filepath.Dir(cfg.CertPath)
@@ -123,11 +123,11 @@ func GenerateOrLoadCertificate(cfg *CertConfig) error {
 		return fmt.Errorf("failed to write private key: %w", err)
 	}
 
-	log.Printf("✅ Self-signed certificate generated successfully")
-	log.Printf("   Certificate: %s", cfg.CertPath)
-	log.Printf("   Private Key: %s", cfg.KeyPath)
-	log.Printf("   Valid for: 10 years (until %s)", notAfter.Format("2006-01-02"))
-	log.Printf("   ⚠️  Your browser will show a security warning - this is normal for self-signed certificates")
+	logger.Info("✅ Self-signed certificate generated successfully")
+	logger.Info("   Certificate: %s", cfg.CertPath)
+	logger.Info("   Private Key: %s", cfg.KeyPath)
+	logger.Info("   Valid for: 10 years (until %s)", notAfter.Format("2006-01-02"))
+	logger.Info("   ⚠️  Your browser will show a security warning - this is normal for self-signed certificates")
 
 	return nil
 }

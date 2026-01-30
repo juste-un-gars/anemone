@@ -16,7 +16,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"os"
 	"path/filepath"
 	"strings"
@@ -110,7 +110,7 @@ func BuildUserManifest(sharePath, shareName, shareType, username string) (*UserM
 		if err != nil {
 			// Log but continue on permission errors
 			if os.IsPermission(err) {
-				log.Printf("⚠️  Permission denied: %s", path)
+				logger.Info("⚠️  Permission denied: %s", path)
 				return nil
 			}
 			return err
@@ -164,7 +164,7 @@ func BuildUserManifest(sharePath, shareName, shareType, username string) (*UserM
 			var calcErr error
 			hash, calcErr = calculateChecksum(path)
 			if calcErr != nil {
-				log.Printf("⚠️  Failed to calculate checksum for %s: %v", relPath, calcErr)
+				logger.Info("⚠️  Failed to calculate checksum for %s: %v", relPath, calcErr)
 				return nil // Skip this file but continue
 			}
 			checksumCalculated++
@@ -188,7 +188,7 @@ func BuildUserManifest(sharePath, shareName, shareType, username string) (*UserM
 	}
 
 	if checksumCalculated > 0 || checksumReused > 0 {
-		log.Printf("   📊 %s: %d files (%d checksums calculated, %d reused from cache)",
+		logger.Info("   📊 %s: %d files (%d checksums calculated, %d reused from cache)",
 			shareName, manifest.FileCount, checksumCalculated, checksumReused)
 	}
 
@@ -243,7 +243,7 @@ func loadCachedManifest(sharePath string) *UserManifest {
 
 	var manifest UserManifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
-		log.Printf("⚠️  Failed to parse existing manifest: %v", err)
+		logger.Info("⚠️  Failed to parse existing manifest: %v", err)
 		return nil
 	}
 

@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/juste-un-gars/anemone/internal/config"
 	"github.com/juste-un-gars/anemone/internal/database"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"github.com/juste-un-gars/anemone/internal/scheduler"
 	"github.com/juste-un-gars/anemone/internal/serverbackup"
 	"github.com/juste-un-gars/anemone/internal/setup"
@@ -26,17 +28,31 @@ import (
 )
 
 func main() {
-	log.Println("🪸 Starting Anemone NAS...")
-
-	// Load configuration
+	// Load configuration first
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
+	// Initialize logger early (with env var level or default)
+	// Will be updated with DB level after database init
+	logLevel := logger.ParseLevel(cfg.LogLevel)
+	if cfg.LogLevel == "" {
+		logLevel = logger.DefaultLevel // WARN
+	}
+	if err := logger.Init(&logger.Config{
+		Level:  logLevel,
+		LogDir: cfg.LogDir,
+	}); err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+	defer logger.Close()
+
+	logger.Info("Starting Anemone NAS...")
+
 	// Check if setup is needed
 	if setup.IsSetupNeeded(cfg.DataDir) {
-		log.Println("🔧 Setup mode detected - starting setup wizard...")
+		logger.Info("Setup mode detected - starting setup wizard...")
 		runSetupMode(cfg)
 		return
 	}
@@ -44,30 +60,40 @@ func main() {
 	// Validate directories exist and are writable
 	if warnings := cfg.ValidateDirs(); len(warnings) > 0 {
 		for _, w := range warnings {
-			log.Printf("⚠️  %s", w)
+			logger.Warn("Directory warning", "message", w)
 		}
 	}
 
 	// Initialize database
 	db, err := database.Init(cfg.DatabasePath)
 	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		logger.Error("Failed to initialize database", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	// Run migrations
 	if err := database.Migrate(db); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
+		logger.Error("Failed to run migrations", "error", err)
+		os.Exit(1)
+	}
+
+	// Update log level from DB (unless overridden by env var)
+	if cfg.LogLevel == "" {
+		if dbLevel, err := sysconfig.GetLogLevel(db); err == nil {
+			logger.SetLevel(logger.ParseLevel(dbLevel))
+			logger.Info("Log level set from database", "level", dbLevel)
+		}
 	}
 
 	// Sync current version in database with code version
 	if err := updater.SyncVersionWithDB(db); err != nil {
-		log.Printf("⚠️  Warning: Failed to sync version with DB: %v", err)
+		logger.Warn("Failed to sync version with DB", "error", err)
 	}
 
 	// Cleanup zombie syncs (syncs stuck in "running" state)
 	if err := syncpkg.CleanupZombieSyncs(db); err != nil {
-		log.Printf("⚠️  Warning: Failed to cleanup zombie syncs: %v", err)
+		logger.Warn("Failed to cleanup zombie syncs", "error", err)
 	}
 
 	// Start automatic synchronization scheduler
@@ -91,11 +117,10 @@ func main() {
 	// Monitors share directories and regenerates manifests when files change
 	manifestWatcher, err := usermanifest.NewWatcher(db)
 	if err != nil {
-		log.Printf("⚠️  Failed to create manifest watcher: %v", err)
-		log.Println("   Falling back to scheduled manifest generation only")
+		logger.Warn("Failed to create manifest watcher, falling back to scheduled generation", "error", err)
 	} else {
 		if err := manifestWatcher.Start(); err != nil {
-			log.Printf("⚠️  Failed to start manifest watcher: %v", err)
+			logger.Warn("Failed to start manifest watcher", "error", err)
 		}
 		defer manifestWatcher.Stop()
 	}
@@ -130,7 +155,8 @@ func main() {
 
 	// If neither is enabled, this shouldn't happen due to config validation
 	if !cfg.EnableHTTPS && !cfg.EnableHTTP {
-		log.Fatal("❌ No server protocol enabled. Set ENABLE_HTTPS=true or ENABLE_HTTP=true")
+		logger.Error("No server protocol enabled. Set ENABLE_HTTPS=true or ENABLE_HTTP=true")
+		os.Exit(1)
 	}
 
 	// Wait for all servers
@@ -146,27 +172,28 @@ func startHTTPSServer(cfg *config.Config, router http.Handler) {
 	}
 
 	if err := tls.GenerateOrLoadCertificate(certCfg); err != nil {
-		log.Fatalf("Failed to setup TLS certificate: %v", err)
+		logger.Error("Failed to setup TLS certificate", "error", err)
+		os.Exit(1)
 	}
 
 	addr := fmt.Sprintf(":%s", cfg.HTTPSPort)
-	log.Printf("🔒 HTTPS server listening on https://localhost%s", addr)
-	log.Printf("   ⚠️  If using a self-signed certificate, your browser will show a security warning")
-	log.Printf("   ✓  This is normal and safe for local/private use")
+	logger.Info("HTTPS server listening", "address", fmt.Sprintf("https://localhost%s", addr))
+	logger.Info("Self-signed certificate warning is normal for local/private use")
 
 	if err := http.ListenAndServeTLS(addr, cfg.TLSCertPath, cfg.TLSKeyPath, router); err != nil {
-		log.Fatalf("HTTPS server failed: %v", err)
+		logger.Error("HTTPS server failed", "error", err)
+		os.Exit(1)
 	}
 }
 
 func startHTTPServer(cfg *config.Config, router http.Handler) {
 	addr := fmt.Sprintf(":%s", cfg.Port)
-	log.Printf("⚠️  HTTP server listening on http://localhost%s", addr)
-	log.Printf("   ⚠️  WARNING: HTTP is not secure. Credentials and data are transmitted in clear text!")
-	log.Printf("   ✓  Consider using HTTPS instead by setting ENABLE_HTTPS=true")
+	logger.Warn("HTTP server listening (insecure)", "address", fmt.Sprintf("http://localhost%s", addr))
+	logger.Warn("HTTP transmits credentials in clear text. Consider ENABLE_HTTPS=true")
 
 	if err := http.ListenAndServe(addr, router); err != nil {
-		log.Fatalf("HTTP server failed: %v", err)
+		logger.Error("HTTP server failed", "error", err)
+		os.Exit(1)
 	}
 }
 
@@ -198,7 +225,7 @@ func runSetupMode(cfg *config.Config) {
 
 	// If neither is enabled, default to HTTP for setup
 	if !cfg.EnableHTTPS && !cfg.EnableHTTP {
-		log.Println("⚠️  No server protocol enabled, defaulting to HTTP for setup wizard")
+		logger.Warn("No server protocol enabled, defaulting to HTTP for setup wizard")
 		startHTTPServer(cfg, router)
 		return
 	}

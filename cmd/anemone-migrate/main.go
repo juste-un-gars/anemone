@@ -8,7 +8,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -35,52 +35,55 @@ func main() {
 	dbPath := filepath.Join(*dataDir, "db", "anemone.db")
 	sharesDir := filepath.Join(*dataDir, "shares")
 
-	log.Printf("🪸 Anemone Share Migration Tool")
-	log.Printf("Data dir: %s", *dataDir)
-	log.Printf("Database: %s", dbPath)
-	log.Printf("Shares dir: %s", sharesDir)
-	log.Printf("Dry run: %v", *dryRun)
-	log.Printf("")
+	logger.Info("🪸 Anemone Share Migration Tool")
+	logger.Info("Data dir: %s", *dataDir)
+	logger.Info("Database: %s", dbPath)
+	logger.Info("Shares dir: %s", sharesDir)
+	logger.Info("Dry run: %v", *dryRun)
+	logger.Info("")
 
 	// Open database
 	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		log.Fatalf("Failed to open database: %v", err)
+		logger.Error("Failed to open database", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	// Initialize quota manager
 	qm, err := quota.NewQuotaManager(sharesDir)
 	if err != nil {
-		log.Fatalf("Failed to initialize quota manager: %v", err)
+		logger.Error("Failed to initialize quota manager", "error", err)
+		os.Exit(1)
 	}
 
 	// Get all shares
 	allShares, err := shares.GetAll(db)
 	if err != nil {
-		log.Fatalf("Failed to get shares: %v", err)
+		logger.Error("Failed to get shares", "error", err)
+		os.Exit(1)
 	}
 
 	if len(allShares) == 0 {
-		log.Printf("No shares found in database")
+		logger.Info("No shares found in database")
 		return
 	}
 
-	log.Printf("Found %d shares to process\n", len(allShares))
+	logger.Info("Found %d shares to process\n", len(allShares))
 
 	successCount := 0
 	skipCount := 0
 	errorCount := 0
 
 	for _, share := range allShares {
-		log.Printf("\n---")
-		log.Printf("Processing share: %s (ID: %d, User ID: %d)", share.Name, share.ID, share.UserID)
-		log.Printf("  Path: %s", share.Path)
+		logger.Info("\n---")
+		logger.Info("Processing share: %s (ID: %d, User ID: %d)", share.Name, share.ID, share.UserID)
+		logger.Info("  Path: %s", share.Path)
 
 		// Get user info for quota
 		user, err := users.GetByID(db, share.UserID)
 		if err != nil {
-			log.Printf("  ❌ ERROR: Failed to get user info: %v", err)
+			logger.Info("  ❌ ERROR: Failed to get user info: %v", err)
 			errorCount++
 			continue
 		}
@@ -97,23 +100,23 @@ func main() {
 			}
 		}
 
-		log.Printf("  User: %s (Quota: %dGB)", user.Username, quotaGB)
+		logger.Info("  User: %s (Quota: %dGB)", user.Username, quotaGB)
 
 		// Check if path exists
 		info, err := os.Stat(share.Path)
 		if err != nil {
 			if os.IsNotExist(err) {
-				log.Printf("  ⚠️  SKIP: Path does not exist")
+				logger.Info("  ⚠️  SKIP: Path does not exist")
 				skipCount++
 				continue
 			}
-			log.Printf("  ❌ ERROR: Failed to stat path: %v", err)
+			logger.Info("  ❌ ERROR: Failed to stat path: %v", err)
 			errorCount++
 			continue
 		}
 
 		if !info.IsDir() {
-			log.Printf("  ❌ ERROR: Path is not a directory")
+			logger.Info("  ❌ ERROR: Path is not a directory")
 			errorCount++
 			continue
 		}
@@ -121,16 +124,16 @@ func main() {
 		// Check if already a subvolume
 		isSubvol := btrfs.IsSubvolume(share.Path)
 		if isSubvol && !*force {
-			log.Printf("  ⏭️  SKIP: Already a subvolume")
+			logger.Info("  ⏭️  SKIP: Already a subvolume")
 			skipCount++
 			continue
 		}
 
 		if *dryRun {
 			if isSubvol {
-				log.Printf("  [DRY RUN] Would update quota to %dGB", quotaGB)
+				logger.Info("  [DRY RUN] Would update quota to %dGB", quotaGB)
 			} else {
-				log.Printf("  [DRY RUN] Would migrate to subvolume with %dGB quota", quotaGB)
+				logger.Info("  [DRY RUN] Would migrate to subvolume with %dGB quota", quotaGB)
 			}
 			successCount++
 			continue
@@ -139,29 +142,29 @@ func main() {
 		// Perform migration
 		if isSubvol {
 			// Just update quota
-			log.Printf("  🔄 Updating quota to %dGB...", quotaGB)
+			logger.Info("  🔄 Updating quota to %dGB...", quotaGB)
 			if err := qm.UpdateQuota(share.Path, quotaGB); err != nil {
-				log.Printf("  ❌ ERROR: Failed to update quota: %v", err)
+				logger.Info("  ❌ ERROR: Failed to update quota: %v", err)
 				errorCount++
 				continue
 			}
-			log.Printf("  ✅ Quota updated successfully")
+			logger.Info("  ✅ Quota updated successfully")
 		} else {
 			// Full migration: regular dir → subvolume with quota
-			log.Printf("  🔄 Migrating to subvolume with %dGB quota...", quotaGB)
+			logger.Info("  🔄 Migrating to subvolume with %dGB quota...", quotaGB)
 
 			backupPath := share.Path + ".backup"
 
 			// Step 1: Rename original directory to .backup
 			if err := os.Rename(share.Path, backupPath); err != nil {
-				log.Printf("  ❌ ERROR: Failed to rename original: %v", err)
+				logger.Info("  ❌ ERROR: Failed to rename original: %v", err)
 				errorCount++
 				continue
 			}
 
 			// Step 2: Create subvolume with quota (no owner - will be set by cp -a)
 			if err := qm.CreateQuotaDir(share.Path, quotaGB, ""); err != nil {
-				log.Printf("  ❌ ERROR: Failed to create subvolume: %v", err)
+				logger.Info("  ❌ ERROR: Failed to create subvolume: %v", err)
 				// Rollback
 				os.Rename(backupPath, share.Path)
 				errorCount++
@@ -169,10 +172,10 @@ func main() {
 			}
 
 			// Step 3: Copy data from backup to new subvolume
-			log.Printf("  📦 Copying data...")
+			logger.Info("  📦 Copying data...")
 			cmd := exec.Command("cp", "-a", backupPath+"/.", share.Path+"/")
 			if output, err := cmd.CombinedOutput(); err != nil {
-				log.Printf("  ❌ ERROR: Failed to copy data: %v\nOutput: %s", err, output)
+				logger.Info("  ❌ ERROR: Failed to copy data: %v\nOutput: %s", err, output)
 				// Rollback
 				qm.RemoveQuotaDir(share.Path)
 				os.Rename(backupPath, share.Path)
@@ -183,36 +186,36 @@ func main() {
 			// Step 4: Verify ownership
 			cmd = exec.Command("sudo", "/usr/bin/chown", "-R", fmt.Sprintf("%s:%s", user.Username, user.Username), share.Path)
 			if err := cmd.Run(); err != nil {
-				log.Printf("  ⚠️  WARNING: Failed to set ownership: %v", err)
+				logger.Info("  ⚠️  WARNING: Failed to set ownership: %v", err)
 			}
 
 			// Step 5: Keep backup for safety
-			log.Printf("  💾 Original data backed up to: %s", backupPath)
-			log.Printf("  ⚠️  IMPORTANT: Verify the share works, then manually remove: sudo rm -rf %s", backupPath)
+			logger.Info("  💾 Original data backed up to: %s", backupPath)
+			logger.Info("  ⚠️  IMPORTANT: Verify the share works, then manually remove: sudo rm -rf %s", backupPath)
 
-			log.Printf("  ✅ Migration completed successfully")
+			logger.Info("  ✅ Migration completed successfully")
 		}
 
 		successCount++
 	}
 
 	// Summary
-	log.Printf("\n" + strings.Repeat("=", 50))
-	log.Printf("Migration Summary:")
-	log.Printf("  ✅ Success: %d", successCount)
-	log.Printf("  ⏭️  Skipped: %d", skipCount)
-	log.Printf("  ❌ Errors: %d", errorCount)
-	log.Printf(strings.Repeat("=", 50))
+	logger.Info("\n" + strings.Repeat("=", 50))
+	logger.Info("Migration Summary:")
+	logger.Info("  ✅ Success: %d", successCount)
+	logger.Info("  ⏭️  Skipped: %d", skipCount)
+	logger.Info("  ❌ Errors: %d", errorCount)
+	logger.Info(strings.Repeat("=", 50))
 
 	if *dryRun {
-		log.Printf("\n⚠️  This was a DRY RUN. No changes were made.")
-		log.Printf("Run without --dry-run to perform the migration.")
+		logger.Info("\n⚠️  This was a DRY RUN. No changes were made.")
+		logger.Info("Run without --dry-run to perform the migration.")
 	} else if successCount > 0 {
-		log.Printf("\n✅ Migration completed!")
-		log.Printf("\nNext steps:")
-		log.Printf("  1. Test SMB access to verify shares work correctly")
-		log.Printf("  2. Once verified, remove backup directories:")
-		log.Printf("     sudo rm -rf %s/*/.backup", sharesDir)
+		logger.Info("\n✅ Migration completed!")
+		logger.Info("\nNext steps:")
+		logger.Info("  1. Test SMB access to verify shares work correctly")
+		logger.Info("  2. Once verified, remove backup directories:")
+		logger.Info("     sudo rm -rf %s/*/.backup", sharesDir)
 	}
 }
 

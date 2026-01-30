@@ -6,7 +6,7 @@ package usermanifest
 
 import (
 	"database/sql"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"strings"
 	"time"
 
@@ -27,18 +27,18 @@ const DefaultIntervalMinutes = 5
 // The scheduler runs in the background and does not block.
 func StartScheduler(db *sql.DB, sharesDir string, intervalMinutes int) {
 	if intervalMinutes <= 0 {
-		log.Println("📋 User manifest scheduler disabled (interval=0)")
+		logger.Info("📋 User manifest scheduler disabled (interval=0)")
 		return
 	}
 
-	log.Printf("📋 Starting user manifest scheduler (every %d minutes)...", intervalMinutes)
+	logger.Info("📋 Starting user manifest scheduler (every %d minutes)...", intervalMinutes)
 
 	// Run initial generation after a short delay (let server start fully)
 	go func() {
 		time.Sleep(30 * time.Second)
-		log.Println("📋 Running initial manifest generation...")
+		logger.Info("📋 Running initial manifest generation...")
 		if err := GenerateAllManifests(db); err != nil {
-			log.Printf("⚠️  Initial manifest generation failed: %v", err)
+			logger.Info("⚠️  Initial manifest generation failed: %v", err)
 		}
 	}()
 
@@ -48,14 +48,14 @@ func StartScheduler(db *sql.DB, sharesDir string, intervalMinutes int) {
 		defer ticker.Stop()
 
 		for range ticker.C {
-			log.Println("📋 Running scheduled manifest generation...")
+			logger.Info("📋 Running scheduled manifest generation...")
 			if err := GenerateAllManifests(db); err != nil {
-				log.Printf("⚠️  Scheduled manifest generation failed: %v", err)
+				logger.Info("⚠️  Scheduled manifest generation failed: %v", err)
 			}
 		}
 	}()
 
-	log.Println("✅ User manifest scheduler started")
+	logger.Info("✅ User manifest scheduler started")
 }
 
 // GenerateAllManifests generates manifests for all user shares.
@@ -72,7 +72,7 @@ func GenerateAllManifests(db *sql.DB) error {
 	}
 
 	if len(allShares) == 0 {
-		log.Println("   📋 No shares found, skipping manifest generation")
+		logger.Info("   📋 No shares found, skipping manifest generation")
 		return nil
 	}
 
@@ -88,7 +88,7 @@ func GenerateAllManifests(db *sql.DB) error {
 		// Get username for this share
 		username, err := getUsername(db, share.UserID)
 		if err != nil {
-			log.Printf("⚠️  Failed to get username for share %s: %v", share.Name, err)
+			logger.Info("⚠️  Failed to get username for share %s: %v", share.Name, err)
 			errorCount++
 			continue
 		}
@@ -96,14 +96,14 @@ func GenerateAllManifests(db *sql.DB) error {
 		// Build manifest
 		manifest, err := BuildUserManifest(share.Path, share.Name, shareType, username)
 		if err != nil {
-			log.Printf("⚠️  Failed to build manifest for %s: %v", share.Name, err)
+			logger.Info("⚠️  Failed to build manifest for %s: %v", share.Name, err)
 			errorCount++
 			continue
 		}
 
 		// Write manifest
 		if err := WriteManifest(manifest, share.Path); err != nil {
-			log.Printf("⚠️  Failed to write manifest for %s: %v", share.Name, err)
+			logger.Info("⚠️  Failed to write manifest for %s: %v", share.Name, err)
 			errorCount++
 			continue
 		}
@@ -115,11 +115,11 @@ func GenerateAllManifests(db *sql.DB) error {
 
 	elapsed := time.Since(startTime)
 
-	log.Printf("✅ Manifest generation complete in %v: %d shares processed (%d files, %s)",
+	logger.Info("✅ Manifest generation complete in %v: %d shares processed (%d files, %s)",
 		elapsed.Round(time.Millisecond), successCount, totalFiles, FormatSize(totalSize))
 
 	if errorCount > 0 {
-		log.Printf("⚠️  %d shares had errors", errorCount)
+		logger.Info("⚠️  %d shares had errors", errorCount)
 	}
 
 	return nil

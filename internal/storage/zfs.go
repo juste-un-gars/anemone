@@ -230,8 +230,8 @@ func extractVDevType(name string) string {
 	if strings.HasPrefix(name, "spare") {
 		return "spare"
 	}
-	if name == "log" {
-		return "log"
+	if name == "github.com/juste-un-gars/anemone/internal/logger" {
+		return "github.com/juste-un-gars/anemone/internal/logger"
 	}
 	if name == "cache" {
 		return "cache"

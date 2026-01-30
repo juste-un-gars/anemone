@@ -6,7 +6,7 @@ package web
 
 import (
 	"encoding/json"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -34,14 +34,14 @@ func (s *Server) handleAdminUSBBackup(w http.ResponseWriter, r *http.Request) {
 	// Get all USB backup configurations
 	backups, err := usbbackup.GetAll(s.db)
 	if err != nil {
-		log.Printf("Error getting USB backups: %v", err)
+		logger.Info("Error getting USB backups: %v", err)
 		backups = []*usbbackup.USBBackup{}
 	}
 
 	// Detect available drives
 	drives, err := usbbackup.DetectDrives()
 	if err != nil {
-		log.Printf("Error detecting drives: %v", err)
+		logger.Info("Error detecting drives: %v", err)
 		drives = []usbbackup.DriveInfo{}
 	}
 
@@ -115,7 +115,7 @@ func (s *Server) handleAdminUSBBackup(w http.ResponseWriter, r *http.Request) {
 	// Detect unmounted disks (can be formatted)
 	unmountedDisks, err := usbbackup.DetectUnmountedDisks()
 	if err != nil {
-		log.Printf("Error detecting unmounted disks: %v", err)
+		logger.Info("Error detecting unmounted disks: %v", err)
 		unmountedDisks = []usbbackup.UnmountedDisk{}
 	}
 
@@ -166,7 +166,7 @@ func (s *Server) handleAdminUSBBackup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_usb_backup.html", data); err != nil {
-		log.Printf("Template error: %v", err)
+		logger.Info("Template error: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -222,7 +222,7 @@ func (s *Server) handleAdminUSBBackupAdd(w http.ResponseWriter, r *http.Request)
 	backup.SetSelectedShareIDs(selectedShareIDs)
 
 	if err := usbbackup.Create(s.db, backup); err != nil {
-		log.Printf("Error creating USB backup: %v", err)
+		logger.Info("Error creating USB backup: %v", err)
 		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "error_creating"), http.StatusSeeOther)
 		return
 	}
@@ -273,7 +273,7 @@ func (s *Server) handleUSBBackupDelete(w http.ResponseWriter, r *http.Request, i
 	}
 
 	if err := usbbackup.Delete(s.db, id); err != nil {
-		log.Printf("Error deleting USB backup: %v", err)
+		logger.Info("Error deleting USB backup: %v", err)
 		http.Error(w, "Error deleting backup", http.StatusInternalServerError)
 		return
 	}
@@ -292,7 +292,7 @@ func (s *Server) handleUSBBackupSync(w http.ResponseWriter, r *http.Request, id 
 
 	backup, err := usbbackup.GetByID(s.db, id)
 	if err != nil {
-		log.Printf("Error getting USB backup: %v", err)
+		logger.Info("Error getting USB backup: %v", err)
 		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "backup_not_found"), http.StatusSeeOther)
 		return
 	}
@@ -311,7 +311,7 @@ func (s *Server) handleUSBBackupSync(w http.ResponseWriter, r *http.Request, id 
 	// Get master key
 	var masterKey string
 	if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
-		log.Printf("Error getting master key: %v", err)
+		logger.Info("Error getting master key: %v", err)
 		http.Redirect(w, r, "/admin/usb-backup?error=internal_error", http.StatusSeeOther)
 		return
 	}
@@ -353,9 +353,9 @@ func (s *Server) handleUSBBackupSync(w http.ResponseWriter, r *http.Request, id 
 		}
 
 		if syncErr != nil {
-			log.Printf("USB backup sync error: %v", syncErr)
+			logger.Info("USB backup sync error: %v", syncErr)
 		} else if result != nil {
-			log.Printf("USB backup sync completed: %d added, %d updated, %d deleted, %s",
+			logger.Info("USB backup sync completed: %d added, %d updated, %d deleted, %s",
 				result.FilesAdded, result.FilesUpdated, result.FilesDeleted,
 				usbbackup.FormatBytes(result.BytesSynced))
 		}
@@ -433,7 +433,7 @@ func (s *Server) handleUSBBackupEditForm(w http.ResponseWriter, r *http.Request,
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_usb_backup_edit.html", data); err != nil {
-		log.Printf("Template error: %v", err)
+		logger.Info("Template error: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -519,7 +519,7 @@ func (s *Server) handleUSBBackupEdit(w http.ResponseWriter, r *http.Request, id 
 	}
 
 	if err := usbbackup.Update(s.db, backup); err != nil {
-		log.Printf("Error updating USB backup: %v", err)
+		logger.Info("Error updating USB backup: %v", err)
 		http.Redirect(w, r, "/admin/usb-backup/"+strconv.Itoa(id)+"?error="+i18n.T(lang, "error_updating"), http.StatusSeeOther)
 		return
 	}
@@ -621,7 +621,7 @@ func (s *Server) handleAdminUSBFormat(w http.ResponseWriter, r *http.Request) {
 
 	// Validate device path for security
 	if err := storage.ValidateDevicePath(device); err != nil {
-		log.Printf("Invalid device path: %s - %v", device, err)
+		logger.Info("Invalid device path: %s - %v", device, err)
 		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "usb_format.error.invalid_device"), http.StatusSeeOther)
 		return
 	}
@@ -629,18 +629,18 @@ func (s *Server) handleAdminUSBFormat(w http.ResponseWriter, r *http.Request) {
 	// Check if device is in use
 	inUse, usedBy, err := storage.IsDiskInUse(device)
 	if err != nil {
-		log.Printf("Error checking disk: %v", err)
+		logger.Info("Error checking disk: %v", err)
 		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "usb_format.error.check_failed"), http.StatusSeeOther)
 		return
 	}
 	if inUse {
-		log.Printf("Disk %s is in use: %s", device, usedBy)
+		logger.Info("Disk %s is in use: %s", device, usedBy)
 		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "usb_format.error.in_use"), http.StatusSeeOther)
 		return
 	}
 
 	// Create partition and format
-	log.Printf("Formatting %s as %s with label %q", device, filesystem, label)
+	logger.Info("Formatting %s as %s with label %q", device, filesystem, label)
 
 	opts := storage.CreatePartitionOptions{
 		Device:     device,
@@ -650,12 +650,12 @@ func (s *Server) handleAdminUSBFormat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := storage.CreatePartition(opts); err != nil {
-		log.Printf("Format failed: %v", err)
+		logger.Info("Format failed: %v", err)
 		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "usb_format.error.format_failed"), http.StatusSeeOther)
 		return
 	}
 
-	log.Printf("Successfully formatted %s as %s", device, filesystem)
+	logger.Info("Successfully formatted %s as %s", device, filesystem)
 	http.Redirect(w, r, "/admin/usb-backup?formatted=1", http.StatusSeeOther)
 }
 

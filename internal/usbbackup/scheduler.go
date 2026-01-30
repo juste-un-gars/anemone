@@ -6,7 +6,7 @@ package usbbackup
 
 import (
 	"database/sql"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"path/filepath"
 	"time"
 
@@ -16,7 +16,7 @@ import (
 // StartScheduler launches the automatic USB backup scheduler in a goroutine
 // It checks every minute if a sync should be triggered for each USB backup based on their individual configuration
 func StartScheduler(db *sql.DB, dataDir string) {
-	log.Println("🔄 Starting USB backup scheduler...")
+	logger.Info("🔄 Starting USB backup scheduler...")
 
 	// Run scheduler in background
 	go func() {
@@ -29,7 +29,7 @@ func StartScheduler(db *sql.DB, dataDir string) {
 			// Get all enabled USB backups
 			backups, err := GetEnabled(db)
 			if err != nil {
-				log.Printf("⚠️  USB Scheduler: Failed to get backups: %v", err)
+				logger.Info("⚠️  USB Scheduler: Failed to get backups: %v", err)
 				continue
 			}
 
@@ -40,12 +40,12 @@ func StartScheduler(db *sql.DB, dataDir string) {
 					continue
 				}
 
-				log.Printf("🔄 USB Scheduler: Triggering sync for '%s' (frequency: %s)...", backup.Name, backup.SyncFrequency)
+				logger.Info("🔄 USB Scheduler: Triggering sync for '%s' (frequency: %s)...", backup.Name, backup.SyncFrequency)
 
 				// Get master key
 				var masterKey string
 				if err := db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
-					log.Printf("⚠️  USB Scheduler: Failed to get master key: %v", err)
+					logger.Info("⚠️  USB Scheduler: Failed to get master key: %v", err)
 					continue
 				}
 
@@ -82,13 +82,13 @@ func StartScheduler(db *sql.DB, dataDir string) {
 
 				// Log results
 				if syncErr != nil {
-					log.Printf("⚠️  USB Scheduler: Sync to %s failed: %v", backup.Name, syncErr)
+					logger.Info("⚠️  USB Scheduler: Sync to %s failed: %v", backup.Name, syncErr)
 				} else if result != nil {
 					if len(result.Errors) > 0 {
-						log.Printf("⚠️  USB Scheduler: Sync to %s completed with errors - Added: %d, Updated: %d, Deleted: %d, Errors: %d",
+						logger.Info("⚠️  USB Scheduler: Sync to %s completed with errors - Added: %d, Updated: %d, Deleted: %d, Errors: %d",
 							backup.Name, result.FilesAdded, result.FilesUpdated, result.FilesDeleted, len(result.Errors))
 					} else {
-						log.Printf("✅ USB Scheduler: Sync to %s completed - Added: %d, Updated: %d, Deleted: %d, %s",
+						logger.Info("✅ USB Scheduler: Sync to %s completed - Added: %d, Updated: %d, Deleted: %d, %s",
 							backup.Name, result.FilesAdded, result.FilesUpdated, result.FilesDeleted, FormatBytes(result.BytesSynced))
 					}
 				}
@@ -96,5 +96,5 @@ func StartScheduler(db *sql.DB, dataDir string) {
 		}
 	}()
 
-	log.Println("✅ USB backup scheduler started (checks every 1 minute)")
+	logger.Info("✅ USB backup scheduler started (checks every 1 minute)")
 }

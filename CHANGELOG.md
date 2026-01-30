@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1-beta] - 2026-01-30
+
+### Added
+
+#### Logging System
+- **New logging infrastructure**: Structured logging with `log/slog` (Go 1.21+ standard library)
+- **Log levels**: DEBUG, INFO, WARN, ERROR - configurable via UI or environment variable
+- **Log rotation**: Daily log files with automatic cleanup (30 days or 200 MB max)
+- **Log persistence**: Log level saved in database, persists across restarts
+- **Admin UI**: New `/admin/logs` page to view/download logs and change log level
+- **Environment override**: `ANEMONE_LOG_LEVEL` takes priority over database setting
+
+### Changed
+- Migrated ~40 files from standard `log` package to new `logger` package
+- Logs now written to both stdout and file (`/srv/anemone/logs/anemone-YYYY-MM-DD.log`)
+- Default log level is WARN (reduces noise in production)
+
+### Technical
+- New package: `internal/logger/` with `logger.go`, `rotation.go`, `logger_test.go`
+- New config options: `ANEMONE_LOG_LEVEL`, `ANEMONE_LOG_DIR`
+- New sysconfig functions: `GetLogLevel()`, `SetLogLevel()`
+- New routes: `/admin/logs`, `/admin/logs/level`, `/admin/logs/download`
+
 ## [0.13.0-beta] - 2026-01-26
 
 ### Added

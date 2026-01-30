@@ -8,7 +8,7 @@ package serverbackup
 import (
 	"database/sql"
 	"fmt"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"os"
 	"path/filepath"
 	"sort"
@@ -65,11 +65,11 @@ func CreateServerBackup(db *sql.DB, backupDir string) (string, error) {
 		return "", fmt.Errorf("failed to write backup file: %w", err)
 	}
 
-	log.Printf("Server backup created: %s (%d bytes)", filename, len(encryptedData))
+	logger.Info("Server backup created: %s (%d bytes)", filename, len(encryptedData))
 
 	// Clean old backups
 	if err := CleanOldBackups(backupDir, MaxBackups); err != nil {
-		log.Printf("Warning: failed to clean old backups: %v", err)
+		logger.Info("Warning: failed to clean old backups: %v", err)
 	}
 
 	return filepath, nil
@@ -128,9 +128,9 @@ func CleanOldBackups(backupDir string, maxBackups int) error {
 	// Delete old backups
 	for i := maxBackups; i < len(backups); i++ {
 		if err := os.Remove(backups[i].Path); err != nil {
-			log.Printf("Warning: failed to remove old backup %s: %v", backups[i].Filename, err)
+			logger.Info("Warning: failed to remove old backup %s: %v", backups[i].Filename, err)
 		} else {
-			log.Printf("Removed old backup: %s", backups[i].Filename)
+			logger.Info("Removed old backup: %s", backups[i].Filename)
 		}
 	}
 
@@ -172,7 +172,7 @@ func StartScheduler(db *sql.DB, dataDir string) {
 	backupDir := filepath.Join(dataDir, "backups", "server")
 
 	go func() {
-		log.Printf("🕐 Server backup scheduler started (daily at 4:00 AM)")
+		logger.Info("🕐 Server backup scheduler started (daily at 4:00 AM)")
 
 		for {
 			now := time.Now()
@@ -186,18 +186,18 @@ func StartScheduler(db *sql.DB, dataDir string) {
 
 			// Sleep until next 4 AM
 			duration := time.Until(next4AM)
-			log.Printf("Next automatic server backup scheduled for: %s (in %v)",
+			logger.Info("Next automatic server backup scheduled for: %s (in %v)",
 				next4AM.Format("2006-01-02 15:04:05"), duration.Round(time.Minute))
 
 			time.Sleep(duration)
 
 			// Create backup
-			log.Printf("Creating automatic server backup...")
+			logger.Info("Creating automatic server backup...")
 			backupPath, err := CreateServerBackup(db, backupDir)
 			if err != nil {
-				log.Printf("❌ Automatic backup failed: %v", err)
+				logger.Info("❌ Automatic backup failed: %v", err)
 			} else {
-				log.Printf("✅ Automatic server backup created: %s", backupPath)
+				logger.Info("✅ Automatic server backup created: %s", backupPath)
 			}
 
 			// Sleep a bit to avoid creating multiple backups if the clock changes

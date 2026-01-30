@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/fs"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -104,13 +104,13 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 
 	// Initialize i18n
 	if err := i18n.Init(cfg.Language); err != nil {
-		log.Printf("Warning: Failed to initialize i18n: %v", err)
+		logger.Info("Warning: Failed to initialize i18n: %v", err)
 	}
 
 	// Create translator instance
 	translator, err := i18n.New()
 	if err != nil {
-		log.Printf("Warning: Failed to create translator: %v", err)
+		logger.Info("Warning: Failed to create translator: %v", err)
 	}
 
 	// Start with translator's FuncMap (includes T with parameter support)
@@ -247,6 +247,11 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/admin/settings/sync-password", auth.RequireAdmin(server.handleAdminSettingsSyncPassword))
 	mux.HandleFunc("/admin/settings/trash", auth.RequireAdmin(server.handleAdminSettingsTrash))
 
+	// Admin routes - Logs
+	mux.HandleFunc("/admin/logs", auth.RequireAdmin(server.handleAdminLogs))
+	mux.HandleFunc("/admin/logs/level", auth.RequireAdmin(server.handleAdminLogsLevel))
+	mux.HandleFunc("/admin/logs/download", auth.RequireAdmin(server.handleAdminLogsDownload))
+
 	// Admin routes - Sync
 	mux.HandleFunc("/admin/sync", auth.RequireAdmin(server.handleAdminSync))
 	mux.HandleFunc("/admin/sync/config", auth.RequireAdmin(server.handleAdminSyncConfig))
@@ -373,7 +378,7 @@ func (s *Server) syncAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		// Check if sync auth password is configured
 		isConfigured, err := syncauth.IsConfigured(s.db)
 		if err != nil {
-			log.Printf("Error checking sync auth config: %v", err)
+			logger.Info("Error checking sync auth config: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -387,7 +392,7 @@ func (s *Server) syncAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		// Get password from header
 		password := r.Header.Get("X-Sync-Password")
 		if password == "" {
-			log.Printf("Sync auth failed: No X-Sync-Password header from %s", r.RemoteAddr)
+			logger.Info("Sync auth failed: No X-Sync-Password header from %s", r.RemoteAddr)
 			http.Error(w, "Unauthorized: X-Sync-Password header required", http.StatusUnauthorized)
 			return
 		}
@@ -395,13 +400,13 @@ func (s *Server) syncAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		// Check if password is correct
 		valid, err := syncauth.CheckSyncAuthPassword(s.db, password)
 		if err != nil {
-			log.Printf("Error checking sync auth password: %v", err)
+			logger.Info("Error checking sync auth password: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		if !valid {
-			log.Printf("Sync auth failed: Invalid password from %s", r.RemoteAddr)
+			logger.Info("Sync auth failed: Invalid password from %s", r.RemoteAddr)
 			http.Error(w, "Forbidden: Invalid password", http.StatusForbidden)
 			return
 		}
@@ -531,7 +536,7 @@ func (s *Server) getDashboardStats(session *auth.Session, lang string) *Dashboar
 		var totalUsedGB float64
 		rows, err := s.db.Query("SELECT id FROM users")
 		if err != nil {
-			log.Printf("Error querying users for storage stats: %v", err)
+			logger.Info("Error querying users for storage stats: %v", err)
 		} else {
 			defer rows.Close()
 			for rows.Next() {
@@ -582,7 +587,7 @@ func (s *Server) getDashboardStats(session *auth.Session, lang string) *Dashboar
 		// User stats: personal quota
 		quotaInfo, err := quota.GetUserQuota(s.db, session.UserID)
 		if err != nil {
-			log.Printf("Error getting quota info: %v", err)
+			logger.Info("Error getting quota info: %v", err)
 		} else {
 			stats.QuotaInfo = quotaInfo
 			stats.StorageUsed = fmt.Sprintf("%.2f GB", quotaInfo.UsedTotalGB)
@@ -593,7 +598,7 @@ func (s *Server) getDashboardStats(session *auth.Session, lang string) *Dashboar
 		// Get user's shares for trash count
 		userShares, err := shares.GetByUser(s.db, session.UserID)
 		if err != nil {
-			log.Printf("Error getting shares for stats: %v", err)
+			logger.Info("Error getting shares for stats: %v", err)
 			return stats
 		}
 
@@ -603,7 +608,7 @@ func (s *Server) getDashboardStats(session *auth.Session, lang string) *Dashboar
 			username := session.Username
 			trashItems, err := trash.ListTrashItems(share.Path, username)
 			if err != nil {
-				log.Printf("Error listing trash for share %s: %v", share.Name, err)
+				logger.Info("Error listing trash for share %s: %v", share.Name, err)
 				continue
 			}
 			totalTrashCount += len(trashItems)
@@ -651,7 +656,7 @@ func calculateDirectorySize(path string) int64 {
 		return nil
 	})
 	if err != nil {
-		log.Printf("Error calculating directory size for %s: %v", path, err)
+		logger.Info("Error calculating directory size for %s: %v", path, err)
 	}
 	return size
 }
@@ -675,7 +680,7 @@ func formatBytes(bytes int64) string {
 func NewSetupRouter(cfg *config.Config) http.Handler {
 	// Initialize i18n with default language
 	if err := i18n.Init(cfg.Language); err != nil {
-		log.Printf("Warning: Failed to initialize i18n: %v", err)
+		logger.Info("Warning: Failed to initialize i18n: %v", err)
 	}
 
 	// Create setup wizard server
@@ -683,7 +688,7 @@ func NewSetupRouter(cfg *config.Config) http.Handler {
 
 	// Start setup mode
 	if err := wizardServer.GetManager().Start(); err != nil {
-		log.Printf("Warning: Failed to start setup mode: %v", err)
+		logger.Info("Warning: Failed to start setup mode: %v", err)
 	}
 
 	mux := http.NewServeMux()

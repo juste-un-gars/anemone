@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"net/http"
 	"os"
 	"os/exec"
@@ -32,7 +32,7 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 
 	// Parse multipart form (max 10GB)
 	if err := r.ParseMultipartForm(10 << 30); err != nil {
-		log.Printf("Error parsing multipart form: %v", err)
+		logger.Info("Error parsing multipart form: %v", err)
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
@@ -55,7 +55,7 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 	// Find matching share in local database
 	userShares, err := shares.GetByUser(s.db, userID)
 	if err != nil {
-		log.Printf("Error getting user shares: %v", err)
+		logger.Info("Error getting user shares: %v", err)
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
@@ -69,7 +69,7 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if targetShare == nil {
-		log.Printf("No matching share found for user %d, share %s", userID, shareName)
+		logger.Info("No matching share found for user %d, share %s", userID, shareName)
 		http.Error(w, "Share not found", http.StatusNotFound)
 		return
 	}
@@ -77,7 +77,7 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 	// Get archive file
 	file, _, err := r.FormFile("archive")
 	if err != nil {
-		log.Printf("Error getting archive file: %v", err)
+		logger.Info("Error getting archive file: %v", err)
 		http.Error(w, "Missing archive file", http.StatusBadRequest)
 		return
 	}
@@ -91,7 +91,7 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 		// Get user's encryption key
 		encryptionKey, err := sync.GetUserEncryptionKey(s.db, userID)
 		if err != nil {
-			log.Printf("Error getting encryption key: %v", err)
+			logger.Info("Error getting encryption key: %v", err)
 			http.Error(w, "Failed to get encryption key", http.StatusInternalServerError)
 			return
 		}
@@ -99,7 +99,7 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 		// Decrypt archive
 		var decryptedBuf bytes.Buffer
 		if err := crypto.DecryptStream(file, &decryptedBuf, encryptionKey); err != nil {
-			log.Printf("Error decrypting archive: %v", err)
+			logger.Info("Error decrypting archive: %v", err)
 			http.Error(w, fmt.Sprintf("Failed to decrypt archive: %v", err), http.StatusInternalServerError)
 			return
 		}
@@ -108,12 +108,12 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 
 	// Extract archive to local share path
 	if err := sync.ExtractTarGz(reader, targetShare.Path); err != nil {
-		log.Printf("Error extracting archive: %v", err)
+		logger.Info("Error extracting archive: %v", err)
 		http.Error(w, fmt.Sprintf("Failed to extract archive: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Successfully received and extracted sync to: %s (user %d, share %s)", targetShare.Path, userID, shareName)
+	logger.Info("Successfully received and extracted sync to: %s (user %d, share %s)", targetShare.Path, userID, shareName)
 
 	// Return success
 	w.Header().Set("Content-Type", "application/json")
@@ -171,7 +171,7 @@ func (s *Server) handleAPISyncManifestGet(w http.ResponseWriter, r *http.Request
 	// Read encrypted manifest
 	encryptedData, err := os.ReadFile(manifestPath)
 	if err != nil {
-		log.Printf("Error reading manifest file: %v", err)
+		logger.Info("Error reading manifest file: %v", err)
 		http.Error(w, "Failed to read manifest", http.StatusInternalServerError)
 		return
 	}
@@ -215,7 +215,7 @@ func (s *Server) handleAPISyncManifestPut(w http.ResponseWriter, r *http.Request
 	// Read encrypted manifest from request body
 	encryptedData, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("Error reading request body: %v", err)
+		logger.Info("Error reading request body: %v", err)
 		http.Error(w, "Failed to read manifest data", http.StatusBadRequest)
 		return
 	}
@@ -224,7 +224,7 @@ func (s *Server) handleAPISyncManifestPut(w http.ResponseWriter, r *http.Request
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
 	backupDir := filepath.Join(s.cfg.IncomingDir, sourceServer, backupDirName)
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		log.Printf("Error creating backup directory: %v", err)
+		logger.Info("Error creating backup directory: %v", err)
 		http.Error(w, "Failed to create backup directory", http.StatusInternalServerError)
 		return
 	}
@@ -232,12 +232,12 @@ func (s *Server) handleAPISyncManifestPut(w http.ResponseWriter, r *http.Request
 	// Write encrypted manifest
 	manifestPath := filepath.Join(backupDir, ".anemone-manifest.json.enc")
 	if err := os.WriteFile(manifestPath, encryptedData, 0644); err != nil {
-		log.Printf("Error writing manifest file: %v", err)
+		logger.Info("Error writing manifest file: %v", err)
 		http.Error(w, "Failed to write manifest", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Successfully updated manifest for user %d, share %s", userID, shareName)
+	logger.Info("Successfully updated manifest for user %d, share %s", userID, shareName)
 
 	// Return success
 	w.Header().Set("Content-Type", "application/json")
@@ -270,7 +270,7 @@ func (s *Server) handleAPISyncSourceInfo(w http.ResponseWriter, r *http.Request)
 	// Read JSON data from request body
 	sourceInfoData, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("Error reading request body: %v", err)
+		logger.Info("Error reading request body: %v", err)
 		http.Error(w, "Failed to read source info data", http.StatusBadRequest)
 		return
 	}
@@ -285,7 +285,7 @@ func (s *Server) handleAPISyncSourceInfo(w http.ResponseWriter, r *http.Request)
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
 	backupDir := filepath.Join(s.cfg.IncomingDir, sourceServer, backupDirName)
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		log.Printf("Error creating backup directory: %v", err)
+		logger.Info("Error creating backup directory: %v", err)
 		http.Error(w, "Failed to create backup directory", http.StatusInternalServerError)
 		return
 	}
@@ -293,12 +293,12 @@ func (s *Server) handleAPISyncSourceInfo(w http.ResponseWriter, r *http.Request)
 	// Write source info file (unencrypted metadata)
 	sourceInfoPath := filepath.Join(backupDir, ".source-info.json")
 	if err := os.WriteFile(sourceInfoPath, sourceInfoData, 0644); err != nil {
-		log.Printf("Error writing source info file: %v", err)
+		logger.Info("Error writing source info file: %v", err)
 		http.Error(w, "Failed to write source info", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Successfully updated source info for user %d, share %s", userID, shareName)
+	logger.Info("Successfully updated source info for user %d, share %s", userID, shareName)
 
 	// Return success
 	w.Header().Set("Content-Type", "application/json")
@@ -324,7 +324,7 @@ func (s *Server) handleAPISyncFile(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request) {
 	// Parse multipart form (max 10GB)
 	if err := r.ParseMultipartForm(10 << 30); err != nil {
-		log.Printf("Error parsing multipart form: %v", err)
+		logger.Info("Error parsing multipart form: %v", err)
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
@@ -360,7 +360,7 @@ func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request)
 	// Get file from multipart form
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		log.Printf("Error getting file: %v", err)
+		logger.Info("Error getting file: %v", err)
 		http.Error(w, "Missing file", http.StatusBadRequest)
 		return
 	}
@@ -373,7 +373,7 @@ func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request)
 
 	// Create parent directory if needed
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-		log.Printf("Error creating directory: %v", err)
+		logger.Info("Error creating directory: %v", err)
 		http.Error(w, "Failed to create directory", http.StatusInternalServerError)
 		return
 	}
@@ -381,19 +381,19 @@ func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request)
 	// Write file to disk
 	outFile, err := os.Create(targetPath)
 	if err != nil {
-		log.Printf("Error creating file: %v", err)
+		logger.Info("Error creating file: %v", err)
 		http.Error(w, "Failed to create file", http.StatusInternalServerError)
 		return
 	}
 	defer outFile.Close()
 
 	if _, err := io.Copy(outFile, file); err != nil {
-		log.Printf("Error writing file: %v", err)
+		logger.Info("Error writing file: %v", err)
 		http.Error(w, "Failed to write file", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Successfully uploaded file: %s (user %d, share %s)", relativePath, userID, shareName)
+	logger.Info("Successfully uploaded file: %s (user %d, share %s)", relativePath, userID, shareName)
 
 	// Return success
 	w.Header().Set("Content-Type", "application/json")
@@ -439,9 +439,9 @@ func (s *Server) handleAPISyncFileDelete(w http.ResponseWriter, r *http.Request)
 	if err := os.Remove(targetPath); err != nil {
 		if os.IsNotExist(err) {
 			// File already doesn't exist - that's OK
-			log.Printf("File already deleted: %s", relativePath)
+			logger.Info("File already deleted: %s", relativePath)
 		} else {
-			log.Printf("Error deleting file: %v", err)
+			logger.Info("Error deleting file: %v", err)
 			http.Error(w, "Failed to delete file", http.StatusInternalServerError)
 			return
 		}
@@ -450,7 +450,7 @@ func (s *Server) handleAPISyncFileDelete(w http.ResponseWriter, r *http.Request)
 	// Clean up empty parent directories
 	cleanEmptyParentDirs(filepath.Dir(targetPath), backupDir)
 
-	log.Printf("Successfully deleted file: %s (user %d, share %s)", relativePath, userID, shareName)
+	logger.Info("Successfully deleted file: %s (user %d, share %s)", relativePath, userID, shareName)
 
 	// Return success
 	w.Header().Set("Content-Type", "application/json")
@@ -533,7 +533,7 @@ func (s *Server) handleAPISyncListPhysicalFiles(w http.ResponseWriter, r *http.R
 	})
 
 	if err != nil {
-		log.Printf("Error listing files in %s: %v", backupDir, err)
+		logger.Info("Error listing files in %s: %v", backupDir, err)
 		http.Error(w, "Failed to list files", http.StatusInternalServerError)
 		return
 	}
@@ -550,7 +550,7 @@ func (s *Server) handleAPISyncListPhysicalFiles(w http.ResponseWriter, r *http.R
 	}
 	w.Write(filesJSON)
 
-	log.Printf("Listed %d physical files for user %d, share %s", len(files), userID, shareName)
+	logger.Info("Listed %d physical files for user %d, share %s", len(files), userID, shareName)
 }
 
 // handleAPISyncDeleteUserBackup deletes all backup data for a user on this peer
@@ -602,7 +602,7 @@ func (s *Server) handleAPISyncDeleteUserBackup(w http.ResponseWriter, r *http.Re
 	pattern := fmt.Sprintf("%d_*", userID)
 	matches, err := filepath.Glob(filepath.Join(incomingDir, pattern))
 	if err != nil {
-		log.Printf("Error globbing backup directories: %v", err)
+		logger.Info("Error globbing backup directories: %v", err)
 		http.Error(w, "Failed to find backup directories", http.StatusInternalServerError)
 		return
 	}
@@ -613,11 +613,11 @@ func (s *Server) handleAPISyncDeleteUserBackup(w http.ResponseWriter, r *http.Re
 		// Delete the entire backup directory (using sudo for permission)
 		cmd := exec.Command("sudo", "rm", "-rf", backupDir)
 		if err := cmd.Run(); err != nil {
-			log.Printf("Warning: failed to delete backup directory %s: %v", backupDir, err)
+			logger.Info("Warning: failed to delete backup directory %s: %v", backupDir, err)
 			continue
 		}
 		deletedCount++
-		log.Printf("Deleted backup directory: %s", backupDir)
+		logger.Info("Deleted backup directory: %s", backupDir)
 	}
 
 	// Return success
@@ -625,7 +625,7 @@ func (s *Server) handleAPISyncDeleteUserBackup(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"success": true, "message": "User backup deleted", "deleted_directories": %d}`, deletedCount)
 
-	log.Printf("Deleted %d backup director(ies) for user %d from source %s", deletedCount, userID, sourceServer)
+	logger.Info("Deleted %d backup director(ies) for user %d from source %s", deletedCount, userID, sourceServer)
 }
 
 
@@ -669,7 +669,7 @@ func (s *Server) handleAPISyncListUserBackups(w http.ResponseWriter, r *http.Req
 			w.Write([]byte("[]"))
 			return
 		}
-		log.Printf("Error reading backups directory: %v", err)
+		logger.Info("Error reading backups directory: %v", err)
 		http.Error(w, "Failed to read backups directory", http.StatusInternalServerError)
 		return
 	}
@@ -771,7 +771,7 @@ func (s *Server) handleAPISyncDownloadEncryptedManifest(w http.ResponseWriter, r
 	// Read encrypted manifest
 	encryptedData, err := os.ReadFile(manifestPath)
 	if err != nil {
-		log.Printf("Error reading encrypted manifest: %v", err)
+		logger.Info("Error reading encrypted manifest: %v", err)
 		http.Error(w, "Failed to read manifest", http.StatusInternalServerError)
 		return
 	}
@@ -782,7 +782,7 @@ func (s *Server) handleAPISyncDownloadEncryptedManifest(w http.ResponseWriter, r
 	w.WriteHeader(http.StatusOK)
 	w.Write(encryptedData)
 
-	log.Printf("Sent encrypted manifest for user %d share %s", userID, shareName)
+	logger.Info("Sent encrypted manifest for user %d share %s", userID, shareName)
 }
 
 // handleAPISyncDownloadEncryptedFile downloads an encrypted file without decrypting it
@@ -835,7 +835,7 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 	// This prevents path traversal attacks like /srv/anemone/backups_evil/../etc/passwd
 	relPath, err := filepath.Rel(absBackupPath, absFilePath)
 	if err != nil || strings.HasPrefix(relPath, "..") || filepath.IsAbs(relPath) {
-		log.Printf("Security: Attempted path traversal: %s (relative: %s)", filePath, relPath)
+		logger.Info("Security: Attempted path traversal: %s (relative: %s)", filePath, relPath)
 		http.Error(w, "Invalid file path", http.StatusForbidden)
 		return
 	}
@@ -847,7 +847,7 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 		return
 	}
 	if err != nil {
-		log.Printf("Error accessing file: %v", err)
+		logger.Info("Error accessing file: %v", err)
 		http.Error(w, "Failed to access file", http.StatusInternalServerError)
 		return
 	}
@@ -855,7 +855,7 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 	// Open encrypted file
 	encryptedFile, err := os.Open(encryptedFilePath)
 	if err != nil {
-		log.Printf("Error opening encrypted file: %v", err)
+		logger.Info("Error opening encrypted file: %v", err)
 		http.Error(w, "Failed to open file", http.StatusInternalServerError)
 		return
 	}
@@ -871,7 +871,7 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 	// Stream the encrypted file
 	io.Copy(w, encryptedFile)
 
-	log.Printf("Sent encrypted file %s for user %d share %s", filePath, userID, shareName)
+	logger.Info("Sent encrypted file %s for user %d share %s", filePath, userID, shareName)
 }
 
 // cleanEmptyParentDirs removes empty parent directories up to (but not including) the stopDir.
@@ -903,11 +903,11 @@ func cleanEmptyParentDirs(dir, stopDir string) {
 		// Try to remove empty directory
 		if err := os.Remove(dir); err != nil {
 			// Failed to remove (permissions, etc.), stop
-			log.Printf("Could not remove empty directory %s: %v", dir, err)
+			logger.Info("Could not remove empty directory %s: %v", dir, err)
 			return
 		}
 
-		log.Printf("Removed empty directory: %s", dir)
+		logger.Info("Removed empty directory: %s", dir)
 
 		// Move up to parent directory
 		dir = filepath.Dir(dir)

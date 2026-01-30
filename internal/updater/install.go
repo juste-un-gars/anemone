@@ -6,7 +6,7 @@ package updater
 
 import (
 	"fmt"
-	"log"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -47,8 +47,8 @@ func PerformAutoUpdate(targetVersion string) error {
 		return fmt.Errorf("failed to start auto-update script: %w", err)
 	}
 
-	log.Printf("🚀 Auto-update process started (PID: %d)", cmd.Process.Pid)
-	log.Printf("📝 Update log: /tmp/anemone-update.log")
+	logger.Info("🚀 Auto-update process started (PID: %d)", cmd.Process.Pid)
+	logger.Info("📝 Update log: /tmp/anemone-update.log")
 
 	// Don't wait for the command to finish - let it run independently
 	// The script will handle the git pull, build, and restart

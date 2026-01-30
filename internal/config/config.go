@@ -21,10 +21,14 @@ type Config struct {
 	Language     string // "fr" or "en"
 
 	// TLS configuration
-	EnableHTTPS   bool
-	EnableHTTP    bool   // Disabled by default for security
-	TLSCertPath   string // Path to custom TLS certificate
-	TLSKeyPath    string // Path to custom TLS private key
+	EnableHTTPS bool
+	EnableHTTP  bool   // Disabled by default for security
+	TLSCertPath string // Path to custom TLS certificate
+	TLSKeyPath  string // Path to custom TLS private key
+
+	// Logging configuration
+	LogLevel string // "debug", "info", "warn", "error" (default: "warn")
+	LogDir   string // Directory for log files (default: DataDir/logs)
 }
 
 // Load reads configuration from environment variables or defaults
@@ -54,6 +58,12 @@ func Load() (*Config, error) {
 		incomingDir = filepath.Join(dataDir, "backups", "incoming")
 	}
 
+	// Log directory can be customized, defaults to DataDir/logs
+	logDir := os.Getenv("ANEMONE_LOG_DIR")
+	if logDir == "" {
+		logDir = filepath.Join(dataDir, "logs")
+	}
+
 	cfg := &Config{
 		DatabasePath: filepath.Join(dataDir, "db", "anemone.db"),
 		DataDir:      dataDir,
@@ -66,6 +76,8 @@ func Load() (*Config, error) {
 		EnableHTTP:   enableHTTP,
 		TLSCertPath:  getEnv("TLS_CERT_PATH", ""),
 		TLSKeyPath:   getEnv("TLS_KEY_PATH", ""),
+		LogLevel:     getEnv("ANEMONE_LOG_LEVEL", ""), // Empty = use DB setting or default
+		LogDir:       logDir,
 	}
 
 	// If custom cert/key not provided, use auto-generated ones
