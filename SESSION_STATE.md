@@ -14,9 +14,37 @@
 
 **Session 5: Audit CLAUDE.md** - Completed ✅
 
+---
+
+## Next Session: WireGuard Integration
+
+**Objectif:** Ajouter le support WireGuard pour VPN entre peers
+
+### Tâches planifiées
+
+1. **Installation script (`install.sh`)**
+   - Proposer l'installation de WireGuard au début du script
+   - Installer `wireguard-tools` si accepté
+
+2. **Dashboard Admin**
+   - Nouvelle tuile "WireGuard" dans le dashboard admin
+   - Interface pour gérer la configuration WireGuard
+
+3. **Fonctionnalités à définir**
+   - Génération de clés (privée/publique)
+   - Configuration des peers VPN
+   - Statut de connexion
+   - Import/export de configuration `.conf`
+
+**Pour démarrer:** `"session wireguard"` ou `"continue"`
+
+---
+
+## Completed: Session 5 - Audit CLAUDE.md ✅
+
 **Résultat:**
 - Logging system validé (v0.13.1-beta)
-- Refactoring des 4 fichiers > 800 lignes terminé
+- Refactoring des 4 fichiers > 800 lignes terminé (v0.13.2-beta)
 
 ---
 
@@ -390,17 +418,18 @@ Sessions 71-74 merged and released. Major features:
 - [ ] Test repair mode (install.sh option 2) → simulate-reinstall.sh created
 - [x] Test restauration complète → Fixed login bug
 - [ ] Verify hide dot files works after Samba reload
-- [ ] **Test USB Backup module**
-- [ ] **Test USB Format feature** (new)
-- [ ] **Test NVMe SMART display** (new)
+- [x] **Test USB Backup module** ✅ 2026-01-30
+- [x] **Test USB Format feature** ✅ 2026-01-30
+- [x] **Test NVMe SMART display** ✅ 2026-01-30
 
 ---
 
 ## Future Features
 
-### WireGuard Integration
-- [ ] Installation automatique du client WireGuard lors de l'installation d'Anemone
-- [ ] Interface web pour gérer la configuration WireGuard (clés, endpoints, peers)
+### WireGuard Integration ⏳ Next Session
+- [ ] Proposer installation WireGuard au début de `install.sh`
+- [ ] Nouvelle tuile dans dashboard admin
+- [ ] Interface web pour gérer la configuration (clés, endpoints, peers)
 - [ ] Génération de fichiers de configuration `.conf`
 - [ ] Statut de connexion VPN dans le dashboard
 
