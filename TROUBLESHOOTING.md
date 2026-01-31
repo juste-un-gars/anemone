@@ -207,7 +207,7 @@ sqlite3 /srv/anemone/db/anemone.db "SELECT name, password FROM peers WHERE id = 
 
 ```bash
 # Test SSH connection to peer
-ssh franck@10.8.0.5 'echo "Connection OK"'
+ssh user@10.8.0.2 'echo "Connection OK"'
 ```
 
 ---
@@ -277,8 +277,8 @@ sudo btrfs qgroup show /srv/anemone/shares
 ### Check space used by a specific user
 
 ```bash
-# Replace 'franck' with username
-sudo du -sh /srv/anemone/shares/franck
+# Replace 'alice' with actual username
+sudo du -sh /srv/anemone/shares/alice
 ```
 
 ### Check backup space usage
