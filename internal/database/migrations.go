@@ -195,6 +195,11 @@ func Migrate(db *sql.DB) error {
 		return fmt.Errorf("wireguard_config table migration failed: %w", err)
 	}
 
+	// Migration pour créer la table rclone_backups
+	if err := migrateRcloneTable(db); err != nil {
+		return fmt.Errorf("rclone_backups table migration failed: %w", err)
+	}
+
 	return nil
 }
 
@@ -511,6 +516,51 @@ func migrateWireGuardTable(db *sql.DB) error {
 			if _, err := db.Exec("ALTER TABLE wireguard_config ADD COLUMN peer_preshared_key TEXT"); err != nil {
 				return fmt.Errorf("failed to add peer_preshared_key column: %w", err)
 			}
+		}
+	}
+
+	return nil
+}
+
+// migrateRcloneTable creates the rclone_backups table if it doesn't exist
+func migrateRcloneTable(db *sql.DB) error {
+	// Check if table exists
+	var tableName string
+	err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='rclone_backups'").Scan(&tableName)
+	if err != nil {
+		// Table doesn't exist, create it
+		query := `CREATE TABLE rclone_backups (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			sftp_host TEXT NOT NULL,
+			sftp_port INTEGER DEFAULT 22,
+			sftp_user TEXT NOT NULL,
+			sftp_key_path TEXT,
+			sftp_password TEXT,
+			remote_path TEXT NOT NULL,
+			enabled INTEGER DEFAULT 1,
+			sync_enabled INTEGER DEFAULT 0,
+			sync_frequency TEXT DEFAULT 'daily',
+			sync_time TEXT DEFAULT '02:00',
+			sync_day_of_week INTEGER,
+			sync_day_of_month INTEGER,
+			sync_interval_minutes INTEGER DEFAULT 60,
+			last_sync DATETIME,
+			last_status TEXT DEFAULT 'unknown',
+			last_error TEXT,
+			files_synced INTEGER DEFAULT 0,
+			bytes_synced INTEGER DEFAULT 0,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`
+
+		if _, err := db.Exec(query); err != nil {
+			return fmt.Errorf("failed to create rclone_backups table: %w", err)
+		}
+
+		// Create index for quick lookups
+		if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_rclone_backups_enabled ON rclone_backups(enabled)"); err != nil {
+			return fmt.Errorf("failed to create rclone_backups index: %w", err)
 		}
 	}
 

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{T .Lang "rclone.edit"}} - Anemone</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom styles -->
+    <style>
+        .anemone-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="min-h-screen bg-gray-50">
+    <!-- Navigation Bar -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/dashboard" class="text-2xl font-bold text-gray-900">
+                        🪸 Anemone - {{ServerName}}
+                    </a>
+                    <span class="ml-4 px-3 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                        {{T .Lang "users.role.admin"}}
+                    </span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-gray-700">{{.Session.Username}}</span>
+                    <a href="/logout" class="text-sm text-gray-600 hover:text-gray-900">
+                        {{T .Lang "dashboard.logout"}}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Breadcrumb -->
+        <nav class="mb-4">
+            <a href="/dashboard" class="text-purple-600 hover:text-purple-800">{{T .Lang "dashboard.title"}}</a>
+            <span class="mx-2 text-gray-400">/</span>
+            <a href="/admin/rclone" class="text-purple-600 hover:text-purple-800">{{T .Lang "rclone.title"}}</a>
+            <span class="mx-2 text-gray-400">/</span>
+            <span class="text-gray-600">{{T .Lang "rclone.edit"}}</span>
+        </nav>
+
+        <!-- Header -->
+        <h2 class="text-2xl font-bold text-gray-900 mb-6">{{T .Lang "rclone.edit"}}</h2>
+
+        <!-- Edit Form -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <form method="POST" action="/admin/rclone/{{.Backup.ID}}/edit">
+                <!-- Name -->
+                <div class="mb-4">
+                    <label for="name" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{T .Lang "rclone.name"}}
+                    </label>
+                    <input type="text" id="name" name="name" value="{{.Backup.Name}}" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                </div>
+
+                <!-- SFTP Host -->
+                <div class="mb-4">
+                    <label for="sftp_host" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{T .Lang "rclone.sftp.host"}}
+                    </label>
+                    <input type="text" id="sftp_host" name="sftp_host" value="{{.Backup.SFTPHost}}" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                </div>
+
+                <!-- SFTP Port -->
+                <div class="mb-4">
+                    <label for="sftp_port" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{T .Lang "rclone.sftp.port"}}
+                    </label>
+                    <input type="number" id="sftp_port" name="sftp_port" value="{{.Backup.SFTPPort}}" min="1" max="65535"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                </div>
+
+                <!-- SFTP User -->
+                <div class="mb-4">
+                    <label for="sftp_user" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{T .Lang "rclone.sftp.user"}}
+                    </label>
+                    <input type="text" id="sftp_user" name="sftp_user" value="{{.Backup.SFTPUser}}" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                </div>
+
+                <!-- SSH Key Path -->
+                <div class="mb-4">
+                    <label for="sftp_key_path" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{T .Lang "rclone.sftp.key_path"}}
+                    </label>
+                    <input type="text" id="sftp_key_path" name="sftp_key_path" value="{{.Backup.SFTPKeyPath}}"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                    <p class="mt-1 text-xs text-gray-500">{{T .Lang "rclone.sftp.key_path_hint"}}</p>
+                </div>
+
+                <!-- Remote Path -->
+                <div class="mb-4">
+                    <label for="remote_path" class="block text-sm font-medium text-gray-700 mb-1">
+                        {{T .Lang "rclone.sftp.remote_path"}}
+                    </label>
+                    <input type="text" id="remote_path" name="remote_path" value="{{.Backup.RemotePath}}" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                    <p class="mt-1 text-xs text-gray-500">{{T .Lang "rclone.sftp.remote_path_hint"}}</p>
+                </div>
+
+                <!-- Enabled -->
+                <div class="mb-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" name="enabled" {{if .Backup.Enabled}}checked{{end}}
+                               class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded">
+                        <span class="ml-2 text-sm text-gray-700">{{T .Lang "rclone.enabled"}}</span>
+                    </label>
+                </div>
+
+                <!-- Automatic Sync Schedule -->
+                <div class="mb-6 border-t pt-4 mt-4">
+                    <h3 class="text-sm font-medium text-gray-700 mb-3">{{T .Lang "rclone.schedule_title"}}</h3>
+
+                    <!-- Sync Enabled -->
+                    <div class="mb-4">
+                        <label class="flex items-center">
+                            <input type="checkbox" name="sync_enabled" id="sync_enabled" {{if .Backup.SyncEnabled}}checked{{end}}
+                                   class="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                                   onchange="toggleScheduleOptions(this.checked)">
+                            <span class="ml-2 text-sm text-gray-700">{{T .Lang "rclone.sync_enabled"}}</span>
+                        </label>
+                        <p class="ml-6 text-xs text-gray-500">{{T .Lang "rclone.sync_enabled_hint"}}</p>
+                    </div>
+
+                    <!-- Schedule Options (shown when sync_enabled) -->
+                    <div id="scheduleOptions" class="ml-6 space-y-4" {{if not .Backup.SyncEnabled}}style="display:none"{{end}}>
+                        <!-- Sync Frequency -->
+                        <div>
+                            <label for="sync_frequency" class="block text-sm font-medium text-gray-700 mb-1">
+                                {{T .Lang "rclone.sync_frequency"}}
+                            </label>
+                            <select id="sync_frequency" name="sync_frequency"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500"
+                                    onchange="updateScheduleFields()">
+                                <option value="interval" {{if eq .Backup.SyncFrequency "interval"}}selected{{end}}>{{T .Lang "usb_backup.freq_interval"}}</option>
+                                <option value="daily" {{if eq .Backup.SyncFrequency "daily"}}selected{{end}}>{{T .Lang "usb_backup.freq_daily"}}</option>
+                                <option value="weekly" {{if eq .Backup.SyncFrequency "weekly"}}selected{{end}}>{{T .Lang "usb_backup.freq_weekly"}}</option>
+                                <option value="monthly" {{if eq .Backup.SyncFrequency "monthly"}}selected{{end}}>{{T .Lang "usb_backup.freq_monthly"}}</option>
+                            </select>
+                        </div>
+
+                        <!-- Interval Minutes (for interval mode) -->
+                        <div id="intervalField" {{if ne .Backup.SyncFrequency "interval"}}style="display:none"{{end}}>
+                            <label for="sync_interval_minutes" class="block text-sm font-medium text-gray-700 mb-1">
+                                {{T .Lang "usb_backup.interval_minutes"}}
+                            </label>
+                            <select id="sync_interval_minutes" name="sync_interval_minutes"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                                <option value="15" {{if eq .Backup.SyncIntervalMinutes 15}}selected{{end}}>15 min</option>
+                                <option value="30" {{if eq .Backup.SyncIntervalMinutes 30}}selected{{end}}>30 min</option>
+                                <option value="60" {{if or (eq .Backup.SyncIntervalMinutes 60) (eq .Backup.SyncIntervalMinutes 0)}}selected{{end}}>1 {{T .Lang "common.hour"}}</option>
+                                <option value="120" {{if eq .Backup.SyncIntervalMinutes 120}}selected{{end}}>2 {{T .Lang "common.hours"}}</option>
+                                <option value="240" {{if eq .Backup.SyncIntervalMinutes 240}}selected{{end}}>4 {{T .Lang "common.hours"}}</option>
+                                <option value="480" {{if eq .Backup.SyncIntervalMinutes 480}}selected{{end}}>8 {{T .Lang "common.hours"}}</option>
+                                <option value="720" {{if eq .Backup.SyncIntervalMinutes 720}}selected{{end}}>12 {{T .Lang "common.hours"}}</option>
+                                <option value="1440" {{if eq .Backup.SyncIntervalMinutes 1440}}selected{{end}}>24 {{T .Lang "common.hours"}}</option>
+                            </select>
+                        </div>
+
+                        <!-- Sync Time (for daily/weekly/monthly) -->
+                        <div id="timeField" {{if eq .Backup.SyncFrequency "interval"}}style="display:none"{{end}}>
+                            <label for="sync_time" class="block text-sm font-medium text-gray-700 mb-1">
+                                {{T .Lang "usb_backup.sync_time"}}
+                            </label>
+                            <input type="time" id="sync_time" name="sync_time" value="{{.Backup.SyncTime}}"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                        </div>
+
+                        <!-- Day of Week (for weekly) -->
+                        <div id="weekdayField" {{if ne .Backup.SyncFrequency "weekly"}}style="display:none"{{end}}>
+                            <label for="sync_day_of_week" class="block text-sm font-medium text-gray-700 mb-1">
+                                {{T .Lang "usb_backup.day_of_week"}}
+                            </label>
+                            <select id="sync_day_of_week" name="sync_day_of_week"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                                <option value="0" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 0)}}selected{{end}}>{{T .Lang "common.sunday"}}</option>
+                                <option value="1" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 1)}}selected{{end}}>{{T .Lang "common.monday"}}</option>
+                                <option value="2" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 2)}}selected{{end}}>{{T .Lang "common.tuesday"}}</option>
+                                <option value="3" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 3)}}selected{{end}}>{{T .Lang "common.wednesday"}}</option>
+                                <option value="4" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 4)}}selected{{end}}>{{T .Lang "common.thursday"}}</option>
+                                <option value="5" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 5)}}selected{{end}}>{{T .Lang "common.friday"}}</option>
+                                <option value="6" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 6)}}selected{{end}}>{{T .Lang "common.saturday"}}</option>
+                            </select>
+                        </div>
+
+                        <!-- Day of Month (for monthly) -->
+                        <div id="monthdayField" {{if ne .Backup.SyncFrequency "monthly"}}style="display:none"{{end}}>
+                            <label for="sync_day_of_month" class="block text-sm font-medium text-gray-700 mb-1">
+                                {{T .Lang "usb_backup.day_of_month"}}
+                            </label>
+                            <select id="sync_day_of_month" name="sync_day_of_month"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-purple-500 focus:border-purple-500">
+                                {{range $i := iterate 1 28}}
+                                <option value="{{$i}}" {{if and $.Backup.SyncDayOfMonth (eq (deref $.Backup.SyncDayOfMonth) $i)}}selected{{end}}>{{$i}}</option>
+                                {{end}}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="flex justify-between">
+                    <a href="/admin/rclone" class="px-4 py-2 text-sm text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200">
+                        {{T .Lang "common.cancel"}}
+                    </a>
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white anemone-gradient rounded-md hover:opacity-90">
+                        {{T .Lang "common.save"}}
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Stats -->
+        {{if .Backup.LastSync}}
+        <div class="mt-6 bg-gray-50 rounded-lg p-4">
+            <h3 class="text-sm font-medium text-gray-700 mb-2">{{T .Lang "rclone.stats"}}</h3>
+            <dl class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <dt class="text-gray-500">{{T .Lang "rclone.last_sync"}}</dt>
+                    <dd class="font-medium">{{.Backup.LastSync.Format "2006-01-02 15:04"}}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">{{T .Lang "rclone.last_status"}}</dt>
+                    <dd class="font-medium">{{.Backup.LastStatus}}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">{{T .Lang "rclone.files_synced"}}</dt>
+                    <dd class="font-medium">{{.Backup.FilesSynced}}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-500">{{T .Lang "rclone.bytes_synced"}}</dt>
+                    <dd class="font-medium">{{FormatBytes .Backup.BytesSynced}}</dd>
+                </div>
+            </dl>
+        </div>
+        {{end}}
+    </div>
+</div>
+
+<script>
+function toggleScheduleOptions(show) {
+    const el = document.getElementById('scheduleOptions');
+    if (el) {
+        el.style.display = show ? 'block' : 'none';
+    }
+}
+
+function updateScheduleFields() {
+    const freq = document.getElementById('sync_frequency').value;
+    document.getElementById('intervalField').style.display = freq === 'interval' ? 'block' : 'none';
+    document.getElementById('timeField').style.display = freq !== 'interval' ? 'block' : 'none';
+    document.getElementById('weekdayField').style.display = freq === 'weekly' ? 'block' : 'none';
+    document.getElementById('monthdayField').style.display = freq === 'monthly' ? 'block' : 'none';
+}
+</script>
+</body>
+</html>

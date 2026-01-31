@@ -322,6 +322,11 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/api/admin/usb-backup/drives", auth.RequireAdmin(server.handleAdminUSBDrives))
 	mux.HandleFunc("/api/admin/usb-backup/unmounted", auth.RequireAdmin(server.handleAdminUSBUnmountedDisks))
 
+	// Admin routes - Rclone Cloud Backup
+	mux.HandleFunc("/admin/rclone", auth.RequireAdmin(server.handleAdminRclone))
+	mux.HandleFunc("/admin/rclone/add", auth.RequireAdmin(server.handleAdminRcloneAdd))
+	mux.HandleFunc("/admin/rclone/", auth.RequireAdmin(server.handleAdminRcloneActions))
+
 	// Admin routes - Restore all users (after server restoration)
 	mux.HandleFunc("/admin/restore-users", auth.RequireAdmin(server.handleAdminRestoreUsers))
 	mux.HandleFunc("/admin/restore-users/restore", auth.RequireAdmin(server.handleAdminRestoreUsersRestore))

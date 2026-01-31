@@ -19,6 +19,7 @@ import (
 	"github.com/juste-un-gars/anemone/internal/setup"
 	syncpkg "github.com/juste-un-gars/anemone/internal/sync"
 	"github.com/juste-un-gars/anemone/internal/sysconfig"
+	"github.com/juste-un-gars/anemone/internal/rclone"
 	"github.com/juste-un-gars/anemone/internal/tls"
 	"github.com/juste-un-gars/anemone/internal/trash"
 	"github.com/juste-un-gars/anemone/internal/updater"
@@ -105,6 +106,9 @@ func main() {
 
 	// Start automatic USB backup scheduler
 	usbbackup.StartScheduler(db, cfg.DataDir)
+
+	// Start automatic rclone (cloud) backup scheduler
+	rclone.StartScheduler(db, cfg.DataDir)
 
 	// Auto-connect WireGuard VPN if configured
 	if err := wgpkg.AutoConnect(db); err != nil {

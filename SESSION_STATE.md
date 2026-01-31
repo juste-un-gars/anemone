@@ -5,12 +5,123 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.13.3-beta
+**Current Version:** v0.13.4-beta
 **Last Updated:** 2026-01-31
 
 ---
 
 ## Current Session
+
+**Session 7: Rclone Cloud Backup** - Complete ✅
+
+---
+
+## Session 7: Rclone Cloud Backup
+
+**Date:** 2026-01-31
+**Objectif:** Ajouter module rclone pour backup SFTP des répertoires backup/ utilisateurs
+**Status:** Complete ✅
+
+### Contexte
+
+Module pour sauvegarder les répertoires `backup/` de tous les utilisateurs vers un serveur SFTP externe via rclone. Mode push uniquement (Anemone → SFTP).
+
+### Modules implémentés
+
+| # | Module | Objectif | Status |
+|---|--------|----------|--------|
+| 1 | **Infrastructure DB + Struct** | Table `rclone_backups`, migration, struct Go, CRUD | ✅ Done |
+| 2 | **Sync avec rclone** | Fonctions sync via rclone CLI | ✅ Done |
+| 3 | **Scheduler** | Planification automatique des backups | ✅ Done |
+| 4 | **UI + Handlers** | Interface admin, routes, templates | ✅ Done |
+| 5 | **Traductions** | i18n FR + EN | ✅ Done |
+
+### Architecture
+
+```
+internal/rclone/
+├── rclone.go       # Struct RcloneBackup, CRUD DB
+├── sync.go         # Fonctions de synchronisation (appel rclone)
+└── scheduler.go    # Scheduler pour sync automatique
+
+web/templates/
+├── admin_rclone.html       # Interface admin (liste + formulaire)
+└── admin_rclone_edit.html  # Formulaire d'édition
+
+internal/web/
+└── handlers_admin_rclone.go  # Handlers HTTP
+```
+
+### Schéma DB
+
+```sql
+CREATE TABLE rclone_backups (
+    id INTEGER PRIMARY KEY,
+    name TEXT,
+    sftp_host TEXT,
+    sftp_port INTEGER DEFAULT 22,
+    sftp_user TEXT,
+    sftp_key_path TEXT,
+    sftp_password TEXT,
+    remote_path TEXT,
+    enabled INTEGER DEFAULT 1,
+    sync_enabled INTEGER DEFAULT 0,
+    sync_frequency TEXT DEFAULT 'daily',
+    sync_time TEXT DEFAULT '02:00',
+    sync_day_of_week INTEGER,
+    sync_day_of_month INTEGER,
+    sync_interval_minutes INTEGER DEFAULT 60,
+    last_sync DATETIME,
+    last_status TEXT DEFAULT 'unknown',
+    last_error TEXT,
+    files_synced INTEGER DEFAULT 0,
+    bytes_synced INTEGER DEFAULT 0,
+    created_at DATETIME,
+    updated_at DATETIME
+);
+```
+
+### Files Created
+- `internal/rclone/rclone.go` - Struct + CRUD (~400 lignes)
+- `internal/rclone/sync.go` - Fonctions sync (~250 lignes)
+- `internal/rclone/scheduler.go` - Scheduler (~60 lignes)
+- `internal/web/handlers_admin_rclone.go` - Handlers HTTP (~350 lignes)
+- `web/templates/admin_rclone.html` - Template liste + ajout
+- `web/templates/admin_rclone_edit.html` - Template édition
+
+### Files Modified
+- `internal/database/migrations.go` - Ajout `migrateRcloneTable()`
+- `internal/web/router.go` - Routes `/admin/rclone/*`
+- `web/templates/dashboard_admin.html` - Tuile "Rclone Cloud Backup"
+- `internal/i18n/locales/fr.json` - Traductions FR (~40 clés)
+- `internal/i18n/locales/en.json` - Traductions EN (~40 clés)
+- `cmd/anemone/main.go` - Démarrage scheduler rclone
+- `internal/updater/updater.go` - Version bump 0.13.4-beta
+
+### Fonctionnalités
+
+- **Destinations SFTP multiples** : Configurer plusieurs serveurs SFTP
+- **Auth SSH key ou password** : Support clé SSH ou mot de passe
+- **Test de connexion** : Vérifier la connexion avant sync
+- **Sync manuelle** : Bouton "Sync maintenant"
+- **Planification** : Interval/Daily/Weekly/Monthly (comme USB Backup)
+- **Statistiques** : Fichiers/octets synchronisés, dernière sync
+
+### Commandes rclone utilisées
+
+```bash
+# Test de connexion
+rclone lsd :sftp,host=server,user=user,key_file=/path/to/key: /path
+
+# Sync d'un répertoire backup utilisateur
+rclone sync /srv/anemone/shares/alice/backup/ \
+    :sftp,host=server,user=user,key_file=/path/to/key:/backups/anemone/alice/ \
+    --progress --stats-one-line
+```
+
+---
+
+## Previous Session
 
 **Session 6: WireGuard Integration** - Complete ✅
 
@@ -496,6 +607,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 7 | Rclone Cloud Backup | 2026-01-31 | Complete ✅ |
 | 6 | WireGuard Integration | 2026-01-30 | Complete ✅ |
 | 5 | Audit CLAUDE.md + Refactoring | 2026-01-30 | Completed ✅ |
 | 77 | Mount Disk + Persistent fstab | 2026-01-25 | Completed ✅ |
@@ -537,12 +649,13 @@ Sessions 71-74 merged and released. Major features:
 - [x] Affichage clé publique client (pour config serveur)
 - [x] Auto-start au démarrage
 
-### Simple Sync Peers (rclone)
-- [ ] Nouveau module `internal/rclone/` (séparé des peers)
-- [ ] Synchronisation unidirectionnelle Anemone → destination externe
-- [ ] Support rclone pour multiples backends (S3, SFTP, Google Drive, etc.)
-- [ ] Configuration simplifiée pour utilisateurs ne souhaitant pas le P2P complet
-- [ ] Planification des sauvegardes simples
+### Simple Sync Peers (rclone) ✅ Complete (v0.13.4-beta)
+- [x] Nouveau module `internal/rclone/` (séparé des peers)
+- [x] Synchronisation unidirectionnelle Anemone → destination externe
+- [x] Support SFTP (premier backend implémenté)
+- [x] Configuration simplifiée pour utilisateurs ne souhaitant pas le P2P complet
+- [x] Planification des sauvegardes (interval/daily/weekly/monthly)
+- [ ] Support backends additionnels (S3, Google Drive, etc.) - à faire
 
 ### Local Backup (USB/External Drive)
 
@@ -578,8 +691,9 @@ Sessions 71-74 merged and released. Major features:
 ## Next Steps
 
 1. ~~WireGuard integration~~ ✅ Complete
-2. Module rclone pour backup cloud
+2. ~~Module rclone pour backup cloud~~ ✅ Complete (v0.13.4-beta)
 3. Améliorer la gestion des erreurs WireGuard
 4. Tests automatisés pour WireGuard
+5. Support backends additionnels rclone (S3, Google Drive, etc.)
 
 Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.
