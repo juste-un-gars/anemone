@@ -6,7 +6,7 @@
 > - Ne pas continuer sans validation utilisateur
 
 **Current Version:** v0.13.3-beta
-**Last Updated:** 2026-01-30
+**Last Updated:** 2026-01-31
 
 ---
 
@@ -18,9 +18,9 @@
 
 ## Session 6: WireGuard Integration
 
-**Date:** 2026-01-30
+**Date:** 2026-01-30 → 2026-01-31
 **Objectif:** Ajouter le support WireGuard pour VPN entre peers Anemone
-**Status:** In Progress 🔄
+**Status:** Complete ✅
 
 ### Contexte WireGuard
 
@@ -38,11 +38,13 @@ WireGuard est un VPN moderne, simple et performant:
 | 2 | **install.sh** | Installation optionnelle wireguard-tools | ✅ Done |
 | 3 | **UI Dashboard + Routes** | Tuile admin, handlers, template | ✅ Done |
 | 4 | **Import .conf** | Parser fichier et stocker en DB | ✅ Done |
-| 5 | **Édition manuelle** | Formulaire pour modifier les champs | ⏭️ Skip (réimport) |
+| 5 | **Édition manuelle** | Formulaire pour modifier les champs | ✅ Done (2026-01-31) |
 | 6 | **Activation** | `wg-quick up/down`, toggle ON/OFF | ✅ Done |
 | 7 | **Auto-start** | Lancer au démarrage d'Anemone si configuré | ✅ Done |
 | 8 | **Statut** | Afficher état connexion | ✅ Done |
 | 9 | **Backup/Restore** | Intégration avec sauvegarde/restauration | ✅ Done |
+| 10 | **PresharedKey** | Support clé pré-partagée dans parser/conf | ✅ Done (2026-01-31) |
+| 11 | **Client PublicKey** | Dérivation et affichage clé publique client | ✅ Done (2026-01-31) |
 
 ### Architecture prévue
 
@@ -70,6 +72,7 @@ CREATE TABLE wireguard_config (
     dns TEXT,
     -- Peer (serveur)
     peer_public_key TEXT,
+    peer_preshared_key TEXT,  -- Added 2026-01-31
     peer_endpoint TEXT,
     allowed_ips TEXT,
     persistent_keepalive INTEGER DEFAULT 25,
@@ -81,6 +84,8 @@ CREATE TABLE wireguard_config (
 );
 ```
 
+**Note:** La clé publique du client (`PublicKey`) est dérivée de `PrivateKey` via `wg pubkey`, pas stockée en DB.
+
 ### Release
 
 **v0.13.3-beta** released: https://github.com/juste-un-gars/anemone/releases/tag/v0.13.3-beta
@@ -90,22 +95,32 @@ CREATE TABLE wireguard_config (
 **Working on:** Session Complete
 **Progress:** ✅ All modules done
 
+### Bugfixes (2026-01-31)
+
+| Issue | Fix |
+|-------|-----|
+| Template panic on startup | Replaced `\"` with backticks in Go template |
+| No edit button | Added Edit modal + handler `/admin/wireguard/edit` |
+| PresharedKey missing | Added parsing + generation in .conf files |
+| VPN not connecting | PresharedKey was not included in generated conf |
+| Client PublicKey not shown | Added `DerivePublicKey()` using `wg pubkey` |
+
 ### Files Modified
-- `internal/database/migrations.go` - Ajout `migrateWireGuardTable()`
-- `internal/wireguard/wireguard.go` - Nouveau package avec struct Config et CRUD
-- `internal/wireguard/parser.go` - Parser pour fichiers .conf
-- `internal/wireguard/conffile.go` - Génération fichier .conf, Connect/Disconnect
+- `internal/database/migrations.go` - Ajout `migrateWireGuardTable()` + colonne `peer_preshared_key`
+- `internal/wireguard/wireguard.go` - Struct Config avec PublicKey/PeerPresharedKey, `DerivePublicKey()`
+- `internal/wireguard/parser.go` - Parser pour fichiers .conf + PresharedKey
+- `internal/wireguard/conffile.go` - Génération fichier .conf avec PresharedKey
 - `cmd/anemone/main.go` - Appel AutoConnect au démarrage
 - `internal/wireguard/status.go` - Récupération statut détaillé (handshake, transfer)
 - `internal/backup/backup.go` - Ajout WireGuardBackup struct + export
 - `internal/setup/restore.go` - Ajout restoreWireGuard()
 - `install.sh` - Ajout `install_wireguard()` + règles sudoers wg-quick
 - `web/templates/dashboard_admin.html` - Ajout tuile WireGuard
-- `internal/i18n/locales/en.json` - Traductions WireGuard (EN)
-- `internal/i18n/locales/fr.json` - Traductions WireGuard (FR)
-- `internal/web/handlers_admin_wireguard.go` - Handlers WireGuard
-- `internal/web/router.go` - Route `/admin/wireguard`
-- `web/templates/admin_wireguard.html` - Template page WireGuard
+- `internal/i18n/locales/en.json` - Traductions WireGuard (EN) + edit/public_key
+- `internal/i18n/locales/fr.json` - Traductions WireGuard (FR) + edit/public_key
+- `internal/web/handlers_admin_wireguard.go` - Handlers WireGuard + `handleAdminWireGuardEdit`
+- `internal/web/router.go` - Routes `/admin/wireguard/*`
+- `web/templates/admin_wireguard.html` - Template avec Edit modal + PublicKey display
 
 ### Décisions techniques
 
@@ -503,17 +518,24 @@ Sessions 71-74 merged and released. Major features:
 - [x] **Test USB Backup module** ✅ 2026-01-30
 - [x] **Test USB Format feature** ✅ 2026-01-30
 - [x] **Test NVMe SMART display** ✅ 2026-01-30
+- [x] **Test WireGuard import** ✅ 2026-01-31
+- [x] **Test WireGuard connect/disconnect** ✅ 2026-01-31
+- [x] **Test WireGuard PresharedKey** ✅ 2026-01-31
+- [x] **Test WireGuard edit config** ✅ 2026-01-31
 
 ---
 
 ## Future Features
 
-### WireGuard Integration ⏳ Next Session
-- [ ] Proposer installation WireGuard au début de `install.sh`
-- [ ] Nouvelle tuile dans dashboard admin
-- [ ] Interface web pour gérer la configuration (clés, endpoints, peers)
-- [ ] Génération de fichiers de configuration `.conf`
-- [ ] Statut de connexion VPN dans le dashboard
+### WireGuard Integration ✅ Complete (v0.13.3-beta)
+- [x] Proposer installation WireGuard au début de `install.sh`
+- [x] Nouvelle tuile dans dashboard admin
+- [x] Interface web pour gérer la configuration (import, edit, delete)
+- [x] Génération de fichiers de configuration `.conf`
+- [x] Statut de connexion VPN dans le dashboard
+- [x] Support PresharedKey
+- [x] Affichage clé publique client (pour config serveur)
+- [x] Auto-start au démarrage
 
 ### Simple Sync Peers (rclone)
 - [ ] Nouveau module `internal/rclone/` (séparé des peers)
@@ -555,10 +577,9 @@ Sessions 71-74 merged and released. Major features:
 
 ## Next Steps
 
-1. Tester le module USB Backup sur un vrai disque
-2. Tester le formatage USB (FAT32/exFAT)
-3. Tester l'affichage SMART NVMe
-4. Module rclone pour backup cloud
-5. WireGuard integration
+1. ~~WireGuard integration~~ ✅ Complete
+2. Module rclone pour backup cloud
+3. Améliorer la gestion des erreurs WireGuard
+4. Tests automatisés pour WireGuard
 
 Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.
