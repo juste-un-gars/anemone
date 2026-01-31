@@ -5,6 +5,7 @@
 package web
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -38,6 +39,9 @@ func (s *Server) handleAdminRclone(w http.ResponseWriter, r *http.Request) {
 	if rcloneInstalled {
 		rcloneVersion, _ = rclone.GetRcloneVersion()
 	}
+
+	// Get SSH key info
+	sshKeyInfo, _ := rclone.GetSSHKeyInfo(s.cfg.DataDir)
 
 	// Build backup status info
 	type BackupWithStatus struct {
@@ -79,12 +83,14 @@ func (s *Server) handleAdminRclone(w http.ResponseWriter, r *http.Request) {
 		"Backups":          backupsWithStatus,
 		"RcloneInstalled":  rcloneInstalled,
 		"RcloneVersion":    rcloneVersion,
+		"SSHKeyInfo":       sshKeyInfo,
 		"FormatBytes":      rclone.FormatBytes,
 		"Success":          r.URL.Query().Get("success") != "",
 		"Syncing":          r.URL.Query().Get("syncing") != "",
 		"TestSuccess":      r.URL.Query().Get("test_success") != "",
 		"TestError":        r.URL.Query().Get("test_error"),
 		"Error":            r.URL.Query().Get("error"),
+		"KeyGenerated":     r.URL.Query().Get("key_generated") != "",
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_rclone.html", data); err != nil {
@@ -252,7 +258,7 @@ func (s *Server) handleRcloneTest(w http.ResponseWriter, r *http.Request, id int
 		return
 	}
 
-	err = rclone.TestConnection(backup)
+	err = rclone.TestConnection(backup, s.cfg.DataDir)
 	if err != nil {
 		logger.Info("Rclone connection test failed: %v", err)
 		http.Redirect(w, r, "/admin/rclone?test_error="+err.Error(), http.StatusSeeOther)
@@ -368,4 +374,39 @@ func (s *Server) handleRcloneEdit(w http.ResponseWriter, r *http.Request, id int
 	}
 
 	http.Redirect(w, r, "/admin/rclone?updated=1", http.StatusSeeOther)
+}
+
+// handleAdminRcloneKeyInfo returns SSH key information as JSON
+func (s *Server) handleAdminRcloneKeyInfo(w http.ResponseWriter, r *http.Request) {
+	keyInfo, err := rclone.GetSSHKeyInfo(s.cfg.DataDir)
+	if err != nil {
+		logger.Info("Error getting SSH key info: %v", err)
+		http.Error(w, "Error getting key info", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(keyInfo)
+}
+
+// handleAdminRcloneGenerateKey generates a new SSH key pair
+func (s *Server) handleAdminRcloneGenerateKey(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	keyInfo, err := rclone.GenerateSSHKey(s.cfg.DataDir)
+	if err != nil {
+		logger.Info("Error generating SSH key: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	logger.Info("SSH key generated for rclone at %s", keyInfo.KeyPath)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(keyInfo)
 }

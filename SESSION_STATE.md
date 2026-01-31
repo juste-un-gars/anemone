@@ -5,12 +5,80 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.13.4-beta
+**Current Version:** v0.13.5-beta
 **Last Updated:** 2026-01-31
 
 ---
 
 ## Current Session
+
+**Session 8: Rclone SSH Key Generation** - Complete ✅
+
+---
+
+## Session 8: Rclone SSH Key Generation
+
+**Date:** 2026-01-31
+**Objectif:** Ajouter génération de clé SSH depuis l'interface web + documentation serveur distant
+**Status:** Complete ✅
+
+### Contexte
+
+Améliorer l'UX du module rclone pour éviter les lignes de commande :
+- Générer la clé SSH depuis l'interface web
+- Afficher la clé publique à copier
+- Utiliser des chemins relatifs pour la portabilité
+- Documenter la configuration du serveur distant
+
+### Modules implémentés
+
+| # | Module | Objectif | Status |
+|---|--------|----------|--------|
+| 1 | **SSH Key Generation** | Fonctions GenerateSSHKey, GetSSHKeyInfo, ResolveKeyPath | ✅ Done |
+| 2 | **Handlers + Routes** | Endpoints /admin/rclone/key-info et /generate-key | ✅ Done |
+| 3 | **UI Update** | Section clé SSH dans admin_rclone.html | ✅ Done |
+| 4 | **Traductions** | Clés i18n FR + EN pour section clé SSH | ✅ Done |
+| 5 | **Documentation** | docs/rclone-backup.md | ✅ Done |
+
+### Architecture
+
+```
+internal/rclone/
+├── rclone.go       # Struct RcloneBackup, CRUD DB
+├── sync.go         # Fonctions sync (modifié: ResolveKeyPath)
+├── sshkey.go       # NEW: GenerateSSHKey, GetSSHKeyInfo, ResolveKeyPath
+└── scheduler.go    # Scheduler pour sync automatique
+```
+
+### Files Created
+- `internal/rclone/sshkey.go` - Génération et gestion clé SSH (~100 lignes)
+- `docs/rclone-backup.md` - Documentation complète (~200 lignes)
+
+### Files Modified
+- `internal/rclone/sync.go` - buildRemoteString prend dataDir, utilise ResolveKeyPath
+- `internal/web/handlers_admin_rclone.go` - handleAdminRcloneKeyInfo, handleAdminRcloneGenerateKey
+- `internal/web/router.go` - Routes /admin/rclone/key-info et /generate-key
+- `web/templates/admin_rclone.html` - Section clé SSH + JavaScript
+- `internal/i18n/locales/fr.json` - Traductions FR (~15 clés)
+- `internal/i18n/locales/en.json` - Traductions EN (~15 clés)
+- `internal/updater/updater.go` - Version bump 0.13.5-beta
+
+### Fonctionnalités
+
+- **Génération clé SSH depuis UI** : Bouton "Générer une clé SSH"
+- **Affichage clé publique** : Zone de texte copiable
+- **Régénération avec confirmation** : Avertit que l'ancienne clé sera invalidée
+- **Chemins relatifs** : `certs/rclone_key` stocké en DB, résolu au runtime
+- **Pré-remplissage** : Le champ "Key Path" utilise le chemin relatif par défaut
+- **Documentation serveur distant** : Guide complet pour configurer le serveur SFTP
+
+### Release
+
+**v0.13.5-beta** : SSH key generation + relative paths + documentation
+
+---
+
+## Previous Session
 
 **Session 7: Rclone Cloud Backup** - Complete ✅
 
@@ -127,6 +195,30 @@ rclone sync /srv/anemone/shares/alice/backup/ \
 
 - **install.sh** : Ajouter installation optionnelle de rclone via `curl https://rclone.org/install.sh | sudo bash`
 - **Vérification version rclone** : Notifier l'admin si une nouvelle version est disponible (comme pour Anemone)
+
+---
+
+## Release v0.13.5-beta (2026-01-31) ✅
+
+### New Features - SSH Key Generation for Rclone
+- **Generate SSH key from UI**: One-click SSH key generation in Cloud Backup page
+- **Display public key**: Copyable public key to add to remote servers
+- **Relative paths**: Key paths stored as relative (e.g., `certs/rclone_key`), resolved at runtime
+- **Portable configuration**: Moving data directory doesn't break key paths
+- **Pre-filled key path**: Form auto-fills with generated key path
+
+### Documentation
+- **New: docs/rclone-backup.md**: Complete guide for configuring rclone SFTP backup
+  - Anemone configuration (via UI)
+  - Remote server setup (SSH, user creation, authorized_keys)
+  - Troubleshooting section
+
+### Technical Changes
+- New `internal/rclone/sshkey.go` with GenerateSSHKey, GetSSHKeyInfo, ResolveKeyPath
+- Modified `buildRemoteString()` to resolve relative key paths
+- New routes: `/admin/rclone/key-info`, `/admin/rclone/generate-key`
+- Updated admin_rclone.html with SSH key section
+- i18n translations (FR + EN) for SSH key UI elements
 
 ---
 
@@ -635,6 +727,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 8 | Rclone SSH Key Generation | 2026-01-31 | Complete ✅ |
 | 7 | Rclone Cloud Backup | 2026-01-31 | Complete ✅ |
 | 6 | WireGuard Integration | 2026-01-30 | Complete ✅ |
 | 5 | Audit CLAUDE.md + Refactoring | 2026-01-30 | Completed ✅ |

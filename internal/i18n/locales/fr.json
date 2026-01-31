@@ -1100,6 +1100,20 @@
   "rclone.info.2": "rclone effectue une synchronisation incrémentale (seuls les fichiers modifiés sont transférés)",
   "rclone.info.3": "Utilisez l'authentification par clé SSH pour une connexion sécurisée sans mot de passe",
 
+  "rclone.ssh_key.title": "Clé SSH Anemone",
+  "rclone.ssh_key.exists": "Clé SSH configurée",
+  "rclone.ssh_key.none": "Aucune clé SSH générée. Générez une clé pour vous connecter aux serveurs SFTP.",
+  "rclone.ssh_key.generate": "Générer une clé SSH",
+  "rclone.ssh_key.regenerate": "Régénérer la clé",
+  "rclone.ssh_key.public_key": "Clé publique (à copier sur le serveur distant)",
+  "rclone.ssh_key.copy": "Copier",
+  "rclone.ssh_key.copied": "Clé publique copiée !",
+  "rclone.ssh_key.copy_hint": "Ajoutez cette clé au fichier ~/.ssh/authorized_keys de l'utilisateur sur le serveur distant.",
+  "rclone.ssh_key.generate_confirm": "Générer une nouvelle clé SSH pour les connexions rclone ?",
+  "rclone.ssh_key.regenerate_confirm": "Régénérer la clé SSH ? L'ancienne clé sera invalide et devra être mise à jour sur tous les serveurs distants.",
+  "rclone.ssh_key.generated": "Clé SSH générée avec succès. Copiez la clé publique sur vos serveurs distants.",
+  "rclone.sftp.key_path_hint_new": "Chemin relatif (ex: certs/rclone_key) ou absolu vers la clé privée SSH",
+
   "dashboard.rclone.title": "Backup Cloud",
   "dashboard.rclone.description": "Sauvegardez vers un serveur SFTP distant via rclone.",
   "dashboard.rclone.button": "Configurer"

@@ -1100,6 +1100,20 @@
   "rclone.info.2": "rclone performs incremental sync (only modified files are transferred)",
   "rclone.info.3": "Use SSH key authentication for secure passwordless connection",
 
+  "rclone.ssh_key.title": "Anemone SSH Key",
+  "rclone.ssh_key.exists": "SSH key configured",
+  "rclone.ssh_key.none": "No SSH key generated. Generate a key to connect to SFTP servers.",
+  "rclone.ssh_key.generate": "Generate SSH Key",
+  "rclone.ssh_key.regenerate": "Regenerate Key",
+  "rclone.ssh_key.public_key": "Public key (copy to remote server)",
+  "rclone.ssh_key.copy": "Copy",
+  "rclone.ssh_key.copied": "Public key copied!",
+  "rclone.ssh_key.copy_hint": "Add this key to the ~/.ssh/authorized_keys file of the user on the remote server.",
+  "rclone.ssh_key.generate_confirm": "Generate a new SSH key for rclone connections?",
+  "rclone.ssh_key.regenerate_confirm": "Regenerate SSH key? The old key will be invalid and must be updated on all remote servers.",
+  "rclone.ssh_key.generated": "SSH key generated successfully. Copy the public key to your remote servers.",
+  "rclone.sftp.key_path_hint_new": "Relative path (e.g., certs/rclone_key) or absolute path to SSH private key",
+
   "dashboard.rclone.title": "Cloud Backup",
   "dashboard.rclone.description": "Backup to a remote SFTP server via rclone.",
   "dashboard.rclone.button": "Configure"

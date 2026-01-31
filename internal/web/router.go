@@ -325,6 +325,8 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// Admin routes - Rclone Cloud Backup
 	mux.HandleFunc("/admin/rclone", auth.RequireAdmin(server.handleAdminRclone))
 	mux.HandleFunc("/admin/rclone/add", auth.RequireAdmin(server.handleAdminRcloneAdd))
+	mux.HandleFunc("/admin/rclone/key-info", auth.RequireAdmin(server.handleAdminRcloneKeyInfo))
+	mux.HandleFunc("/admin/rclone/generate-key", auth.RequireAdmin(server.handleAdminRcloneGenerateKey))
 	mux.HandleFunc("/admin/rclone/", auth.RequireAdmin(server.handleAdminRcloneActions))
 
 	// Admin routes - Restore all users (after server restoration)

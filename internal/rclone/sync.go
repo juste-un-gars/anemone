@@ -52,9 +52,9 @@ func GetRcloneVersion() (string, error) {
 }
 
 // TestConnection tests the SFTP connection for a backup configuration
-func TestConnection(backup *RcloneBackup) error {
+func TestConnection(backup *RcloneBackup, dataDir string) error {
 	// Build rclone remote string
-	remote := buildRemoteString(backup)
+	remote := buildRemoteString(backup, dataDir)
 
 	// Use rclone lsd to test connection (list directories)
 	args := []string{"lsd", remote + backup.RemotePath, "--max-depth", "1"}
@@ -90,7 +90,7 @@ func Sync(db *sql.DB, backup *RcloneBackup, dataDir string) (*SyncResult, error)
 	}
 
 	// Build rclone remote string
-	remote := buildRemoteString(backup)
+	remote := buildRemoteString(backup, dataDir)
 
 	// Sync each user's backup directory
 	for _, user := range allUsers {
@@ -155,7 +155,7 @@ func SyncUser(db *sql.DB, backup *RcloneBackup, dataDir string, username string)
 	}
 
 	// Build rclone remote string
-	remote := buildRemoteString(backup)
+	remote := buildRemoteString(backup, dataDir)
 
 	// Destination: remote path / username
 	destPath := filepath.Join(backup.RemotePath, "backup", username)
@@ -175,7 +175,7 @@ func SyncUser(db *sql.DB, backup *RcloneBackup, dataDir string, username string)
 }
 
 // buildRemoteString builds the rclone SFTP remote connection string
-func buildRemoteString(backup *RcloneBackup) string {
+func buildRemoteString(backup *RcloneBackup, dataDir string) string {
 	// Format: :sftp,host=HOST,user=USER,port=PORT[,key_file=KEY][,pass=PASS]:
 	parts := []string{
 		fmt.Sprintf("host=%s", backup.SFTPHost),
@@ -184,7 +184,9 @@ func buildRemoteString(backup *RcloneBackup) string {
 	}
 
 	if backup.SFTPKeyPath != "" {
-		parts = append(parts, fmt.Sprintf("key_file=%s", backup.SFTPKeyPath))
+		// Resolve relative paths (e.g., "certs/rclone_key" -> "/srv/anemone/certs/rclone_key")
+		resolvedKeyPath := ResolveKeyPath(backup.SFTPKeyPath, dataDir)
+		parts = append(parts, fmt.Sprintf("key_file=%s", resolvedKeyPath))
 	}
 
 	// Note: For password auth, rclone expects the password to be obscured
@@ -285,8 +287,8 @@ func convertToBytes(value float64, unit string) int64 {
 }
 
 // ListRemoteDir lists the contents of a remote directory (for testing/debugging)
-func ListRemoteDir(backup *RcloneBackup, path string) ([]string, error) {
-	remote := buildRemoteString(backup)
+func ListRemoteDir(backup *RcloneBackup, dataDir string, path string) ([]string, error) {
+	remote := buildRemoteString(backup, dataDir)
 
 	args := []string{"lsd", remote + path}
 	cmd := exec.Command("rclone", args...)
