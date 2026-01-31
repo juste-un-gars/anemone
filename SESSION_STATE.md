@@ -123,6 +123,11 @@ rclone sync /srv/anemone/shares/alice/backup/ \
 
 **v0.13.4-beta** released: https://github.com/juste-un-gars/anemone/releases/tag/v0.13.4-beta
 
+### À faire (non implémenté)
+
+- **install.sh** : Ajouter installation optionnelle de rclone via `curl https://rclone.org/install.sh | sudo bash`
+- **Vérification version rclone** : Notifier l'admin si une nouvelle version est disponible (comme pour Anemone)
+
 ---
 
 ## Release v0.13.4-beta (2026-01-31) ✅
@@ -679,6 +684,8 @@ Sessions 71-74 merged and released. Major features:
 - [x] Configuration simplifiée pour utilisateurs ne souhaitant pas le P2P complet
 - [x] Planification des sauvegardes (interval/daily/weekly/monthly)
 - [ ] Support backends additionnels (S3, Google Drive, etc.) - à faire
+- [ ] Installation rclone dans install.sh (curl script officiel)
+- [ ] Vérification version rclone + notification admin si mise à jour disponible
 
 ### Local Backup (USB/External Drive)
 
