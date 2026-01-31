@@ -1039,6 +1039,8 @@
   "wireguard.import.help": "Paste the contents of your WireGuard .conf file.",
   "wireguard.import.placeholder": "[Interface]\nPrivateKey = ...\nAddress = ...\n\n[Peer]\nPublicKey = ...\nEndpoint = ...\nAllowedIPs = ...",
   "wireguard.edit": "Edit",
+  "wireguard.edit.title": "Edit Configuration",
+  "wireguard.edit.help": "Modify the WireGuard configuration settings.",
   "wireguard.delete": "Delete",
   "wireguard.delete.confirm": "Are you sure you want to delete the WireGuard configuration?",
   "wireguard.save": "Save",

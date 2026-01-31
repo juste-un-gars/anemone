@@ -95,6 +95,51 @@ func (s *Server) handleAdminWireGuardImport(w http.ResponseWriter, r *http.Reque
 	s.renderWireGuardPage(w, r, "Configuration imported successfully", "")
 }
 
+// handleAdminWireGuardEdit handles POST to edit the configuration.
+func (s *Server) handleAdminWireGuardEdit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/admin/wireguard", http.StatusSeeOther)
+		return
+	}
+
+	// Get existing config
+	cfg, err := wireguard.Get(s.db)
+	if err != nil || cfg == nil {
+		s.renderWireGuardPage(w, r, "", "No configuration found")
+		return
+	}
+
+	// Update fields from form
+	if name := r.FormValue("name"); name != "" {
+		cfg.Name = name
+	}
+	if address := r.FormValue("address"); address != "" {
+		cfg.Address = address
+	}
+	cfg.DNS = r.FormValue("dns") // Can be empty
+	if endpoint := r.FormValue("peer_endpoint"); endpoint != "" {
+		cfg.PeerEndpoint = endpoint
+	}
+	if allowedIPs := r.FormValue("allowed_ips"); allowedIPs != "" {
+		cfg.AllowedIPs = allowedIPs
+	}
+	if keepalive := r.FormValue("persistent_keepalive"); keepalive != "" {
+		var k int
+		fmt.Sscanf(keepalive, "%d", &k)
+		cfg.PersistentKeepalive = k
+	}
+
+	// Save updated config
+	if err := wireguard.Save(s.db, cfg); err != nil {
+		logger.Error("Failed to save WireGuard config", "error", err)
+		s.renderWireGuardPage(w, r, "", "Failed to save configuration")
+		return
+	}
+
+	logger.Info("WireGuard configuration updated", "address", cfg.Address, "endpoint", cfg.PeerEndpoint)
+	s.renderWireGuardPage(w, r, "Configuration updated successfully", "")
+}
+
 // handleAdminWireGuardDelete handles POST to delete the configuration.
 func (s *Server) handleAdminWireGuardDelete(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
