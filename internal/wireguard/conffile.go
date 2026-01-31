@@ -24,6 +24,9 @@ func GenerateConfFile(cfg *Config) string {
 
 	content += "\n[Peer]\n"
 	content += fmt.Sprintf("PublicKey = %s\n", cfg.PeerPublicKey)
+	if cfg.PeerPresharedKey != "" {
+		content += fmt.Sprintf("PresharedKey = %s\n", cfg.PeerPresharedKey)
+	}
 	content += fmt.Sprintf("Endpoint = %s\n", cfg.PeerEndpoint)
 	content += fmt.Sprintf("AllowedIPs = %s\n", cfg.AllowedIPs)
 	if cfg.PersistentKeepalive > 0 {

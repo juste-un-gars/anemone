@@ -58,6 +58,8 @@ func ParseConfig(content string) (*Config, error) {
 			switch key {
 			case "publickey":
 				cfg.PeerPublicKey = value
+			case "presharedkey":
+				cfg.PeerPresharedKey = value
 			case "endpoint":
 				cfg.PeerEndpoint = value
 			case "allowedips":

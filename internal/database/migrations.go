@@ -489,6 +489,7 @@ func migrateWireGuardTable(db *sql.DB) error {
 			address TEXT,
 			dns TEXT,
 			peer_public_key TEXT,
+			peer_preshared_key TEXT,
 			peer_endpoint TEXT,
 			allowed_ips TEXT DEFAULT '0.0.0.0/0',
 			persistent_keepalive INTEGER DEFAULT 25,
@@ -500,6 +501,16 @@ func migrateWireGuardTable(db *sql.DB) error {
 
 		if _, err := db.Exec(query); err != nil {
 			return fmt.Errorf("failed to create wireguard_config table: %w", err)
+		}
+	} else {
+		// Table exists, check for peer_preshared_key column
+		var colName string
+		err := db.QueryRow("SELECT name FROM pragma_table_info('wireguard_config') WHERE name='peer_preshared_key'").Scan(&colName)
+		if err != nil {
+			// Column doesn't exist, add it
+			if _, err := db.Exec("ALTER TABLE wireguard_config ADD COLUMN peer_preshared_key TEXT"); err != nil {
+				return fmt.Errorf("failed to add peer_preshared_key column: %w", err)
+			}
 		}
 	}
 

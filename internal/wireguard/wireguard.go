@@ -27,6 +27,7 @@ type Config struct {
 
 	// Peer section (server)
 	PeerPublicKey       string
+	PeerPresharedKey    string // Optional preshared key for additional security
 	PeerEndpoint        string // Server address (e.g., vpn.example.com:51820)
 	AllowedIPs          string // Routes through VPN (e.g., 0.0.0.0/0 or 10.0.0.0/24)
 	PersistentKeepalive int    // Keepalive interval in seconds
@@ -51,17 +52,17 @@ func DerivePublicKey(privateKey string) (string, error) {
 // Returns nil if no configuration exists.
 func Get(db *sql.DB) (*Config, error) {
 	query := `SELECT id, name, private_key, address, dns,
-		peer_public_key, peer_endpoint, allowed_ips, persistent_keepalive,
+		peer_public_key, peer_preshared_key, peer_endpoint, allowed_ips, persistent_keepalive,
 		enabled, auto_start, created_at, updated_at
 		FROM wireguard_config LIMIT 1`
 
 	cfg := &Config{}
-	var privateKey, address, dns, peerPublicKey, peerEndpoint, allowedIPs sql.NullString
+	var privateKey, address, dns, peerPublicKey, peerPresharedKey, peerEndpoint, allowedIPs sql.NullString
 	var createdAt, updatedAt sql.NullTime
 
 	err := db.QueryRow(query).Scan(
 		&cfg.ID, &cfg.Name, &privateKey, &address, &dns,
-		&peerPublicKey, &peerEndpoint, &allowedIPs, &cfg.PersistentKeepalive,
+		&peerPublicKey, &peerPresharedKey, &peerEndpoint, &allowedIPs, &cfg.PersistentKeepalive,
 		&cfg.Enabled, &cfg.AutoStart, &createdAt, &updatedAt,
 	)
 	if err == sql.ErrNoRows {
@@ -75,6 +76,7 @@ func Get(db *sql.DB) (*Config, error) {
 	cfg.Address = address.String
 	cfg.DNS = dns.String
 	cfg.PeerPublicKey = peerPublicKey.String
+	cfg.PeerPresharedKey = peerPresharedKey.String
 	cfg.PeerEndpoint = peerEndpoint.String
 	cfg.AllowedIPs = allowedIPs.String
 	if createdAt.Valid {
@@ -105,13 +107,13 @@ func Save(db *sql.DB, cfg *Config) error {
 	if existing == nil {
 		// Insert new config
 		query := `INSERT INTO wireguard_config
-			(name, private_key, address, dns, peer_public_key, peer_endpoint,
+			(name, private_key, address, dns, peer_public_key, peer_preshared_key, peer_endpoint,
 			allowed_ips, persistent_keepalive, enabled, auto_start, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
 
 		result, err := db.Exec(query,
 			cfg.Name, cfg.PrivateKey, cfg.Address, cfg.DNS,
-			cfg.PeerPublicKey, cfg.PeerEndpoint, cfg.AllowedIPs,
+			cfg.PeerPublicKey, cfg.PeerPresharedKey, cfg.PeerEndpoint, cfg.AllowedIPs,
 			cfg.PersistentKeepalive, cfg.Enabled, cfg.AutoStart,
 		)
 		if err != nil {
@@ -127,14 +129,14 @@ func Save(db *sql.DB, cfg *Config) error {
 		// Update existing config
 		query := `UPDATE wireguard_config SET
 			name = ?, private_key = ?, address = ?, dns = ?,
-			peer_public_key = ?, peer_endpoint = ?, allowed_ips = ?,
+			peer_public_key = ?, peer_preshared_key = ?, peer_endpoint = ?, allowed_ips = ?,
 			persistent_keepalive = ?, enabled = ?, auto_start = ?,
 			updated_at = CURRENT_TIMESTAMP
 			WHERE id = ?`
 
 		_, err := db.Exec(query,
 			cfg.Name, cfg.PrivateKey, cfg.Address, cfg.DNS,
-			cfg.PeerPublicKey, cfg.PeerEndpoint, cfg.AllowedIPs,
+			cfg.PeerPublicKey, cfg.PeerPresharedKey, cfg.PeerEndpoint, cfg.AllowedIPs,
 			cfg.PersistentKeepalive, cfg.Enabled, cfg.AutoStart,
 			existing.ID,
 		)
