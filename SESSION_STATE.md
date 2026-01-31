@@ -12,6 +12,37 @@
 
 ## Current Session
 
+**Session 9: Documentation Update** - Complete ✅
+
+---
+
+## Session 9: Documentation Update
+
+**Date:** 2026-01-31
+**Objective:** Update all documentation to reflect recent features (WireGuard, Rclone, Logging)
+**Status:** Complete ✅
+
+### Files Updated
+
+| File | Changes |
+|------|---------|
+| **CHANGELOG.md** | Added v0.13.4-beta (Rclone) + v0.13.5-beta (SSH Key) + comparison links |
+| **README.md** | Added WireGuard, Cloud backup, Logging in Features + architecture diagram |
+| **docs/README.md** | Added link to rclone-backup.md |
+| **docs/user-guide.md** | Added sections: Cloud Backup, WireGuard VPN, System Logs |
+| **.claude/REFERENCE.md** | Updated version, DB tables, packages, env vars, date |
+| **docs/architecture.png** | New architecture diagram |
+
+### Summary
+
+- All documentation now reflects v0.13.5-beta features
+- Architecture diagram added to README.md
+- User guide covers all major features (USB Backup, Cloud Backup, WireGuard, Logs)
+
+---
+
+## Previous Session
+
 **Session 8: Rclone SSH Key Generation** - Complete ✅
 
 ---
@@ -75,6 +106,15 @@ internal/rclone/
 ### Release
 
 **v0.13.5-beta** : SSH key generation + relative paths + documentation
+
+### Tests en cours
+
+- [ ] Générer clé SSH depuis l'interface web
+- [ ] Copier clé publique sur serveur distant (FR2)
+- [ ] Configurer destination SFTP avec chemin relatif
+- [ ] Tester connexion
+- [ ] Lancer synchronisation manuelle
+- [ ] Vérifier fichiers sur serveur distant
 
 ---
 
@@ -755,6 +795,8 @@ Sessions 71-74 merged and released. Major features:
 - [x] **Test WireGuard connect/disconnect** ✅ 2026-01-31
 - [x] **Test WireGuard PresharedKey** ✅ 2026-01-31
 - [x] **Test WireGuard edit config** ✅ 2026-01-31
+- [ ] **Test Rclone SSH key generation** ← En cours
+- [ ] **Test Rclone sync FR1 → FR2**
 
 ---
 

@@ -95,6 +95,13 @@ gh release create v0.9.X-beta --title "Anemone v0.9.X" --notes "Release notes"
 ~/anemone/                    # Git repository
 ├── cmd/anemone/main.go       # Entry point
 ├── internal/                 # Go packages
+│   ├── config/               # Configuration
+│   ├── database/             # SQLite + migrations
+│   ├── logger/               # Logging system
+│   ├── rclone/               # Cloud backup (SFTP)
+│   ├── usbbackup/            # USB backup
+│   ├── wireguard/            # WireGuard VPN
+│   └── web/                  # HTTP handlers
 ├── web/templates/            # HTML templates
 └── web/static/               # CSS, JS, images
 ```
@@ -121,6 +128,8 @@ gh release create v0.9.X-beta --title "Anemone v0.9.X" --notes "Release notes"
 | `ENABLE_HTTP` | `false` | Enable HTTP |
 | `ENABLE_HTTPS` | `true` | Enable HTTPS |
 | `LANGUAGE` | `fr` | Default language (fr/en) |
+| `ANEMONE_LOG_LEVEL` | `warn` | Log level (debug/info/warn/error) |
+| `ANEMONE_LOG_DIR` | `$DATA_DIR/logs` | Log files directory |
 
 ---
 
@@ -145,6 +154,9 @@ SELECT * FROM sync_log ORDER BY id DESC LIMIT 10;  # Recent syncs
 - `peers` - P2P peers
 - `sync_log` - Sync history
 - `sync_config` - Scheduler config
+- `usb_backups` - USB backup destinations
+- `wireguard_config` - WireGuard VPN settings
+- `rclone_backups` - Rclone cloud backup destinations
 
 ---
 
@@ -153,7 +165,7 @@ SELECT * FROM sync_log ORDER BY id DESC LIMIT 10;  # Recent syncs
 Update version in: `internal/updater/updater.go`
 
 ```go
-const CurrentVersion = "0.9.16-beta"
+const CurrentVersion = "0.13.5-beta"
 ```
 
 ---
@@ -183,4 +195,4 @@ Add new keys to both files, then use in templates:
 
 ---
 
-*Last updated: 2025-01-18*
+*Last updated: 2026-01-31*

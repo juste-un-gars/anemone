@@ -9,15 +9,22 @@
 
 ---
 
+## Architecture
+
+![Anemone Architecture](docs/architecture.png)
+
 ## Features
 
 - **Multi-user** with individual SMB shares
 - **P2P synchronization** with end-to-end encryption (AES-256-GCM)
+- **Cloud backup** via rclone to SFTP servers with scheduling
 - **USB backup** to external drives with scheduling
+- **WireGuard VPN** client for secure peer connections
 - **Storage management** - Format, mount, eject disks from web UI
 - **Incremental sync** - Only modified files are transferred
 - **Quotas** per user (Btrfs recommended)
 - **Trash** with configurable retention
+- **Logging system** with configurable levels and rotation
 - **Web interface** for administration
 - **Bilingual** French / English
 
@@ -42,6 +49,7 @@ Then open `https://localhost:8443` to complete the setup.
 | [Storage Setup](docs/storage-setup.md) | RAID, ZFS, Btrfs |
 | [User Guide](docs/user-guide.md) | Users, shares, quotas |
 | [P2P Sync](docs/p2p-sync.md) | Peers, scheduler, restore |
+| [Cloud Backup](docs/rclone-backup.md) | Backup to SFTP servers via rclone |
 | [USB Backup](docs/usb-backup.md) | Backup to USB drives |
 | [Security](docs/security.md) | Encryption, keys, architecture |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues and solutions |

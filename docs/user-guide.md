@@ -212,8 +212,88 @@ Always eject before disconnecting:
 3. Wait for confirmation
 4. Remove the drive
 
+## Cloud Backup (Rclone)
+
+Back up your server to remote SFTP servers using rclone.
+
+### Adding a Backup Destination
+
+1. Go to **Cloud Backup** (admin)
+2. Click **Add Destination**
+3. Configure SFTP connection:
+   - Host and port (default 22)
+   - Username
+   - SSH key or password authentication
+   - Remote path for backups
+
+### SSH Key Authentication
+
+1. In Cloud Backup, click **Generate SSH Key**
+2. Copy the public key displayed
+3. Add it to the remote server's `~/.ssh/authorized_keys`
+4. Test connection before syncing
+
+### Automatic Scheduling
+
+1. Edit a backup destination
+2. Enable **Automatic sync**
+3. Choose frequency: interval, daily, weekly, or monthly
+
+See [Cloud Backup Guide](rclone-backup.md) for complete documentation.
+
+## WireGuard VPN
+
+Connect to remote peers through a secure VPN tunnel.
+
+### Importing Configuration
+
+1. Go to **WireGuard** (admin)
+2. Paste your WireGuard `.conf` file content
+3. Click **Import**
+
+### Connection Control
+
+- **Connect**: Establish VPN tunnel
+- **Disconnect**: Close VPN tunnel
+- **Auto-start**: Automatically connect when Anemone starts
+
+### Status Display
+
+The dashboard shows:
+- Connection status (connected/disconnected)
+- Last handshake time
+- Data transferred (sent/received)
+
+## System Logs
+
+View and manage application logs.
+
+### Accessing Logs
+
+1. Go to **System Logs** (admin)
+2. View recent log entries
+3. Download log files for analysis
+
+### Log Levels
+
+| Level | Description |
+|-------|-------------|
+| DEBUG | Verbose debugging information |
+| INFO | General operational messages |
+| WARN | Warning conditions (default) |
+| ERROR | Error conditions |
+
+### Changing Log Level
+
+1. Go to **System Logs**
+2. Select desired level
+3. Level persists across restarts
+
+Override with environment variable: `ANEMONE_LOG_LEVEL=debug`
+
 ## See Also
 
+- [Cloud Backup](rclone-backup.md) - Complete rclone backup guide
 - [USB Backup](usb-backup.md) - Complete USB backup guide
 - [P2P Sync](p2p-sync.md) - Backups between servers
 - [Security](security.md) - Encryption keys

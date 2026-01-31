@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.5-beta] - 2026-01-31
+
+### Added
+
+#### SSH Key Generation for Rclone SFTP
+- **Generate SSH key from UI**: One-click SSH key generation directly in Cloud Backup page
+- **Display public key**: Copyable public key to add to remote servers' `authorized_keys`
+- **Relative key paths**: Key paths stored as relative (e.g., `certs/rclone_key`), resolved at runtime for portability
+- **Pre-filled key path**: Form auto-fills with generated key path when creating new SFTP destinations
+
+### Documentation
+- **New guide**: `docs/rclone-backup.md` - Complete guide for configuring rclone SFTP backup
+  - Anemone configuration via web UI
+  - Remote server setup (SSH user, authorized_keys)
+  - Troubleshooting section
+
+### Technical
+- New file: `internal/rclone/sshkey.go` with GenerateSSHKey, GetSSHKeyInfo, ResolveKeyPath functions
+- Modified `buildRemoteString()` to resolve relative key paths at runtime
+- New routes: `/admin/rclone/key-info`, `/admin/rclone/generate-key`
+- Updated `admin_rclone.html` with SSH key generation section
+- i18n translations (FR + EN) for SSH key UI elements
+
+## [0.13.4-beta] - 2026-01-31
+
+### Added
+
+#### Rclone Cloud Backup (SFTP)
+- **New Cloud Backup module**: Backup user data to remote SFTP servers using rclone
+- **Multiple SFTP destinations**: Configure multiple backup servers
+- **SSH key or password auth**: Support both authentication methods
+- **Connection testing**: Verify SFTP connection before syncing
+- **Manual sync**: "Sync now" button for immediate backup
+- **Automatic scheduling**: Interval, daily, weekly, or monthly schedules (like USB Backup)
+- **Sync statistics**: Files/bytes synced, last sync time and status
+- **Progress tracking**: Real-time progress display during sync
+
+### Technical
+- New package: `internal/rclone/` with rclone.go, sync.go, scheduler.go
+- New database table: `rclone_backups` with SFTP config, scheduling, and status fields
+- New admin page: `/admin/rclone` for cloud backup configuration
+- Scheduler runs every minute, checks enabled backups
+- i18n translations (FR + EN) for all rclone UI elements
+
 ## [0.13.3-beta] - 2026-01-30
 
 ### Added
@@ -366,7 +410,12 @@ https://github.com/juste-un-gars/anemone
 
 ---
 
-[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.13.0-beta...HEAD
+[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.13.5-beta...HEAD
+[0.13.5-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.4-beta...v0.13.5-beta
+[0.13.4-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.3-beta...v0.13.4-beta
+[0.13.3-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.2-beta...v0.13.3-beta
+[0.13.2-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.1-beta...v0.13.2-beta
+[0.13.1-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.0-beta...v0.13.1-beta
 [0.13.0-beta]: https://github.com/juste-un-gars/anemone/compare/v0.12.0-beta...v0.13.0-beta
 [0.12.0-beta]: https://github.com/juste-un-gars/anemone/compare/v0.11.9-beta...v0.12.0-beta
 [0.11.9-beta]: https://github.com/juste-un-gars/anemone/compare/v0.11.8-beta...v0.11.9-beta
