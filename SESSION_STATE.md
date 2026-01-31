@@ -12,17 +12,17 @@
 
 ## Current Session
 
-**Session 9: Documentation Update** - Complete ✅
+**Session 9: Documentation Update & Cleanup** - Complete ✅
 
 ---
 
-## Session 9: Documentation Update
+## Session 9: Documentation Update & Cleanup
 
 **Date:** 2026-01-31
-**Objective:** Update all documentation to reflect recent features (WireGuard, Rclone, Logging)
+**Objective:** Update all documentation, add architecture diagram, cleanup releases
 **Status:** Complete ✅
 
-### Files Updated
+### Documentation Updates
 
 | File | Changes |
 |------|---------|
@@ -32,12 +32,20 @@
 | **docs/user-guide.md** | Added sections: Cloud Backup, WireGuard VPN, System Logs |
 | **.claude/REFERENCE.md** | Updated version, DB tables, packages, env vars, date |
 | **docs/architecture.png** | New architecture diagram |
+| **TROUBLESHOOTING.md** | Removed personal info from examples |
+
+### Cleanup
+
+- Removed personal info ("franck") from documentation examples
+- Deleted all old GitHub releases (kept only v0.13.5-beta)
+- Tags git conserved for traceability
 
 ### Summary
 
 - All documentation now reflects v0.13.5-beta features
 - Architecture diagram added to README.md
 - User guide covers all major features (USB Backup, Cloud Backup, WireGuard, Logs)
+- GitHub releases page cleaned up (single release)
 
 ---
 
