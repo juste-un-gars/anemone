@@ -88,5 +88,12 @@ func ParseConfig(content string) (*Config, error) {
 		return nil, fmt.Errorf("missing Endpoint in [Peer]")
 	}
 
+	// Derive public key from private key
+	if cfg.PrivateKey != "" {
+		if pubKey, err := DerivePublicKey(cfg.PrivateKey); err == nil {
+			cfg.PublicKey = pubKey
+		}
+	}
+
 	return cfg, nil
 }

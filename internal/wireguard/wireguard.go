@@ -8,6 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -20,6 +21,7 @@ type Config struct {
 
 	// Interface section
 	PrivateKey string
+	PublicKey  string // Client public key (derived from PrivateKey)
 	Address    string // Client IP (e.g., 10.0.0.5/32)
 	DNS        string // Optional DNS server
 
@@ -32,6 +34,17 @@ type Config struct {
 	// Options
 	Enabled   bool // Is VPN connection active
 	AutoStart bool // Start VPN on Anemone boot
+}
+
+// DerivePublicKey calculates the public key from a private key using wg pubkey.
+func DerivePublicKey(privateKey string) (string, error) {
+	cmd := exec.Command("wg", "pubkey")
+	cmd.Stdin = strings.NewReader(privateKey)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to derive public key: %w", err)
+	}
+	return strings.TrimSpace(string(output)), nil
 }
 
 // Get retrieves the WireGuard configuration from database.
@@ -69,6 +82,13 @@ func Get(db *sql.DB) (*Config, error) {
 	}
 	if updatedAt.Valid {
 		cfg.UpdatedAt = updatedAt.Time
+	}
+
+	// Derive public key from private key
+	if cfg.PrivateKey != "" {
+		if pubKey, err := DerivePublicKey(cfg.PrivateKey); err == nil {
+			cfg.PublicKey = pubKey
+		}
 	}
 
 	return cfg, nil

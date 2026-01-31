@@ -188,6 +188,14 @@
                         <dt class="text-xs font-medium text-gray-500">{{T .Lang "wireguard.address"}}</dt>
                         <dd class="mt-1 text-sm text-gray-900 font-mono">{{.Config.Address}}</dd>
                     </div>
+                    {{if .Config.PublicKey}}
+                    <div class="sm:col-span-2">
+                        <dt class="text-xs font-medium text-gray-500">{{T .Lang "wireguard.public_key"}}
+                            <span class="text-gray-400">({{T .Lang "wireguard.public_key.help"}})</span>
+                        </dt>
+                        <dd class="mt-1 text-sm text-gray-900 font-mono text-xs break-all select-all cursor-pointer" title="Click to select">{{.Config.PublicKey}}</dd>
+                    </div>
+                    {{end}}
                     {{if .Config.DNS}}
                     <div>
                         <dt class="text-xs font-medium text-gray-500">{{T .Lang "wireguard.dns"}}</dt>

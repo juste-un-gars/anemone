@@ -1022,6 +1022,8 @@
   "wireguard.status.sent": "Envoyé",
   "wireguard.interface": "Interface",
   "wireguard.address": "Adresse",
+  "wireguard.public_key": "Clé publique",
+  "wireguard.public_key.help": "à configurer sur le serveur",
   "wireguard.dns": "DNS",
   "wireguard.peer": "Serveur",
   "wireguard.peer.endpoint": "Point d'accès",
