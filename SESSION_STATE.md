@@ -119,6 +119,29 @@ rclone sync /srv/anemone/shares/alice/backup/ \
     --progress --stats-one-line
 ```
 
+### Release
+
+**v0.13.4-beta** released: https://github.com/juste-un-gars/anemone/releases/tag/v0.13.4-beta
+
+---
+
+## Release v0.13.4-beta (2026-01-31) ✅
+
+### New Features - Rclone Cloud Backup
+- **SFTP backup destinations**: Configure multiple SFTP servers for cloud backup
+- **SSH key or password auth**: Support both authentication methods
+- **Connection testing**: Verify SFTP connection before syncing
+- **Manual sync**: "Sync now" button for immediate backup
+- **Automatic scheduling**: Interval/Daily/Weekly/Monthly (like USB Backup)
+- **Sync statistics**: Files/bytes synced, last sync time and status
+
+### Technical Changes
+- New `internal/rclone/` package (rclone.go, sync.go, scheduler.go)
+- New `rclone_backups` table with SFTP config, scheduling, and status fields
+- New admin UI at `/admin/rclone` with add/edit/delete/sync/test actions
+- Scheduler runs every minute, checks enabled backups
+- i18n translations (FR + EN) for all rclone UI elements
+
 ---
 
 ## Previous Session
