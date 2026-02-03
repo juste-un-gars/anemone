@@ -1,12 +1,26 @@
-# Data and runtime
-data/
-*.db
+# === SECRETS & CREDENTIALS (CRITICAL) ===
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+secrets/
+credentials/
+
+# === LOGS ===
+logs/
 *.log
+*.log.*
 
-# Docker
-docker-compose.override.yml
+# === DATABASES ===
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+data/
 
-# Go
+# === GO BUILD ===
 *.exe
 *.exe~
 *.dll
@@ -14,8 +28,11 @@ docker-compose.override.yml
 *.dylib
 *.test
 *.out
-go.work
 vendor/
+go.work
+go.work.sum
+
+# Project binaries
 /anemone
 /anemone-dfree
 /anemone-smbgen
@@ -25,22 +42,31 @@ vendor/
 /anemone-decrypt-password
 /anemone-reencrypt-key
 
-# OS
-.DS_Store
-Thumbs.db
-*.swp
-*~
-
-# IDE
+# === IDE & EDITORS ===
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# Temporaires
+# === OS FILES ===
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# === TEMPORARY & CACHE ===
 tmp/
 temp/
 *.tmp
 *.bak
+*.cache
+.cache/
 _old/
+
+# === PROJECT SPECIFIC ===
+
+# Docker
+docker-compose.override.yml
 
 # Data backups (but not source code in internal/backup/)
 /backup/

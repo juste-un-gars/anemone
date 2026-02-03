@@ -8,11 +8,11 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 **Critical rules that apply to EVERY session:**
 
-1. **Incremental only** - Max 150 lines per iteration, STOP for validation
-2. **No hardcoding** - No secrets, paths, credentials in code (use env/config)
-3. **Security audit** - MANDATORY before "project complete" status
-4. **Stop points** - Wait for "OK"/"validated" after each module
-5. **Read first** - Always read CLAUDE.md and SESSION_STATE.md before starting
+1. **Incremental only** → Max 150 lines per iteration, STOP for validation
+2. **No hardcoding** → No secrets, paths, credentials in code (use .env)
+3. **Logs from day 1** → Configurable via LOG_LEVEL, LOG_TO_FILE, LOG_PATH
+4. **Security audit** → MANDATORY before "project complete" status
+5. **Stop points** → Wait for "OK"/"validated" after each module
 
 **If unsure, read the relevant section below.**
 
@@ -80,7 +80,7 @@ Waiting for your validation before continuing.
 **NEVER hardcode in source files:**
 - Passwords, API keys, tokens, secrets
 - Database credentials or connection strings
-- Absolute paths (`/home/user/...`)
+- Absolute paths (`/home/user/...`, `/root/...`)
 - IP addresses, hostnames, ports (production)
 - Email addresses, usernames for services
 - Environment-specific URLs (dev, staging, prod)
@@ -89,6 +89,7 @@ Waiting for your validation before continuing.
 - Environment variables (`.env` files, never committed)
 - Configuration files (with `.example` templates)
 - Relative paths or configurable base paths (`cfg.DataDir`, `cfg.IncomingDir`, etc.)
+- Secret managers for production (Vault, etc.)
 
 **Portability Checklist:**
 - [ ] App starts with only environment configuration (no code edits)
@@ -115,9 +116,106 @@ func Load() *Config {
 }
 ```
 
-### Development Order
+### Logging Standards
 
-1. **Foundation first** — Config, DB, Auth
+**Goal: Comprehensive, configurable logging for debugging, auditing, and monitoring.**
+
+**MUST configure logging infrastructure in Stage 1 (Foundation)** before any other code.
+
+**Log Levels (configurable via `ANEMONE_LOG_LEVEL` env var):**
+```
+DEBUG   → Everything (dev only, verbose)
+INFO    → Normal operations (API calls, user actions)
+WARN    → Suspicious behavior (rate limit hits, deprecated usage)
+ERROR   → Handled errors (connection failures, validation errors)
+FATAL   → Unrecoverable errors (app crash)
+```
+
+**Environment Variables (add to `.env.example`):**
+```env
+ANEMONE_LOG_LEVEL=info       # debug|info|warn|error|fatal
+ANEMONE_LOG_TO_FILE=false    # true = file, false = console
+ANEMONE_LOG_PATH=./logs      # Where to store log files
+ANEMONE_LOG_MAX_SIZE=10M     # Max file size before rotation
+ANEMONE_LOG_MAX_FILES=7      # Keep last N files
+ANEMONE_LOG_FORMAT=json      # json|text (json for prod monitoring)
+```
+
+**What to Log:**
+- API requests (route, method, status code, response time)
+- Auth events (login, logout, failed attempts)
+- Database operations (if DEBUG level)
+- File operations (create, read, update, delete)
+- External service calls (API calls, webhooks)
+- Errors with stack traces
+- Security events (injection attempts, unauthorized access)
+
+**NEVER Log (Security Critical):**
+- Passwords, tokens, API keys, secrets
+- Credit card numbers, SSNs, personal IDs
+- Session tokens, JWTs (log hash/ID only)
+- Full request/response bodies if they contain sensitive data
+- Database connection strings with credentials
+
+**Logger Pattern (Go):**
+```go
+// internal/logger/logger.go
+package logger
+
+import (
+    "log/slog"
+    "os"
+)
+
+var Log *slog.Logger
+
+func Init(level, format string, toFile bool, path string) {
+    var handler slog.Handler
+    opts := &slog.HandlerOptions{Level: parseLevel(level)}
+
+    var output *os.File = os.Stdout
+    if toFile {
+        output, _ = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0640)
+    }
+
+    if format == "json" {
+        handler = slog.NewJSONHandler(output, opts)
+    } else {
+        handler = slog.NewTextHandler(output, opts)
+    }
+    Log = slog.New(handler)
+}
+
+func parseLevel(level string) slog.Level {
+    switch level {
+    case "debug": return slog.LevelDebug
+    case "warn":  return slog.LevelWarn
+    case "error": return slog.LevelError
+    default:      return slog.LevelInfo
+    }
+}
+```
+
+**Production Best Practices:**
+- Use `LOG_LEVEL=info` or `warn` (not debug)
+- Enable `LOG_TO_FILE=true` with rotation
+- Use `LOG_FORMAT=json` for parsing by monitoring tools
+- Set up log shipping to centralized system (Loki, ELK, etc.)
+- Set up alerts for ERROR/FATAL levels
+- Verify log directory permissions (not world-readable)
+
+**Setup Checklist (Stage 1):**
+- [ ] Create logger package with full implementation
+- [ ] Add all LOG_* variables to `.env.example`
+- [ ] Add to `.gitignore`: `logs/`, `*.log`, `*.log.*`
+- [ ] Test all log levels
+- [ ] Test file creation and rotation
+- [ ] Verify logs NOT committed to git
+- [ ] Verify log files have proper permissions (640 on Unix)
+
+### Development Order (Enforce)
+
+1. **Foundation first** — Config, DB, Auth, **Logging**
 2. **Test foundation** — Don't continue if broken
 3. **Core features** — One by one, tested
 4. **Advanced features** — Only after core works
@@ -421,8 +519,10 @@ govulncheck ./...          # Check for vulnerabilities
 - [ ] No credit card numbers, SSNs, personal IDs in logs
 - [ ] Session tokens not logged (only hash/ID if needed)
 - [ ] Full request/response bodies not logged if sensitive
-- [ ] Log files not publicly accessible
+- [ ] Log files not publicly accessible (outside webroot)
+- [ ] Log rotation configured (max size/count)
 - [ ] Production uses INFO or WARN level (not DEBUG)
+- [ ] File permissions restrict log access (chmod 640 or stricter)
 - [ ] Security events are logged (auth failures, injection attempts)
 
 #### 6. Configuration Security
@@ -459,6 +559,122 @@ Changes:
 ```
 
 Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`
+
+---
+
+## Git Best Practices & .gitignore
+
+### Critical Rules (MANDATORY)
+
+**NEVER commit to repository:**
+- Secrets, credentials, API keys, tokens
+- `.env` files (commit `.env.example` only)
+- Database files (SQLite .db, etc.)
+- Log files, debug outputs
+- IDE/editor configurations (user-specific)
+- Build artifacts, compiled binaries
+- Dependency directories (vendor/)
+- OS-specific files (.DS_Store, Thumbs.db)
+- Temporary files, caches
+
+**ALWAYS commit:**
+- `.env.example` (template with placeholders)
+- `.gitignore` (comprehensive)
+- README.md, CLAUDE.md
+- Source code, configuration templates
+- Database migrations/schemas (NOT the actual data)
+- Documentation, LICENSE
+
+### Go Project .gitignore Template
+
+```gitignore
+# === SECRETS & CREDENTIALS (CRITICAL) ===
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+secrets/
+credentials/
+
+# === LOGS ===
+logs/
+*.log
+*.log.*
+
+# === DATABASES ===
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+data/
+
+# === GO BUILD ===
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+go.work
+go.work.sum
+
+# === IDE & EDITORS ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# === OS FILES ===
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# === TEMPORARY & CACHE ===
+tmp/
+temp/
+*.tmp
+*.bak
+*.cache
+.cache/
+```
+
+### Pre-Commit Checklist
+
+**Before every commit, verify:**
+- [ ] No `.env` or secrets in staged files
+- [ ] No absolute paths in code
+- [ ] No hardcoded credentials or API keys
+- [ ] No temporary debug code
+- [ ] `.gitignore` is up to date
+- [ ] Commit message follows convention
+
+### Emergency: Committed Secrets by Mistake
+
+**If you accidentally committed secrets:**
+
+```bash
+# 1. Remove from last commit (not pushed yet)
+git rm --cached .env
+git commit --amend --no-edit
+
+# 2. If already pushed (CRITICAL - ACT IMMEDIATELY)
+# a) Rotate/revoke ALL exposed credentials NOW
+# b) Remove from history (force push required)
+git filter-branch --force --index-filter \
+  'git rm --cached --ignore-unmatch .env' \
+  --prune-empty --tag-name-filter cat -- --all
+git push --force --all
+```
+
+**IMPORTANT:** Removing from Git history is not enough. Secrets must be:
+1. **Immediately revoked/rotated** (API keys, passwords, tokens)
+2. **Reported** if company/team credentials
+3. **Monitored** for unauthorized use
 
 ---
 
@@ -499,5 +715,5 @@ sudo systemctl restart anemone
 
 ---
 
-**Last Updated:** 2026-01-30
-**Version:** 3.0.0
+**Last Updated:** 2026-02-03
+**Version:** 3.2.0
