@@ -12,6 +12,44 @@
 
 ## Current Session
 
+**Session 11: V2 UI Redesign** - In Progress (Modules A-C terminés, D-F à faire)
+
+---
+
+## Session 11: V2 UI Redesign
+
+**Date:** 2026-02-08
+**Objective:** Refonte complète UI : dark theme, sidebar gauche, sauvegardes consolidées (inspiré newui.jpg)
+**Status:** In Progress - Phase 2 Modules A-C terminés ✅
+
+### Phase 1 : Prototype v2 ✅
+
+Prototype créé sous `/v2/` avec serveur de prévisualisation standalone. Design validé.
+
+### Phase 2 : Migration (EN COURS)
+
+**Module A : Dashboard admin ✅** — `/dashboard` rend le layout v2
+**Module B : Backups consolidée ✅** — `/admin/backups` avec 5 onglets
+**Module C : 9 pages admin ✅** — Users, Peers, Shares, Settings, Trash, Logs, WireGuard, System Update, Storage
+
+Templates v2 créés : `v2_users.html`, `v2_peers.html`, `v2_shares.html`, `v2_settings.html`, `v2_settings_trash.html`, `v2_logs.html`, `v2_wireguard.html`, `v2_system_update.html`, `v2_storage.html`
+
+Handlers modifiés : `handlers_admin_users.go`, `handlers_admin_peers.go`, `handlers_user.go`, `handlers_admin_settings.go`, `handlers_admin_logs.go`, `handlers_admin_wireguard.go`, `handlers_admin_backup.go`, `handlers_admin_storage.go`
+
+Bug fix : `.hidden { display: none !important; }` ajouté dans `v2.css` (modals avec inline display:flex overridaient hidden)
+
+### Modules restants (À FAIRE)
+
+**Module D : Pages utilisateur** — dashboard_user, trash, restore, settings
+**Module E : Pages auth** — login, setup, activate, reset_password
+**Module F : Nettoyage** — supprimer prototype, anciens templates v1, migrer sous-pages (11 formulaires add/edit encore en v1)
+
+**Détails :** `.claude/sessions/SESSION_011_v2_ui_redesign.md`
+
+---
+
+## Previous Session
+
 **Session 10: USB Backup Mount Fix** - Complete ✅
 
 ---
@@ -805,6 +843,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 11 | V2 UI Redesign | 2026-02-08 | In Progress (A-C ✅, D-F TODO) |
 | 10 | USB Backup Mount Fix | 2026-02-08 | Complete ✅ |
 | 9 | Documentation Update & Cleanup | 2026-01-31 | Complete ✅ |
 | 8 | Rclone SSH Key Generation | 2026-01-31 | Complete ✅ |
@@ -895,10 +934,16 @@ Sessions 71-74 merged and released. Major features:
 
 ## Next Steps
 
-1. ~~WireGuard integration~~ ✅ Complete
-2. ~~Module rclone pour backup cloud~~ ✅ Complete (v0.13.4-beta)
-3. Améliorer la gestion des erreurs WireGuard
-4. Tests automatisés pour WireGuard
-5. Support backends additionnels rclone (S3, Google Drive, etc.)
+1. **V2 UI Redesign — Module D : Pages utilisateur** ← PROCHAIN
+   - Migrer dashboard_user, trash, restore, settings utilisateur vers v2
+2. **V2 UI Redesign — Module E : Pages auth**
+   - Migrer login, setup, activate, reset_password
+3. **V2 UI Redesign — Module F : Nettoyage**
+   - Supprimer prototype (`cmd/v2preview/`, routes `/v2/`)
+   - Migrer 11 sous-pages (formulaires add/edit) encore en v1
+   - Supprimer anciens templates v1 remplacés
+4. Améliorer la gestion des erreurs WireGuard
+5. Tests automatisés pour WireGuard
+6. Support backends additionnels rclone (S3, Google Drive, etc.)
 
 Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.
