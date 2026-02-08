@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.6-beta] - 2026-02-08
+
+### Fixed
+- **USB Backup: false success on removed drive** - `IsMounted()` now checks `/proc/mounts` instead of just directory existence. Prevents false "success" status when a USB drive is physically removed without unmounting, and avoids writing backup data to the system disk by mistake.
+
 ## [0.13.5-beta] - 2026-01-31
 
 ### Added
@@ -411,6 +416,7 @@ https://github.com/juste-un-gars/anemone
 ---
 
 [Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.13.5-beta...HEAD
+[0.13.6-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.5-beta...v0.13.6-beta
 [0.13.5-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.4-beta...v0.13.5-beta
 [0.13.4-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.3-beta...v0.13.4-beta
 [0.13.3-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.2-beta...v0.13.3-beta

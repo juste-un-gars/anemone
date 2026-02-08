@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -354,12 +355,21 @@ func UpdateSyncStatus(db *sql.DB, id int, status string, errorMsg string, filesS
 }
 
 // IsMounted checks if the backup drive is currently mounted
+// by verifying /proc/mounts instead of just checking if the directory exists.
+// This prevents false positives when a USB drive is physically removed
+// without being properly unmounted (the mount point directory still exists).
 func (b *USBBackup) IsMounted() bool {
-	info, err := os.Stat(b.MountPath)
+	data, err := os.ReadFile("/proc/mounts")
 	if err != nil {
 		return false
 	}
-	return info.IsDir()
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 2 && fields[1] == b.MountPath {
+			return true
+		}
+	}
+	return false
 }
 
 // GetFullBackupPath returns the complete path for backups on this drive
