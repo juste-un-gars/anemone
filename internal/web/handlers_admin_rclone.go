@@ -19,6 +19,12 @@ import (
 
 // handleAdminRclone displays the rclone backup management page
 func (s *Server) handleAdminRclone(w http.ResponseWriter, r *http.Request) {
+	// Redirect GET to consolidated backups page
+	if r.Method == http.MethodGet {
+		http.Redirect(w, r, "/admin/backups", http.StatusSeeOther)
+		return
+	}
+
 	session, ok := auth.GetSessionFromContext(r)
 	if !ok {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)

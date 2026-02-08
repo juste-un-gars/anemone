@@ -377,8 +377,8 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// API routes - User management (protected by password authentication)
 	mux.HandleFunc("/api/sync/delete-user-backup", server.syncAuthMiddleware(server.handleAPISyncDeleteUserBackup))
 
-	// V2 UI prototype routes (admin only)
-	mux.HandleFunc("/v2/backups", auth.RequireAdmin(server.handleV2Backups))
+	// Admin routes - Consolidated backups page
+	mux.HandleFunc("/admin/backups", auth.RequireAdmin(server.handleAdminBackups))
 
 	// Apply security headers middleware to all routes
 	return securityHeadersMiddleware(mux)

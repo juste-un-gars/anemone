@@ -53,7 +53,7 @@
             {{T .Lang "v2.dashboard.last_backup"}}
         </div>
         <div class="v2-card-value" style="font-size:1.25rem;">{{.Stats.LastBackup}}</div>
-        <div class="v2-card-subtitle"><a href="/admin/usb-backup" style="color:var(--accent);text-decoration:none;">{{T .Lang "v2.dashboard.configure_backups"}}</a></div>
+        <div class="v2-card-subtitle"><a href="/admin/backups" style="color:var(--accent);text-decoration:none;">{{T .Lang "v2.dashboard.configure_backups"}}</a></div>
     </div>
 </div>
 
@@ -88,7 +88,7 @@
         <div style="font-size:2rem;font-weight:800;color:{{if or (eq .Stats.LastBackup "Jamais") (eq .Stats.LastBackup "Never")}}var(--error){{else}}var(--success){{end}};margin-bottom:0.75rem;">
             {{.Stats.LastBackup}}
         </div>
-        <a href="/admin/usb-backup" class="v2-btn v2-btn-primary">{{T .Lang "v2.dashboard.configure_backups"}}</a>
+        <a href="/admin/backups" class="v2-btn v2-btn-primary">{{T .Lang "v2.dashboard.configure_backups"}}</a>
     </div>
 </div>
 

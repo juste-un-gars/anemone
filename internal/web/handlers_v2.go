@@ -135,8 +135,8 @@ func (s *Server) loadV2Page(page string, funcMap template.FuncMap) *template.Tem
 	)
 }
 
-// handleV2Backups serves the v2 consolidated backups page.
-func (s *Server) handleV2Backups(w http.ResponseWriter, r *http.Request) {
+// handleAdminBackups serves the consolidated backups page (USB, Cloud, P2P, Incoming, Server).
+func (s *Server) handleAdminBackups(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.GetSessionFromContext(r)
 	if !ok {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
