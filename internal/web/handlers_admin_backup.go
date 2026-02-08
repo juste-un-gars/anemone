@@ -196,8 +196,8 @@ func (s *Server) handleAdminBackupCreate(w http.ResponseWriter, r *http.Request)
 
 	logger.Info("Manual server backup created: %s", backupPath)
 
-	// Redirect back to backup list
-	http.Redirect(w, r, "/admin/backup", http.StatusSeeOther)
+	// Redirect back to server backup tab
+	http.Redirect(w, r, "/admin/backups?tab=server", http.StatusSeeOther)
 }
 
 // handleAdminBackupDownload downloads a backup re-encrypted with user passphrase

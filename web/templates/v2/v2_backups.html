@@ -323,11 +323,8 @@
                     <td style="font-size:0.8125rem;color:var(--text-secondary);">{{.Date}}</td>
                     <td>
                         <div style="display:flex;gap:0.5rem;">
-                            <a href="/admin/backup/download?file={{.Name}}" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "v2.backups.server.download"}}</a>
-                            <form method="POST" action="/admin/backup/delete" onsubmit="return confirm('{{T $.Lang "v2.backups.confirm_delete"}}');">
-                                <input type="hidden" name="file" value="{{.Name}}">
-                                <button type="submit" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "v2.backups.delete"}}</button>
-                            </form>
+                            <button onclick="openDownloadModal('{{.Name}}')" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "v2.backups.server.download"}}</button>
+                            <button onclick="deleteServerBackup('{{.Name}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "v2.backups.delete"}}</button>
                         </div>
                     </td>
                 </tr>
@@ -346,8 +343,79 @@
     {{end}}
 </div>
 
-<!-- Tab switching script -->
+<!-- Download Modal -->
+<div id="downloadModal" class="hidden" style="position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;">
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.5);" onclick="closeDownloadModal()"></div>
+    <div class="v2-card" style="position:relative;width:100%;max-width:28rem;padding:1.5rem;z-index:51;">
+        <h3 style="font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:1rem;">{{T .Lang "backup.download.title"}}</h3>
+        <form id="downloadForm" method="POST" action="/admin/backup/download">
+            <input type="hidden" name="filename" id="downloadFilename">
+            <div style="margin-bottom:0.75rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "backup.download.password"}}
+                </label>
+                <input type="password" name="passphrase" id="dlPassphrase" required minlength="12"
+                       style="width:100%;padding:0.5rem 0.75rem;border-radius:0.375rem;border:1px solid var(--border);background:var(--bg-page);color:var(--text-primary);font-size:0.8125rem;"
+                       placeholder="{{T .Lang "backup.download.password_placeholder"}}">
+                <p style="font-size:0.7rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "backup.download.password_help"}}</p>
+            </div>
+            <div style="margin-bottom:0.75rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "backup.download.confirm"}}
+                </label>
+                <input type="password" name="passphrase_confirm" id="dlPassphraseConfirm" required minlength="12"
+                       style="width:100%;padding:0.5rem 0.75rem;border-radius:0.375rem;border:1px solid var(--border);background:var(--bg-page);color:var(--text-primary);font-size:0.8125rem;"
+                       placeholder="{{T .Lang "backup.download.confirm_placeholder"}}">
+            </div>
+            <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);border-radius:0.375rem;padding:0.75rem;margin-bottom:1rem;font-size:0.75rem;color:var(--warning);">
+                {{T .Lang "backup.download.warning"}}
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
+                <button type="button" onclick="closeDownloadModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "backup.action.download"}}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Scripts -->
 <script>
+// Server backup: download modal
+function openDownloadModal(filename) {
+    document.getElementById('downloadFilename').value = filename;
+    document.getElementById('dlPassphrase').value = '';
+    document.getElementById('dlPassphraseConfirm').value = '';
+    document.getElementById('downloadModal').classList.remove('hidden');
+}
+function closeDownloadModal() {
+    document.getElementById('downloadModal').classList.add('hidden');
+}
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeDownloadModal(); });
+
+var dlForm = document.getElementById('downloadForm');
+if (dlForm) {
+    dlForm.addEventListener('submit', function(e) {
+        var p = document.getElementById('dlPassphrase').value;
+        var c = document.getElementById('dlPassphraseConfirm').value;
+        if (p !== c) { e.preventDefault(); alert('{{T .Lang "backup.download.error_mismatch"}}'); return; }
+        if (p.length < 12) { e.preventDefault(); alert('{{T .Lang "backup.download.error_length"}}'); return; }
+    });
+}
+
+// Server backup: delete
+function deleteServerBackup(filename) {
+    if (!confirm('{{T .Lang "backup.delete.confirm"}}')) return;
+    fetch('/admin/backup/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'filename=' + encodeURIComponent(filename)
+    }).then(function(r) {
+        if (r.ok) { alert('{{T .Lang "backup.delete.success"}}'); location.reload(); }
+        else { r.text().then(function(t) { alert('{{T .Lang "backup.delete.error"}}' + ': ' + t); }); }
+    }).catch(function(err) { alert('{{T .Lang "backup.delete.error"}}' + ': ' + err.message); });
+}
+
+// Tab switching
 function switchTab(tab) {
     // Update URL
     var url = new URL(window.location);
