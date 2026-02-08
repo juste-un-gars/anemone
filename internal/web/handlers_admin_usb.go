@@ -429,16 +429,23 @@ func (s *Server) handleUSBBackupEditForm(w http.ResponseWriter, r *http.Request,
 		sharesWithUsers = append(sharesWithUsers, swu)
 	}
 
-	data := map[string]interface{}{
-		"Session":     session,
-		"Title":       i18n.T(lang, "usb_backup.edit"),
-		"Lang":        lang,
-		"Backup":      backup,
-		"AllShares":   sharesWithUsers,
-		"FormatBytes": usbbackup.FormatBytes,
+	data := struct {
+		V2TemplateData
+		Backup    *usbbackup.USBBackup
+		AllShares []ShareWithUser
+	}{
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      i18n.T(lang, "usb_backup.edit"),
+			ActivePage: "backups",
+			Session:    session,
+		},
+		Backup:    backup,
+		AllShares: sharesWithUsers,
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "admin_usb_backup_edit.html", data); err != nil {
+	tmpl := s.loadV2Page("v2_usb_backup_edit.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 		logger.Info("Template error: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}

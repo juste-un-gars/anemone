@@ -1,0 +1,197 @@
+{{/* Anemone v2 - Add peer form */}}
+{{define "content"}}
+<!-- Back link -->
+<div style="margin-bottom:1.5rem;">
+    <a href="/admin/peers" style="font-size:0.8125rem;color:var(--info);text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
+        {{T .Lang "common.back"}}
+    </a>
+</div>
+
+{{if .Error}}
+<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;">
+    <div style="font-size:0.875rem;color:var(--error);">{{.Error}}</div>
+</div>
+{{end}}
+
+<div class="v2-card">
+    <form method="POST" action="/admin/peers/add">
+        <!-- Name -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "peers.name"}} *
+            </label>
+            <input type="text" name="name" required
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;"
+                   placeholder="nas-bureau">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "peers.name.help"}}</div>
+        </div>
+
+        <!-- Address -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "peers.address"}} *
+            </label>
+            <input type="text" name="address" required
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;"
+                   placeholder="{{T .Lang "peers.address.placeholder"}}">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "peers.address.help"}}</div>
+        </div>
+
+        <!-- Port -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "peers.port"}}
+            </label>
+            <input type="number" name="port" value="8443" min="1" max="65535"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "peers.port.help"}}</div>
+        </div>
+
+        <!-- Public Key -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "peers.public_key"}}
+            </label>
+            <textarea name="public_key" rows="3"
+                      style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-family:monospace;font-size:0.8125rem;"
+                      placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"></textarea>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "peers.public_key.help"}}</div>
+        </div>
+
+        <!-- Password -->
+        <div style="margin-bottom:1.5rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "peers.password.label"}}
+            </label>
+            <input type="password" name="password"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;"
+                   placeholder="{{T .Lang "peers.password.placeholder"}}">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "peers.password.help"}}</div>
+        </div>
+
+        <!-- Sync Configuration -->
+        <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-bottom:1.5rem;">
+            <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:1rem;">{{T .Lang "peers.sync_config.title"}}</div>
+
+            <!-- Enable -->
+            <div style="margin-bottom:1rem;">
+                <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
+                    <input type="checkbox" name="sync_enabled" checked> {{T .Lang "peers.sync_config.enable"}}
+                </label>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;margin-left:1.5rem;">{{T .Lang "peers.sync_config.enable_help"}}</div>
+            </div>
+
+            <!-- Frequency -->
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "peers.sync_config.frequency"}}
+                </label>
+                <select id="sync_frequency" name="sync_frequency"
+                        style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    <option value="interval">{{T .Lang "peers.sync_config.frequency.interval"}}</option>
+                    <option value="daily" selected>{{T .Lang "peers.sync_config.frequency.daily"}}</option>
+                    <option value="weekly">{{T .Lang "peers.sync_config.frequency.weekly"}}</option>
+                    <option value="monthly">{{T .Lang "peers.sync_config.frequency.monthly"}}</option>
+                </select>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "peers.sync_config.frequency_help"}}</div>
+            </div>
+
+            <!-- Interval section -->
+            <div id="interval_section" style="margin-bottom:1rem;display:none;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "peers.sync_config.interval"}}
+                </label>
+                <div style="display:flex;gap:0.5rem;">
+                    <input type="number" name="sync_interval_value" value="1" min="1"
+                           style="width:6rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    <select name="sync_interval_unit"
+                            style="width:8rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                        <option value="minutes">{{T .Lang "peers.sync_config.interval_unit.minutes"}}</option>
+                        <option value="hours" selected>{{T .Lang "peers.sync_config.interval_unit.hours"}}</option>
+                    </select>
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "peers.sync_config.interval_help"}}</div>
+            </div>
+
+            <!-- Sync Time -->
+            <div id="sync_time_section" style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "peers.sync_config.time"}}
+                </label>
+                <input type="time" name="sync_time" value="23:00"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "peers.sync_config.time_help"}}</div>
+            </div>
+
+            <!-- Day of Week -->
+            <div id="day_of_week_section" style="margin-bottom:1rem;display:none;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "peers.sync_config.day_of_week"}}
+                </label>
+                <select name="sync_day_of_week"
+                        style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    <option value="0">{{T .Lang "peers.sync_config.day_of_week.sunday"}}</option>
+                    <option value="1">{{T .Lang "peers.sync_config.day_of_week.monday"}}</option>
+                    <option value="2">{{T .Lang "peers.sync_config.day_of_week.tuesday"}}</option>
+                    <option value="3">{{T .Lang "peers.sync_config.day_of_week.wednesday"}}</option>
+                    <option value="4">{{T .Lang "peers.sync_config.day_of_week.thursday"}}</option>
+                    <option value="5">{{T .Lang "peers.sync_config.day_of_week.friday"}}</option>
+                    <option value="6" selected>{{T .Lang "peers.sync_config.day_of_week.saturday"}}</option>
+                </select>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "peers.sync_config.day_of_week_help"}}</div>
+            </div>
+
+            <!-- Day of Month -->
+            <div id="day_of_month_section" style="margin-bottom:1rem;display:none;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "peers.sync_config.day_of_month"}}
+                </label>
+                <input type="number" name="sync_day_of_month" value="1" min="1" max="31"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "peers.sync_config.day_of_month_help"}}</div>
+            </div>
+
+            <!-- Timeout -->
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{if eq .Lang "fr"}}Timeout sync (heures){{else}}Sync Timeout (hours){{end}}
+                </label>
+                <input type="number" name="sync_timeout_hours" value="2" min="0" max="72"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">
+                    {{if eq .Lang "fr"}}Durée maximale autorisée pour une synchronisation (0 = pas de limite){{else}}Maximum allowed duration for a sync (0 = no limit){{end}}
+                </div>
+            </div>
+        </div>
+
+        <!-- Enable Peer -->
+        <div style="margin-bottom:1.5rem;">
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
+                <input type="checkbox" name="enabled" checked> {{T .Lang "peers.enabled"}}
+            </label>
+        </div>
+
+        <!-- Info -->
+        <div class="v2-card" style="border-left:3px solid var(--info);margin-bottom:1.5rem;background:var(--bg-page);">
+            <div style="font-size:0.8125rem;color:var(--text-secondary);">{{T .Lang "peers.info"}}</div>
+        </div>
+
+        <!-- Buttons -->
+        <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
+            <a href="/admin/peers" class="v2-btn" style="text-decoration:none;">{{T .Lang "common.cancel"}}</a>
+            <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "peers.add"}}</button>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('sync_frequency').addEventListener('change', function() {
+    var f = this.value;
+    document.getElementById('interval_section').style.display = f === 'interval' ? '' : 'none';
+    document.getElementById('sync_time_section').style.display = f === 'interval' ? 'none' : '';
+    document.getElementById('day_of_week_section').style.display = f === 'weekly' ? '' : 'none';
+    document.getElementById('day_of_month_section').style.display = f === 'monthly' ? '' : 'none';
+});
+</script>
+{{end}}

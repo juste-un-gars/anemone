@@ -157,17 +157,19 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		// Show add peer form
 		data := struct {
-			Lang    string
-			Title   string
-			Session *auth.Session
-			Error   string
+			V2TemplateData
+			Error string
 		}{
-			Lang:    lang,
-			Title:   i18n.T(lang, "peers.add.title"),
-			Session: session,
+			V2TemplateData: V2TemplateData{
+				Lang:       lang,
+				Title:      i18n.T(lang, "peers.add.title"),
+				ActivePage: "peers",
+				Session:    session,
+			},
 		}
 
-		if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
+		tmpl := s.loadV2Page("v2_peers_add.html", s.funcMap)
+		if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 			logger.Info("Error rendering peers add template: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
@@ -193,21 +195,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 
 		// Validate
 		if name == "" || address == "" {
-			data := struct {
-				Lang    string
-				Title   string
-				Session *auth.Session
-				Error   string
-			}{
-				Lang:    lang,
-				Title:   i18n.T(lang, "peers.add.title"),
-				Session: session,
-				Error:   "Le nom et l'adresse sont requis",
-			}
-			if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
-				logger.Info("Error rendering peers add template: %v", err)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			}
+			s.renderPeersAddError(w, lang, session, "Le nom et l'adresse sont requis")
 			return
 		}
 
@@ -217,21 +205,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 			var err error
 			port, err = strconv.Atoi(portStr)
 			if err != nil || port < 1 || port > 65535 {
-				data := struct {
-					Lang    string
-					Title   string
-					Session *auth.Session
-					Error   string
-				}{
-					Lang:    lang,
-					Title:   i18n.T(lang, "peers.add.title"),
-					Session: session,
-					Error:   "Port invalide",
-				}
-				if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
-					logger.Info("Error rendering peers add template: %v", err)
-					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-				}
+				s.renderPeersAddError(w, lang, session, "Port invalide")
 				return
 			}
 		}
@@ -284,21 +258,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 		var masterKey string
 		if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
 			logger.Info("Error getting master key: %v", err)
-			data := struct {
-				Lang    string
-				Title   string
-				Session *auth.Session
-				Error   string
-			}{
-				Lang:    lang,
-				Title:   i18n.T(lang, "peers.add.title"),
-				Session: session,
-				Error:   "Erreur système",
-			}
-			if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
-				logger.Info("Error rendering peers add template: %v", err)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			}
+			s.renderPeersAddError(w, lang, session, "Erreur système")
 			return
 		}
 
@@ -313,21 +273,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 			encrypted, err := peers.EncryptPeerPassword(password, masterKey)
 			if err != nil {
 				logger.Info("Error encrypting peer password: %v", err)
-				data := struct {
-					Lang    string
-					Title   string
-					Session *auth.Session
-					Error   string
-				}{
-					Lang:    lang,
-					Title:   i18n.T(lang, "peers.add.title"),
-					Session: session,
-					Error:   "Erreur lors du chiffrement du mot de passe",
-				}
-				if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
-					logger.Info("Error rendering peers add template: %v", err)
-					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-				}
+				s.renderPeersAddError(w, lang, session, "Erreur lors du chiffrement du mot de passe")
 				return
 			}
 			pwPtr = encrypted
@@ -351,21 +297,7 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 
 		if err := peers.Create(s.db, peer); err != nil {
 			logger.Info("Error creating peer: %v", err)
-			data := struct {
-				Lang    string
-				Title   string
-				Session *auth.Session
-				Error   string
-			}{
-				Lang:    lang,
-				Title:   i18n.T(lang, "peers.add.title"),
-				Session: session,
-				Error:   fmt.Sprintf("Erreur lors de la création du pair: %v", err),
-			}
-			if err := s.templates.ExecuteTemplate(w, "admin_peers_add.html", data); err != nil {
-				logger.Info("Error rendering peers add template: %v", err)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			}
+			s.renderPeersAddError(w, lang, session, fmt.Sprintf("Erreur lors de la création du pair: %v", err))
 			return
 		}
 
@@ -375,6 +307,24 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+// renderPeersAddError renders the add peer form with an error message.
+func (s *Server) renderPeersAddError(w http.ResponseWriter, lang string, session *auth.Session, errMsg string) {
+	data := struct {
+		V2TemplateData
+		Error string
+	}{
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      i18n.T(lang, "peers.add.title"),
+			ActivePage: "peers",
+			Session:    session,
+		},
+		Error: errMsg,
+	}
+	tmpl := s.loadV2Page("v2_peers_add.html", s.funcMap)
+	tmpl.ExecuteTemplate(w, "v2_base", data)
 }
 
 func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request) {
@@ -417,19 +367,24 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
+		lang := s.getLang(r)
 		data := struct {
-			Lang    string
-			Session *auth.Session
-			Peer    *peers.Peer
-			Error   string
+			V2TemplateData
+			Peer  *peers.Peer
+			Error string
 		}{
-			Lang:    s.cfg.Language,
-			Session: session,
-			Peer:    peer,
-			Error:   r.URL.Query().Get("error"),
+			V2TemplateData: V2TemplateData{
+				Lang:       lang,
+				Title:      peer.Name,
+				ActivePage: "peers",
+				Session:    session,
+			},
+			Peer:  peer,
+			Error: r.URL.Query().Get("error"),
 		}
 
-		if err := s.templates.ExecuteTemplate(w, "admin_peers_edit.html", data); err != nil {
+		tmpl := s.loadV2Page("v2_peers_edit.html", s.funcMap)
+		if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 			logger.Info("Template error: %v", err)
 			http.Error(w, "Template error", http.StatusInternalServerError)
 		}

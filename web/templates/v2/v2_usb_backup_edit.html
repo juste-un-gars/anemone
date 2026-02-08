@@ -1,0 +1,239 @@
+{{/* Anemone v2 - USB backup edit form */}}
+{{define "content"}}
+<!-- Back link -->
+<div style="margin-bottom:1.5rem;">
+    <a href="/admin/backups" style="font-size:0.8125rem;color:var(--info);text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
+        {{T .Lang "common.back"}}
+    </a>
+</div>
+
+<div class="v2-card" style="margin-bottom:1rem;">
+    <form method="POST" action="/admin/usb-backup/{{.Backup.ID}}/edit">
+        <!-- Name -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "usb_backup.name"}}
+            </label>
+            <input type="text" name="name" value="{{.Backup.Name}}" required
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+        </div>
+
+        <!-- Mount Path -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "usb_backup.mount_path"}}
+            </label>
+            <input type="text" name="mount_path" value="{{.Backup.MountPath}}" required
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "usb_backup.mount_path_hint"}}</div>
+        </div>
+
+        <!-- Backup Path -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "usb_backup.backup_path"}}
+            </label>
+            <input type="text" name="backup_path" value="{{.Backup.BackupPath}}"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "usb_backup.backup_path_hint"}}</div>
+        </div>
+
+        <!-- Backup Type -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.5rem;">
+                {{T .Lang "usb_backup.backup_type"}}
+            </label>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
+                    <input type="radio" name="backup_type" value="config"
+                           {{if eq .Backup.BackupType "config"}}checked{{end}} onchange="document.getElementById('shareSelection').style.display='none'">
+                    {{T .Lang "usb_backup.type_config"}}
+                    <span style="font-size:0.75rem;color:var(--text-muted);">({{T .Lang "usb_backup.type_config_desc"}})</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
+                    <input type="radio" name="backup_type" value="full"
+                           {{if ne .Backup.BackupType "config"}}checked{{end}} onchange="document.getElementById('shareSelection').style.display=''">
+                    {{T .Lang "usb_backup.type_full"}}
+                    <span style="font-size:0.75rem;color:var(--text-muted);">({{T .Lang "usb_backup.type_full_desc"}})</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Share Selection -->
+        <div id="shareSelection" style="margin-bottom:1rem;{{if eq .Backup.BackupType "config"}}display:none;{{end}}">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "usb_backup.select_shares"}}
+            </label>
+            {{if .AllShares}}
+            <div style="max-height:12rem;overflow-y:auto;border:1px solid var(--border);border-radius:0.5rem;">
+                {{range .AllShares}}
+                <label style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0.75rem;border-bottom:1px solid var(--border);cursor:pointer;font-size:0.875rem;color:var(--text-primary);">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <input type="checkbox" name="selected_shares" value="{{.ID}}" {{if .IsSelected}}checked{{end}}>
+                        {{.Username}}/{{.Name}}
+                    </div>
+                    <span style="font-size:0.75rem;color:var(--text-muted);">{{.Size}}</span>
+                </label>
+                {{end}}
+            </div>
+            {{else}}
+            <div style="font-size:0.8125rem;color:var(--text-muted);">{{T .Lang "usb_backup.no_shares"}}</div>
+            {{end}}
+        </div>
+
+        <!-- Enabled -->
+        <div style="margin-bottom:0.75rem;">
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
+                <input type="checkbox" name="enabled" {{if .Backup.Enabled}}checked{{end}}> {{T .Lang "usb_backup.enabled"}}
+            </label>
+        </div>
+
+        <!-- Auto Detect -->
+        <div style="margin-bottom:1.5rem;">
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
+                <input type="checkbox" name="auto_detect" {{if .Backup.AutoDetect}}checked{{end}}> {{T .Lang "usb_backup.auto_detect"}}
+            </label>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;margin-left:1.5rem;">{{T .Lang "usb_backup.auto_detect_hint"}}</div>
+        </div>
+
+        <!-- Schedule -->
+        <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-bottom:1.5rem;">
+            <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:1rem;">{{T .Lang "usb_backup.schedule_title"}}</div>
+
+            <!-- Sync Enabled -->
+            <div style="margin-bottom:1rem;">
+                <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
+                    <input type="checkbox" name="sync_enabled" id="sync_enabled" {{if .Backup.SyncEnabled}}checked{{end}}
+                           onchange="document.getElementById('scheduleOpts').style.display=this.checked?'':'none'">
+                    {{T .Lang "usb_backup.sync_enabled"}}
+                </label>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;margin-left:1.5rem;">{{T .Lang "usb_backup.sync_enabled_hint"}}</div>
+            </div>
+
+            <div id="scheduleOpts" {{if not .Backup.SyncEnabled}}style="display:none"{{end}}>
+                <!-- Frequency -->
+                <div style="margin-bottom:1rem;">
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                        {{T .Lang "usb_backup.sync_frequency"}}
+                    </label>
+                    <select id="sync_frequency" name="sync_frequency"
+                            style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;"
+                            onchange="updateUSBFields()">
+                        <option value="interval" {{if eq .Backup.SyncFrequency "interval"}}selected{{end}}>{{T .Lang "usb_backup.freq_interval"}}</option>
+                        <option value="daily" {{if eq .Backup.SyncFrequency "daily"}}selected{{end}}>{{T .Lang "usb_backup.freq_daily"}}</option>
+                        <option value="weekly" {{if eq .Backup.SyncFrequency "weekly"}}selected{{end}}>{{T .Lang "usb_backup.freq_weekly"}}</option>
+                        <option value="monthly" {{if eq .Backup.SyncFrequency "monthly"}}selected{{end}}>{{T .Lang "usb_backup.freq_monthly"}}</option>
+                    </select>
+                </div>
+
+                <!-- Interval Minutes -->
+                <div id="intervalField" {{if ne .Backup.SyncFrequency "interval"}}style="display:none"{{end}}>
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                            {{T .Lang "usb_backup.interval_minutes"}}
+                        </label>
+                        <select name="sync_interval_minutes"
+                                style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                            <option value="15" {{if eq .Backup.SyncIntervalMinutes 15}}selected{{end}}>15 min</option>
+                            <option value="30" {{if eq .Backup.SyncIntervalMinutes 30}}selected{{end}}>30 min</option>
+                            <option value="60" {{if or (eq .Backup.SyncIntervalMinutes 60) (eq .Backup.SyncIntervalMinutes 0)}}selected{{end}}>1 {{T .Lang "common.hour"}}</option>
+                            <option value="120" {{if eq .Backup.SyncIntervalMinutes 120}}selected{{end}}>2 {{T .Lang "common.hours"}}</option>
+                            <option value="240" {{if eq .Backup.SyncIntervalMinutes 240}}selected{{end}}>4 {{T .Lang "common.hours"}}</option>
+                            <option value="480" {{if eq .Backup.SyncIntervalMinutes 480}}selected{{end}}>8 {{T .Lang "common.hours"}}</option>
+                            <option value="720" {{if eq .Backup.SyncIntervalMinutes 720}}selected{{end}}>12 {{T .Lang "common.hours"}}</option>
+                            <option value="1440" {{if eq .Backup.SyncIntervalMinutes 1440}}selected{{end}}>24 {{T .Lang "common.hours"}}</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Sync Time -->
+                <div id="timeField" {{if eq .Backup.SyncFrequency "interval"}}style="display:none"{{end}}>
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                            {{T .Lang "usb_backup.sync_time"}}
+                        </label>
+                        <input type="time" name="sync_time" value="{{.Backup.SyncTime}}"
+                               style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    </div>
+                </div>
+
+                <!-- Day of Week -->
+                <div id="weekdayField" {{if ne .Backup.SyncFrequency "weekly"}}style="display:none"{{end}}>
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                            {{T .Lang "usb_backup.day_of_week"}}
+                        </label>
+                        <select name="sync_day_of_week"
+                                style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                            <option value="0" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 0)}}selected{{end}}>{{T .Lang "common.sunday"}}</option>
+                            <option value="1" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 1)}}selected{{end}}>{{T .Lang "common.monday"}}</option>
+                            <option value="2" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 2)}}selected{{end}}>{{T .Lang "common.tuesday"}}</option>
+                            <option value="3" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 3)}}selected{{end}}>{{T .Lang "common.wednesday"}}</option>
+                            <option value="4" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 4)}}selected{{end}}>{{T .Lang "common.thursday"}}</option>
+                            <option value="5" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 5)}}selected{{end}}>{{T .Lang "common.friday"}}</option>
+                            <option value="6" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 6)}}selected{{end}}>{{T .Lang "common.saturday"}}</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Day of Month -->
+                <div id="monthdayField" {{if ne .Backup.SyncFrequency "monthly"}}style="display:none"{{end}}>
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                            {{T .Lang "usb_backup.day_of_month"}}
+                        </label>
+                        <select name="sync_day_of_month"
+                                style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                            {{range $i := iterate 1 28}}
+                            <option value="{{$i}}" {{if and $.Backup.SyncDayOfMonth (eq (deref $.Backup.SyncDayOfMonth) $i)}}selected{{end}}>{{$i}}</option>
+                            {{end}}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Buttons -->
+        <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
+            <a href="/admin/backups" class="v2-btn" style="text-decoration:none;">{{T .Lang "common.cancel"}}</a>
+            <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "common.save"}}</button>
+        </div>
+    </form>
+</div>
+
+<!-- Stats -->
+{{if .Backup.LastSync}}
+<div class="v2-card">
+    <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:1rem;">{{T .Lang "usb_backup.stats"}}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "usb_backup.last_sync"}}</div>
+            <div style="font-size:0.875rem;color:var(--text-primary);">{{.Backup.LastSync.Format "2006-01-02 15:04"}}</div>
+        </div>
+        <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "usb_backup.last_status"}}</div>
+            <div style="font-size:0.875rem;color:var(--text-primary);">{{.Backup.LastStatus}}</div>
+        </div>
+        <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "usb_backup.files_synced"}}</div>
+            <div style="font-size:0.875rem;color:var(--text-primary);">{{.Backup.FilesSynced}}</div>
+        </div>
+        <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "usb_backup.bytes_synced"}}</div>
+            <div style="font-size:0.875rem;color:var(--text-primary);">{{FormatBytes .Backup.BytesSynced}}</div>
+        </div>
+    </div>
+</div>
+{{end}}
+
+<script>
+function updateUSBFields() {
+    var f = document.getElementById('sync_frequency').value;
+    document.getElementById('intervalField').style.display = f === 'interval' ? '' : 'none';
+    document.getElementById('timeField').style.display = f !== 'interval' ? '' : 'none';
+    document.getElementById('weekdayField').style.display = f === 'weekly' ? '' : 'none';
+    document.getElementById('monthdayField').style.display = f === 'monthly' ? '' : 'none';
+}
+</script>
+{{end}}

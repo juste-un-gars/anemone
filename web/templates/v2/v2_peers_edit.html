@@ -1,0 +1,223 @@
+{{/* Anemone v2 - Edit peer form */}}
+{{define "content"}}
+<!-- Back link -->
+<div style="margin-bottom:1.5rem;">
+    <a href="/admin/peers" style="font-size:0.8125rem;color:var(--info);text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
+        {{T .Lang "common.back"}}
+    </a>
+</div>
+
+{{if .Error}}
+<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;">
+    <div style="font-size:0.875rem;color:var(--error);">{{.Error}}</div>
+</div>
+{{end}}
+
+<div class="v2-card" style="margin-bottom:1rem;">
+    <form method="POST" action="/admin/peers/{{.Peer.ID}}/update">
+        <!-- Name -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "peers.name"}} *
+            </label>
+            <input type="text" name="name" required value="{{.Peer.Name}}"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;"
+                   placeholder="nas-bureau">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "peers.name.help"}}</div>
+        </div>
+
+        <!-- Address -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "peers.address"}} *
+            </label>
+            <input type="text" name="address" required value="{{.Peer.Address}}"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;"
+                   placeholder="192.168.1.100">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "peers.address.help"}}</div>
+        </div>
+
+        <!-- Port -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "peers.port"}}
+            </label>
+            <input type="number" name="port" value="{{.Peer.Port}}" min="1" max="65535"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "peers.port.help"}}</div>
+        </div>
+
+        <!-- Password -->
+        <div style="margin-bottom:1.5rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{if eq .Lang "fr"}}Mot de passe de synchronisation{{else}}Synchronization Password{{end}}
+            </label>
+            <input type="password" name="password"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;"
+                   placeholder="{{if .Peer.Password}}********{{else}}{{if eq .Lang "fr"}}Aucun mot de passe{{else}}No password{{end}}{{end}}">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">
+                {{if eq .Lang "fr"}}Laisser vide pour conserver le mot de passe actuel.{{else}}Leave empty to keep current password.{{end}}
+            </div>
+            {{if .Peer.Password}}
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.8125rem;color:var(--text-secondary);margin-top:0.5rem;cursor:pointer;">
+                <input type="checkbox" name="clear_password" value="1">
+                {{if eq .Lang "fr"}}Supprimer le mot de passe{{else}}Remove password{{end}}
+            </label>
+            {{end}}
+        </div>
+
+        <!-- Sync Configuration -->
+        <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-bottom:1.5rem;">
+            <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:1rem;">
+                {{if eq .Lang "fr"}}Configuration de synchronisation automatique{{else}}Automatic Sync Configuration{{end}}
+            </div>
+
+            <!-- Enable -->
+            <div style="margin-bottom:1rem;">
+                <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
+                    <input type="checkbox" name="sync_enabled" {{if .Peer.SyncEnabled}}checked{{end}}>
+                    {{if eq .Lang "fr"}}Activer la synchronisation automatique{{else}}Enable automatic sync{{end}}
+                </label>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;margin-left:1.5rem;">
+                    {{if eq .Lang "fr"}}Synchroniser automatiquement les partages vers ce pair{{else}}Automatically sync shares to this peer{{end}}
+                </div>
+            </div>
+
+            <!-- Frequency -->
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{if eq .Lang "fr"}}Frequence{{else}}Frequency{{end}}
+                </label>
+                <select id="sync_frequency" name="sync_frequency"
+                        style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    <option value="interval" {{if eq .Peer.SyncFrequency "interval"}}selected{{end}}>{{if eq .Lang "fr"}}Intervalle{{else}}Interval{{end}}</option>
+                    <option value="daily" {{if eq .Peer.SyncFrequency "daily"}}selected{{end}}>{{if eq .Lang "fr"}}Quotidien{{else}}Daily{{end}}</option>
+                    <option value="weekly" {{if eq .Peer.SyncFrequency "weekly"}}selected{{end}}>{{if eq .Lang "fr"}}Hebdomadaire{{else}}Weekly{{end}}</option>
+                    <option value="monthly" {{if eq .Peer.SyncFrequency "monthly"}}selected{{end}}>{{if eq .Lang "fr"}}Mensuel{{else}}Monthly{{end}}</option>
+                </select>
+            </div>
+
+            <!-- Interval section -->
+            <div id="interval_section" style="margin-bottom:1rem;{{if ne .Peer.SyncFrequency "interval"}}display:none;{{end}}">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{if eq .Lang "fr"}}Intervalle{{else}}Interval{{end}}
+                </label>
+                <div style="display:flex;gap:0.5rem;">
+                    <input type="number" name="sync_interval_value" value="{{if .Peer.SyncIntervalMinutes}}{{.Peer.SyncIntervalMinutes}}{{else}}60{{end}}" min="1"
+                           style="width:6rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    <select name="sync_interval_unit"
+                            style="width:8rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                        <option value="minutes">{{if eq .Lang "fr"}}minutes{{else}}minutes{{end}}</option>
+                        <option value="hours">{{if eq .Lang "fr"}}heures{{else}}hours{{end}}</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Sync Time -->
+            <div id="sync_time_section" style="margin-bottom:1rem;{{if eq .Peer.SyncFrequency "interval"}}display:none;{{end}}">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{if eq .Lang "fr"}}Heure de synchronisation{{else}}Sync Time{{end}}
+                </label>
+                <input type="time" name="sync_time" value="{{.Peer.SyncTime}}"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+
+            <!-- Day of Week -->
+            <div id="day_of_week_section" style="margin-bottom:1rem;{{if ne .Peer.SyncFrequency "weekly"}}display:none;{{end}}">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{if eq .Lang "fr"}}Jour de la semaine{{else}}Day of Week{{end}}
+                </label>
+                <select name="sync_day_of_week"
+                        style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    {{$dayOfWeek := derefInt .Peer.SyncDayOfWeek}}
+                    <option value="0" {{if eq $dayOfWeek 0}}selected{{end}}>{{if eq .Lang "fr"}}Dimanche{{else}}Sunday{{end}}</option>
+                    <option value="1" {{if eq $dayOfWeek 1}}selected{{end}}>{{if eq .Lang "fr"}}Lundi{{else}}Monday{{end}}</option>
+                    <option value="2" {{if eq $dayOfWeek 2}}selected{{end}}>{{if eq .Lang "fr"}}Mardi{{else}}Tuesday{{end}}</option>
+                    <option value="3" {{if eq $dayOfWeek 3}}selected{{end}}>{{if eq .Lang "fr"}}Mercredi{{else}}Wednesday{{end}}</option>
+                    <option value="4" {{if eq $dayOfWeek 4}}selected{{end}}>{{if eq .Lang "fr"}}Jeudi{{else}}Thursday{{end}}</option>
+                    <option value="5" {{if eq $dayOfWeek 5}}selected{{end}}>{{if eq .Lang "fr"}}Vendredi{{else}}Friday{{end}}</option>
+                    <option value="6" {{if eq $dayOfWeek 6}}selected{{end}}>{{if eq .Lang "fr"}}Samedi{{else}}Saturday{{end}}</option>
+                </select>
+            </div>
+
+            <!-- Day of Month -->
+            <div id="day_of_month_section" style="margin-bottom:1rem;{{if ne .Peer.SyncFrequency "monthly"}}display:none;{{end}}">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{if eq .Lang "fr"}}Jour du mois{{else}}Day of Month{{end}}
+                </label>
+                <input type="number" name="sync_day_of_month" value="{{if .Peer.SyncDayOfMonth}}{{.Peer.SyncDayOfMonth}}{{else}}1{{end}}" min="1" max="31"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+
+            <!-- Timeout -->
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{if eq .Lang "fr"}}Timeout sync (heures){{else}}Sync Timeout (hours){{end}}
+                </label>
+                <input type="number" name="sync_timeout_hours" value="{{if .Peer.SyncTimeoutHours}}{{.Peer.SyncTimeoutHours}}{{else}}2{{end}}" min="0" max="72"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">
+                    {{if eq .Lang "fr"}}0 = pas de limite{{else}}0 = no limit{{end}}
+                </div>
+            </div>
+        </div>
+
+        <!-- Info -->
+        <div class="v2-card" style="border-left:3px solid var(--info);margin-bottom:1.5rem;background:var(--bg-page);">
+            <div style="font-size:0.8125rem;color:var(--text-secondary);">
+                {{if eq .Lang "fr"}}Les modifications seront appliquees immediatement.{{else}}Changes will be applied immediately.{{end}}
+            </div>
+        </div>
+
+        <!-- Buttons -->
+        <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
+            <a href="/admin/peers" class="v2-btn" style="text-decoration:none;">{{T .Lang "common.cancel"}}</a>
+            <button type="submit" class="v2-btn v2-btn-primary">{{if eq .Lang "fr"}}Enregistrer{{else}}Save{{end}}</button>
+        </div>
+    </form>
+</div>
+
+<!-- Peer Info -->
+<div class="v2-card">
+    <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:1rem;">
+        {{if eq .Lang "fr"}}Informations du pair{{else}}Peer Information{{end}}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+        <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">ID</div>
+            <div style="font-size:0.875rem;color:var(--text-primary);">{{.Peer.ID}}</div>
+        </div>
+        <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">{{if eq .Lang "fr"}}Statut{{else}}Status{{end}}</div>
+            <div>
+                {{if eq .Peer.Status "online"}}
+                <span class="v2-badge" style="background:rgba(34,197,94,0.15);color:var(--success);">{{if eq .Lang "fr"}}En ligne{{else}}Online{{end}}</span>
+                {{else if eq .Peer.Status "offline"}}
+                <span class="v2-badge" style="background:rgba(239,68,68,0.15);color:var(--error);">{{if eq .Lang "fr"}}Hors ligne{{else}}Offline{{end}}</span>
+                {{else}}
+                <span class="v2-badge" style="background:rgba(156,163,175,0.15);color:var(--text-muted);">{{if eq .Lang "fr"}}Inconnu{{else}}Unknown{{end}}</span>
+                {{end}}
+            </div>
+        </div>
+        <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">{{if eq .Lang "fr"}}Cree le{{else}}Created{{end}}</div>
+            <div style="font-size:0.875rem;color:var(--text-primary);">{{.Peer.CreatedAt.Format "2006-01-02 15:04"}}</div>
+        </div>
+        <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">{{if eq .Lang "fr"}}Modifie le{{else}}Updated{{end}}</div>
+            <div style="font-size:0.875rem;color:var(--text-primary);">{{.Peer.UpdatedAt.Format "2006-01-02 15:04"}}</div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('sync_frequency').addEventListener('change', function() {
+    var f = this.value;
+    document.getElementById('interval_section').style.display = f === 'interval' ? '' : 'none';
+    document.getElementById('sync_time_section').style.display = f === 'interval' ? 'none' : '';
+    document.getElementById('day_of_week_section').style.display = f === 'weekly' ? '' : 'none';
+    document.getElementById('day_of_month_section').style.display = f === 'monthly' ? '' : 'none';
+});
+</script>
+{{end}}

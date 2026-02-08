@@ -69,13 +69,19 @@ func (s *Server) handleAdminUsersAdd(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodGet {
 		// Show form
-		data := TemplateData{
-			Lang:    lang,
-			Title:   i18n.T(lang, "users.add.title"),
-			Session: session,
+		data := struct {
+			V2TemplateData
+		}{
+			V2TemplateData: V2TemplateData{
+				Lang:       lang,
+				Title:      i18n.T(lang, "users.add.title"),
+				ActivePage: "users",
+				Session:    session,
+			},
 		}
 
-		if err := s.templates.ExecuteTemplate(w, "admin_users_add.html", data); err != nil {
+		tmpl := s.loadV2Page("v2_users_add.html", s.funcMap)
+		if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 			logger.Info("Error rendering add user template: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
@@ -96,38 +102,20 @@ func (s *Server) handleAdminUsersAdd(w http.ResponseWriter, r *http.Request) {
 
 		// Validate
 		if username == "" {
-			data := TemplateData{
-				Lang:    lang,
-				Title:   i18n.T(lang, "users.add.title"),
-				Session: session,
-				Error:   i18n.T(lang, "users.errors.username_required"),
-			}
-			s.templates.ExecuteTemplate(w, "admin_users_add.html", data)
+			s.renderUsersAddError(w, lang, session, i18n.T(lang, "users.errors.username_required"))
 			return
 		}
 
 		// Validate username format (prevent command injection)
 		if err := users.ValidateUsername(username); err != nil {
-			data := TemplateData{
-				Lang:    lang,
-				Title:   i18n.T(lang, "users.add.title"),
-				Session: session,
-				Error:   fmt.Sprintf("Invalid username format: %v", err),
-			}
-			s.templates.ExecuteTemplate(w, "admin_users_add.html", data)
+			s.renderUsersAddError(w, lang, session, fmt.Sprintf("Invalid username format: %v", err))
 			return
 		}
 
 		// Check if username already exists
 		_, err := users.GetByUsername(s.db, username)
 		if err == nil {
-			data := TemplateData{
-				Lang:    lang,
-				Title:   i18n.T(lang, "users.add.title"),
-				Session: session,
-				Error:   i18n.T(lang, "users.errors.username_exists"),
-			}
-			s.templates.ExecuteTemplate(w, "admin_users_add.html", data)
+			s.renderUsersAddError(w, lang, session, i18n.T(lang, "users.errors.username_exists"))
 			return
 		}
 
@@ -168,6 +156,24 @@ func (s *Server) handleAdminUsersAdd(w http.ResponseWriter, r *http.Request) {
 		// Redirect to token display page
 		http.Redirect(w, r, fmt.Sprintf("/admin/users/%d/token", user.ID), http.StatusSeeOther)
 	}
+}
+
+// renderUsersAddError renders the add user form with an error message.
+func (s *Server) renderUsersAddError(w http.ResponseWriter, lang string, session *auth.Session, errMsg string) {
+	data := struct {
+		V2TemplateData
+		Error string
+	}{
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      i18n.T(lang, "users.add.title"),
+			ActivePage: "users",
+			Session:    session,
+		},
+		Error: errMsg,
+	}
+	tmpl := s.loadV2Page("v2_users_add.html", s.funcMap)
+	tmpl.ExecuteTemplate(w, "v2_base", data)
 }
 
 // handleAdminUsersActions handles user-specific actions (token display, delete)
@@ -251,25 +257,26 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 		activationURL := fmt.Sprintf("%s://%s/activate/%s", protocol, host, token.Token)
 
 		data := struct {
-			Lang          string
-			Title         string
-			Session       *auth.Session
+			V2TemplateData
 			Username      string
 			Email         string
 			ActivationURL string
 			ExpiresAt     time.Time
-			T             func(string) string
 		}{
-			Lang:          lang,
-			Title:         i18n.T(lang, "users.token.title"),
-			Session:       session,
+			V2TemplateData: V2TemplateData{
+				Lang:       lang,
+				Title:      i18n.T(lang, "users.token.title"),
+				ActivePage: "users",
+				Session:    session,
+			},
 			Username:      user.Username,
 			Email:         user.Email,
 			ActivationURL: activationURL,
 			ExpiresAt:     token.ExpiresAt,
 		}
 
-		if err := s.templates.ExecuteTemplate(w, "admin_users_token.html", data); err != nil {
+		tmpl := s.loadV2Page("v2_users_token.html", s.funcMap)
+		if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 			logger.Info("Error rendering token template: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
@@ -308,25 +315,26 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 		resetURL := fmt.Sprintf("%s://%s/reset-password?token=%s", protocol, host, token.Token)
 
 		data := struct {
-			Lang      string
-			Title     string
-			Session   *auth.Session
+			V2TemplateData
 			Username  string
 			Email     string
 			ResetURL  string
 			ExpiresAt time.Time
-			T         func(string) string
 		}{
-			Lang:      lang,
-			Title:     i18n.T(lang, "reset.token.title"),
-			Session:   session,
+			V2TemplateData: V2TemplateData{
+				Lang:       lang,
+				Title:      i18n.T(lang, "reset.token.title"),
+				ActivePage: "users",
+				Session:    session,
+			},
 			Username:  user.Username,
 			Email:     user.Email,
 			ResetURL:  resetURL,
 			ExpiresAt: token.ExpiresAt,
 		}
 
-		if err := s.templates.ExecuteTemplate(w, "admin_users_reset_token.html", data); err != nil {
+		tmpl := s.loadV2Page("v2_users_reset_token.html", s.funcMap)
+		if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 			logger.Info("Error rendering reset token template: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return

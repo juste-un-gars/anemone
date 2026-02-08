@@ -588,20 +588,22 @@ func (s *Server) handleAdminUserQuota(w http.ResponseWriter, r *http.Request, us
 		}
 
 		data := struct {
-			Lang      string
-			Title     string
-			Session   *auth.Session
+			V2TemplateData
 			User      *users.User
 			QuotaInfo *quota.QuotaInfo
 		}{
-			Lang:      lang,
-			Title:     i18n.T(lang, "users.quota.title"),
-			Session:   session,
+			V2TemplateData: V2TemplateData{
+				Lang:       lang,
+				Title:      i18n.T(lang, "users.quota.title"),
+				ActivePage: "users",
+				Session:    session,
+			},
 			User:      user,
 			QuotaInfo: quotaInfo,
 		}
 
-		if err := s.templates.ExecuteTemplate(w, "admin_users_quota.html", data); err != nil {
+		tmpl := s.loadV2Page("v2_users_quota.html", s.funcMap)
+		if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 			logger.Info("Error rendering quota template: %v", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return

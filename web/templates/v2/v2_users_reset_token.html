@@ -1,0 +1,76 @@
+{{/* Anemone v2 - Password reset token display */}}
+{{define "content"}}
+<!-- Success header -->
+<div style="text-align:center;margin-bottom:1.5rem;">
+    <div style="width:3.5rem;height:3.5rem;border-radius:50%;background:rgba(34,197,94,0.15);display:inline-flex;align-items:center;justify-content:center;margin-bottom:0.75rem;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
+    </div>
+    <div style="font-size:0.875rem;color:var(--text-secondary);">
+        {{T .Lang "reset.token.for_user"}} <strong style="color:var(--text-primary);">{{.Username}}</strong>
+    </div>
+</div>
+
+<!-- Warning -->
+<div class="v2-card" style="border-left:3px solid var(--warning);margin-bottom:1rem;">
+    <div style="font-size:0.875rem;font-weight:600;color:var(--warning);">{{T .Lang "reset.token.warning"}}</div>
+</div>
+
+<!-- Info -->
+<div style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:1rem;">
+    {{T .Lang "reset.token.info"}}
+</div>
+
+<!-- Reset Link -->
+<div class="v2-card" style="margin-bottom:1rem;">
+    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+        {{T .Lang "reset.token.link"}}
+    </label>
+    <div style="display:flex;gap:0.5rem;align-items:center;">
+        <input type="text" readonly value="{{.ResetURL}}" id="reset-link"
+               style="flex:1;padding:0.5rem 0.75rem;border:2px solid var(--info);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-family:monospace;font-size:0.8125rem;">
+        <button type="button" onclick="copyResetLink()" id="copy-btn" class="v2-btn v2-btn-primary" style="white-space:nowrap;">
+            {{T .Lang "reset.token.copy"}}
+        </button>
+    </div>
+</div>
+
+<!-- Expiration -->
+<div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8125rem;color:var(--text-muted);margin-bottom:1rem;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    <strong>{{T .Lang "reset.token.expires"}}</strong> {{.ExpiresAt.Format "02/01/2006 15:04"}}
+</div>
+
+<!-- User Info -->
+<div class="v2-card" style="margin-bottom:1.5rem;">
+    <div style="font-size:0.8125rem;font-weight:600;color:var(--text-primary);margin-bottom:0.75rem;">{{T .Lang "reset.token.user_info"}}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+        <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "reset.token.username"}}</div>
+            <div style="font-size:0.875rem;color:var(--text-primary);">{{.Username}}</div>
+        </div>
+        {{if .Email}}
+        <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "reset.token.email"}}</div>
+            <div style="font-size:0.875rem;color:var(--text-primary);">{{.Email}}</div>
+        </div>
+        {{end}}
+    </div>
+</div>
+
+<!-- Done button -->
+<div style="display:flex;justify-content:flex-end;">
+    <a href="/admin/users" class="v2-btn v2-btn-primary" style="text-decoration:none;">{{T .Lang "reset.token.done"}}</a>
+</div>
+
+<script>
+function copyResetLink() {
+    var input = document.getElementById('reset-link');
+    input.select();
+    document.execCommand('copy');
+    var btn = document.getElementById('copy-btn');
+    var orig = btn.textContent;
+    btn.textContent = '\u2713 OK';
+    setTimeout(function() { btn.textContent = orig; }, 2000);
+}
+</script>
+{{end}}

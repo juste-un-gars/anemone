@@ -5,14 +5,53 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.13.6-beta
+**Current Version:** v0.15.0-beta
 **Last Updated:** 2026-02-08
 
 ---
 
 ## Current Session
 
-**Session 11: V2 UI Redesign** - In Progress (Modules A-D terminés, E-F à faire)
+**Session 12: Module F Cleanup** - Complete ✅
+
+---
+
+## Session 12: Module F Cleanup
+
+**Date:** 2026-02-08
+**Objective:** Nettoyage v2 : supprimer prototype, anciens templates v1, migrer 8 sous-pages
+**Status:** Complete ✅
+
+### Module F1 : Prototype supprimé ✅
+- Supprimé `cmd/v2preview/main.go`, binaire `v2preview`, `newui.jpg`
+
+### Module F2 : 14 templates v1 supprimés ✅
+- dashboard_admin, dashboard_user, admin_users, admin_peers, admin_shares, admin_settings, admin_settings_trash, admin_logs, admin_wireguard, admin_system_update, admin_storage, trash, restore, settings
+
+### Module F3 : 8 sous-pages migrées en v2 ✅
+- **Users (4):** v2_users_add, v2_users_quota, v2_users_token, v2_users_reset_token
+- **Peers (2):** v2_peers_add, v2_peers_edit
+- **Rclone (1):** v2_rclone_edit
+- **USB Backup (1):** v2_usb_backup_edit
+
+### Handlers modifiés
+- `handlers_admin_users.go` — handleAdminUsersAdd, handleAdminUsersActions (token/reset), renderUsersAddError
+- `handlers_user.go` — handleAdminUserQuota
+- `handlers_admin_peers.go` — handleAdminPeersAdd, handleAdminPeersActions (edit), renderPeersAddError
+- `handlers_admin_rclone.go` — handleRcloneEditForm
+- `handlers_admin_usb.go` — handleUSBBackupEditForm
+
+### Bilan v2
+- **24 templates v2** (16 main + 8 sub-pages)
+- **Restant en v1 (intentionnel):** auth/setup (7), backup POST error paths (5), pages rares (3)
+
+**Détails :** `.claude/sessions/SESSION_011_v2_ui_redesign.md`
+
+---
+
+## Previous Session
+
+**Session 11: V2 UI Redesign** - Complete ✅ (Modules A-D)
 
 ---
 
@@ -20,34 +59,7 @@
 
 **Date:** 2026-02-08
 **Objective:** Refonte complète UI : dark theme, sidebar gauche, sauvegardes consolidées (inspiré newui.jpg)
-**Status:** In Progress - Phase 2 Modules A-D terminés ✅
-
-### Phase 1 : Prototype v2 ✅
-
-Prototype créé sous `/v2/` avec serveur de prévisualisation standalone. Design validé.
-
-### Phase 2 : Migration (EN COURS)
-
-**Module A : Dashboard admin ✅** — `/dashboard` rend le layout v2
-**Module B : Backups consolidée ✅** — `/admin/backups` avec 5 onglets
-**Module C : 9 pages admin ✅** — Users, Peers, Shares, Settings, Trash, Logs, WireGuard, System Update, Storage
-
-Templates v2 créés : `v2_users.html`, `v2_peers.html`, `v2_shares.html`, `v2_settings.html`, `v2_settings_trash.html`, `v2_logs.html`, `v2_wireguard.html`, `v2_system_update.html`, `v2_storage.html`
-
-Handlers modifiés : `handlers_admin_users.go`, `handlers_admin_peers.go`, `handlers_user.go`, `handlers_admin_settings.go`, `handlers_admin_logs.go`, `handlers_admin_wireguard.go`, `handlers_admin_backup.go`, `handlers_admin_storage.go`
-
-Bug fix : `.hidden { display: none !important; }` ajouté dans `v2.css` (modals avec inline display:flex overridaient hidden)
-
-**Module D : 4 pages utilisateur ✅** — Dashboard user, Trash, Restore, Settings
-
-Créé `v2_base_user.html` (layout séparé avec sidebar simplifiée) + `loadV2UserPage()` dans `handlers_v2.go`
-Templates v2 : `v2_dashboard_user.html`, `v2_trash.html`, `v2_restore.html`, `v2_settings_user.html`
-Handlers modifiés : `handlers_user.go`, `handlers_restore.go`
-
-### Modules restants (À FAIRE)
-
-**Module E : Pages auth** — login, setup, activate, reset_password
-**Module F : Nettoyage** — supprimer prototype, anciens templates v1, migrer sous-pages (11 formulaires add/edit encore en v1)
+**Status:** Complete ✅ — Modules A-D + F terminés
 
 **Détails :** `.claude/sessions/SESSION_011_v2_ui_redesign.md`
 
@@ -848,7 +860,8 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
-| 11 | V2 UI Redesign | 2026-02-08 | In Progress (A-D ✅, E-F TODO) |
+| 12 | Module F Cleanup | 2026-02-08 | Complete ✅ |
+| 11 | V2 UI Redesign | 2026-02-08 | Complete ✅ (A-D + F) |
 | 10 | USB Backup Mount Fix | 2026-02-08 | Complete ✅ |
 | 9 | Documentation Update & Cleanup | 2026-01-31 | Complete ✅ |
 | 8 | Rclone SSH Key Generation | 2026-01-31 | Complete ✅ |
@@ -939,15 +952,11 @@ Sessions 71-74 merged and released. Major features:
 
 ## Next Steps
 
-1. **V2 UI Redesign — Module E : Pages auth** ← PROCHAIN
+1. **V2 UI Redesign — Module E : Pages auth** (optionnel)
    - Migrer login, setup, activate, reset_password vers v2
    - Style séparé (pas de sidebar, page centrée)
-2. **V2 UI Redesign — Module F : Nettoyage**
-   - Supprimer prototype (`cmd/v2preview/`, routes `/v2/`)
-   - Migrer 11 sous-pages (formulaires add/edit) encore en v1
-   - Supprimer anciens templates v1 remplacés
-3. Améliorer la gestion des erreurs WireGuard
-4. Tests automatisés pour WireGuard
-5. Support backends additionnels rclone (S3, Google Drive, etc.)
+2. Améliorer la gestion des erreurs WireGuard
+3. Tests automatisés pour WireGuard
+4. Support backends additionnels rclone (S3, Google Drive, etc.)
 
 Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.

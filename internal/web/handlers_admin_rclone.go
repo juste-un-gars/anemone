@@ -289,14 +289,21 @@ func (s *Server) handleRcloneEditForm(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
-	data := map[string]interface{}{
-		"Session": session,
-		"Title":   i18n.T(lang, "rclone.edit"),
-		"Lang":    lang,
-		"Backup":  backup,
+	data := struct {
+		V2TemplateData
+		Backup *rclone.RcloneBackup
+	}{
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      i18n.T(lang, "rclone.edit"),
+			ActivePage: "backups",
+			Session:    session,
+		},
+		Backup: backup,
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "admin_rclone_edit.html", data); err != nil {
+	tmpl := s.loadV2Page("v2_rclone_edit.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 		logger.Info("Template error: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}

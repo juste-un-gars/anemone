@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0-beta] - 2026-02-08
+
+### Changed
+
+#### V2 UI Redesign Complete
+- **Complete dark theme UI migration**: All 24 templates (16 main + 8 sub-pages) now use the v2 layout with dark theme, sidebar navigation, and CSS variable theming
+- **8 sub-page forms migrated to v2**: Users add/quota/token/reset, Peers add/edit, Rclone edit, USB Backup edit
+- **14 obsolete v1 templates removed**: All replaced admin and user templates deleted
+- **Prototype cleanup**: Removed `cmd/v2preview/` standalone preview server and related files
+- **Error rendering helpers**: Added `renderUsersAddError()` and `renderPeersAddError()` for consistent v2 form error re-rendering
+
+### Technical
+- Updated handlers: `handlers_admin_users.go`, `handlers_user.go`, `handlers_admin_peers.go`, `handlers_admin_rclone.go`, `handlers_admin_usb.go`
+- All sub-page handlers now use `V2TemplateData` + `loadV2Page()` pattern
+- Remaining v1 templates (intentional): auth/setup pages (7), backup POST error paths (5), rare pages (3)
+
 ## [0.13.6-beta] - 2026-02-08
 
 ### Fixed
@@ -415,7 +431,8 @@ https://github.com/juste-un-gars/anemone
 
 ---
 
-[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.13.5-beta...HEAD
+[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.15.0-beta...HEAD
+[0.15.0-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.6-beta...v0.15.0-beta
 [0.13.6-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.5-beta...v0.13.6-beta
 [0.13.5-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.4-beta...v0.13.5-beta
 [0.13.4-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.3-beta...v0.13.4-beta
