@@ -135,6 +135,15 @@ func (s *Server) loadV2Page(page string, funcMap template.FuncMap) *template.Tem
 	)
 }
 
+// loadV2UserPage parses the v2 user base layout with a specific page template.
+func (s *Server) loadV2UserPage(page string, funcMap template.FuncMap) *template.Template {
+	base := filepath.Join("web", "templates", "v2", "v2_base_user.html")
+	pageFile := filepath.Join("web", "templates", "v2", page)
+	return template.Must(
+		template.New("v2_base_user.html").Funcs(funcMap).ParseFiles(base, pageFile),
+	)
+}
+
 // handleAdminBackups serves the consolidated backups page (USB, Cloud, P2P, Incoming, Server).
 func (s *Server) handleAdminBackups(w http.ResponseWriter, r *http.Request) {
 	session, ok := auth.GetSessionFromContext(r)

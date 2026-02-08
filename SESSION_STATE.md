@@ -12,7 +12,7 @@
 
 ## Current Session
 
-**Session 11: V2 UI Redesign** - In Progress (Modules A-C terminés, D-F à faire)
+**Session 11: V2 UI Redesign** - In Progress (Modules A-D terminés, E-F à faire)
 
 ---
 
@@ -20,7 +20,7 @@
 
 **Date:** 2026-02-08
 **Objective:** Refonte complète UI : dark theme, sidebar gauche, sauvegardes consolidées (inspiré newui.jpg)
-**Status:** In Progress - Phase 2 Modules A-C terminés ✅
+**Status:** In Progress - Phase 2 Modules A-D terminés ✅
 
 ### Phase 1 : Prototype v2 ✅
 
@@ -38,9 +38,14 @@ Handlers modifiés : `handlers_admin_users.go`, `handlers_admin_peers.go`, `hand
 
 Bug fix : `.hidden { display: none !important; }` ajouté dans `v2.css` (modals avec inline display:flex overridaient hidden)
 
+**Module D : 4 pages utilisateur ✅** — Dashboard user, Trash, Restore, Settings
+
+Créé `v2_base_user.html` (layout séparé avec sidebar simplifiée) + `loadV2UserPage()` dans `handlers_v2.go`
+Templates v2 : `v2_dashboard_user.html`, `v2_trash.html`, `v2_restore.html`, `v2_settings_user.html`
+Handlers modifiés : `handlers_user.go`, `handlers_restore.go`
+
 ### Modules restants (À FAIRE)
 
-**Module D : Pages utilisateur** — dashboard_user, trash, restore, settings
 **Module E : Pages auth** — login, setup, activate, reset_password
 **Module F : Nettoyage** — supprimer prototype, anciens templates v1, migrer sous-pages (11 formulaires add/edit encore en v1)
 
@@ -843,7 +848,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
-| 11 | V2 UI Redesign | 2026-02-08 | In Progress (A-C ✅, D-F TODO) |
+| 11 | V2 UI Redesign | 2026-02-08 | In Progress (A-D ✅, E-F TODO) |
 | 10 | USB Backup Mount Fix | 2026-02-08 | Complete ✅ |
 | 9 | Documentation Update & Cleanup | 2026-01-31 | Complete ✅ |
 | 8 | Rclone SSH Key Generation | 2026-01-31 | Complete ✅ |

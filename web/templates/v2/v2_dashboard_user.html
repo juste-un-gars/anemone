@@ -1,0 +1,142 @@
+{{define "content"}}
+<!-- Stats Cards -->
+<div class="v2-stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+    {{if .Stats.QuotaInfo}}
+    <!-- Backup Storage -->
+    <div class="v2-card" style="padding:1.25rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(99,102,241,0.12);display:flex;align-items:center;justify-content:center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+            </div>
+            <div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">Backup</div>
+                <div style="font-size:1.25rem;font-weight:700;color:var(--text-primary);">{{.Stats.QuotaInfo.UsedBackupGB | printf "%.2f"}} GB</div>
+            </div>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem;">
+            {{if eq .Stats.QuotaInfo.QuotaBackupGB 0.0}}
+                {{T .Lang "dashboard.user.quota.on"}} &infin; {{T .Lang "dashboard.user.quota.unlimited"}}
+            {{else}}
+                {{T .Lang "dashboard.user.quota.on"}} {{.Stats.QuotaInfo.QuotaBackupGB}} GB ({{.Stats.QuotaInfo.PercentBackup | printf "%.1f"}}%)
+            {{end}}
+        </div>
+        <div style="width:100%;height:6px;border-radius:3px;background:var(--bg-page);overflow:hidden;">
+            {{if eq .Stats.QuotaInfo.BackupAlertLevel "critical"}}
+            <div style="height:100%;border-radius:3px;background:var(--error);width:{{.Stats.QuotaInfo.PercentBackup}}%;"></div>
+            {{else if eq .Stats.QuotaInfo.BackupAlertLevel "danger"}}
+            <div style="height:100%;border-radius:3px;background:var(--warning);width:{{.Stats.QuotaInfo.PercentBackup}}%;"></div>
+            {{else}}
+            <div style="height:100%;border-radius:3px;background:var(--success);width:{{.Stats.QuotaInfo.PercentBackup}}%;"></div>
+            {{end}}
+        </div>
+        {{if eq .Stats.QuotaInfo.BackupAlertLevel "critical"}}
+        <div style="font-size:0.7rem;color:var(--error);margin-top:0.4rem;font-weight:500;">{{T .Lang "dashboard.user.quota.exceeded"}}</div>
+        {{else if eq .Stats.QuotaInfo.BackupAlertLevel "danger"}}
+        <div style="font-size:0.7rem;color:var(--warning);margin-top:0.4rem;font-weight:500;">{{T .Lang "dashboard.user.quota.almost_full"}}</div>
+        {{end}}
+    </div>
+
+    <!-- Data Storage -->
+    <div class="v2-card" style="padding:1.25rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(16,185,129,0.12);display:flex;align-items:center;justify-content:center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+            </div>
+            <div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">Data</div>
+                <div style="font-size:1.25rem;font-weight:700;color:var(--text-primary);">{{.Stats.QuotaInfo.UsedDataGB | printf "%.2f"}} GB</div>
+            </div>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem;">
+            {{if eq .Stats.QuotaInfo.QuotaDataGB 0.0}}
+                {{T .Lang "dashboard.user.quota.on"}} &infin; {{T .Lang "dashboard.user.quota.unlimited"}}
+            {{else}}
+                {{T .Lang "dashboard.user.quota.on"}} {{.Stats.QuotaInfo.QuotaDataGB}} GB ({{.Stats.QuotaInfo.PercentData | printf "%.1f"}}%)
+            {{end}}
+        </div>
+        <div style="width:100%;height:6px;border-radius:3px;background:var(--bg-page);overflow:hidden;">
+            {{if eq .Stats.QuotaInfo.DataAlertLevel "critical"}}
+            <div style="height:100%;border-radius:3px;background:var(--error);width:{{.Stats.QuotaInfo.PercentData}}%;"></div>
+            {{else if eq .Stats.QuotaInfo.DataAlertLevel "danger"}}
+            <div style="height:100%;border-radius:3px;background:var(--warning);width:{{.Stats.QuotaInfo.PercentData}}%;"></div>
+            {{else}}
+            <div style="height:100%;border-radius:3px;background:var(--success);width:{{.Stats.QuotaInfo.PercentData}}%;"></div>
+            {{end}}
+        </div>
+        {{if eq .Stats.QuotaInfo.DataAlertLevel "critical"}}
+        <div style="font-size:0.7rem;color:var(--error);margin-top:0.4rem;font-weight:500;">{{T .Lang "dashboard.user.quota.exceeded"}}</div>
+        {{else if eq .Stats.QuotaInfo.DataAlertLevel "danger"}}
+        <div style="font-size:0.7rem;color:var(--warning);margin-top:0.4rem;font-weight:500;">{{T .Lang "dashboard.user.quota.almost_full"}}</div>
+        {{end}}
+    </div>
+    {{end}}
+
+    <!-- Last Backup -->
+    <div class="v2-card" style="padding:1.25rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(245,158,11,0.12);display:flex;align-items:center;justify-content:center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+            </div>
+            <div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "dashboard.user.last_backup"}}</div>
+                <div style="font-size:1.125rem;font-weight:700;color:var(--text-primary);">{{.Stats.LastBackup}}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trash Count -->
+    <div class="v2-card" style="padding:1.25rem;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(239,68,68,0.12);display:flex;align-items:center;justify-content:center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+            </div>
+            <div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "trash.title"}}</div>
+                <div style="font-size:1.25rem;font-weight:700;color:var(--text-primary);">{{.Stats.TrashCount}}</div>
+                <div style="font-size:0.7rem;color:var(--text-muted);">{{T .Lang "trash.items"}}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:1rem;margin-top:1.5rem;">
+    <div class="v2-card" style="padding:1.25rem;">
+        <h3 style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:0.5rem;">
+            {{T .Lang "trash.title"}}
+        </h3>
+        <p style="font-size:0.8125rem;color:var(--text-muted);margin-bottom:1rem;">
+            {{T .Lang "trash.card_description_retention"}}
+        </p>
+        <a href="/trash" class="v2-btn v2-btn-primary" style="display:inline-flex;align-items:center;gap:0.5rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+            {{T .Lang "trash.view_button"}}
+        </a>
+    </div>
+
+    <div class="v2-card" style="padding:1.25rem;">
+        <h3 style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:0.5rem;">
+            {{T .Lang "dashboard.user.restore.title"}}
+        </h3>
+        <p style="font-size:0.8125rem;color:var(--text-muted);margin-bottom:1rem;">
+            {{T .Lang "dashboard.user.restore.description"}}
+        </p>
+        <a href="/restore" class="v2-btn v2-btn-primary" style="display:inline-flex;align-items:center;gap:0.5rem;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            {{T .Lang "dashboard.user.restore.button"}}
+        </a>
+    </div>
+</div>
+{{end}}

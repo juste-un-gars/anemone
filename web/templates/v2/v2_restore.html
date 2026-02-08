@@ -1,0 +1,371 @@
+{{define "content"}}
+<!-- Backup selection -->
+<div class="v2-card" style="padding:1.25rem;margin-bottom:1rem;">
+    <label for="backup-select" style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.5rem;">
+        {{T .Lang "restore.select_backup"}}
+    </label>
+    <select id="backup-select" style="width:100%;max-width:500px;padding:0.5rem 0.75rem;border-radius:0.375rem;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);font-size:0.8125rem;">
+        <option value="">{{T .Lang "restore.choose_backup"}}</option>
+    </select>
+    <div id="backup-info" class="hidden" style="margin-top:1rem;">
+        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:1rem;">
+            <div>
+                <span style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "restore.backup_info.files"}}</span>
+                <span id="backup-file-count" style="margin-left:0.5rem;font-weight:600;color:var(--text-primary);font-size:0.8125rem;">-</span>
+            </div>
+            <div>
+                <span style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "restore.backup_info.size"}}</span>
+                <span id="backup-size" style="margin-left:0.5rem;font-weight:600;color:var(--text-primary);font-size:0.8125rem;">-</span>
+            </div>
+            <div>
+                <span style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "restore.backup_info.modified"}}</span>
+                <span id="backup-date" style="margin-left:0.5rem;font-weight:600;color:var(--text-primary);font-size:0.8125rem;">-</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading state -->
+<div id="loading" class="hidden v2-card" style="padding:3rem;text-align:center;">
+    <div style="display:inline-block;width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--info);border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+    <p style="margin-top:1rem;color:var(--text-muted);font-size:0.8125rem;">{{T .Lang "restore.loading"}}</p>
+</div>
+<style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+
+<!-- File browser -->
+<div id="file-browser" class="hidden v2-card" style="padding:0;overflow:hidden;">
+    <!-- Breadcrumb -->
+    <div style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);background:var(--bg-page);">
+        <nav>
+            <ol id="breadcrumb" style="display:flex;align-items:center;gap:0.25rem;list-style:none;margin:0;padding:0;">
+                <li>
+                    <a href="#" data-path="/" class="breadcrumb-link" style="color:var(--text-muted);display:flex;align-items:center;">
+                        <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                        </svg>
+                    </a>
+                </li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- Selection toolbar -->
+    <div id="selection-toolbar" class="hidden" style="padding:0.75rem 1rem;border-bottom:1px solid var(--border);background:rgba(99,102,241,0.06);display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <span id="selection-count" style="font-size:0.8125rem;font-weight:600;color:var(--text-primary);">0 {{T .Lang "restore.selection.count"}}</span>
+            <button onclick="selectAll()" style="font-size:0.75rem;color:var(--info);background:none;border:none;cursor:pointer;">
+                {{T .Lang "restore.selection.select_all"}}
+            </button>
+            <button onclick="clearSelection()" style="font-size:0.75rem;color:var(--info);background:none;border:none;cursor:pointer;">
+                {{T .Lang "restore.selection.clear"}}
+            </button>
+        </div>
+        <button onclick="downloadSelection()" class="v2-btn v2-btn-primary" style="font-size:0.75rem;padding:0.375rem 0.75rem;">
+            <svg style="width:14px;height:14px;margin-right:0.25rem;vertical-align:middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            {{T .Lang "restore.selection.download"}}
+        </button>
+    </div>
+
+    <!-- File list -->
+    <div style="overflow-x:auto;">
+        <table class="v2-table">
+            <thead>
+                <tr>
+                    <th style="width:40px;">
+                        <input type="checkbox" id="select-all-checkbox" onchange="toggleSelectAll()" style="accent-color:var(--info);">
+                    </th>
+                    <th>{{T .Lang "restore.file_browser.name"}}</th>
+                    <th>{{T .Lang "restore.file_browser.size"}}</th>
+                    <th>{{T .Lang "restore.file_browser.modified"}}</th>
+                    <th style="text-align:right;">{{T .Lang "restore.file_browser.actions"}}</th>
+                </tr>
+            </thead>
+            <tbody id="file-list">
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- No backups message -->
+<div id="no-backups" class="hidden v2-card" style="padding:3rem;text-align:center;">
+    <svg style="margin:0 auto 1rem;width:48px;height:48px;color:var(--text-muted);" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+    </svg>
+    <h3 style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:0.25rem;">{{T .Lang "restore.empty.title"}}</h3>
+    <p style="font-size:0.8125rem;color:var(--text-muted);">{{T .Lang "restore.empty.message"}}</p>
+</div>
+
+<script>
+    const lang = '{{.Lang}}';
+    const t = {
+        errorLoadingBackups: '{{T .Lang "restore.error.loading"}}',
+        errorLoadingFiles: '{{T .Lang "restore.error.files"}}',
+        downloadAction: '{{T .Lang "restore.action.download"}}',
+        errorDownload: '{{T .Lang "restore.error.download"}}',
+        selectionCount: '{{T .Lang "restore.selection.count"}}',
+        errorSelection: '{{T .Lang "restore.error.selection"}}',
+        minutesAgo: '{{T .Lang "restore.time.minutes_ago"}}',
+        hoursAgo: '{{T .Lang "restore.time.hours_ago"}}',
+        daysAgo: '{{T .Lang "restore.time.days_ago"}}'
+    };
+
+    function tr(template, values) {
+        let result = template;
+        for (const [key, value] of Object.entries(values)) {
+            result = result.replace(`{{${key}}}`, value);
+        }
+        return result;
+    }
+
+    let backups = [];
+    let currentBackup = null;
+    let currentPath = '/';
+    let fileTree = null;
+    let selectedItems = new Set();
+
+    document.addEventListener('DOMContentLoaded', async () => { await loadBackups(); });
+
+    document.getElementById('backup-select').addEventListener('change', async (e) => {
+        const value = e.target.value;
+        if (!value) {
+            document.getElementById('backup-info').classList.add('hidden');
+            document.getElementById('file-browser').classList.add('hidden');
+            return;
+        }
+        const [peerIdStr, sourceServer, ...shareNameParts] = value.split(':');
+        const peerId = parseInt(peerIdStr);
+        const shareName = shareNameParts.join(':');
+        currentBackup = backups.find(b => b.peer_id === peerId && b.source_server === sourceServer && b.share_name === shareName);
+        if (!currentBackup) return;
+        document.getElementById('backup-file-count').textContent = currentBackup.file_count;
+        document.getElementById('backup-size').textContent = formatBytes(currentBackup.total_size);
+        document.getElementById('backup-date').textContent = formatDate(currentBackup.last_modified);
+        document.getElementById('backup-info').classList.remove('hidden');
+        await loadFiles(peerId, shareName, sourceServer);
+    });
+
+    async function loadBackups() {
+        try {
+            const response = await fetch('/api/restore/backups');
+            if (!response.ok) throw new Error('Failed to load backups');
+            backups = await response.json();
+            const select = document.getElementById('backup-select');
+            if (backups.length === 0) { document.getElementById('no-backups').classList.remove('hidden'); return; }
+            backups.forEach(backup => {
+                const option = document.createElement('option');
+                option.value = `${backup.peer_id}:${backup.source_server}:${backup.share_name}`;
+                option.textContent = `${backup.peer_name} - ${backup.share_name} (from ${backup.source_server})`;
+                select.appendChild(option);
+            });
+        } catch (error) { console.error('Error loading backups:', error); alert(t.errorLoadingBackups); }
+    }
+
+    async function loadFiles(peerId, shareName, sourceServer) {
+        document.getElementById('loading').classList.remove('hidden');
+        document.getElementById('file-browser').classList.add('hidden');
+        try {
+            const response = await fetch(`/api/restore/files?peer_id=${peerId}&backup=${encodeURIComponent(shareName)}&source_server=${encodeURIComponent(sourceServer)}`);
+            if (!response.ok) throw new Error('Failed to load files');
+            fileTree = await response.json();
+            currentPath = '/';
+            renderFiles();
+            document.getElementById('file-browser').classList.remove('hidden');
+        } catch (error) { console.error('Error loading files:', error); alert(t.errorLoadingFiles); }
+        finally { document.getElementById('loading').classList.add('hidden'); }
+    }
+
+    function renderFiles() {
+        const fileList = document.getElementById('file-list');
+        fileList.innerHTML = '';
+        const currentNode = getNodeAtPath(currentPath);
+        if (!currentNode || !currentNode.children) return;
+        const items = Object.values(currentNode.children).sort((a, b) => {
+            if (a.is_dir && !b.is_dir) return -1;
+            if (!a.is_dir && b.is_dir) return 1;
+            return a.name.localeCompare(b.name);
+        });
+        items.forEach(item => {
+            const row = document.createElement('tr');
+            // Checkbox
+            const checkboxCell = document.createElement('td');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'item-checkbox';
+            checkbox.style.accentColor = 'var(--info)';
+            checkbox.dataset.path = item.path;
+            checkbox.dataset.isDir = item.is_dir;
+            checkbox.addEventListener('change', () => toggleItem(item.path, item.is_dir));
+            checkboxCell.appendChild(checkbox);
+            row.appendChild(checkboxCell);
+            // Name
+            const nameCell = document.createElement('td');
+            if (item.is_dir) {
+                const link = document.createElement('a');
+                link.href = '#';
+                link.style.cssText = 'display:flex;align-items:center;gap:0.5rem;color:var(--info);text-decoration:none;font-weight:500;';
+                link.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2"><path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>${item.name}`;
+                link.addEventListener('click', (e) => { e.preventDefault(); navigateToDir(item.path); });
+                nameCell.appendChild(link);
+            } else {
+                nameCell.innerHTML = `<div style="display:flex;align-items:center;gap:0.5rem;color:var(--text-primary);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>${item.name}</div>`;
+            }
+            row.appendChild(nameCell);
+            // Size
+            const sizeCell = document.createElement('td');
+            sizeCell.style.color = 'var(--text-muted)';
+            sizeCell.textContent = item.is_dir ? '-' : formatBytes(item.size);
+            row.appendChild(sizeCell);
+            // Modified
+            const modCell = document.createElement('td');
+            modCell.style.color = 'var(--text-muted)';
+            modCell.textContent = item.is_dir ? '-' : formatDate(item.mod_time);
+            row.appendChild(modCell);
+            // Actions
+            const actionsCell = document.createElement('td');
+            actionsCell.style.textAlign = 'right';
+            if (!item.is_dir) {
+                const downloadLink = document.createElement('a');
+                downloadLink.href = '#';
+                downloadLink.style.cssText = 'font-size:0.75rem;color:var(--info);text-decoration:none;';
+                downloadLink.textContent = t.downloadAction;
+                downloadLink.addEventListener('click', (e) => { e.preventDefault(); downloadFile(item.path); });
+                actionsCell.appendChild(downloadLink);
+            }
+            row.appendChild(actionsCell);
+            fileList.appendChild(row);
+        });
+        updateBreadcrumb();
+    }
+
+    function getNodeAtPath(path) {
+        if (path === '/') return fileTree;
+        const parts = path.split('/').filter(p => p);
+        let node = fileTree;
+        for (const part of parts) { if (!node.children || !node.children[part]) return null; node = node.children[part]; }
+        return node;
+    }
+
+    function navigateToDir(path) { currentPath = path; renderFiles(); }
+
+    function updateBreadcrumb() {
+        const breadcrumb = document.getElementById('breadcrumb');
+        breadcrumb.innerHTML = '';
+        const rootLi = document.createElement('li');
+        const rootLink = document.createElement('a');
+        rootLink.href = '#';
+        rootLink.style.cssText = 'color:var(--text-muted);display:flex;align-items:center;';
+        rootLink.innerHTML = `<svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>`;
+        rootLink.addEventListener('click', (e) => { e.preventDefault(); navigateToDir('/'); });
+        rootLi.appendChild(rootLink);
+        breadcrumb.appendChild(rootLi);
+        if (currentPath !== '/') {
+            const parts = currentPath.split('/').filter(p => p);
+            let accPath = '';
+            parts.forEach((part, index) => {
+                accPath += '/' + part;
+                const li = document.createElement('li');
+                li.style.display = 'flex';
+                li.style.alignItems = 'center';
+                const sep = document.createElement('span');
+                sep.style.cssText = 'color:var(--text-muted);margin:0 0.25rem;';
+                sep.textContent = '/';
+                li.appendChild(sep);
+                const partLink = document.createElement('a');
+                partLink.href = '#';
+                partLink.style.cssText = `font-size:0.8125rem;font-weight:500;text-decoration:none;color:${index === parts.length - 1 ? 'var(--text-primary)' : 'var(--text-muted)'};`;
+                partLink.textContent = part;
+                const pathToNavigate = accPath;
+                partLink.addEventListener('click', (e) => { e.preventDefault(); navigateToDir(pathToNavigate); });
+                li.appendChild(partLink);
+                breadcrumb.appendChild(li);
+            });
+        }
+    }
+
+    async function downloadFile(filePath) {
+        if (!currentBackup) return;
+        const fileName = filePath.split('/').pop();
+        const url = `/api/restore/download?peer_id=${currentBackup.peer_id}&backup=${encodeURIComponent(currentBackup.share_name)}&file=${encodeURIComponent(filePath)}&source_server=${encodeURIComponent(currentBackup.source_server)}`;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl; a.download = fileName;
+            document.body.appendChild(a); a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (error) { console.error('Download error:', error); alert(t.errorDownload); }
+    }
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diff = now - date;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        if (days === 0) {
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            if (hours === 0) { const mins = Math.floor(diff / (1000 * 60)); return tr(t.minutesAgo, {minutes: mins}); }
+            return tr(t.hoursAgo, {hours: hours});
+        }
+        if (days < 30) return tr(t.daysAgo, {days: days});
+        return date.toLocaleDateString(lang === 'fr' ? 'fr-FR' : 'en-US');
+    }
+
+    function toggleItem(path) {
+        if (selectedItems.has(path)) { selectedItems.delete(path); } else { selectedItems.add(path); }
+        updateSelectionUI();
+    }
+
+    function toggleSelectAll() {
+        const checkbox = document.getElementById('select-all-checkbox');
+        document.querySelectorAll('.item-checkbox').forEach(cb => { cb.checked = checkbox.checked; if (checkbox.checked) selectedItems.add(cb.dataset.path); else selectedItems.delete(cb.dataset.path); });
+        updateSelectionUI();
+    }
+
+    function selectAll() {
+        document.querySelectorAll('.item-checkbox').forEach(cb => { cb.checked = true; selectedItems.add(cb.dataset.path); });
+        document.getElementById('select-all-checkbox').checked = true;
+        updateSelectionUI();
+    }
+
+    function clearSelection() {
+        selectedItems.clear();
+        document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = false);
+        document.getElementById('select-all-checkbox').checked = false;
+        updateSelectionUI();
+    }
+
+    function updateSelectionUI() {
+        const count = selectedItems.size;
+        const toolbar = document.getElementById('selection-toolbar');
+        const countEl = document.getElementById('selection-count');
+        if (count > 0) { toolbar.classList.remove('hidden'); toolbar.style.display = 'flex'; countEl.textContent = `${count} ${t.selectionCount}`; }
+        else { toolbar.classList.add('hidden'); }
+        const itemCheckboxes = document.querySelectorAll('.item-checkbox');
+        document.getElementById('select-all-checkbox').checked = itemCheckboxes.length > 0 && Array.from(itemCheckboxes).every(cb => cb.checked);
+    }
+
+    async function downloadSelection() {
+        if (selectedItems.size === 0) { alert(t.errorSelection); return; }
+        if (!currentBackup) return;
+        const paths = Array.from(selectedItems);
+        const url = `/api/restore/download-multiple?peer_id=${currentBackup.peer_id}&backup=${encodeURIComponent(currentBackup.share_name)}&source_server=${encodeURIComponent(currentBackup.source_server)}`;
+        const form = document.createElement('form');
+        form.method = 'POST'; form.action = url;
+        paths.forEach(path => { const input = document.createElement('input'); input.type = 'hidden'; input.name = 'paths'; input.value = path; form.appendChild(input); });
+        document.body.appendChild(form); form.submit(); document.body.removeChild(form);
+    }
+</script>
+{{end}}

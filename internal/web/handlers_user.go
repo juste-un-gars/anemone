@@ -90,16 +90,23 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// User: render v1 dashboard (unchanged)
-	data := TemplateData{
-		Lang:    lang,
-		Title:   i18n.T(lang, "dashboard.title"),
-		Session: session,
-		Stats:   stats,
+	// User: render v2 user dashboard
+	userData := struct {
+		V2TemplateData
+		Stats *DashboardStats
+	}{
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      i18n.T(lang, "v2.nav.dashboard"),
+			ActivePage: "dashboard",
+			Session:    session,
+		},
+		Stats: stats,
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "dashboard_user.html", data); err != nil {
-		logger.Info("Error rendering dashboard template: %v", err)
+	tmplUser := s.loadV2UserPage("v2_dashboard_user.html", s.funcMap)
+	if err := tmplUser.ExecuteTemplate(w, "v2_base_user", userData); err != nil {
+		logger.Info("Error rendering v2 user dashboard: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -154,19 +161,21 @@ func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := struct {
-		Lang    string
-		Title   string
-		Session *auth.Session
-		Items   []TrashItemWithShare
+		V2TemplateData
+		Items []TrashItemWithShare
 	}{
-		Lang:    lang,
-		Title:   i18n.T(lang, "trash.title"),
-		Session: session,
-		Items:   allTrashItems,
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      i18n.T(lang, "trash.title"),
+			ActivePage: "trash",
+			Session:    session,
+		},
+		Items: allTrashItems,
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "trash.html", data); err != nil {
-		logger.Info("Error rendering trash template: %v", err)
+	tmpl := s.loadV2UserPage("v2_trash.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base_user", data); err != nil {
+		logger.Info("Error rendering v2 trash template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -432,24 +441,27 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	lang := s.getLang(r)
 	data := struct {
-		Lang    string
-		Title   string
-		Session *auth.Session
+		V2TemplateData
 		User    *users.User
 		Success string
 		Error   string
 	}{
-		Lang:    s.getLang(r),
-		Title:   "Settings",
-		Session: session,
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      i18n.T(lang, "settings.title"),
+			ActivePage: "settings",
+			Session:    session,
+		},
 		User:    user,
 		Success: r.URL.Query().Get("success"),
 		Error:   r.URL.Query().Get("error"),
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "settings.html", data); err != nil {
-		logger.Info("Error executing settings template: %v", err)
+	tmpl := s.loadV2UserPage("v2_settings_user.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base_user", data); err != nil {
+		logger.Info("Error rendering v2 settings template: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }

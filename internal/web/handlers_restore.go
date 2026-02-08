@@ -24,6 +24,7 @@ import (
 
 	"github.com/juste-un-gars/anemone/internal/auth"
 	"github.com/juste-un-gars/anemone/internal/crypto"
+	"github.com/juste-un-gars/anemone/internal/i18n"
 	"github.com/juste-un-gars/anemone/internal/logger"
 	"github.com/juste-un-gars/anemone/internal/peers"
 	"github.com/juste-un-gars/anemone/internal/restore"
@@ -37,16 +38,17 @@ func (s *Server) handleRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := struct {
-		Lang    string
-		Session *auth.Session
-	}{
-		Lang:    s.cfg.Language,
-		Session: session,
+	lang := s.getLang(r)
+	data := V2TemplateData{
+		Lang:       lang,
+		Title:      i18n.T(lang, "v2.nav.restore"),
+		ActivePage: "restore",
+		Session:    session,
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "restore.html", data); err != nil {
-		logger.Info("Error rendering restore template: %v", err)
+	tmpl := s.loadV2UserPage("v2_restore.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base_user", data); err != nil {
+		logger.Info("Error rendering v2 restore template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
