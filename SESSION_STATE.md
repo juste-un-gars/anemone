@@ -5,12 +5,42 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.13.5-beta
-**Last Updated:** 2026-01-31
+**Current Version:** v0.13.6-beta
+**Last Updated:** 2026-02-08
 
 ---
 
 ## Current Session
+
+**Session 10: USB Backup Mount Fix** - Complete ✅
+
+---
+
+## Session 10: USB Backup Mount Fix
+
+**Date:** 2026-02-08
+**Objective:** Fix false success status when USB drive is physically removed without unmounting
+**Status:** Complete ✅
+
+### Bug Description
+
+When a USB drive is physically removed without being properly unmounted, the backup still shows "Success" status because `IsMounted()` only checked if the directory `/mnt/xxx` existed (which it does - it's an empty folder on the root filesystem). This also caused backup data to be written to the system disk instead of the USB drive.
+
+### Fix Applied
+
+| File | Change |
+|------|--------|
+| `internal/usbbackup/usbbackup.go` | `IsMounted()` now reads `/proc/mounts` to verify actual mount point |
+| `internal/updater/updater.go` | Version bump to 0.13.6-beta |
+| `CHANGELOG.md` | Added v0.13.6-beta entry |
+
+### Release
+
+**v0.13.6-beta** released: https://github.com/juste-un-gars/anemone/releases/tag/v0.13.6-beta
+
+---
+
+## Previous Session
 
 **Session 9: Documentation Update & Cleanup** - Complete ✅
 
@@ -775,6 +805,8 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 10 | USB Backup Mount Fix | 2026-02-08 | Complete ✅ |
+| 9 | Documentation Update & Cleanup | 2026-01-31 | Complete ✅ |
 | 8 | Rclone SSH Key Generation | 2026-01-31 | Complete ✅ |
 | 7 | Rclone Cloud Backup | 2026-01-31 | Complete ✅ |
 | 6 | WireGuard Integration | 2026-01-30 | Complete ✅ |
