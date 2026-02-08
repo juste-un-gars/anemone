@@ -939,16 +939,15 @@ Sessions 71-74 merged and released. Major features:
 
 ## Next Steps
 
-1. **V2 UI Redesign — Module D : Pages utilisateur** ← PROCHAIN
-   - Migrer dashboard_user, trash, restore, settings utilisateur vers v2
-2. **V2 UI Redesign — Module E : Pages auth**
-   - Migrer login, setup, activate, reset_password
-3. **V2 UI Redesign — Module F : Nettoyage**
+1. **V2 UI Redesign — Module E : Pages auth** ← PROCHAIN
+   - Migrer login, setup, activate, reset_password vers v2
+   - Style séparé (pas de sidebar, page centrée)
+2. **V2 UI Redesign — Module F : Nettoyage**
    - Supprimer prototype (`cmd/v2preview/`, routes `/v2/`)
    - Migrer 11 sous-pages (formulaires add/edit) encore en v1
    - Supprimer anciens templates v1 remplacés
-4. Améliorer la gestion des erreurs WireGuard
-5. Tests automatisés pour WireGuard
-6. Support backends additionnels rclone (S3, Google Drive, etc.)
+3. Améliorer la gestion des erreurs WireGuard
+4. Tests automatisés pour WireGuard
+5. Support backends additionnels rclone (S3, Google Drive, etc.)
 
 Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.
