@@ -558,17 +558,25 @@ func (s *Server) handleAdminSystemUpdate(w http.ResponseWriter, r *http.Request)
 		logger.Info("Error getting last update check: %v", err)
 	}
 
-	data := TemplateData{
-		Lang:       lang,
-		Title:      i18n.T(lang, "update.page.title"),
-		Session:    session,
+	data := struct {
+		V2TemplateData
+		UpdateInfo *updater.UpdateInfo
+		Data       map[string]interface{}
+	}{
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      i18n.T(lang, "update.page.title"),
+			ActivePage: "updates",
+			Session:    session,
+		},
 		UpdateInfo: updateInfo,
 		Data: map[string]interface{}{
 			"LastCheck": lastCheck,
 		},
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "admin_system_update.html", data); err != nil {
+	tmpl := s.loadV2Page("v2_system_update.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 		logger.Info("Error rendering system update template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return

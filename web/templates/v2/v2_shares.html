@@ -1,0 +1,114 @@
+{{/* Anemone v2 - Shares management page */}}
+{{define "headerActions"}}
+<a href="/shares/add" class="v2-btn v2-btn-primary v2-btn-sm">+ {{T .Lang "shares.add"}}</a>
+{{end}}
+
+{{define "content"}}
+<!-- SMB Status -->
+<div class="v2-card" style="margin-bottom:1rem;padding:0.75rem 1rem;">
+    <div style="display:flex;align-items:center;gap:0.75rem;">
+        <span style="font-size:0.8125rem;color:var(--text-secondary);">{{T .Lang "shares.smb_status"}}:</span>
+        {{if not .SMBInstalled}}
+            <span class="v2-badge" style="background:var(--bg-page);color:var(--text-muted);">{{T .Lang "shares.smb_not_installed"}}</span>
+        {{else if eq .SMBStatus "active"}}
+            <span class="v2-badge v2-badge-success">{{T .Lang "shares.smb_active"}}</span>
+        {{else}}
+            <span class="v2-badge v2-badge-error">{{T .Lang "shares.smb_inactive"}}</span>
+        {{end}}
+    </div>
+</div>
+
+<!-- Shares Table -->
+{{if .Shares}}
+<div class="v2-card" style="padding:0;overflow:hidden;">
+    <table class="v2-table">
+        <thead>
+            <tr>
+                <th>{{T .Lang "shares.name"}}</th>
+                <th>{{T .Lang "shares.path"}}</th>
+                <th>{{T .Lang "shares.protocol"}}</th>
+                <th>{{T .Lang "shares.sync_enabled"}}</th>
+                <th>{{T .Lang "shares.created"}}</th>
+                <th style="text-align:right;">{{T .Lang "shares.actions"}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Shares}}
+            <tr>
+                <td style="font-weight:600;">{{.Name}}</td>
+                <td>
+                    <code style="font-size:0.8125rem;color:var(--text-secondary);">{{.Path}}</code>
+                    {{if eq .Protocol "smb"}}
+                    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">
+                        \\{{T $.Lang "shares.access_path"}}\{{.Name}}
+                    </div>
+                    {{end}}
+                </td>
+                <td>
+                    <span class="v2-badge v2-badge-info">
+                        {{if eq .Protocol "smb"}}{{T $.Lang "shares.protocol.smb"}}{{else}}{{.Protocol}}{{end}}
+                    </span>
+                </td>
+                <td>
+                    {{if .SyncEnabled}}
+                        <span class="v2-badge v2-badge-success">{{T $.Lang "common.yes"}}</span>
+                    {{else}}
+                        <span class="v2-badge" style="background:var(--bg-page);color:var(--text-muted);">{{T $.Lang "common.no"}}</span>
+                    {{end}}
+                </td>
+                <td style="font-size:0.8125rem;color:var(--text-secondary);">
+                    {{.CreatedAt.Format "02/01/2006 15:04"}}
+                </td>
+                <td style="text-align:right;">
+                    <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+                        {{if .SyncEnabled}}
+                        <button onclick="syncShare({{.ID}}, '{{.Name}}')" class="v2-btn v2-btn-primary v2-btn-sm">Sync</button>
+                        {{end}}
+                        <button onclick="deleteShare({{.ID}}, '{{.Name}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "shares.action.delete"}}</button>
+                    </div>
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{else}}
+<div class="v2-card v2-empty">
+    <svg class="v2-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+    </svg>
+    <div style="font-size:0.875rem;margin-bottom:0.5rem;">{{T .Lang "shares.empty"}}</div>
+    <div style="font-size:0.8125rem;color:var(--text-muted);margin-bottom:1rem;">{{T .Lang "shares.empty.help"}}</div>
+    <a href="/shares/add" class="v2-btn v2-btn-primary v2-btn-sm">+ {{T .Lang "shares.add"}}</a>
+</div>
+{{end}}
+
+<script>
+function deleteShare(shareID, shareName) {
+    if (!confirm('{{T .Lang "shares.delete.confirm"}}\n\n' + shareName)) return;
+    fetch('/shares/' + shareID + '/delete', { method: 'POST' })
+    .then(function(r) { if (r.ok) window.location.reload(); else alert('{{T .Lang "common.error"}}'); });
+}
+
+function syncShare(shareID, shareName) {
+    if (!confirm('Sync "' + shareName + '" ?')) return;
+    var btn = event.target.closest('button');
+    var orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.textContent = 'Sync...';
+
+    fetch('/sync/share/' + shareID, { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        alert(data.success ? data.message : data.message);
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        btn.innerHTML = orig;
+        alert('Error: ' + err);
+    });
+}
+</script>
+{{end}}

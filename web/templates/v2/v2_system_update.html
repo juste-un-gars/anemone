@@ -1,0 +1,156 @@
+{{/* Anemone v2 - System Update page */}}
+{{define "headerActions"}}
+<button onclick="checkForUpdates()" id="checkButton" class="v2-btn v2-btn-secondary v2-btn-sm">
+    <svg style="display:inline;width:14px;height:14px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+    {{T .Lang "update.check_now"}}
+</button>
+{{end}}
+
+{{define "content"}}
+<style>
+.markdown-content { line-height:1.6;color:var(--text-primary); }
+.markdown-content h1 { font-size:1.5em;font-weight:bold;margin:1em 0 0.5em; }
+.markdown-content h2 { font-size:1.3em;font-weight:bold;margin:1em 0 0.5em; }
+.markdown-content h3 { font-size:1.1em;font-weight:bold;margin:1em 0 0.5em; }
+.markdown-content p { margin:0.5em 0; }
+.markdown-content ul { list-style:disc;margin-left:1.5em; }
+.markdown-content li { margin:0.25em 0; }
+.markdown-content code { background:var(--bg-page);padding:0.2em 0.4em;border-radius:3px;font-family:monospace; }
+</style>
+
+<!-- Message Area -->
+<div id="messageArea"></div>
+
+<!-- Version Status -->
+<div class="v2-stats-grid" style="margin-bottom:1.5rem;">
+    <div class="v2-card">
+        <div class="v2-card-title">{{T .Lang "update.status.current_version"}}</div>
+        <div class="v2-card-value" id="currentVersion">{{.UpdateInfo.CurrentVersion}}</div>
+    </div>
+    <div class="v2-card">
+        <div class="v2-card-title">{{T .Lang "update.status.latest_version"}}</div>
+        <div class="v2-card-value" id="latestVersion" style="color:{{if .UpdateInfo.Available}}var(--success){{else}}var(--text-secondary){{end}};">{{.UpdateInfo.LatestVersion}}</div>
+    </div>
+</div>
+
+<!-- Status + Actions -->
+<div class="v2-card" style="margin-bottom:1.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+        <div id="statusBadge">
+            {{if .UpdateInfo.Available}}
+            <span class="v2-badge v2-badge-success" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">
+                {{T .Lang "update.status.available"}}
+            </span>
+            {{else}}
+            <span class="v2-badge" style="background:var(--bg-page);color:var(--text-secondary);font-size:0.8125rem;padding:0.375rem 0.75rem;">
+                {{T .Lang "update.status.up_to_date"}}
+            </span>
+            {{end}}
+        </div>
+
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+            {{if .UpdateInfo.Available}}
+            <button onclick="confirmUpdate()" id="installButton" class="v2-btn v2-btn-primary">
+                {{T .Lang "update.install.button"}}
+            </button>
+            {{end}}
+        </div>
+    </div>
+
+    <div style="margin-top:0.75rem;font-size:0.75rem;color:var(--text-muted);" id="lastCheckText">
+        {{if .Data.LastCheck}}
+        {{if not .Data.LastCheck.IsZero}}
+        {{T .Lang "update.last_check"}}: {{.Data.LastCheck.Format "2006-01-02 15:04:05"}}
+        {{else}}
+        {{T .Lang "update.never_checked"}}
+        {{end}}
+        {{else}}
+        {{T .Lang "update.never_checked"}}
+        {{end}}
+    </div>
+</div>
+
+<!-- Release Notes -->
+{{if .UpdateInfo.Available}}
+<div class="v2-card" style="margin-bottom:1.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "update.release_notes"}}</div>
+        <a href="{{.UpdateInfo.ReleaseURL}}" target="_blank" class="v2-btn v2-btn-secondary v2-btn-sm">
+            {{T .Lang "update.view_on_github"}}
+        </a>
+    </div>
+    <div id="releaseNotes" class="markdown-content">
+        {{.UpdateInfo.ReleaseNotes}}
+    </div>
+</div>
+{{end}}
+
+<!-- Info -->
+<div class="v2-card" style="border-left:3px solid var(--info);">
+    <div style="font-size:0.8125rem;color:var(--text-secondary);">{{T .Lang "update.info.auto_check"}}</div>
+</div>
+
+<script>
+async function checkForUpdates() {
+    var button = document.getElementById('checkButton');
+    var messageArea = document.getElementById('messageArea');
+    button.disabled = true;
+    button.textContent = '{{T .Lang "update.checking"}}...';
+
+    try {
+        var response = await fetch('/admin/system/update/check', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        var data = await response.json();
+
+        if (data.success) {
+            messageArea.innerHTML = '<div class="v2-card" style="border-left:3px solid var(--success);margin-bottom:1rem;"><div style="font-size:0.875rem;color:var(--success);">' + data.updateMessage + '</div></div>';
+            if (data.updateInfo) {
+                document.getElementById('latestVersion').textContent = data.updateInfo.latest_version;
+                document.getElementById('latestVersion').style.color = data.updateInfo.available ? 'var(--success)' : 'var(--text-secondary)';
+                var now = new Date();
+                document.getElementById('lastCheckText').textContent = '{{T .Lang "update.last_check"}}: ' + now.toLocaleString();
+                if (data.updateInfo.available) { setTimeout(function() { location.reload(); }, 2000); }
+            }
+        } else {
+            messageArea.innerHTML = '<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;"><div style="font-size:0.875rem;color:var(--error);">' + data.error + '</div></div>';
+        }
+    } catch (error) {
+        messageArea.innerHTML = '<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;"><div style="font-size:0.875rem;color:var(--error);">Error: ' + error.message + '</div></div>';
+    } finally {
+        button.disabled = false;
+        button.textContent = '{{T .Lang "update.check_now"}}';
+    }
+}
+
+function confirmUpdate() {
+    if (confirm('{{T .Lang "update.install.confirm_message"}}\n\n{{T .Lang "update.install.confirm_warning"}}')) {
+        installUpdate();
+    }
+}
+
+async function installUpdate() {
+    var button = document.getElementById('installButton');
+    var messageArea = document.getElementById('messageArea');
+    button.disabled = true;
+    button.textContent = '{{T .Lang "update.install.installing"}}';
+
+    try {
+        var response = await fetch('/admin/system/update/install', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        var data = await response.json();
+
+        if (data.success) {
+            messageArea.innerHTML = '<div class="v2-card" style="border-left:3px solid var(--success);margin-bottom:1rem;"><div style="font-size:0.875rem;color:var(--success);">' + data.message + '<br><small style="color:var(--text-muted);">{{T .Lang "update.install.restarting"}}</small></div></div>';
+            messageArea.scrollIntoView({ behavior: 'smooth' });
+            setTimeout(function() { window.location.href = '/login'; }, 30000);
+        } else {
+            messageArea.innerHTML = '<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;"><div style="font-size:0.875rem;color:var(--error);">' + data.error + '</div></div>';
+            button.disabled = false;
+            button.textContent = '{{T .Lang "update.install.button"}}';
+        }
+    } catch (error) {
+        messageArea.innerHTML = '<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;"><div style="font-size:0.875rem;color:var(--error);">Error: ' + error.message + '</div></div>';
+        button.disabled = false;
+        button.textContent = '{{T .Lang "update.install.button"}}';
+    }
+}
+</script>
+{{end}}

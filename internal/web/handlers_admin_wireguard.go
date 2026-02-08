@@ -39,26 +39,7 @@ func (s *Server) handleAdminWireGuard(w http.ResponseWriter, r *http.Request) {
 		status = wireguard.GetStatus(cfg.Name)
 	}
 
-	data := struct {
-		Lang      string
-		Session   *auth.Session
-		Installed bool
-		Config    *wireguard.Config
-		Status    *wireguard.Status
-		Success   string
-		Error     string
-	}{
-		Lang:      lang,
-		Session:   session,
-		Installed: installed,
-		Config:    cfg,
-		Status:    status,
-	}
-
-	if err := s.templates.ExecuteTemplate(w, "admin_wireguard.html", data); err != nil {
-		logger.Error("Error rendering WireGuard template", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
+	s.renderWireGuardPageV2(w, session, lang, installed, cfg, status, "", "")
 }
 
 // isWireGuardInstalled checks if wg-quick is available.
@@ -278,17 +259,25 @@ func (s *Server) renderWireGuardPage(w http.ResponseWriter, r *http.Request, suc
 		status = wireguard.GetStatus(cfg.Name)
 	}
 
+	s.renderWireGuardPageV2(w, session, lang, installed, cfg, status, success, errorMsg)
+}
+
+// renderWireGuardPageV2 renders the v2 WireGuard page.
+func (s *Server) renderWireGuardPageV2(w http.ResponseWriter, session *auth.Session, lang string, installed bool, cfg *wireguard.Config, status *wireguard.Status, success, errorMsg string) {
 	data := struct {
-		Lang      string
-		Session   *auth.Session
+		V2TemplateData
 		Installed bool
 		Config    *wireguard.Config
 		Status    *wireguard.Status
 		Success   string
 		Error     string
 	}{
-		Lang:      lang,
-		Session:   session,
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      "WireGuard VPN",
+			ActivePage: "wireguard",
+			Session:    session,
+		},
 		Installed: installed,
 		Config:    cfg,
 		Status:    status,
@@ -296,7 +285,8 @@ func (s *Server) renderWireGuardPage(w http.ResponseWriter, r *http.Request, suc
 		Error:     errorMsg,
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "admin_wireguard.html", data); err != nil {
+	tmpl := s.loadV2Page("v2_wireguard.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 		logger.Error("Error rendering WireGuard template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}

@@ -39,24 +39,7 @@ func (s *Server) handleAdminLogs(w http.ResponseWriter, r *http.Request) {
 		logFiles = nil
 	}
 
-	data := struct {
-		Lang         string
-		Session      *auth.Session
-		CurrentLevel string
-		LogFiles     []logger.LogFileEntry
-		Success      string
-		Error        string
-	}{
-		Lang:         lang,
-		Session:      session,
-		CurrentLevel: currentLevel,
-		LogFiles:     logFiles,
-	}
-
-	if err := s.templates.ExecuteTemplate(w, "admin_logs.html", data); err != nil {
-		logger.Error("Error rendering admin logs template", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
+	s.renderLogsPageV2(w, session, lang, currentLevel, logFiles, "", "")
 }
 
 // handleAdminLogsLevel handles POST to change the log level.
@@ -151,7 +134,7 @@ func (s *Server) handleAdminLogsDownload(w http.ResponseWriter, r *http.Request)
 	http.ServeFile(w, r, filePath)
 }
 
-// renderLogsPage is a helper to render the logs page with messages.
+// renderLogsPage is a helper to render the logs page with messages (used by handleAdminLogsLevel).
 func (s *Server) renderLogsPage(w http.ResponseWriter, session *auth.Session, lang, success, errMsg string) {
 	currentLevel, err := sysconfig.GetLogLevel(s.db)
 	if err != nil {
@@ -160,23 +143,32 @@ func (s *Server) renderLogsPage(w http.ResponseWriter, session *auth.Session, la
 
 	logFiles, _ := logger.ListLogFiles(s.cfg.LogDir, "anemone")
 
+	s.renderLogsPageV2(w, session, lang, currentLevel, logFiles, success, errMsg)
+}
+
+// renderLogsPageV2 renders the v2 logs page.
+func (s *Server) renderLogsPageV2(w http.ResponseWriter, session *auth.Session, lang, currentLevel string, logFiles []logger.LogFileEntry, success, errMsg string) {
 	data := struct {
-		Lang         string
-		Session      *auth.Session
+		V2TemplateData
 		CurrentLevel string
 		LogFiles     []logger.LogFileEntry
 		Success      string
 		Error        string
 	}{
-		Lang:         lang,
-		Session:      session,
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      "Logs",
+			ActivePage: "logs",
+			Session:    session,
+		},
 		CurrentLevel: currentLevel,
 		LogFiles:     logFiles,
 		Success:      success,
 		Error:        errMsg,
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "admin_logs.html", data); err != nil {
+	tmpl := s.loadV2Page("v2_logs.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 		logger.Error("Error rendering admin logs template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}

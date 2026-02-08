@@ -1,0 +1,1103 @@
+{{/* Anemone v2 - Storage Management page */}}
+{{define "headerActions"}}
+<button onclick="location.reload()" class="v2-btn v2-btn-secondary v2-btn-sm">
+    <svg style="display:inline;width:14px;height:14px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+    {{T .Lang "common.refresh"}}
+</button>
+{{end}}
+
+{{define "content"}}
+<style>
+.help-tooltip {
+    position:relative;display:inline-flex;align-items:center;justify-content:center;
+    width:16px;height:16px;background:var(--bg-page);border-radius:50%;
+    font-size:10px;color:var(--text-muted);cursor:help;margin-left:4px;flex-shrink:0;
+}
+.help-tooltip:hover::after {
+    content:attr(data-tip);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+    background:var(--text-primary);color:var(--bg-card);padding:8px 12px;border-radius:6px;
+    font-size:12px;font-weight:normal;white-space:normal;width:280px;max-width:90vw;
+    z-index:100;box-shadow:0 4px 6px rgba(0,0,0,0.2);line-height:1.4;margin-bottom:4px;
+}
+.help-tooltip:hover::before {
+    content:'';position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+    border:6px solid transparent;border-top-color:var(--text-primary);margin-bottom:-8px;z-index:100;
+}
+.smart-value-good { color: var(--success); }
+.smart-value-warning { color: var(--warning); }
+.smart-value-critical { color: var(--error); }
+.smart-card { background:var(--bg-page);border-radius:8px;padding:12px;margin-bottom:0.75rem; }
+.smart-card-title { font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px; }
+.storage-progress { width:100%;height:8px;background:var(--bg-page);border-radius:4px;overflow:hidden;margin:0.5rem 0; }
+.storage-progress-bar { height:100%;border-radius:4px;transition:width 0.3s; }
+</style>
+
+<!-- Tab navigation -->
+<div class="v2-tabs" id="storageTabs">
+    <button class="v2-tab active" data-tab="overview" onclick="showTab('overview')">{{T .Lang "storage.tab_overview"}}</button>
+    <button class="v2-tab" data-tab="disks" onclick="showTab('disks')">{{T .Lang "storage.tab_disks"}}</button>
+    <button class="v2-tab" data-tab="pools" onclick="showTab('pools')">{{T .Lang "storage.tab_pools"}}</button>
+    {{if .ZFSAvailable}}
+    <button class="v2-tab" data-tab="datasets" onclick="showTab('datasets')">{{T .Lang "storage.tab_datasets"}}</button>
+    <button class="v2-tab" data-tab="snapshots" onclick="showTab('snapshots')">{{T .Lang "storage.tab_snapshots"}}</button>
+    {{end}}
+</div>
+
+<!-- ===== Overview Tab ===== -->
+<div class="v2-tab-panel active" id="tab-overview">
+    <div class="v2-stats-grid" style="margin-bottom:1.5rem;">
+        <div class="v2-card">
+            <div class="v2-card-title">{{T .Lang "storage.total_disks"}}</div>
+            <div class="v2-card-value">{{.Overview.TotalDisks}}</div>
+        </div>
+        <div class="v2-card">
+            <div class="v2-card-title">{{T .Lang "storage.disk_health"}}</div>
+            <div class="v2-card-value">
+                <span style="color:var(--success);">{{.Overview.HealthyDisks}}</span>
+                {{if gt .Overview.WarningDisks 0}} / <span style="color:var(--warning);">{{.Overview.WarningDisks}}</span>{{end}}
+                {{if gt .Overview.CriticalDisks 0}} / <span style="color:var(--error);">{{.Overview.CriticalDisks}}</span>{{end}}
+            </div>
+        </div>
+        <div class="v2-card">
+            <div class="v2-card-title">{{T .Lang "storage.zfs_pools"}}</div>
+            <div class="v2-card-value">
+                {{if .ZFSAvailable}}{{.Overview.TotalPools}}{{if gt .Overview.DegradedPools 0}} <span style="font-size:0.75rem;color:var(--warning);">({{.Overview.DegradedPools}} {{T .Lang "storage.degraded"}})</span>{{end}}
+                {{else}}<span style="color:var(--text-muted);">{{T .Lang "storage.not_available"}}</span>{{end}}
+            </div>
+        </div>
+        <div class="v2-card">
+            <div class="v2-card-title">{{T .Lang "storage.total_capacity"}}</div>
+            <div class="v2-card-value">
+                {{if .Overview.TotalCapacity}}{{.Overview.UsedCapHuman}} / {{.Overview.TotalCapHuman}}{{else}}-{{end}}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Disks Tab ===== -->
+<div class="v2-tab-panel" id="tab-disks">
+    <div class="v2-card" style="margin-bottom:1rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <div>
+                <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.physical_disks"}}</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{if .SMARTAvailable}}{{T .Lang "storage.smart_enabled"}}{{else}}{{T .Lang "storage.smart_disabled"}}{{end}}</div>
+            </div>
+        </div>
+        {{if .Disks}}
+        <div style="overflow-x:auto;">
+            <table class="v2-table">
+                <thead>
+                    <tr>
+                        <th>{{T .Lang "storage.disk"}}</th>
+                        <th>{{T .Lang "storage.model"}}</th>
+                        <th>{{T .Lang "storage.size"}}</th>
+                        <th>{{T .Lang "storage.type"}}</th>
+                        <th>{{T .Lang "storage.status"}}</th>
+                        <th>{{T .Lang "storage.health"}}</th>
+                        <th>{{T .Lang "storage.temp"}}</th>
+                        <th>{{T .Lang "storage.power_on"}}</th>
+                        <th>{{T .Lang "users.actions"}}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .Disks}}
+                    <tr>
+                        <td>
+                            <div style="font-weight:500;color:var(--text-primary);">{{.Name}}</div>
+                            <div style="font-size:0.6875rem;color:var(--text-muted);">{{.Path}}</div>
+                        </td>
+                        <td>{{if .Model}}{{.Model}}{{else}}-{{end}}</td>
+                        <td>{{.SizeHuman}}</td>
+                        <td>
+                            <span class="v2-badge {{if eq .Type "NVMe"}}v2-badge-info{{else if eq .Type "SSD"}}v2-badge-info{{end}}">{{.Type}}</span>
+                        </td>
+                        <td>
+                            {{if .Mountpoint}}
+                            <div style="display:flex;align-items:center;gap:0.25rem;">
+                                <svg style="width:14px;height:14px;color:var(--success);" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                <span style="font-family:monospace;font-size:0.6875rem;color:var(--success);">{{.Mountpoint}}</span>
+                                {{if .Filesystem}}<span style="font-size:0.6875rem;color:var(--text-muted);margin-left:0.25rem;">({{.Filesystem}})</span>{{end}}
+                            </div>
+                            {{else if .Filesystem}}
+                            <div style="display:flex;align-items:center;gap:0.25rem;">
+                                <span class="v2-badge v2-badge-warning">{{.Filesystem}}</span>
+                                <span style="font-size:0.6875rem;color:var(--text-muted);">{{T $.Lang "storage.not_mounted"}}</span>
+                            </div>
+                            {{else}}<span style="color:var(--text-muted);">-</span>{{end}}
+                        </td>
+                        <td>
+                            <span class="v2-badge {{if eq .Health "OK"}}v2-badge-success{{else if eq .Health "WARNING"}}v2-badge-warning{{else if eq .Health "CRITICAL"}}v2-badge-error{{end}}">{{.Health}}</span>
+                        </td>
+                        <td>
+                            {{if ge .Temperature 0}}<span style="{{if gt .Temperature 55}}color:var(--error);{{else if gt .Temperature 45}}color:var(--warning);{{end}}">{{.Temperature}}°C</span>{{else}}-{{end}}
+                        </td>
+                        <td>{{if ge .PowerOnHours 0}}{{.PowerOnHours}}h{{else}}-{{end}}</td>
+                        <td>
+                            <div style="display:flex;gap:0.5rem;align-items:center;">
+                                <button onclick="showSMARTDetails('{{.Name}}')" class="v2-btn v2-btn-secondary v2-btn-sm">SMART</button>
+                                {{if .Mountpoint}}
+                                <button onclick="unmountDisk('{{.Mountpoint}}')" class="v2-btn v2-btn-secondary v2-btn-sm" title="{{T $.Lang "storage.unmount"}}">
+                                    <svg style="display:inline;width:14px;height:14px;vertical-align:middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                                </button>
+                                <button onclick="ejectDisk('{{.Mountpoint}}')" class="v2-btn v2-btn-secondary v2-btn-sm" title="{{T $.Lang "storage.eject"}}">
+                                    <svg style="display:inline;width:14px;height:14px;vertical-align:middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                                </button>
+                                {{else if .Filesystem}}
+                                <button onclick="showMountDiskModal('{{.Path}}', '{{.Name}}')" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "storage.mount"}}</button>
+                                <button onclick="showFormatDiskModal('{{.Path}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "storage.format"}}</button>
+                                {{else}}
+                                <button onclick="showFormatDiskModal('{{.Path}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "storage.format"}}</button>
+                                {{end}}
+                            </div>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{else}}
+        <div class="v2-empty">
+            <div class="v2-empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/></svg>
+            </div>
+            <div>{{T .Lang "storage.no_disks"}}</div>
+        </div>
+        {{end}}
+    </div>
+</div>
+
+<!-- ===== Pools Tab ===== -->
+<div class="v2-tab-panel" id="tab-pools">
+    {{if .ZFSAvailable}}
+    <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-bottom:1rem;">
+        <button onclick="showImportPoolModal()" class="v2-btn v2-btn-secondary v2-btn-sm">{{T .Lang "storage.import_pool"}}</button>
+        <button onclick="showCreatePoolModal()" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "storage.create_pool"}}</button>
+    </div>
+    {{if .Pools}}
+    {{range .Pools}}
+    <div class="v2-card" style="margin-bottom:1rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem;flex-wrap:wrap;gap:0.5rem;">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span style="font-size:1rem;font-weight:600;color:var(--text-primary);">{{.Name}}</span>
+                <span class="v2-badge {{if eq .State "ONLINE"}}v2-badge-success{{else if eq .State "DEGRADED"}}v2-badge-warning{{else}}v2-badge-error{{end}}">{{.State}}</span>
+            </div>
+            <div style="display:flex;gap:0.375rem;">
+                <button onclick="startScrub('{{.Name}}')" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "storage.start_scrub"}}</button>
+                <button onclick="showExportPoolModal('{{.Name}}')" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "storage.export"}}</button>
+                <button onclick="showDestroyPoolModal('{{.Name}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "storage.destroy"}}</button>
+            </div>
+        </div>
+        <!-- Progress bar -->
+        <div class="storage-progress">
+            <div class="storage-progress-bar" style="width:{{printf "%.1f" .UsedPercent}}%;background:{{if gt .UsedPercent 90.0}}var(--error){{else if gt .UsedPercent 80.0}}var(--warning){{else}}var(--success){{end}};"></div>
+        </div>
+        <div style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:0.75rem;">{{.AllocHuman}} / {{.SizeHuman}} ({{printf "%.1f" .UsedPercent}}%)</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.5rem;font-size:0.8125rem;margin-bottom:0.75rem;">
+            <div><span style="color:var(--text-muted);">{{T $.Lang "storage.free"}}:</span> <span style="color:var(--text-primary);">{{.FreeHuman}}</span></div>
+            <div><span style="color:var(--text-muted);">{{T $.Lang "storage.fragmentation"}}:</span> <span style="color:var(--text-primary);">{{.Fragmentation}}%</span></div>
+            <div><span style="color:var(--text-muted);">{{T $.Lang "storage.dedup"}}:</span> <span style="color:var(--text-primary);">{{printf "%.2f" .Dedup}}x</span></div>
+            <div><span style="color:var(--text-muted);">{{T $.Lang "storage.errors"}}:</span> <span style="{{if ne .Errors "No known data errors"}}color:var(--error);{{else}}color:var(--text-primary);{{end}}">{{.Errors}}</span></div>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.75rem;"><span style="font-weight:500;">{{T $.Lang "storage.scan"}}:</span> {{.ScanStatus}}</div>
+        {{if .VDevs}}
+        <div style="margin-top:0.5rem;">
+            <div style="font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.5rem;">{{T $.Lang "storage.vdevs"}}</div>
+            {{range .VDevs}}
+            <div style="background:var(--bg-page);border-radius:6px;padding:0.75rem;margin-bottom:0.5rem;">
+                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem;">
+                    <span style="font-weight:500;color:var(--text-primary);">{{.Name}}</span>
+                    <span class="v2-badge">{{.Type}}</span>
+                    <span class="v2-badge {{if eq .State "ONLINE"}}v2-badge-success{{else if eq .State "DEGRADED"}}v2-badge-warning{{else}}v2-badge-error{{end}}">{{.State}}</span>
+                </div>
+                {{if .Disks}}
+                <div style="margin-left:1rem;">
+                    {{range .Disks}}
+                    <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8125rem;padding:0.125rem 0;">
+                        <span style="color:var(--text-secondary);">{{.Name}}</span>
+                        <span class="v2-badge {{if eq .State "ONLINE"}}v2-badge-success{{else if eq .State "DEGRADED"}}v2-badge-warning{{else}}v2-badge-error{{end}}" style="font-size:0.625rem;">{{.State}}</span>
+                        {{if or (gt .Read 0) (gt .Write 0) (gt .Cksum 0)}}<span style="font-size:0.6875rem;color:var(--error);">R:{{.Read}} W:{{.Write}} C:{{.Cksum}}</span>{{end}}
+                    </div>
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+    </div>
+    {{end}}
+    {{else}}
+    <div class="v2-card">
+        <div class="v2-empty">
+            <div class="v2-empty-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            </div>
+            <div>{{T .Lang "storage.no_pools"}}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "storage.no_pools_info"}}</div>
+        </div>
+    </div>
+    {{end}}
+    {{else}}
+    <div class="v2-card" style="border-left:3px solid var(--warning);">
+        <div style="font-size:0.875rem;color:var(--text-secondary);">{{T .Lang "storage.zfs_not_installed"}}</div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "storage.zfs_install_info"}}</div>
+    </div>
+    {{end}}
+</div>
+
+{{if .ZFSAvailable}}
+<!-- ===== Datasets Tab ===== -->
+<div class="v2-tab-panel" id="tab-datasets">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
+        <button onclick="showCreateDatasetModal()" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "storage.create_dataset"}}</button>
+    </div>
+    <div class="v2-card">
+        <div id="datasets-list">
+            <div style="text-align:center;color:var(--text-muted);padding:2rem;">{{T .Lang "common.loading"}}...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Snapshots Tab ===== -->
+<div class="v2-tab-panel" id="tab-snapshots">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
+        <button onclick="showCreateSnapshotModal()" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "storage.create_snapshot"}}</button>
+    </div>
+    <div class="v2-card">
+        <div id="snapshots-list">
+            <div style="text-align:center;color:var(--text-muted);padding:2rem;">{{T .Lang "common.loading"}}...</div>
+        </div>
+    </div>
+</div>
+{{end}}
+
+<!-- Password Verification Modal -->
+<div id="passwordModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;">
+    <div class="v2-card" style="width:24rem;max-width:90vw;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <div id="passwordModalTitle" style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.confirm_action"}}</div>
+            <button onclick="closePasswordModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+        </div>
+        <div id="passwordModalWarning" style="background:rgba(239,68,68,0.1);border:1px solid var(--error);border-radius:6px;padding:0.75rem;margin-bottom:1rem;font-size:0.8125rem;color:var(--error);"></div>
+        <form id="passwordForm" onsubmit="submitPasswordVerification(event)">
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "settings.password.current"}}</label>
+                <input type="password" id="verifyPassword" required style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
+                <button type="button" onclick="closePasswordModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="submit" class="v2-btn v2-btn-danger">{{T .Lang "storage.confirm"}}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- SMART Details Modal -->
+<div id="smartModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;">
+    <div class="v2-card" style="width:48rem;max-width:90vw;max-height:85vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;position:sticky;top:0;background:var(--bg-card);padding-bottom:0.5rem;border-bottom:1px solid var(--border);">
+            <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.smart_details"}} - <span id="smartDiskName"></span></div>
+            <button onclick="closeSMARTModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+        </div>
+        <div id="smartContent"></div>
+    </div>
+</div>
+
+<!-- Create Pool Modal -->
+<div id="createPoolModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;">
+    <div class="v2-card" style="width:30rem;max-width:90vw;max-height:85vh;overflow-y:auto;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.create_pool"}}</div>
+            <button onclick="closeCreatePoolModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+        </div>
+        <form id="createPoolForm" onsubmit="createPool(event)">
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.pool_name"}}</label>
+                    <input type="text" id="poolName" required pattern="[a-zA-Z][a-zA-Z0-9_\-.:]*" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.vdev_type"}}</label>
+                    <select id="poolVdevType" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                        <option value="stripe">Stripe ({{T .Lang "storage.no_redundancy"}})</option>
+                        <option value="mirror">Mirror ({{T .Lang "storage.mirror_desc"}})</option>
+                        <option value="raidz1">RAIDZ1 ({{T .Lang "storage.raidz1_desc"}})</option>
+                        <option value="raidz2">RAIDZ2 ({{T .Lang "storage.raidz2_desc"}})</option>
+                        <option value="raidz3">RAIDZ3 ({{T .Lang "storage.raidz3_desc"}})</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.select_disks"}}</label>
+                    <div id="poolDisksList" style="max-height:12rem;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:0.5rem;background:var(--bg-page);"></div>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.mountpoint"}}</label>
+                    <input type="text" id="poolMountpoint" placeholder="/mnt/pool" pattern="^/[a-zA-Z0-9/_\-]*$" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    <div style="font-size:0.6875rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "storage.mountpoint_help"}}</div>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.compression"}}</label>
+                    <select id="poolCompression" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                        <option value="lz4">LZ4 ({{T .Lang "storage.recommended"}})</option>
+                        <option value="zstd">ZSTD</option>
+                        <option value="off">{{T .Lang "storage.off"}}</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.5rem;">
+                <button type="button" onclick="closeCreatePoolModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "storage.create"}}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Create Dataset Modal -->
+<div id="createDatasetModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;">
+    <div class="v2-card" style="width:24rem;max-width:90vw;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.create_dataset"}}</div>
+            <button onclick="closeCreateDatasetModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+        </div>
+        <form id="createDatasetForm" onsubmit="createDataset(event)">
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.dataset_name"}}</label>
+                    <input type="text" id="datasetName" required placeholder="pool/dataset" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    <div style="font-size:0.6875rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "storage.dataset_name_help"}}</div>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.compression"}}</label>
+                    <select id="datasetCompression" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                        <option value="">{{T .Lang "storage.inherit"}}</option>
+                        <option value="lz4">LZ4</option>
+                        <option value="zstd">ZSTD</option>
+                        <option value="off">{{T .Lang "storage.off"}}</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.quota"}}</label>
+                    <input type="text" id="datasetQuota" placeholder="10G" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    <div style="font-size:0.6875rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "storage.quota_help"}}</div>
+                </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.5rem;">
+                <button type="button" onclick="closeCreateDatasetModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "storage.create"}}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Create Snapshot Modal -->
+<div id="createSnapshotModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;">
+    <div class="v2-card" style="width:24rem;max-width:90vw;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.create_snapshot"}}</div>
+            <button onclick="closeCreateSnapshotModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+        </div>
+        <form id="createSnapshotForm" onsubmit="createSnapshot(event)">
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.dataset"}}</label>
+                    <select id="snapshotDataset" required style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;"></select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.snapshot_name"}}</label>
+                    <input type="text" id="snapshotName" required pattern="[a-zA-Z0-9][a-zA-Z0-9_\-.:]*" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    <div style="font-size:0.6875rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "storage.snapshot_name_help"}}</div>
+                </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.5rem;">
+                <button type="button" onclick="closeCreateSnapshotModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "storage.create"}}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Format Disk Modal -->
+<div id="formatDiskModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;">
+    <div class="v2-card" style="width:24rem;max-width:90vw;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.format_disk"}}</div>
+            <button onclick="closeFormatDiskModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+        </div>
+        <div style="background:rgba(239,68,68,0.1);border:1px solid var(--error);border-radius:6px;padding:0.75rem;margin-bottom:1rem;font-size:0.8125rem;color:var(--error);">{{T .Lang "storage.format_warning"}}</div>
+        <form id="formatDiskForm" onsubmit="formatDisk(event)">
+            <input type="hidden" id="formatDiskDevice">
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.device"}}</label>
+                    <div id="formatDiskDeviceDisplay" style="font-family:monospace;font-size:0.8125rem;background:var(--bg-page);padding:0.5rem 0.75rem;border-radius:6px;color:var(--text-primary);"></div>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.filesystem"}}</label>
+                    <select id="formatFilesystem" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                        <option value="ext4">ext4 (Linux)</option>
+                        <option value="xfs">XFS (Linux)</option>
+                        <option value="exfat">exFAT (Windows/Mac/Linux)</option>
+                        <option value="fat32">FAT32 ({{T .Lang "usb_format.universal"}})</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.label"}}</label>
+                    <input type="text" id="formatLabel" maxlength="12" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                </div>
+                <div style="border-top:1px solid var(--border);padding-top:1rem;">
+                    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                        <input type="checkbox" id="formatMount" checked onchange="toggleMountPath()">
+                        <span style="font-size:0.8125rem;color:var(--text-secondary);">{{T .Lang "storage.mount_after_format"}}</span>
+                    </label>
+                    <div id="mountPathContainer" style="margin-top:0.5rem;">
+                        <input type="text" id="formatMountPath" placeholder="/mnt/sda" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.8125rem;font-family:monospace;">
+                    </div>
+                    <div id="formatSharedAccessContainer" style="margin-top:0.5rem;">
+                        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                            <input type="checkbox" id="formatSharedAccess" checked>
+                            <span style="font-size:0.8125rem;color:var(--text-secondary);">{{T .Lang "storage.shared_access"}}</span>
+                        </label>
+                        <div style="font-size:0.6875rem;color:var(--text-muted);margin-left:1.5rem;">{{T .Lang "storage.shared_access_hint"}}</div>
+                    </div>
+                    <div id="formatPersistentContainer" style="margin-top:0.5rem;">
+                        <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                            <input type="checkbox" id="formatPersistent" checked>
+                            <span style="font-size:0.8125rem;color:var(--text-secondary);">{{T .Lang "storage.persistent_mount"}}</span>
+                        </label>
+                        <div style="font-size:0.6875rem;color:var(--text-muted);margin-left:1.5rem;">{{T .Lang "storage.persistent_mount_hint"}}</div>
+                    </div>
+                </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.5rem;">
+                <button type="button" onclick="closeFormatDiskModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="submit" class="v2-btn v2-btn-danger">{{T .Lang "storage.format"}}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Mount Disk Modal -->
+<div id="mountDiskModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;">
+    <div class="v2-card" style="width:24rem;max-width:90vw;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.mount_disk"}}</div>
+            <button onclick="closeMountDiskModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+        </div>
+        <form id="mountDiskForm" onsubmit="mountDisk(event)">
+            <input type="hidden" id="mountDiskDevice">
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.device"}}</label>
+                    <div id="mountDiskDeviceDisplay" style="font-family:monospace;font-size:0.8125rem;background:var(--bg-page);padding:0.5rem 0.75rem;border-radius:6px;color:var(--text-primary);"></div>
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.mount_path"}}</label>
+                    <input type="text" id="mountDiskPath" required placeholder="/mnt/sda" style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.8125rem;font-family:monospace;">
+                    <div style="font-size:0.6875rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "storage.mount_path_hint"}}</div>
+                </div>
+                <div style="border-top:1px solid var(--border);padding-top:1rem;">
+                    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                        <input type="checkbox" id="mountSharedAccess" checked>
+                        <span style="font-size:0.8125rem;color:var(--text-secondary);">{{T .Lang "storage.shared_access"}}</span>
+                    </label>
+                    <div style="font-size:0.6875rem;color:var(--text-muted);margin-left:1.5rem;">{{T .Lang "storage.shared_access_hint"}}</div>
+                    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-top:0.5rem;">
+                        <input type="checkbox" id="mountPersistent">
+                        <span style="font-size:0.8125rem;color:var(--text-secondary);">{{T .Lang "storage.persistent_mount"}}</span>
+                    </label>
+                    <div style="font-size:0.6875rem;color:var(--text-muted);margin-left:1.5rem;">{{T .Lang "storage.persistent_mount_hint"}}</div>
+                </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.5rem;">
+                <button type="button" onclick="closeMountDiskModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "storage.mount"}}</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+var verificationToken = null;
+var pendingAction = null;
+
+// Tab switching
+function showTab(tabName) {
+    document.querySelectorAll('.v2-tab-panel').forEach(function(el) { el.classList.remove('active'); });
+    document.querySelectorAll('.v2-tab').forEach(function(el) { el.classList.remove('active'); });
+    var panel = document.getElementById('tab-' + tabName);
+    if (panel) panel.classList.add('active');
+    var tab = document.querySelector('.v2-tab[data-tab="' + tabName + '"]');
+    if (tab) tab.classList.add('active');
+    if (tabName === 'datasets') loadDatasets();
+    if (tabName === 'snapshots') loadSnapshots();
+}
+
+// Password verification
+function requirePassword(title, warning, callback) {
+    pendingAction = callback;
+    document.getElementById('passwordModalTitle').textContent = title;
+    document.getElementById('passwordModalWarning').textContent = warning;
+    document.getElementById('verifyPassword').value = '';
+    document.getElementById('passwordModal').classList.remove('hidden');
+}
+function closePasswordModal() {
+    document.getElementById('passwordModal').classList.add('hidden');
+    pendingAction = null;
+}
+async function submitPasswordVerification(e) {
+    e.preventDefault();
+    var password = document.getElementById('verifyPassword').value;
+    try {
+        var resp = await fetch('/api/admin/verify-password', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({password: password})
+        });
+        var data = await resp.json();
+        if (data.success && data.token) {
+            verificationToken = data.token;
+            var action = pendingAction;
+            closePasswordModal();
+            if (action) action();
+        } else {
+            alert(data.error || '{{T .Lang "login.error"}}');
+        }
+    } catch (err) {
+        alert('{{T .Lang "common.error"}}: ' + err);
+    }
+}
+
+// SMART Modal
+var smartTranslations = {
+    generalInfo: '{{T .Lang "storage.smart.general_info"}}',
+    diskErrors: '{{T .Lang "storage.smart.disk_errors"}}',
+    nvmeInfo: '{{T .Lang "storage.smart.nvme_info"}}',
+    ssdWear: '{{T .Lang "storage.smart.ssd_wear"}}',
+    dataVolume: '{{T .Lang "storage.smart.data_volume"}}',
+    allAttributes: '{{T .Lang "storage.smart.all_attributes"}}',
+    health: '{{T .Lang "storage.health"}}',
+    temp: '{{T .Lang "storage.temp"}}',
+    powerOn: '{{T .Lang "storage.power_on"}}',
+    powerCycles: '{{T .Lang "storage.power_cycles"}}',
+    reallocated: '{{T .Lang "storage.reallocated"}}',
+    pending: '{{T .Lang "storage.pending"}}',
+    uncorrectable: '{{T .Lang "storage.uncorrectable"}}',
+    mediaErrors: '{{T .Lang "storage.smart.media_errors"}}',
+    unsafeShutdowns: '{{T .Lang "storage.smart.unsafe_shutdowns"}}',
+    availableSpare: '{{T .Lang "storage.smart.available_spare"}}',
+    percentageUsed: '{{T .Lang "storage.smart.percentage_used"}}',
+    dataWritten: '{{T .Lang "storage.smart.data_written"}}',
+    dataRead: '{{T .Lang "storage.smart.data_read"}}',
+    statusGood: '{{T .Lang "storage.smart.status.good"}}',
+    statusWarning: '{{T .Lang "storage.smart.status.warning"}}',
+    statusCritical: '{{T .Lang "storage.smart.status.critical"}}',
+    notAvailable: '{{T .Lang "storage.smart_not_available"}}',
+    helpHealth: '{{T .Lang "storage.smart.help.health"}}',
+    helpTemp: '{{T .Lang "storage.smart.help.temperature"}}',
+    helpPowerOn: '{{T .Lang "storage.smart.help.power_on_hours"}}',
+    helpPowerCycles: '{{T .Lang "storage.smart.help.power_cycles"}}',
+    helpReallocated: '{{T .Lang "storage.smart.help.reallocated"}}',
+    helpPending: '{{T .Lang "storage.smart.help.pending"}}',
+    helpUncorrectable: '{{T .Lang "storage.smart.help.uncorrectable"}}',
+    helpMediaErrors: '{{T .Lang "storage.smart.help.media_errors"}}',
+    helpUnsafeShutdowns: '{{T .Lang "storage.smart.help.unsafe_shutdowns"}}',
+    helpAvailableSpare: '{{T .Lang "storage.smart.help.available_spare"}}',
+    helpPercentageUsed: '{{T .Lang "storage.smart.help.percentage_used"}}',
+    helpDataWritten: '{{T .Lang "storage.smart.help.data_written"}}',
+    helpDataRead: '{{T .Lang "storage.smart.help.data_read"}}',
+    attrName: '{{T .Lang "storage.attr_name"}}',
+    attrValue: '{{T .Lang "storage.attr_value"}}',
+    attrWorst: '{{T .Lang "storage.attr_worst"}}',
+    attrRaw: '{{T .Lang "storage.attr_raw"}}'
+};
+
+function helpIcon(tip) {
+    return '<span class="help-tooltip" data-tip="' + tip.replace(/"/g, '&quot;') + '">?</span>';
+}
+function formatBytes(units) {
+    var bytes = units * 512 * 1000;
+    if (bytes >= 1e15) return (bytes / 1e15).toFixed(1) + ' PB';
+    if (bytes >= 1e12) return (bytes / 1e12).toFixed(1) + ' TB';
+    if (bytes >= 1e9) return (bytes / 1e9).toFixed(1) + ' GB';
+    return (bytes / 1e6).toFixed(1) + ' MB';
+}
+function formatHours(hours) {
+    if (hours < 24) return hours + 'h';
+    var days = Math.floor(hours / 24);
+    if (days < 365) return days + 'j (' + hours.toLocaleString() + 'h)';
+    var years = (days / 365).toFixed(1);
+    return years + ' ans (' + hours.toLocaleString() + 'h)';
+}
+function getValueClass(value, warnThresh, critThresh, inverse) {
+    if (inverse) {
+        if (value <= critThresh) return 'smart-value-critical';
+        if (value <= warnThresh) return 'smart-value-warning';
+        return 'smart-value-good';
+    } else {
+        if (value >= critThresh) return 'smart-value-critical';
+        if (value >= warnThresh) return 'smart-value-warning';
+        return 'smart-value-good';
+    }
+}
+function smartMetricRow(label, value, helpTip, valueClass) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:0.375rem 0;border-bottom:1px solid var(--border);">' +
+        '<div style="display:flex;align-items:center;font-size:0.8125rem;color:var(--text-secondary);">' + label + helpIcon(helpTip) + '</div>' +
+        '<div style="font-size:0.8125rem;font-weight:500;" class="' + (valueClass || '') + '">' + value + '</div></div>';
+}
+
+function showSMARTDetails(diskName) {
+    document.getElementById('smartDiskName').textContent = diskName;
+    document.getElementById('smartContent').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">{{T .Lang "common.loading"}}...</div>';
+    document.getElementById('smartModal').classList.remove('hidden');
+
+    fetch('/api/admin/storage/disk/' + diskName + '/smart')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.available) {
+            document.getElementById('smartContent').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">' + smartTranslations.notAvailable + '</div>';
+            return;
+        }
+        var html = '';
+        var healthClass = data.healthy ? 'background:rgba(16,185,129,0.1);border:1px solid var(--success);color:var(--success);' : 'background:rgba(239,68,68,0.1);border:1px solid var(--error);color:var(--error);';
+        var healthText = data.healthy ? smartTranslations.statusGood : smartTranslations.statusCritical;
+        html += '<div style="display:flex;align-items:center;gap:0.5rem;padding:0.75rem;border-radius:8px;margin-bottom:1rem;' + healthClass + '">';
+        html += '<span style="font-weight:500;">' + smartTranslations.health + ': ' + healthText + '</span>' + helpIcon(smartTranslations.helpHealth) + '</div>';
+
+        html += '<div class="smart-card"><div class="smart-card-title">' + smartTranslations.generalInfo + '</div>';
+        var tempClass = data.temperature > 60 ? 'smart-value-critical' : (data.temperature > 50 ? 'smart-value-warning' : 'smart-value-good');
+        html += smartMetricRow(smartTranslations.temp, data.temperature > 0 ? data.temperature + '°C' : '-', smartTranslations.helpTemp, tempClass);
+        var powerHoursClass = data.power_on_hours > 50000 ? 'smart-value-warning' : '';
+        html += smartMetricRow(smartTranslations.powerOn, data.power_on_hours > 0 ? formatHours(data.power_on_hours) : '-', smartTranslations.helpPowerOn, powerHoursClass);
+        html += smartMetricRow(smartTranslations.powerCycles, data.power_cycle_count > 0 ? data.power_cycle_count.toLocaleString() : '-', smartTranslations.helpPowerCycles, '');
+        html += '</div>';
+
+        if (data.is_nvme) {
+            html += '<div class="smart-card"><div class="smart-card-title">' + smartTranslations.nvmeInfo + '</div>';
+            html += smartMetricRow(smartTranslations.mediaErrors, data.media_errors, smartTranslations.helpMediaErrors, data.media_errors > 0 ? 'smart-value-critical' : 'smart-value-good');
+            html += smartMetricRow(smartTranslations.unsafeShutdowns, data.unsafe_shutdowns, smartTranslations.helpUnsafeShutdowns, data.unsafe_shutdowns > 100 ? 'smart-value-warning' : '');
+            html += '</div>';
+            html += '<div class="smart-card"><div class="smart-card-title">' + smartTranslations.ssdWear + '</div>';
+            html += smartMetricRow(smartTranslations.availableSpare, data.available_spare + '%', smartTranslations.helpAvailableSpare, getValueClass(data.available_spare, 20, 10, true));
+            html += smartMetricRow(smartTranslations.percentageUsed, data.percentage_used + '%', smartTranslations.helpPercentageUsed, getValueClass(data.percentage_used, 80, 100, false));
+            html += '</div>';
+            if (data.data_units_written > 0 || data.data_units_read > 0) {
+                html += '<div class="smart-card"><div class="smart-card-title">' + smartTranslations.dataVolume + '</div>';
+                html += smartMetricRow(smartTranslations.dataWritten, formatBytes(data.data_units_written), smartTranslations.helpDataWritten, '');
+                html += smartMetricRow(smartTranslations.dataRead, formatBytes(data.data_units_read), smartTranslations.helpDataRead, '');
+                html += '</div>';
+            }
+        } else {
+            var hasErrors = data.reallocated_sectors > 0 || data.pending_sectors > 0 || data.uncorrectable_sectors > 0;
+            html += '<div class="smart-card" style="' + (hasErrors ? 'border:1px solid var(--error);' : '') + '"><div class="smart-card-title">' + smartTranslations.diskErrors + '</div>';
+            html += smartMetricRow(smartTranslations.reallocated, data.reallocated_sectors, smartTranslations.helpReallocated, getValueClass(data.reallocated_sectors, 10, 100, false));
+            html += smartMetricRow(smartTranslations.pending, data.pending_sectors, smartTranslations.helpPending, data.pending_sectors > 0 ? 'smart-value-critical' : 'smart-value-good');
+            html += smartMetricRow(smartTranslations.uncorrectable, data.uncorrectable_sectors, smartTranslations.helpUncorrectable, data.uncorrectable_sectors > 0 ? 'smart-value-critical' : 'smart-value-good');
+            html += '</div>';
+        }
+
+        if (data.attributes && data.attributes.length > 0) {
+            html += '<details class="smart-card"><summary class="smart-card-title" style="cursor:pointer;">' + smartTranslations.allAttributes + ' (' + data.attributes.length + ')</summary>';
+            html += '<div style="overflow-x:auto;margin-top:0.5rem;max-height:12rem;overflow-y:auto;"><table class="v2-table" style="font-size:0.75rem;"><thead><tr>';
+            html += '<th>ID</th><th>' + smartTranslations.attrName + '</th><th style="text-align:right;">' + smartTranslations.attrValue + '</th><th style="text-align:right;">' + smartTranslations.attrWorst + '</th><th>' + smartTranslations.attrRaw + '</th></tr></thead><tbody>';
+            data.attributes.forEach(function(attr) {
+                var rowStyle = attr.status === 'failing' ? 'background:rgba(239,68,68,0.1);' : (attr.status === 'warning' ? 'background:rgba(245,158,11,0.1);' : '');
+                html += '<tr style="' + rowStyle + '"><td>' + attr.id + '</td><td>' + attr.name + '</td><td style="text-align:right;">' + attr.value + '</td><td style="text-align:right;">' + attr.worst + '</td><td style="font-family:monospace;">' + attr.raw_value + '</td></tr>';
+            });
+            html += '</tbody></table></div></details>';
+        }
+        document.getElementById('smartContent').innerHTML = html;
+    }).catch(function(err) {
+        document.getElementById('smartContent').innerHTML = '<div style="text-align:center;color:var(--error);padding:2rem;">{{T .Lang "common.error"}}: ' + err + '</div>';
+    });
+}
+function closeSMARTModal() { document.getElementById('smartModal').classList.add('hidden'); }
+
+// Pool operations
+function startScrub(poolName) {
+    if (!confirm('{{T .Lang "storage.confirm_scrub"}}')) return;
+    fetch('/api/admin/storage/pool/' + poolName + '/scrub', {method: 'POST'})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) { alert('{{T .Lang "storage.scrub_started"}}'); location.reload(); }
+        else alert('{{T .Lang "storage.scrub_error"}}: ' + (data.error || 'Unknown'));
+    }).catch(function(err) { alert('{{T .Lang "storage.scrub_error"}}: ' + err); });
+}
+
+function showCreatePoolModal() {
+    loadAvailableDisks();
+    document.getElementById('createPoolModal').classList.remove('hidden');
+}
+function closeCreatePoolModal() { document.getElementById('createPoolModal').classList.add('hidden'); }
+
+async function loadAvailableDisks() {
+    try {
+        var resp = await fetch('/api/admin/storage/disks/available');
+        var disks = await resp.json();
+        var html = '';
+        disks.forEach(function(disk) {
+            var disabled = disk.in_use ? 'disabled' : '';
+            var label = disk.in_use ? disk.path + ' (' + disk.size_human + ') - ' + disk.in_use_by : disk.path + ' (' + disk.size_human + ')';
+            html += '<label style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0;font-size:0.8125rem;color:' + (disk.in_use ? 'var(--text-muted)' : 'var(--text-primary)') + ';"><input type="checkbox" name="poolDisks" value="' + disk.path + '" ' + disabled + '>' + label + '</label>';
+        });
+        document.getElementById('poolDisksList').innerHTML = html || '<div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.8125rem;">{{T .Lang "storage.no_available_disks"}}</div>';
+    } catch (err) {
+        document.getElementById('poolDisksList').innerHTML = '<div style="text-align:center;color:var(--error);padding:1rem;font-size:0.8125rem;">{{T .Lang "common.error"}}</div>';
+    }
+}
+
+async function createPool(e) {
+    e.preventDefault();
+    var name = document.getElementById('poolName').value;
+    var vdevType = document.getElementById('poolVdevType').value;
+    var compression = document.getElementById('poolCompression').value;
+    var mountpoint = document.getElementById('poolMountpoint').value;
+    var disks = Array.from(document.querySelectorAll('input[name="poolDisks"]:checked')).map(function(el) { return el.value; });
+    if (disks.length === 0) { alert('{{T .Lang "storage.select_at_least_one_disk"}}'); return; }
+    closeCreatePoolModal();
+    requirePassword('{{T .Lang "storage.create_pool"}}', '{{T .Lang "storage.create_pool_warning"}}', async function() {
+        try {
+            var resp = await fetch('/api/admin/storage/pool', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
+                body: JSON.stringify({name: name, vdev_type: vdevType, disks: disks, compression: compression, mountpoint: mountpoint, force: true})
+            });
+            var data = await resp.json();
+            if (data.success) { alert('{{T .Lang "storage.pool_created"}}'); location.reload(); }
+            else alert('{{T .Lang "common.error"}}: ' + data.error);
+        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
+    });
+}
+
+function showDestroyPoolModal(poolName) {
+    requirePassword('{{T .Lang "storage.destroy_pool"}}: ' + poolName, '{{T .Lang "storage.destroy_pool_warning"}}', async function() {
+        try {
+            var resp = await fetch('/api/admin/storage/pool-destroy/' + poolName + '?force=true', {
+                method: 'DELETE',
+                headers: {'X-Verification-Token': verificationToken}
+            });
+            var data = await resp.json();
+            if (data.success) { alert('{{T .Lang "storage.pool_destroyed"}}'); location.reload(); }
+            else alert('{{T .Lang "common.error"}}: ' + data.error);
+        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
+    });
+}
+
+function showExportPoolModal(poolName) {
+    requirePassword('{{T .Lang "storage.export_pool"}}: ' + poolName, '{{T .Lang "storage.export_pool_warning"}}', async function() {
+        try {
+            var resp = await fetch('/api/admin/storage/pool-export/' + poolName, {
+                method: 'POST',
+                headers: {'X-Verification-Token': verificationToken}
+            });
+            var data = await resp.json();
+            if (data.success) { alert('{{T .Lang "storage.pool_exported"}}'); location.reload(); }
+            else alert('{{T .Lang "common.error"}}: ' + data.error);
+        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
+    });
+}
+
+function showImportPoolModal() {
+    fetch('/api/admin/storage/pools/importable')
+    .then(function(r) { return r.json(); })
+    .then(function(pools) {
+        if (!pools || pools.length === 0) { alert('{{T .Lang "storage.no_importable_pools"}}'); return; }
+        var poolName = prompt('{{T .Lang "storage.select_pool_to_import"}}:\n' + pools.map(function(p) { return p.name; }).join('\n'));
+        if (!poolName) return;
+        requirePassword('{{T .Lang "storage.import_pool"}}: ' + poolName, '{{T .Lang "storage.import_pool_warning"}}', async function() {
+            var resp = await fetch('/api/admin/storage/pools/import', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
+                body: JSON.stringify({name: poolName, force: true})
+            });
+            var data = await resp.json();
+            if (data.success) { alert('{{T .Lang "storage.pool_imported"}}'); location.reload(); }
+            else alert('{{T .Lang "common.error"}}: ' + data.error);
+        });
+    }).catch(function(err) { alert('{{T .Lang "common.error"}}: ' + err); });
+}
+
+// Dataset operations
+async function loadDatasets() {
+    var pools = '{{range .Pools}}{{.Name}},{{end}}';
+    var poolList = pools.split(',').filter(function(p) { return p; });
+    if (poolList.length === 0) {
+        document.getElementById('datasets-list').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">{{T .Lang "storage.no_pools"}}</div>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < poolList.length; i++) {
+        var pool = poolList[i];
+        try {
+            var resp = await fetch('/api/admin/storage/datasets?parent=' + pool);
+            var datasets = await resp.json();
+            if (datasets && datasets.length > 0) {
+                html += '<div style="margin-bottom:1.5rem;"><div style="font-weight:500;color:var(--text-primary);margin-bottom:0.5rem;">' + pool + '</div>';
+                html += '<div style="overflow-x:auto;"><table class="v2-table"><thead><tr>';
+                html += '<th>{{T .Lang "storage.dataset"}}</th><th>{{T .Lang "storage.type"}}</th><th style="text-align:right;">{{T .Lang "storage.used"}}</th><th style="text-align:right;">{{T .Lang "storage.available"}}</th><th>{{T .Lang "storage.compression"}}</th><th>{{T .Lang "users.actions"}}</th>';
+                html += '</tr></thead><tbody>';
+                datasets.forEach(function(ds) {
+                    html += '<tr><td>' + ds.name + '</td><td>' + ds.type + '</td><td style="text-align:right;">' + ds.used_human + '</td><td style="text-align:right;">' + ds.avail_human + '</td><td>' + ds.compression + '</td>';
+                    html += '<td><button onclick="deleteDataset(\'' + ds.name + '\')" class="v2-btn v2-btn-danger v2-btn-sm">{{T .Lang "common.delete"}}</button></td></tr>';
+                });
+                html += '</tbody></table></div></div>';
+            }
+        } catch (err) { console.error('Error loading datasets for', pool, err); }
+    }
+    document.getElementById('datasets-list').innerHTML = html || '<div style="text-align:center;color:var(--text-muted);padding:2rem;">{{T .Lang "storage.no_datasets"}}</div>';
+}
+
+function showCreateDatasetModal() { document.getElementById('createDatasetModal').classList.remove('hidden'); }
+function closeCreateDatasetModal() { document.getElementById('createDatasetModal').classList.add('hidden'); }
+
+async function createDataset(e) {
+    e.preventDefault();
+    var name = document.getElementById('datasetName').value;
+    var compression = document.getElementById('datasetCompression').value;
+    var quota = document.getElementById('datasetQuota').value;
+    closeCreateDatasetModal();
+    requirePassword('{{T .Lang "storage.create_dataset"}}', '{{T .Lang "storage.create_dataset_warning"}}', async function() {
+        try {
+            var resp = await fetch('/api/admin/storage/dataset', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
+                body: JSON.stringify({name: name, compression: compression, quota: quota})
+            });
+            var data = await resp.json();
+            if (data.success) { alert('{{T .Lang "storage.dataset_created"}}'); loadDatasets(); }
+            else alert('{{T .Lang "common.error"}}: ' + data.error);
+        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
+    });
+}
+
+function deleteDataset(name) {
+    requirePassword('{{T .Lang "storage.delete_dataset"}}: ' + name, '{{T .Lang "storage.delete_dataset_warning"}}', async function() {
+        try {
+            var resp = await fetch('/api/admin/storage/dataset-delete?name=' + encodeURIComponent(name), {
+                method: 'DELETE',
+                headers: {'X-Verification-Token': verificationToken}
+            });
+            var data = await resp.json();
+            if (data.success) { alert('{{T .Lang "storage.dataset_deleted"}}'); loadDatasets(); }
+            else alert('{{T .Lang "common.error"}}: ' + data.error);
+        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
+    });
+}
+
+// Snapshot operations
+async function loadSnapshots() {
+    try {
+        var resp = await fetch('/api/admin/storage/snapshots');
+        var snapshots = await resp.json();
+        var html = '';
+        if (snapshots && snapshots.length > 0) {
+            html = '<div style="overflow-x:auto;"><table class="v2-table"><thead><tr>';
+            html += '<th>{{T .Lang "storage.snapshot"}}</th><th>{{T .Lang "storage.dataset"}}</th><th style="text-align:right;">{{T .Lang "storage.used"}}</th><th>{{T .Lang "storage.created"}}</th><th>{{T .Lang "users.actions"}}</th>';
+            html += '</tr></thead><tbody>';
+            snapshots.forEach(function(snap) {
+                html += '<tr><td>' + snap.snap_name + '</td><td>' + snap.dataset + '</td><td style="text-align:right;">' + snap.used_human + '</td><td>' + snap.creation_str + '</td>';
+                html += '<td><button onclick="rollbackSnapshot(\'' + snap.name + '\')" class="v2-btn v2-btn-secondary v2-btn-sm" style="margin-right:0.25rem;">{{T .Lang "storage.rollback"}}</button>';
+                html += '<button onclick="deleteSnapshot(\'' + snap.name + '\')" class="v2-btn v2-btn-danger v2-btn-sm">{{T .Lang "common.delete"}}</button></td></tr>';
+            });
+            html += '</tbody></table></div>';
+        } else {
+            html = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">{{T .Lang "storage.no_snapshots"}}</div>';
+        }
+        document.getElementById('snapshots-list').innerHTML = html;
+        // Populate snapshot dataset dropdown
+        var pools = '{{range .Pools}}{{.Name}},{{end}}';
+        var select = document.getElementById('snapshotDataset');
+        select.innerHTML = '';
+        var poolArr = pools.split(',').filter(function(p) { return p; });
+        for (var i = 0; i < poolArr.length; i++) {
+            try {
+                var dsResp = await fetch('/api/admin/storage/datasets?parent=' + poolArr[i]);
+                var datasets = await dsResp.json();
+                datasets.forEach(function(ds) {
+                    var opt = document.createElement('option');
+                    opt.value = ds.name;
+                    opt.textContent = ds.name;
+                    select.appendChild(opt);
+                });
+            } catch (err) { console.error(err); }
+        }
+    } catch (err) {
+        document.getElementById('snapshots-list').innerHTML = '<div style="text-align:center;color:var(--error);padding:2rem;">{{T .Lang "common.error"}}</div>';
+    }
+}
+
+function showCreateSnapshotModal() { document.getElementById('createSnapshotModal').classList.remove('hidden'); }
+function closeCreateSnapshotModal() { document.getElementById('createSnapshotModal').classList.add('hidden'); }
+
+async function createSnapshot(e) {
+    e.preventDefault();
+    var dataset = document.getElementById('snapshotDataset').value;
+    var name = document.getElementById('snapshotName').value;
+    try {
+        var resp = await fetch('/api/admin/storage/snapshot', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({dataset: dataset, name: name})
+        });
+        var data = await resp.json();
+        if (data.success) { alert('{{T .Lang "storage.snapshot_created"}}'); closeCreateSnapshotModal(); loadSnapshots(); }
+        else alert('{{T .Lang "common.error"}}: ' + data.error);
+    } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
+}
+
+function deleteSnapshot(name) {
+    requirePassword('{{T .Lang "storage.delete_snapshot"}}: ' + name, '{{T .Lang "storage.delete_snapshot_warning"}}', async function() {
+        try {
+            var resp = await fetch('/api/admin/storage/snapshot-delete?name=' + encodeURIComponent(name), {
+                method: 'DELETE',
+                headers: {'X-Verification-Token': verificationToken}
+            });
+            var data = await resp.json();
+            if (data.success) { alert('{{T .Lang "storage.snapshot_deleted"}}'); loadSnapshots(); }
+            else alert('{{T .Lang "common.error"}}: ' + data.error);
+        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
+    });
+}
+
+function rollbackSnapshot(name) {
+    requirePassword('{{T .Lang "storage.rollback_snapshot"}}: ' + name, '{{T .Lang "storage.rollback_warning"}}', async function() {
+        try {
+            var resp = await fetch('/api/admin/storage/snapshot-rollback', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
+                body: JSON.stringify({snapshot: name, destroy_recent: true})
+            });
+            var data = await resp.json();
+            if (data.success) { alert('{{T .Lang "storage.rollback_success"}}'); location.reload(); }
+            else alert('{{T .Lang "common.error"}}: ' + data.error);
+        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
+    });
+}
+
+// Disk format operations
+function showFormatDiskModal(device) {
+    document.getElementById('formatDiskDevice').value = device;
+    document.getElementById('formatDiskDeviceDisplay').textContent = device;
+    var diskName = device.replace('/dev/', '');
+    document.getElementById('formatMountPath').value = '/mnt/' + diskName;
+    document.getElementById('formatMount').checked = true;
+    document.getElementById('formatSharedAccess').checked = true;
+    document.getElementById('formatPersistent').checked = true;
+    document.getElementById('mountPathContainer').style.display = 'block';
+    document.getElementById('formatSharedAccessContainer').style.display = 'block';
+    document.getElementById('formatPersistentContainer').style.display = 'block';
+    document.getElementById('formatDiskModal').classList.remove('hidden');
+}
+function closeFormatDiskModal() { document.getElementById('formatDiskModal').classList.add('hidden'); }
+function toggleMountPath() {
+    var checked = document.getElementById('formatMount').checked;
+    document.getElementById('mountPathContainer').style.display = checked ? 'block' : 'none';
+    document.getElementById('formatSharedAccessContainer').style.display = checked ? 'block' : 'none';
+    document.getElementById('formatPersistentContainer').style.display = checked ? 'block' : 'none';
+}
+
+async function formatDisk(e) {
+    e.preventDefault();
+    var device = document.getElementById('formatDiskDevice').value;
+    var filesystem = document.getElementById('formatFilesystem').value;
+    var label = document.getElementById('formatLabel').value;
+    var mount = document.getElementById('formatMount').checked;
+    var mountPath = mount ? document.getElementById('formatMountPath').value : '';
+    var sharedAccess = mount ? document.getElementById('formatSharedAccess').checked : false;
+    var persistent = mount ? document.getElementById('formatPersistent').checked : false;
+    if (mount && mountPath) {
+        if (!mountPath.startsWith('/mnt/') && !mountPath.startsWith('/media/')) {
+            alert('{{T .Lang "storage.mount_path_error"}}');
+            return;
+        }
+    }
+    closeFormatDiskModal();
+    requirePassword('{{T .Lang "storage.format_disk"}}: ' + device, '{{T .Lang "storage.format_disk_warning"}}', async function() {
+        try {
+            var resp = await fetch('/api/admin/storage/disk/format', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
+                body: JSON.stringify({device: device, filesystem: filesystem, label: label, force: true, mount: mount, mount_path: mountPath, shared_access: sharedAccess, persistent: persistent})
+            });
+            var data = await resp.json();
+            if (data.success) { alert('{{T .Lang "storage.disk_formatted"}}'); location.reload(); }
+            else alert('{{T .Lang "common.error"}}: ' + data.error);
+        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
+    });
+}
+
+// Mount disk operations
+function showMountDiskModal(device, diskName) {
+    document.getElementById('mountDiskDevice').value = device;
+    document.getElementById('mountDiskDeviceDisplay').textContent = device;
+    document.getElementById('mountDiskPath').value = '/mnt/' + diskName;
+    document.getElementById('mountSharedAccess').checked = true;
+    document.getElementById('mountPersistent').checked = false;
+    document.getElementById('mountDiskModal').classList.remove('hidden');
+}
+function closeMountDiskModal() { document.getElementById('mountDiskModal').classList.add('hidden'); }
+
+async function mountDisk(e) {
+    e.preventDefault();
+    var device = document.getElementById('mountDiskDevice').value;
+    var mountPath = document.getElementById('mountDiskPath').value;
+    var sharedAccess = document.getElementById('mountSharedAccess').checked;
+    var persistent = document.getElementById('mountPersistent').checked;
+    if (!mountPath.startsWith('/mnt/') && !mountPath.startsWith('/media/')) {
+        alert('{{T .Lang "storage.mount_path_error"}}');
+        return;
+    }
+    try {
+        var resp = await fetch('/api/admin/storage/disk/mount', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({device: device, mount_path: mountPath, shared_access: sharedAccess, persistent: persistent})
+        });
+        var data = await resp.json();
+        if (data.success) { alert('{{T .Lang "storage.disk_mounted"}}'); closeMountDiskModal(); location.reload(); }
+        else alert('{{T .Lang "common.error"}}: ' + data.error);
+    } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
+}
+
+// Unmount / Eject
+async function unmountDisk(mountPath) {
+    if (!confirm('{{T .Lang "storage.unmount_confirm"}}: ' + mountPath + '?')) return;
+    try {
+        var resp = await fetch('/api/admin/storage/disk/unmount', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({mount_path: mountPath, eject: false})
+        });
+        var data = await resp.json();
+        if (data.success) { alert('{{T .Lang "storage.disk_unmounted"}}'); location.reload(); }
+        else alert('{{T .Lang "common.error"}}: ' + data.error);
+    } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
+}
+
+async function ejectDisk(mountPath) {
+    if (!confirm('{{T .Lang "storage.eject_confirm"}}: ' + mountPath + '?')) return;
+    try {
+        var resp = await fetch('/api/admin/storage/disk/unmount', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({mount_path: mountPath, eject: true})
+        });
+        var data = await resp.json();
+        if (data.success) { alert('{{T .Lang "storage.disk_ejected"}}'); location.reload(); }
+        else alert('{{T .Lang "common.error"}}: ' + data.error);
+    } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
+}
+
+// Close modals on escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeSMARTModal();
+        closePasswordModal();
+        closeCreatePoolModal();
+        closeCreateDatasetModal();
+        closeCreateSnapshotModal();
+        closeFormatDiskModal();
+        closeMountDiskModal();
+    }
+});
+</script>
+{{end}}

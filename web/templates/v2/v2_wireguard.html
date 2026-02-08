@@ -1,0 +1,258 @@
+{{/* Anemone v2 - WireGuard VPN configuration page */}}
+{{define "content"}}
+<!-- Success/Error Messages -->
+{{if .Success}}
+<div class="v2-card" style="border-left:3px solid var(--success);margin-bottom:1rem;">
+    <div style="font-size:0.875rem;color:var(--success);">{{.Success}}</div>
+</div>
+{{end}}
+{{if .Error}}
+<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;">
+    <div style="font-size:0.875rem;color:var(--error);">{{.Error}}</div>
+</div>
+{{end}}
+
+{{if not .Installed}}
+<!-- WireGuard Not Installed -->
+<div class="v2-card" style="border-left:3px solid var(--warning);">
+    <div style="display:flex;align-items:flex-start;gap:0.75rem;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" style="flex-shrink:0;margin-top:2px;">
+            <path d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z"/>
+        </svg>
+        <div>
+            <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:0.5rem;">
+                {{T .Lang "wireguard.not_installed"}}
+            </div>
+            <div style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:0.75rem;">
+                {{T .Lang "wireguard.not_installed.help"}}
+            </div>
+            <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+                <code style="font-size:0.75rem;background:var(--bg-page);padding:0.375rem 0.75rem;border-radius:0.375rem;color:var(--text-primary);">sudo dnf install wireguard-tools</code>
+                <code style="font-size:0.75rem;background:var(--bg-page);padding:0.375rem 0.75rem;border-radius:0.375rem;color:var(--text-primary);">sudo apt install wireguard-tools</code>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{else if not .Config}}
+<!-- No Configuration -->
+<div class="v2-card v2-empty">
+    <svg class="v2-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+    </svg>
+    <div style="font-size:0.9375rem;font-weight:600;margin-bottom:0.25rem;">{{T .Lang "wireguard.not_configured"}}</div>
+    <div style="font-size:0.8125rem;color:var(--text-muted);margin-bottom:1rem;">{{T .Lang "wireguard.not_configured.help"}}</div>
+    <button type="button" onclick="document.getElementById('importModal').classList.remove('hidden')" class="v2-btn v2-btn-primary">
+        {{T .Lang "wireguard.import"}}
+    </button>
+</div>
+
+{{else}}
+<!-- Configuration Display -->
+<div class="v2-card" style="padding:0;overflow:hidden;">
+    <!-- Status Header -->
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:0.75rem;">
+            <span style="font-size:0.8125rem;font-weight:500;color:var(--text-secondary);">{{T .Lang "wireguard.status"}}:</span>
+            {{if and .Status .Status.Connected}}
+                <span class="v2-badge v2-badge-success">{{T .Lang "wireguard.status.connected"}}</span>
+            {{else}}
+                <span class="v2-badge" style="background:var(--bg-page);color:var(--text-muted);">{{T .Lang "wireguard.status.disconnected"}}</span>
+            {{end}}
+        </div>
+        <div style="display:flex;gap:0.5rem;">
+            {{if and .Status .Status.Connected}}
+            <form method="POST" action="/admin/wireguard/disconnect" style="display:inline;">
+                <button type="submit" class="v2-btn v2-btn-secondary v2-btn-sm">{{T .Lang "wireguard.disconnect"}}</button>
+            </form>
+            {{else}}
+            <form method="POST" action="/admin/wireguard/connect" style="display:inline;">
+                <button type="submit" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "wireguard.connect"}}</button>
+            </form>
+            {{end}}
+        </div>
+    </div>
+
+    {{if and .Status .Status.Connected}}
+    <!-- Connection Stats -->
+    <div style="padding:0.75rem 1.25rem;border-bottom:1px solid var(--border);background:rgba(16,185,129,0.05);">
+        <div style="display:flex;gap:2rem;flex-wrap:wrap;">
+            {{if .Status.LatestHandshake}}
+            <div>
+                <div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">{{T .Lang "wireguard.status.handshake"}}</div>
+                <div style="font-size:0.875rem;font-weight:500;color:var(--text-primary);">{{.Status.LatestHandshake}}</div>
+            </div>
+            {{end}}
+            {{if .Status.TransferRx}}
+            <div>
+                <div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">{{T .Lang "wireguard.status.received"}}</div>
+                <div style="font-size:0.875rem;font-weight:500;color:var(--text-primary);">{{.Status.TransferRx}}</div>
+            </div>
+            {{end}}
+            {{if .Status.TransferTx}}
+            <div>
+                <div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">{{T .Lang "wireguard.status.sent"}}</div>
+                <div style="font-size:0.875rem;font-weight:500;color:var(--text-primary);">{{.Status.TransferTx}}</div>
+            </div>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+
+    <!-- Interface Section -->
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+        <div style="font-size:0.8125rem;font-weight:600;color:var(--text-primary);margin-bottom:0.75rem;">{{T .Lang "wireguard.interface"}}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+            <div>
+                <div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">{{T .Lang "wireguard.interface"}}</div>
+                <div style="font-size:0.875rem;font-family:monospace;color:var(--text-primary);">{{.Config.Name}}</div>
+            </div>
+            <div>
+                <div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">{{T .Lang "wireguard.address"}}</div>
+                <div style="font-size:0.875rem;font-family:monospace;color:var(--text-primary);">{{.Config.Address}}</div>
+            </div>
+            {{if .Config.PublicKey}}
+            <div style="grid-column:span 2;">
+                <div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">{{T .Lang "wireguard.public_key"}}</div>
+                <div style="font-size:0.75rem;font-family:monospace;color:var(--text-primary);word-break:break-all;cursor:pointer;user-select:all;">{{.Config.PublicKey}}</div>
+            </div>
+            {{end}}
+            {{if .Config.DNS}}
+            <div>
+                <div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">{{T .Lang "wireguard.dns"}}</div>
+                <div style="font-size:0.875rem;font-family:monospace;color:var(--text-primary);">{{.Config.DNS}}</div>
+            </div>
+            {{end}}
+        </div>
+    </div>
+
+    <!-- Peer Section -->
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+        <div style="font-size:0.8125rem;font-weight:600;color:var(--text-primary);margin-bottom:0.75rem;">{{T .Lang "wireguard.peer"}}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+            <div style="grid-column:span 2;">
+                <div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">{{T .Lang "wireguard.peer.endpoint"}}</div>
+                <div style="font-size:0.875rem;font-family:monospace;color:var(--text-primary);">{{.Config.PeerEndpoint}}</div>
+            </div>
+            <div style="grid-column:span 2;">
+                <div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">{{T .Lang "wireguard.peer.public_key"}}</div>
+                <div style="font-size:0.75rem;font-family:monospace;color:var(--text-primary);word-break:break-all;">{{.Config.PeerPublicKey}}</div>
+            </div>
+            <div>
+                <div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">{{T .Lang "wireguard.peer.allowed_ips"}}</div>
+                <div style="font-size:0.875rem;font-family:monospace;color:var(--text-primary);">{{.Config.AllowedIPs}}</div>
+            </div>
+            <div>
+                <div style="font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);">{{T .Lang "wireguard.peer.keepalive"}}</div>
+                <div style="font-size:0.875rem;color:var(--text-primary);">{{.Config.PersistentKeepalive}}s</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Options -->
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border);">
+        <form method="POST" action="/admin/wireguard/options" style="display:flex;align-items:center;gap:0.5rem;">
+            <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                <input type="checkbox" name="auto_start" value="1" {{if .Config.AutoStart}}checked{{end}}
+                       onchange="this.form.submit()" style="accent-color:var(--accent);">
+                <span style="font-size:0.8125rem;color:var(--text-primary);">{{T .Lang "wireguard.auto_start"}}</span>
+            </label>
+            <span style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "wireguard.auto_start.help"}}</span>
+        </form>
+    </div>
+
+    <!-- Actions -->
+    <div style="padding:1rem 1.25rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <button type="button" onclick="document.getElementById('importModal').classList.remove('hidden')" class="v2-btn v2-btn-secondary v2-btn-sm">
+            {{T .Lang "wireguard.import"}}
+        </button>
+        <button type="button" onclick="document.getElementById('editModal').classList.remove('hidden')" class="v2-btn v2-btn-secondary v2-btn-sm">
+            {{T .Lang "wireguard.edit"}}
+        </button>
+        <button type="button" onclick="if(confirm('{{T .Lang `wireguard.delete.confirm`}}')) document.getElementById('deleteForm').submit()" class="v2-btn v2-btn-danger v2-btn-sm">
+            {{T .Lang "wireguard.delete"}}
+        </button>
+        <form id="deleteForm" method="POST" action="/admin/wireguard/delete" style="display:none;"></form>
+    </div>
+</div>
+{{end}}
+
+<!-- Import Modal -->
+<div id="importModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;">
+    <div class="v2-card" style="max-width:32rem;width:100%;margin:1rem;">
+        <form method="POST" action="/admin/wireguard/import">
+            <div style="margin-bottom:1rem;">
+                <div style="font-size:1rem;font-weight:600;color:var(--text-primary);">{{T .Lang "wireguard.import.title"}}</div>
+                <div style="font-size:0.8125rem;color:var(--text-secondary);margin-top:0.25rem;">{{T .Lang "wireguard.import.help"}}</div>
+            </div>
+            <textarea name="config" rows="10" required
+                      style="width:100%;padding:0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-family:monospace;font-size:0.8125rem;resize:vertical;"
+                      placeholder="{{T .Lang "wireguard.import.placeholder"}}"></textarea>
+            <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;">
+                <button type="button" onclick="document.getElementById('importModal').classList.add('hidden')" class="v2-btn v2-btn-secondary">
+                    {{T .Lang "wireguard.cancel"}}
+                </button>
+                <button type="submit" class="v2-btn v2-btn-primary">
+                    {{T .Lang "wireguard.import"}}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+{{if .Config}}
+<div id="editModal" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1000;">
+    <div class="v2-card" style="max-width:32rem;width:100%;margin:1rem;">
+        <form method="POST" action="/admin/wireguard/edit">
+            <div style="margin-bottom:1rem;">
+                <div style="font-size:1rem;font-weight:600;color:var(--text-primary);">{{T .Lang "wireguard.edit.title"}}</div>
+                <div style="font-size:0.8125rem;color:var(--text-secondary);margin-top:0.25rem;">{{T .Lang "wireguard.edit.help"}}</div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "wireguard.interface"}}</label>
+                    <input type="text" name="name" value="{{.Config.Name}}" required
+                           style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "wireguard.address"}}</label>
+                    <input type="text" name="address" value="{{.Config.Address}}" required
+                           style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                </div>
+            </div>
+            <div style="margin-top:0.75rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "wireguard.dns"}}</label>
+                <input type="text" name="dns" value="{{.Config.DNS}}"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+            <div style="margin-top:0.75rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "wireguard.peer.endpoint"}}</label>
+                <input type="text" name="peer_endpoint" value="{{.Config.PeerEndpoint}}" required
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.75rem;">
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "wireguard.peer.allowed_ips"}}</label>
+                    <input type="text" name="allowed_ips" value="{{.Config.AllowedIPs}}" required
+                           style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                </div>
+                <div>
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "wireguard.peer.keepalive"}} (s)</label>
+                    <input type="number" name="persistent_keepalive" value="{{.Config.PersistentKeepalive}}" min="0"
+                           style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;">
+                <button type="button" onclick="document.getElementById('editModal').classList.add('hidden')" class="v2-btn v2-btn-secondary">
+                    {{T .Lang "wireguard.cancel"}}
+                </button>
+                <button type="submit" class="v2-btn v2-btn-primary">
+                    {{T .Lang "wireguard.save"}}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{{end}}
+{{end}}

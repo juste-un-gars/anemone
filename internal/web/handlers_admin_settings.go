@@ -31,22 +31,7 @@ func (s *Server) handleAdminSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := struct {
-		Lang         string
-		Session      *auth.Session
-		IsConfigured bool
-		Success      string
-		Error        string
-	}{
-		Lang:         lang,
-		Session:      session,
-		IsConfigured: isConfigured,
-	}
-
-	if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
-		logger.Error("Error rendering admin settings template", "error", err)
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-	}
+	s.renderSettingsPage(w, session, lang, isConfigured, "", "")
 }
 
 func (s *Server) handleAdminSettingsSyncPassword(w http.ResponseWriter, r *http.Request) {
@@ -70,43 +55,13 @@ func (s *Server) handleAdminSettingsSyncPassword(w http.ResponseWriter, r *http.
 	// Validate
 	if password == "" || len(password) < 8 {
 		isConfigured, _ := syncauth.IsConfigured(s.db)
-		data := struct {
-			Lang         string
-			Session      *auth.Session
-			IsConfigured bool
-			Success      string
-			Error        string
-		}{
-			Lang:         lang,
-			Session:      session,
-			IsConfigured: isConfigured,
-			Error:        "Le mot de passe doit contenir au moins 8 caractères",
-		}
-		if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
-			logger.Error("Error rendering admin settings template", "error", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
+		s.renderSettingsPage(w, session, lang, isConfigured, "", "Le mot de passe doit contenir au moins 8 caractères")
 		return
 	}
 
 	if password != passwordConfirm {
 		isConfigured, _ := syncauth.IsConfigured(s.db)
-		data := struct {
-			Lang         string
-			Session      *auth.Session
-			IsConfigured bool
-			Success      string
-			Error        string
-		}{
-			Lang:         lang,
-			Session:      session,
-			IsConfigured: isConfigured,
-			Error:        "Les mots de passe ne correspondent pas",
-		}
-		if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
-			logger.Error("Error rendering admin settings template", "error", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
+		s.renderSettingsPage(w, session, lang, isConfigured, "", "Les mots de passe ne correspondent pas")
 		return
 	}
 
@@ -114,42 +69,37 @@ func (s *Server) handleAdminSettingsSyncPassword(w http.ResponseWriter, r *http.
 	if err := syncauth.SetSyncAuthPassword(s.db, password); err != nil {
 		logger.Error("Error setting sync auth password", "error", err)
 		isConfigured, _ := syncauth.IsConfigured(s.db)
-		data := struct {
-			Lang         string
-			Session      *auth.Session
-			IsConfigured bool
-			Success      string
-			Error        string
-		}{
-			Lang:         lang,
-			Session:      session,
-			IsConfigured: isConfigured,
-			Error:        "Erreur lors de la configuration du mot de passe",
-		}
-		if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
-			logger.Error("Error rendering admin settings template", "error", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
+		s.renderSettingsPage(w, session, lang, isConfigured, "", "Erreur lors de la configuration du mot de passe")
 		return
 	}
 
 	// Success
 	logger.Info("Admin configured sync auth password", "admin", session.Username)
 	isConfigured, _ := syncauth.IsConfigured(s.db)
+	s.renderSettingsPage(w, session, lang, isConfigured, "Mot de passe de synchronisation configuré avec succès", "")
+}
+
+// renderSettingsPage renders the v2 settings page with optional messages.
+func (s *Server) renderSettingsPage(w http.ResponseWriter, session *auth.Session, lang string, isConfigured bool, success, errMsg string) {
 	data := struct {
-		Lang         string
-		Session      *auth.Session
+		V2TemplateData
 		IsConfigured bool
 		Success      string
 		Error        string
 	}{
-		Lang:         lang,
-		Session:      session,
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      "Sync Security",
+			ActivePage: "settings",
+			Session:    session,
+		},
 		IsConfigured: isConfigured,
-		Success:      "Mot de passe de synchronisation configuré avec succès",
+		Success:      success,
+		Error:        errMsg,
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "admin_settings.html", data); err != nil {
+	tmpl := s.loadV2Page("v2_settings.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 		logger.Error("Error rendering admin settings template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
@@ -174,22 +124,7 @@ func (s *Server) handleAdminSettingsTrash(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		data := struct {
-			Lang          string
-			Session       *auth.Session
-			RetentionDays int
-			Success       string
-			Error         string
-		}{
-			Lang:          lang,
-			Session:       session,
-			RetentionDays: retentionDays,
-		}
-
-		if err := s.templates.ExecuteTemplate(w, "admin_settings_trash.html", data); err != nil {
-			logger.Error("Error rendering admin settings trash template", "error", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
+		s.renderTrashPage(w, session, lang, retentionDays, "", "")
 		return
 	}
 
@@ -202,22 +137,7 @@ func (s *Server) handleAdminSettingsTrash(w http.ResponseWriter, r *http.Request
 		retentionDays, err := strconv.Atoi(retentionDaysStr)
 		if err != nil || retentionDays < 0 {
 			currentRetentionDays, _ := sysconfig.GetTrashRetentionDays(s.db)
-			data := struct {
-				Lang          string
-				Session       *auth.Session
-				RetentionDays int
-				Success       string
-				Error         string
-			}{
-				Lang:          lang,
-				Session:       session,
-				RetentionDays: currentRetentionDays,
-				Error:         "La durée de rétention doit être un nombre positif",
-			}
-			if err := s.templates.ExecuteTemplate(w, "admin_settings_trash.html", data); err != nil {
-				logger.Error("Error rendering admin settings trash template", "error", err)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			}
+			s.renderTrashPage(w, session, lang, currentRetentionDays, "", "La durée de rétention doit être un nombre positif")
 			return
 		}
 
@@ -225,46 +145,41 @@ func (s *Server) handleAdminSettingsTrash(w http.ResponseWriter, r *http.Request
 		if err := sysconfig.SetTrashRetentionDays(s.db, retentionDays); err != nil {
 			logger.Error("Error setting trash retention days", "error", err)
 			currentRetentionDays, _ := sysconfig.GetTrashRetentionDays(s.db)
-			data := struct {
-				Lang          string
-				Session       *auth.Session
-				RetentionDays int
-				Success       string
-				Error         string
-			}{
-				Lang:          lang,
-				Session:       session,
-				RetentionDays: currentRetentionDays,
-				Error:         "Erreur lors de la mise à jour de la durée de rétention",
-			}
-			if err := s.templates.ExecuteTemplate(w, "admin_settings_trash.html", data); err != nil {
-				logger.Error("Error rendering admin settings trash template", "error", err)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			}
+			s.renderTrashPage(w, session, lang, currentRetentionDays, "", "Erreur lors de la mise à jour de la durée de rétention")
 			return
 		}
 
 		// Success
 		logger.Info("Admin updated trash retention days", "admin", session.Username, "days", retentionDays)
-		data := struct {
-			Lang          string
-			Session       *auth.Session
-			RetentionDays int
-			Success       string
-			Error         string
-		}{
-			Lang:          lang,
-			Session:       session,
-			RetentionDays: retentionDays,
-			Success:       "Durée de rétention mise à jour avec succès",
-		}
-
-		if err := s.templates.ExecuteTemplate(w, "admin_settings_trash.html", data); err != nil {
-			logger.Error("Error rendering admin settings trash template", "error", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		}
+		s.renderTrashPage(w, session, lang, retentionDays, "Durée de rétention mise à jour avec succès", "")
 		return
 	}
 
 	http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+}
+
+// renderTrashPage renders the v2 trash settings page with optional messages.
+func (s *Server) renderTrashPage(w http.ResponseWriter, session *auth.Session, lang string, retentionDays int, success, errMsg string) {
+	data := struct {
+		V2TemplateData
+		RetentionDays int
+		Success       string
+		Error         string
+	}{
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      "Trash Settings",
+			ActivePage: "trash",
+			Session:    session,
+		},
+		RetentionDays: retentionDays,
+		Success:       success,
+		Error:         errMsg,
+	}
+
+	tmpl := s.loadV2Page("v2_settings_trash.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
+		logger.Error("Error rendering admin settings trash template", "error", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
 }

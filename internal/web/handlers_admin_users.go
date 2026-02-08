@@ -36,14 +36,21 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	data := TemplateData{
-		Lang:    lang,
-		Title:   i18n.T(lang, "users.title"),
-		Session: session,
-		Users:   allUsers,
+	data := struct {
+		V2TemplateData
+		Users []*users.User
+	}{
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      i18n.T(lang, "users.title"),
+			ActivePage: "users",
+			Session:    session,
+		},
+		Users: allUsers,
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "admin_users.html", data); err != nil {
+	tmpl := s.loadV2Page("v2_users.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 		logger.Info("Error rendering users template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return

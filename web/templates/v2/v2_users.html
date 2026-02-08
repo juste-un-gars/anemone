@@ -1,0 +1,109 @@
+{{/* Anemone v2 - Users management page */}}
+{{define "headerActions"}}
+<a href="/admin/users/add" class="v2-btn v2-btn-primary v2-btn-sm">+ {{T .Lang "users.add"}}</a>
+{{end}}
+
+{{define "content"}}
+{{if .Users}}
+<div class="v2-card" style="padding:0;overflow:hidden;">
+    <table class="v2-table">
+        <thead>
+            <tr>
+                <th>{{T .Lang "users.username"}}</th>
+                <th>{{T .Lang "users.email"}}</th>
+                <th>{{T .Lang "users.role"}}</th>
+                <th>{{T .Lang "users.status"}}</th>
+                <th>{{T .Lang "users.created"}}</th>
+                <th style="text-align:right;">{{T .Lang "users.actions"}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Users}}
+            <tr>
+                <td style="font-weight:600;">{{.Username}}</td>
+                <td style="font-size:0.8125rem;color:var(--text-secondary);">{{.Email}}</td>
+                <td>
+                    {{if .IsAdmin}}
+                        <span class="v2-badge v2-badge-info">{{T $.Lang "users.role.admin"}}</span>
+                    {{else}}
+                        <span class="v2-badge" style="background:var(--bg-page);color:var(--text-secondary);">{{T $.Lang "users.role.user"}}</span>
+                    {{end}}
+                </td>
+                <td>
+                    {{if .ActivatedAt}}
+                        <span class="v2-badge v2-badge-success">{{T $.Lang "users.status.active"}}</span>
+                    {{else}}
+                        <span class="v2-badge v2-badge-warning">{{T $.Lang "users.status.pending"}}</span>
+                    {{end}}
+                </td>
+                <td style="font-size:0.8125rem;color:var(--text-secondary);">
+                    {{.CreatedAt.Format "02/01/2006"}}
+                </td>
+                <td style="text-align:right;">
+                    <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+                        {{if not .ActivatedAt}}
+                        <a href="/admin/users/{{.ID}}/token" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "users.action.copy_link"}}</a>
+                        {{end}}
+                        {{if .ActivatedAt}}
+                        <a href="/admin/users/{{.ID}}/reset" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "users.action.reset_password"}}</a>
+                        <a href="/admin/users/{{.ID}}/quota" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "users.quota.edit"}}</a>
+                        {{end}}
+                        <button onclick="deleteUser({{.ID}}, '{{.Username}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "users.action.delete"}}</button>
+                    </div>
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{else}}
+<div class="v2-card v2-empty">
+    <svg class="v2-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
+    </svg>
+    <div style="font-size:0.875rem;margin-bottom:0.5rem;">{{T .Lang "users.empty.title"}}</div>
+    <div style="font-size:0.8125rem;color:var(--text-muted);margin-bottom:1rem;">{{T .Lang "users.empty.message"}}</div>
+    <a href="/admin/users/add" class="v2-btn v2-btn-primary v2-btn-sm">+ {{T .Lang "users.add"}}</a>
+</div>
+{{end}}
+
+<script>
+const translations = {
+    deleteWarningTitle: "{{T .Lang "users.delete.warning_title"}}",
+    deleteWarningMessage: "{{T .Lang "users.delete.warning_message"}}",
+    deleteWarningPrompt: "{{T .Lang "users.delete.warning_prompt"}}",
+    deleteConfirm: "{{T .Lang "users.delete.final_confirm"}}",
+    deleteSuccess: "{{T .Lang "users.delete.success"}}",
+    deleteError: "{{T .Lang "users.delete.error"}}",
+    deleteErrorPrefix: "{{T .Lang "users.delete.error_prefix"}}",
+    deleteCancelled: "{{T .Lang "users.delete.cancelled"}}"
+};
+
+function deleteUser(userId, username) {
+    const warningMessage = translations.deleteWarningTitle + '\n\n' +
+        translations.deleteWarningMessage + '\n' + username + '\n\n' +
+        translations.deleteWarningPrompt;
+
+    const confirmation = prompt(warningMessage);
+
+    if (confirmation === username) {
+        if (confirm(translations.deleteConfirm)) {
+            fetch('/admin/users/' + userId + '/delete', {
+                method: 'POST',
+            }).then(function(response) {
+                if (response.ok) {
+                    alert(translations.deleteSuccess);
+                    window.location.reload();
+                } else {
+                    response.text().then(function(text) { alert(translations.deleteErrorPrefix + text); });
+                }
+            }).catch(function(error) {
+                alert(translations.deleteError + error);
+            });
+        }
+    } else if (confirmation !== null) {
+        alert(translations.deleteCancelled);
+    }
+}
+</script>
+{{end}}

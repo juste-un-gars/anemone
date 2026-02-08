@@ -37,20 +37,30 @@ func (s *Server) handleAdminStorage(w http.ResponseWriter, r *http.Request) {
 		overview = &storage.StorageOverview{}
 	}
 
-	data := map[string]interface{}{
-		"Title":          i18n.T(lang, "storage_management"),
-		"Session":        session,
-		"Overview":       overview,
-		"Disks":          overview.Disks,
-		"Pools":          overview.Pools,
-		"SMARTAvailable": overview.SMARTAvailable,
-		"ZFSAvailable":   overview.ZFSAvailable,
-		"Lang":           lang,
-		"ActivePage":     "storage",
+	data := struct {
+		V2TemplateData
+		Overview       *storage.StorageOverview
+		Disks          []storage.Disk
+		Pools          []storage.ZFSPool
+		SMARTAvailable bool
+		ZFSAvailable   bool
+	}{
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      i18n.T(lang, "storage_management"),
+			ActivePage: "storage",
+			Session:    session,
+		},
+		Overview:       overview,
+		Disks:          overview.Disks,
+		Pools:          overview.Pools,
+		SMARTAvailable: overview.SMARTAvailable,
+		ZFSAvailable:   overview.ZFSAvailable,
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "admin_storage.html", data); err != nil {
-		logger.Info("Error executing template: %v", err)
+	tmpl := s.loadV2Page("v2_storage.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
+		logger.Error("Error rendering storage template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }

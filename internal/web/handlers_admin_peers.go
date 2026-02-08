@@ -118,18 +118,19 @@ func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
 	errorMsg := r.URL.Query().Get("error")
 
 	data := struct {
-		Lang         string
-		Title        string
-		Session      *auth.Session
+		V2TemplateData
 		Peers        []*peers.Peer
 		RecentSyncs  []RecentSync
 		RunningSyncs map[int]bool
 		Success      string
 		Error        string
 	}{
-		Lang:         lang,
-		Title:        i18n.T(lang, "peers.title"),
-		Session:      session,
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      i18n.T(lang, "peers.title"),
+			ActivePage: "peers",
+			Session:    session,
+		},
 		Peers:        peersList,
 		RecentSyncs:  recentSyncs,
 		RunningSyncs: runningSyncs,
@@ -137,7 +138,8 @@ func (s *Server) handleAdminPeers(w http.ResponseWriter, r *http.Request) {
 		Error:        errorMsg,
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "admin_peers.html", data); err != nil {
+	tmpl := s.loadV2Page("v2_peers.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 		logger.Info("Error rendering peers template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return

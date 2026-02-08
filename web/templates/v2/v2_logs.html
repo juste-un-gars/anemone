@@ -1,0 +1,113 @@
+{{/* Anemone v2 - Logs management page */}}
+{{define "content"}}
+<!-- Success/Error Messages -->
+{{if .Success}}
+<div class="v2-card" style="border-left:3px solid var(--success);margin-bottom:1rem;">
+    <div style="font-size:0.875rem;color:var(--success);">{{.Success}}</div>
+</div>
+{{end}}
+{{if .Error}}
+<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;">
+    <div style="font-size:0.875rem;color:var(--error);">{{.Error}}</div>
+</div>
+{{end}}
+
+<!-- Log Level Configuration -->
+<div class="v2-card" style="margin-bottom:1.5rem;">
+    <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:0.5rem;">
+        {{T .Lang "admin.logs.level_title"}}
+    </div>
+    <div style="font-size:0.8125rem;color:var(--text-secondary);margin-bottom:1rem;">
+        {{T .Lang "admin.logs.level_description"}}
+    </div>
+
+    <form method="POST" action="/admin/logs/level">
+        <div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-bottom:1rem;">
+            <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                <input type="radio" name="level" value="debug" {{if eq .CurrentLevel "debug"}}checked{{end}}
+                       style="accent-color:var(--accent);">
+                <span class="v2-badge" style="background:var(--bg-page);color:var(--text-secondary);">DEBUG</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                <input type="radio" name="level" value="info" {{if eq .CurrentLevel "info"}}checked{{end}}
+                       style="accent-color:var(--accent);">
+                <span class="v2-badge v2-badge-info">INFO</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                <input type="radio" name="level" value="warn" {{if eq .CurrentLevel "warn"}}checked{{end}}
+                       style="accent-color:var(--accent);">
+                <span class="v2-badge v2-badge-warning">WARN</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                <input type="radio" name="level" value="error" {{if eq .CurrentLevel "error"}}checked{{end}}
+                       style="accent-color:var(--accent);">
+                <span class="v2-badge v2-badge-error">ERROR</span>
+            </label>
+        </div>
+
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:1rem;line-height:1.5;">
+            <div><strong>DEBUG:</strong> {{T .Lang "admin.logs.level_debug"}}</div>
+            <div><strong>INFO:</strong> {{T .Lang "admin.logs.level_info"}}</div>
+            <div><strong>WARN:</strong> {{T .Lang "admin.logs.level_warn"}}</div>
+            <div><strong>ERROR:</strong> {{T .Lang "admin.logs.level_error"}}</div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;">
+            <button type="submit" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "admin.logs.save_level"}}</button>
+        </div>
+    </form>
+</div>
+
+<!-- Log Files -->
+<div class="v2-card">
+    <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:1rem;">
+        {{T .Lang "admin.logs.files_title"}}
+    </div>
+
+    {{if .LogFiles}}
+    <div style="overflow:hidden;border-radius:0.5rem;border:1px solid var(--border);">
+        <table class="v2-table">
+            <thead>
+                <tr>
+                    <th>{{T .Lang "admin.logs.file_name"}}</th>
+                    <th>{{T .Lang "admin.logs.file_date"}}</th>
+                    <th>{{T .Lang "admin.logs.file_size"}}</th>
+                    <th style="text-align:right;">{{T .Lang "admin.logs.actions"}}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .LogFiles}}
+                <tr>
+                    <td style="font-weight:600;">{{.Name}}</td>
+                    <td style="font-size:0.8125rem;color:var(--text-secondary);">{{.Date.Format "2006-01-02"}}</td>
+                    <td style="font-size:0.8125rem;color:var(--text-secondary);">{{.FormatSize}}</td>
+                    <td style="text-align:right;">
+                        <a href="/admin/logs/download?file={{.Name}}" class="v2-btn v2-btn-secondary v2-btn-sm">
+                            {{T $.Lang "admin.logs.download"}}
+                        </a>
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{else}}
+    <div class="v2-empty" style="padding:2rem;">
+        <svg class="v2-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <div style="font-size:0.875rem;">{{T .Lang "admin.logs.no_files"}}</div>
+    </div>
+    {{end}}
+</div>
+
+<!-- Info Box -->
+<div class="v2-card" style="margin-top:1rem;border-left:3px solid var(--info);">
+    <div style="font-size:0.875rem;font-weight:600;color:var(--text-primary);margin-bottom:0.5rem;">{{T .Lang "admin.logs.info_title"}}</div>
+    <div style="font-size:0.8125rem;color:var(--text-secondary);line-height:1.6;">
+        <div>{{T .Lang "admin.logs.info_1"}}</div>
+        <div>{{T .Lang "admin.logs.info_2"}}</div>
+        <div>{{T .Lang "admin.logs.info_3"}}</div>
+    </div>
+</div>
+{{end}}

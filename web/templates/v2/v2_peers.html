@@ -1,0 +1,172 @@
+{{/* Anemone v2 - Peers management page */}}
+{{define "headerActions"}}
+<a href="/admin/peers/add" class="v2-btn v2-btn-primary v2-btn-sm">+ {{T .Lang "peers.add"}}</a>
+{{end}}
+
+{{define "content"}}
+<!-- Success/Error Messages -->
+{{if .Success}}
+<div class="v2-card" style="border-left:3px solid var(--success);margin-bottom:1rem;">
+    <div style="font-size:0.875rem;color:var(--success);">{{.Success}}</div>
+</div>
+{{end}}
+{{if .Error}}
+<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;">
+    <div style="font-size:0.875rem;color:var(--error);">{{.Error}}</div>
+</div>
+{{end}}
+
+<!-- Peers Table -->
+{{if .Peers}}
+<div class="v2-card" style="padding:0;overflow:hidden;">
+    <table class="v2-table">
+        <thead>
+            <tr>
+                <th>{{T .Lang "peers.name"}}</th>
+                <th>{{T .Lang "peers.address"}}</th>
+                <th>{{T .Lang "peers.status"}}</th>
+                <th>{{T .Lang "peers.last_seen"}}</th>
+                <th style="text-align:right;">{{T .Lang "peers.actions"}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Peers}}
+            <tr>
+                <td>
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <span style="font-weight:600;">{{.Name}}</span>
+                        {{if not .Enabled}}
+                            <span class="v2-badge" style="background:var(--bg-page);color:var(--text-muted);">{{T $.Lang "peers.disabled"}}</span>
+                        {{end}}
+                        {{if index $.RunningSyncs .ID}}
+                            <span class="v2-badge v2-badge-info">{{T $.Lang "peers.sync.running"}}</span>
+                        {{end}}
+                    </div>
+                </td>
+                <td><code style="font-size:0.8125rem;color:var(--text-secondary);">{{.Address}}:{{.Port}}</code></td>
+                <td>
+                    {{if eq .Status "online"}}
+                        <span class="v2-badge v2-badge-success">{{T $.Lang "peers.status.online"}}</span>
+                    {{else if eq .Status "offline"}}
+                        <span class="v2-badge v2-badge-error">{{T $.Lang "peers.status.offline"}}</span>
+                    {{else if eq .Status "error"}}
+                        <span class="v2-badge v2-badge-warning">{{T $.Lang "peers.status.error"}}</span>
+                    {{else}}
+                        <span class="v2-badge" style="background:var(--bg-page);color:var(--text-muted);">{{T $.Lang "peers.status.unknown"}}</span>
+                    {{end}}
+                </td>
+                <td style="font-size:0.8125rem;color:var(--text-secondary);">
+                    {{if .LastSeen}}
+                        {{.LastSeen.Format "02/01/2006 15:04"}}
+                    {{else}}
+                        -
+                    {{end}}
+                </td>
+                <td style="text-align:right;">
+                    <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+                        <a href="/admin/peers/{{.ID}}/edit" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "v2.backups.edit"}}</a>
+                        <button onclick="testPeer({{.ID}}, '{{.Name}}')" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "peers.action.test"}}</button>
+                        <button onclick="deletePeer({{.ID}}, '{{.Name}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "peers.action.delete"}}</button>
+                    </div>
+                </td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
+{{else}}
+<div class="v2-card v2-empty">
+    <svg class="v2-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+    </svg>
+    <div style="font-size:0.875rem;margin-bottom:0.5rem;">{{T .Lang "peers.empty"}}</div>
+    <div style="font-size:0.8125rem;color:var(--text-muted);margin-bottom:1rem;">{{T .Lang "peers.empty.help"}}</div>
+    <a href="/admin/peers/add" class="v2-btn v2-btn-primary v2-btn-sm">+ {{T .Lang "peers.add"}}</a>
+</div>
+{{end}}
+
+<!-- Force Sync -->
+<div class="v2-card" style="margin-top:1.5rem;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+            <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:0.25rem;">{{T .Lang "admin.sync.manual.title"}}</div>
+            <div style="font-size:0.8125rem;color:var(--text-secondary);">{{T .Lang "admin.sync.manual.description"}}</div>
+        </div>
+        <form method="POST" action="/admin/sync/force">
+            <button type="submit" onclick="return confirm('{{T .Lang "admin.sync.manual.confirm"}}')" class="v2-btn v2-btn-primary v2-btn-sm">
+                {{T .Lang "admin.sync.manual.button"}}
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Recent Syncs -->
+{{if .RecentSyncs}}
+<div style="margin-top:1.5rem;">
+    <div style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);margin-bottom:0.75rem;">{{T .Lang "admin.sync.report.title"}}</div>
+    <div class="v2-card" style="padding:0;overflow:hidden;">
+        <table class="v2-table">
+            <thead>
+                <tr>
+                    <th>{{T .Lang "admin.sync.report.user"}}</th>
+                    <th>{{T .Lang "admin.sync.report.peer"}}</th>
+                    <th>{{T .Lang "admin.sync.report.date"}}</th>
+                    <th>{{T .Lang "admin.sync.report.status"}}</th>
+                    <th>{{T .Lang "admin.sync.report.files"}}</th>
+                    <th>{{T .Lang "admin.sync.report.size"}}</th>
+                    <th>{{T .Lang "admin.sync.report.speed"}}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .RecentSyncs}}
+                <tr>
+                    <td style="font-weight:600;">{{.Username}}</td>
+                    <td>{{.PeerName}}</td>
+                    <td style="font-size:0.8125rem;color:var(--text-secondary);">{{.StartedAt.Format "02/01 15:04"}}</td>
+                    <td>
+                        {{if eq .Status "success"}}
+                            <span class="v2-badge v2-badge-success">{{T $.Lang "admin.sync.report.status.success"}}</span>
+                        {{else if eq .Status "error"}}
+                            <span class="v2-badge v2-badge-error">{{T $.Lang "admin.sync.report.status.error"}}</span>
+                        {{else}}
+                            <span class="v2-badge v2-badge-warning">{{T $.Lang "admin.sync.report.status.pending"}}</span>
+                        {{end}}
+                    </td>
+                    <td>{{.FilesSynced}}</td>
+                    <td>
+                        {{if gt .BytesSynced 1048576}}
+                        {{printf "%.1f MB" (divf .BytesSynced 1048576)}}
+                        {{else if gt .BytesSynced 1024}}
+                        {{printf "%.1f KB" (divf .BytesSynced 1024)}}
+                        {{else}}
+                        {{.BytesSynced}} B
+                        {{end}}
+                    </td>
+                    <td style="font-size:0.8125rem;color:var(--text-secondary);">{{if .Speed}}{{.Speed}}{{else}}-{{end}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</div>
+{{end}}
+
+<script>
+function testPeer(peerId, peerName) {
+    if (!confirm('{{T .Lang "peers.action.test"}} "' + peerName + '" ?')) return;
+    fetch('/admin/peers/' + peerId + '/test', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        alert(data.status === 'online' ? '{{T .Lang "peers.status.online"}}' : '{{T .Lang "peers.status.offline"}}');
+        window.location.reload();
+    })
+    .catch(function() { alert('Error'); });
+}
+
+function deletePeer(peerId, peerName) {
+    if (!confirm('{{T .Lang "peers.delete.confirm"}}\n\n' + peerName)) return;
+    fetch('/admin/peers/' + peerId + '/delete', { method: 'POST' })
+    .then(function(r) { if (r.ok) window.location.reload(); else alert('Error'); });
+}
+</script>
+{{end}}

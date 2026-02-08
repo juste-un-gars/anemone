@@ -285,22 +285,24 @@ func (s *Server) handleAdminShares(w http.ResponseWriter, r *http.Request) {
 	smbInstalled := smb.CheckSambaInstalled()
 
 	data := struct {
-		Lang         string
-		Title        string
-		Session      *auth.Session
+		V2TemplateData
 		Shares       []*shares.Share
 		SMBStatus    string
 		SMBInstalled bool
 	}{
-		Lang:         lang,
-		Title:        i18n.T(lang, "shares.title"),
-		Session:      session,
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      i18n.T(lang, "shares.title"),
+			ActivePage: "shares",
+			Session:    session,
+		},
 		Shares:       allShares,
 		SMBStatus:    smbStatus,
 		SMBInstalled: smbInstalled,
 	}
 
-	if err := s.templates.ExecuteTemplate(w, "admin_shares.html", data); err != nil {
+	tmpl := s.loadV2Page("v2_shares.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
 		logger.Info("Error rendering shares template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
