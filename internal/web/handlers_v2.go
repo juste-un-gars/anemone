@@ -376,7 +376,7 @@ func (s *Server) getV2IncomingData() ([]V2IncomingBackup, int, string) {
 
 // getV2ServerBackupData retrieves server backup data.
 func (s *Server) getV2ServerBackupData() []V2ServerBackup {
-	backupDir := filepath.Join(s.cfg.DataDir, "backups")
+	backupDir := filepath.Join(s.cfg.DataDir, "backups", "server")
 	files, err := serverbackup.ListBackups(backupDir)
 	if err != nil {
 		logger.Info("Error listing server backups: %v", err)
