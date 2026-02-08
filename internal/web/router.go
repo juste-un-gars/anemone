@@ -36,6 +36,7 @@ type Server struct {
 	db        *sql.DB
 	cfg       *config.Config
 	templates *template.Template
+	funcMap   template.FuncMap
 }
 
 // TemplateData holds data passed to templates
@@ -195,6 +196,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		db:        db,
 		cfg:       cfg,
 		templates: templates,
+		funcMap:   funcMap,
 	}
 
 	mux := http.NewServeMux()
@@ -374,6 +376,9 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 
 	// API routes - User management (protected by password authentication)
 	mux.HandleFunc("/api/sync/delete-user-backup", server.syncAuthMiddleware(server.handleAPISyncDeleteUserBackup))
+
+	// V2 UI prototype routes (admin only)
+	mux.HandleFunc("/v2/backups", auth.RequireAdmin(server.handleV2Backups))
 
 	// Apply security headers middleware to all routes
 	return securityHeadersMiddleware(mux)

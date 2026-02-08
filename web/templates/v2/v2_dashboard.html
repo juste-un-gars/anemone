@@ -1,0 +1,148 @@
+{{/* Anemone v2 - Dashboard page */}}
+{{define "content"}}
+{{if and .UpdateInfo .UpdateInfo.Available}}
+<!-- Update notification banner -->
+<div class="v2-card" style="margin-bottom:1.5rem;border-left:4px solid var(--accent);display:flex;align-items:center;gap:1rem;padding:1rem 1.25rem;">
+    <svg style="width:24px;height:24px;color:var(--accent);flex-shrink:0;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    <div style="flex:1;min-width:0;">
+        <div style="font-size:0.875rem;font-weight:600;color:var(--text-primary);">{{T .Lang "v2.dashboard.update_available"}}</div>
+        <div style="font-size:0.8125rem;color:var(--text-muted);">{{.UpdateInfo.CurrentVersion}} → {{.UpdateInfo.LatestVersion}}</div>
+    </div>
+    <a href="/admin/system/update" class="v2-btn v2-btn-primary" style="flex-shrink:0;">{{T .Lang "v2.dashboard.update_now"}}</a>
+</div>
+{{end}}
+
+<!-- Stats cards -->
+<div class="v2-stats-grid" style="margin-bottom:1.5rem;">
+    <!-- Users -->
+    <div class="v2-card">
+        <div class="v2-card-title">
+            <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;color:var(--accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            {{T .Lang "v2.dashboard.users"}}
+        </div>
+        <div class="v2-card-value">{{.Stats.UserCount}}</div>
+        <div class="v2-card-subtitle">{{T .Lang "v2.dashboard.active_users"}}</div>
+    </div>
+
+    <!-- Storage -->
+    <div class="v2-card">
+        <div class="v2-card-title">
+            <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;color:var(--accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            {{T .Lang "v2.dashboard.storage"}}
+        </div>
+        <div class="v2-card-value">{{.Stats.StorageUsed}}</div>
+        <div class="v2-card-subtitle">{{T .Lang "v2.dashboard.peer_storage"}} {{.Stats.PeerStorageUsed}}</div>
+    </div>
+
+    <!-- Peers -->
+    <div class="v2-card">
+        <div class="v2-card-title">
+            <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;color:var(--accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            {{T .Lang "v2.dashboard.peers"}}
+        </div>
+        <div class="v2-card-value">{{.Stats.PeerCount}}</div>
+        <div class="v2-card-subtitle">{{T .Lang "v2.dashboard.connected_peers"}}</div>
+    </div>
+
+    <!-- Last Backup -->
+    <div class="v2-card">
+        <div class="v2-card-title">
+            <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;color:var(--accent);" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            {{T .Lang "v2.dashboard.last_backup"}}
+        </div>
+        <div class="v2-card-value" style="font-size:1.25rem;">{{.Stats.LastBackup}}</div>
+        <div class="v2-card-subtitle"><a href="/admin/usb-backup" style="color:var(--accent);text-decoration:none;">{{T .Lang "v2.dashboard.configure_backups"}}</a></div>
+    </div>
+</div>
+
+<!-- Two-column: Activity + Backup Status -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+    {{if .RecentActivity}}
+    <!-- Recent Activity -->
+    <div class="v2-card">
+        <div style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);margin-bottom:1rem;">{{T .Lang "v2.dashboard.recent_activity"}}</div>
+        {{range .RecentActivity}}
+        <div class="v2-activity-item">
+            <div class="v2-activity-dot" style="background-color:{{if eq .Status "success"}}var(--success){{else if eq .Status "error"}}var(--error){{else}}var(--warning){{end}};"></div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:0.8125rem;color:var(--text-primary);">{{.Description}}</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">{{.Time}}</div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+    {{else}}
+    <div class="v2-card">
+        <div style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);margin-bottom:1rem;">{{T .Lang "v2.dashboard.recent_activity"}}</div>
+        <div class="v2-empty" style="padding:1.5rem 0;">
+            <div style="color:var(--text-muted);font-size:0.875rem;">{{T .Lang "v2.dashboard.no_activity"}}</div>
+        </div>
+    </div>
+    {{end}}
+
+    <!-- Backup Status -->
+    <div class="v2-card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
+        <div style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);margin-bottom:1rem;align-self:flex-start;">{{T .Lang "v2.dashboard.backup_status"}}</div>
+        <div style="font-size:2rem;font-weight:800;color:{{if or (eq .Stats.LastBackup "Jamais") (eq .Stats.LastBackup "Never")}}var(--error){{else}}var(--success){{end}};margin-bottom:0.75rem;">
+            {{.Stats.LastBackup}}
+        </div>
+        <a href="/admin/usb-backup" class="v2-btn v2-btn-primary">{{T .Lang "v2.dashboard.configure_backups"}}</a>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div style="margin-bottom:1.5rem;">
+    <div style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);margin-bottom:0.75rem;">{{T .Lang "v2.dashboard.quick_actions"}}</div>
+    <div class="v2-actions-grid">
+        <a href="/admin/users" class="v2-action-card">
+            <div class="v2-action-icon" style="background:rgba(124,58,237,0.15);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            </div>
+            <div>
+                <div style="font-size:0.875rem;font-weight:600;">{{T .Lang "v2.dashboard.action_users"}}</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">{{.Stats.UserCount}} {{T .Lang "v2.dashboard.active_label"}}</div>
+            </div>
+        </a>
+
+        <a href="/admin/settings/trash" class="v2-action-card">
+            <div class="v2-action-icon" style="background:rgba(239,68,68,0.15);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+            </div>
+            <div>
+                <div style="font-size:0.875rem;font-weight:600;">{{T .Lang "v2.dashboard.action_trash"}}</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "v2.dashboard.manage"}}</div>
+            </div>
+        </a>
+
+        <a href="/admin/peers" class="v2-action-card">
+            <div class="v2-action-icon" style="background:rgba(59,130,246,0.15);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+            </div>
+            <div>
+                <div style="font-size:0.875rem;font-weight:600;">{{T .Lang "v2.dashboard.action_peers"}}</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">{{.Stats.PeerCount}} {{T .Lang "v2.dashboard.connected_label"}}</div>
+            </div>
+        </a>
+
+        <a href="/admin/logs" class="v2-action-card">
+            <div class="v2-action-icon" style="background:rgba(16,185,129,0.15);">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            </div>
+            <div>
+                <div style="font-size:0.875rem;font-weight:600;">{{T .Lang "v2.dashboard.action_logs"}}</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "v2.dashboard.view_logs"}}</div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<style>
+@media (max-width: 768px) {
+    div[style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
+}
+</style>
+{{end}}

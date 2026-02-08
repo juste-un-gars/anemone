@@ -66,21 +66,39 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	data := TemplateData{
-		Lang:       lang,
-		Title:      i18n.T(lang, "dashboard.title"),
-		Session:    session,
-		Stats:      stats,
-		UpdateInfo: updateInfo,
-	}
-
-	// Choose template based on role
-	template := "dashboard_user.html"
 	if session.IsAdmin {
-		template = "dashboard_admin.html"
+		// Admin: render v2 dashboard
+		activity := s.getRecentActivity(lang, 5)
+
+		data := V2DashboardData{
+			V2TemplateData: V2TemplateData{
+				Lang:       lang,
+				Title:      i18n.T(lang, "v2.nav.dashboard"),
+				ActivePage: "dashboard",
+				Session:    session,
+			},
+			Stats:          stats,
+			RecentActivity: activity,
+			UpdateInfo:     updateInfo,
+		}
+
+		tmpl := s.loadV2Page("v2_dashboard.html", s.funcMap)
+		if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
+			logger.Info("Error rendering v2 dashboard: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		return
 	}
 
-	if err := s.templates.ExecuteTemplate(w, template, data); err != nil {
+	// User: render v1 dashboard (unchanged)
+	data := TemplateData{
+		Lang:    lang,
+		Title:   i18n.T(lang, "dashboard.title"),
+		Session: session,
+		Stats:   stats,
+	}
+
+	if err := s.templates.ExecuteTemplate(w, "dashboard_user.html", data); err != nil {
 		logger.Info("Error rendering dashboard template: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
