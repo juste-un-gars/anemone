@@ -12,45 +12,46 @@
 
 ## Current Session
 
-**Session 14: v2 UI Bugfixes** - Complete ✅
+**Session 15: Rclone & UI Bugfixes** - In Progress (paused)
 
-**Détails :** `.claude/sessions/SESSION_014_v2_bugfixes.md`
+**Détails :** `.claude/sessions/SESSION_015_rclone_bugfixes.md`
 
 ---
 
-## Session 14: v2 UI Bugfixes
+## Session 15: Rclone & UI Bugfixes
 
 **Date:** 2026-02-10
-**Objective:** Corriger tous les boutons/pages cassés dans l'interface v2
-**Status:** Complete ✅
+**Objective:** Corriger bugs rclone (WebDAV, logs), UI backups (tabs, restore, SSH key), tester pCloud
+**Status:** In Progress (paused)
 
-### Bugs corrigés
-| # | Bug | Cause | Fix |
-|---|-----|-------|-----|
-| 1 | `/admin/users/add` → Internal Server Error | Template `.Error` manquant dans le struct GET | Ajout `Error string` au data struct |
-| 2 | `/admin/usb-backup/add` → 405 Method Not Allowed | Handler POST uniquement, pas de GET | Ajout GET handler + template `v2_usb_backup_add.html` |
-| 3 | `/shares/add` → 404 / redirige dashboard | Route inexistante, bouton inutile | Supprimé bouton (partages auto-créés par utilisateur) |
-| 4 | P2P "Configurer" → 405 | Lien vers `/admin/sync/config` (POST only) | Changé vers `/admin/peers` |
-| 5 | `/restore` (user) → connexion coupée | `{{${key}}}` JS conflicte avec Go template → panic | Changé placeholders `{{key}}` → `{key}` |
+### Bugs corrigés (8)
+| # | Bug | Fix |
+|---|-----|-----|
+| 1 | Restore "Erreur chargement backups" (aucun backup) | nil slice → `make([]PeerBackup, 0)` |
+| 2 | Section SSH Key absente dans Cloud backup | Section complète : générer/copier/régénérer |
+| 3 | Bouton "Modifier" cloud → 405 | Lien `/admin/rclone/{id}` (GET) |
+| 4 | Sync/Test/Delete → retour page USB | Redirections → `/admin/backups?tab=cloud` |
+| 5 | Onglet Cloud pas sélectionné après redirect | `ActiveTab` côté serveur |
+| 6 | WebDAV URL cassée (pCloud) | `quoteValue()` pour `:` et `,` |
+| 7 | Logs `!BADKEY` rclone | `fmt.Sprintf` au lieu de printf args |
+| 8 | Pas de notifications flash backups | Flash/FlashType dans struct + template |
 
-### Release v0.15.1-beta
-- Tag créé et poussé sur GitHub
-- Branche `feature/v2-dashboard-admin` mergée dans `main`
-- Release: https://github.com/juste-un-gars/anemone/releases/tag/v0.15.1-beta
+### En attente
+- **pCloud** : nécessite OAuth (pas WebDAV). Configurer via `sudo -u anemone rclone config` + `rclone authorize "pcloud"`, puis Type "Remote" dans Anemone
+- **Test SFTP FR1→FR2** : pas encore fait
+- **Logs `!BADKEY`** : reste dans handlers_admin_rclone, sync, trash, manifest
+- **Permission denied manifests** : droits écriture `/srv/anemone/shares/*/`
 
-### Files Modified
-- `internal/web/handlers_admin_users.go` — Ajout `Error` au GET data struct
-- `internal/web/handlers_admin_usb.go` — GET handler + redirections corrigées
-- `web/templates/v2/v2_usb_backup_add.html` — (nouveau) formulaire ajout USB backup
-- `web/templates/v2/v2_shares.html` — Supprimé bouton "Ajouter"
-- `web/templates/v2/v2_backups.html` — Lien P2P → `/admin/peers`
-- `web/templates/v2/v2_restore.html` — Fix conflit Go template / JS template literals
-- `internal/i18n/locales/{fr,en}.json` — `usb_backup.select_drive` + fix placeholders restore
+### Décision
+- Branche `feature/v2-dashboard-admin` supprimée — tout sur `main` désormais
 
-### Handoff Notes
-- Rclone multi-provider (Session 13) à tester sur FR1 avec FR2 comme serveur de réception
-- Configurer rclone named remote sur FR1 via `sudo -u anemone rclone config`
-- FR2 : SSH installé (`sudo systemctl enable --now ssh`), créer dossier réception
+---
+
+## Previous Session
+
+**Session 14: v2 UI Bugfixes** - Complete ✅
+
+**Détails :** `.claude/sessions/SESSION_014_v2_bugfixes.md`
 
 ---
 
@@ -881,6 +882,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 15 | Rclone & UI Bugfixes | 2026-02-10 | In Progress (paused) |
 | 14 | v2 UI Bugfixes | 2026-02-10 | Complete ✅ |
 | 13 | Cloud Backup Multi-Provider + Chiffrement | 2026-02-10 | Complete ✅ |
 | 12 | Module F Cleanup | 2026-02-08 | Complete ✅ |
