@@ -954,6 +954,7 @@
   "usb_backup.type_full_desc": "config + selected shares",
   "usb_backup.select_shares": "Shares to backup",
   "usb_backup.no_shares": "No shares available",
+  "usb_backup.select_drive": "Select a detected drive",
   "usb_backup.schedule_title": "Automatic Sync",
   "usb_backup.sync_enabled": "Enable automatic sync",
   "usb_backup.sync_enabled_hint": "Automatically run backup according to the schedule below.",

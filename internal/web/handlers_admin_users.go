@@ -71,6 +71,7 @@ func (s *Server) handleAdminUsersAdd(w http.ResponseWriter, r *http.Request) {
 		// Show form
 		data := struct {
 			V2TemplateData
+			Error string
 		}{
 			V2TemplateData: V2TemplateData{
 				Lang:       lang,
@@ -78,6 +79,7 @@ func (s *Server) handleAdminUsersAdd(w http.ResponseWriter, r *http.Request) {
 				ActivePage: "users",
 				Session:    session,
 			},
+			Error: r.URL.Query().Get("error"),
 		}
 
 		tmpl := s.loadV2Page("v2_users_add.html", s.funcMap)

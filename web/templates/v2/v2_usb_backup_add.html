@@ -1,0 +1,114 @@
+{{/* Anemone v2 - USB backup add form */}}
+{{define "content"}}
+<!-- Back link -->
+<div style="margin-bottom:1.5rem;">
+    <a href="/admin/backups" style="font-size:0.8125rem;color:var(--info);text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
+        {{T .Lang "common.back"}}
+    </a>
+</div>
+
+{{if .Error}}
+<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;">
+    <div style="font-size:0.875rem;color:var(--error);">{{.Error}}</div>
+</div>
+{{end}}
+
+<div class="v2-card">
+    <form method="POST" action="/admin/usb-backup/add">
+        <!-- Name -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "usb_backup.name"}} *
+            </label>
+            <input type="text" name="name" required
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;"
+                   placeholder="My USB Backup">
+        </div>
+
+        <!-- Mount Path -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "usb_backup.mount_path"}} *
+            </label>
+            {{if .Drives}}
+            <select id="driveSelect" onchange="document.getElementById('mount_path').value=this.value"
+                    style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;margin-bottom:0.5rem;">
+                <option value="">-- {{T .Lang "usb_backup.select_drive"}} --</option>
+                {{range .Drives}}
+                <option value="{{.MountPath}}">{{.MountPath}} {{if .Label}}({{.Label}}){{end}} - {{.Filesystem}}</option>
+                {{end}}
+            </select>
+            {{end}}
+            <input type="text" name="mount_path" id="mount_path" required
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;"
+                   placeholder="/mnt/usb-backup">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "usb_backup.mount_path_hint"}}</div>
+        </div>
+
+        <!-- Backup Path -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "usb_backup.backup_path"}}
+            </label>
+            <input type="text" name="backup_path" value="anemone-backup"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "usb_backup.backup_path_hint"}}</div>
+        </div>
+
+        <!-- Backup Type -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.5rem;">
+                {{T .Lang "usb_backup.backup_type"}}
+            </label>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
+                    <input type="radio" name="backup_type" value="config" onchange="document.getElementById('shareSelection').style.display='none'">
+                    {{T .Lang "usb_backup.type_config"}}
+                    <span style="font-size:0.75rem;color:var(--text-muted);">({{T .Lang "usb_backup.type_config_desc"}})</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
+                    <input type="radio" name="backup_type" value="full" checked onchange="document.getElementById('shareSelection').style.display=''">
+                    {{T .Lang "usb_backup.type_full"}}
+                    <span style="font-size:0.75rem;color:var(--text-muted);">({{T .Lang "usb_backup.type_full_desc"}})</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Share Selection -->
+        <div id="shareSelection" style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "usb_backup.select_shares"}}
+            </label>
+            {{if .Shares}}
+            <div style="max-height:12rem;overflow-y:auto;border:1px solid var(--border);border-radius:0.5rem;">
+                {{range .Shares}}
+                <label style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0.75rem;border-bottom:1px solid var(--border);cursor:pointer;font-size:0.875rem;color:var(--text-primary);">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <input type="checkbox" name="selected_shares" value="{{.ID}}" checked>
+                        {{.Username}}/{{.Name}}
+                    </div>
+                    <span style="font-size:0.75rem;color:var(--text-muted);">{{.Size}}</span>
+                </label>
+                {{end}}
+            </div>
+            {{else}}
+            <div style="font-size:0.8125rem;color:var(--text-muted);">{{T .Lang "usb_backup.no_shares"}}</div>
+            {{end}}
+        </div>
+
+        <!-- Enabled -->
+        <div style="margin-bottom:1.5rem;">
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
+                <input type="checkbox" name="enabled" checked> {{T .Lang "usb_backup.enabled"}}
+            </label>
+        </div>
+
+        <!-- Buttons -->
+        <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
+            <a href="/admin/backups" class="v2-btn" style="text-decoration:none;">{{T .Lang "common.cancel"}}</a>
+            <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "common.save"}}</button>
+        </div>
+    </form>
+</div>
+{{end}}

@@ -954,6 +954,7 @@
   "usb_backup.type_full_desc": "config + partages sélectionnés",
   "usb_backup.select_shares": "Partages à sauvegarder",
   "usb_backup.no_shares": "Aucun partage disponible",
+  "usb_backup.select_drive": "Sélectionner un disque détecté",
   "usb_backup.schedule_title": "Synchronisation automatique",
   "usb_backup.sync_enabled": "Activer la synchronisation automatique",
   "usb_backup.sync_enabled_hint": "Lancer automatiquement la sauvegarde selon la planification ci-dessous.",

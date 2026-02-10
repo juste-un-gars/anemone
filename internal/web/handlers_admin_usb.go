@@ -179,12 +179,66 @@ func (s *Server) handleAdminUSBBackup(w http.ResponseWriter, r *http.Request) {
 
 // handleAdminUSBBackupAdd handles adding a new USB backup configuration
 func (s *Server) handleAdminUSBBackupAdd(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	lang := s.getLang(r)
+
+	if r.Method == http.MethodGet {
+		// Show add form
+		type ShareInfo struct {
+			ID       int
+			Name     string
+			Username string
+			Size     string
+		}
+		var shareList []ShareInfo
+		allShares, _ := shares.GetAll(s.db)
+		for _, sh := range allShares {
+			si := ShareInfo{ID: sh.ID, Name: sh.Name}
+			if user, err := users.GetByID(s.db, sh.UserID); err == nil {
+				si.Username = user.Username
+			}
+			if sizeBytes, err := usbbackup.CalculateDirSize(sh.Path); err == nil {
+				si.Size = usbbackup.FormatBytes(sizeBytes)
+			}
+			shareList = append(shareList, si)
+		}
+
+		// Get detected USB drives
+		drives, _ := usbbackup.DetectDrives()
+
+		data := struct {
+			V2TemplateData
+			Shares []ShareInfo
+			Drives []usbbackup.DriveInfo
+			Error  string
+		}{
+			V2TemplateData: V2TemplateData{
+				Lang:       lang,
+				Title:      i18n.T(lang, "v2.backups.add"),
+				ActivePage: "backups",
+				Session:    session,
+			},
+			Shares: shareList,
+			Drives: drives,
+			Error:  r.URL.Query().Get("error"),
+		}
+
+		tmpl := s.loadV2Page("v2_usb_backup_add.html", s.funcMap)
+		if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
+			logger.Info("Error rendering USB backup add template: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		}
+		return
+	}
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-
-	lang := s.getLang(r)
 
 	name := strings.TrimSpace(r.FormValue("name"))
 	mountPath := strings.TrimSpace(r.FormValue("mount_path"))
@@ -194,7 +248,7 @@ func (s *Server) handleAdminUSBBackupAdd(w http.ResponseWriter, r *http.Request)
 	autoDetect := r.FormValue("auto_detect") == "on"
 
 	if name == "" || mountPath == "" {
-		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "missing_fields"), http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/usb-backup/add?error="+i18n.T(lang, "missing_fields"), http.StatusSeeOther)
 		return
 	}
 
@@ -229,11 +283,11 @@ func (s *Server) handleAdminUSBBackupAdd(w http.ResponseWriter, r *http.Request)
 
 	if err := usbbackup.Create(s.db, backup); err != nil {
 		logger.Info("Error creating USB backup: %v", err)
-		http.Redirect(w, r, "/admin/usb-backup?error="+i18n.T(lang, "error_creating"), http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/usb-backup/add?error="+i18n.T(lang, "error_creating"), http.StatusSeeOther)
 		return
 	}
 
-	http.Redirect(w, r, "/admin/usb-backup?success=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/backups", http.StatusSeeOther)
 }
 
 // handleAdminUSBBackupActions handles edit, delete, sync actions for USB backups
