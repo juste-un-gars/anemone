@@ -5,14 +5,14 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.15.1-beta
+**Current Version:** v0.15.2-beta
 **Last Updated:** 2026-02-10
 
 ---
 
 ## Current Session
 
-**Session 15: Rclone & UI Bugfixes** - In Progress (paused)
+**Session 15: Rclone & UI Bugfixes** - Complete ✅
 
 **Détails :** `.claude/sessions/SESSION_015_rclone_bugfixes.md`
 
@@ -22,9 +22,9 @@
 
 **Date:** 2026-02-10
 **Objective:** Corriger bugs rclone (WebDAV, logs), UI backups (tabs, restore, SSH key), tester pCloud
-**Status:** In Progress (paused)
+**Status:** Complete ✅
 
-### Bugs corrigés (11)
+### Bugs corrigés (12)
 | # | Bug | Fix |
 |---|-----|-----|
 | 1 | Restore "Erreur chargement backups" (aucun backup) | nil slice → `make([]PeerBackup, 0)` |
@@ -38,9 +38,9 @@
 | 9 | Pas de bouton Supprimer sur page édition cloud | Bouton `formaction` ajouté |
 | 10 | Bouton Supprimer → "destination mise à jour" | Form imbriqué → `formaction` |
 | 11 | Statut sync cloud pas affiché (running/success/error) | `LastStatus` ajouté au struct + template |
+| 12 | Sync cloud reste bloquée en "running" si process meurt | PID tracking + scheduler vérifie chaque minute + cleanup au démarrage |
 
 ### En attente
-- **pCloud** : remote configuré, token OAuth invalide → `rclone config reconnect pcloud:` puis re-tester sync
 - **Test SFTP FR1→FR2** : pas encore fait
 - **Logs `!BADKEY`** : reste dans handlers_admin_rclone, sync, trash, manifest
 - **Permission denied manifests** : droits écriture `/srv/anemone/shares/*/`
@@ -885,7 +885,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
-| 15 | Rclone & UI Bugfixes | 2026-02-10 | In Progress (paused) |
+| 15 | Rclone & UI Bugfixes | 2026-02-10 | Complete ✅ |
 | 14 | v2 UI Bugfixes | 2026-02-10 | Complete ✅ |
 | 13 | Cloud Backup Multi-Provider + Chiffrement | 2026-02-10 | Complete ✅ |
 | 12 | Module F Cleanup | 2026-02-08 | Complete ✅ |

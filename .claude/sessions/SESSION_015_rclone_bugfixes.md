@@ -3,7 +3,7 @@
 ## Meta
 - **Date:** 2026-02-10
 - **Goal:** Corriger bugs rclone (WebDAV, logs), UI backups (tabs, restore, SSH key), tester pCloud
-- **Status:** In Progress (paused)
+- **Status:** Complete ✅
 
 ## Bugs corrigés
 
@@ -20,6 +20,7 @@
 | 9 | Pas de bouton Supprimer sur page édition cloud | Bouton absent de `v2_rclone_edit.html` | Ajout bouton avec `formaction` pour override l'action du form |
 | 10 | Bouton Supprimer → "destination mise à jour" | Form delete imbriqué dans form edit (HTML interdit) | Remplacé par `formaction` sur le bouton |
 | 11 | Statut sync (running/success/error) pas affiché | `V2RcloneConfig` n'avait pas `LastStatus`, colonne affichait seulement enabled/disabled | Ajout `LastStatus` au struct + affichage conditionnel dans template |
+| 12 | Sync cloud bloquée en "running" si process meurt/anemone redémarre | `cmd.Run()` sans tracking PID, pas de détection de process mort | PID tracking via `sync.Map`, scheduler vérifie chaque minute, `CleanupStaleRunning()` au démarrage |
 
 ## Découvertes en cours de session
 
@@ -47,12 +48,14 @@
 - `internal/web/handlers_restore.go` — nil slice → empty slice pour API restore
 - `internal/web/handlers_v2.go` — ActiveTab, Flash/FlashType, SSHKeyPublicKey/RelPath, LastStatus dans V2RcloneConfig
 - `internal/web/handlers_admin_rclone.go` — Redirections v1→v2, query params
-- `internal/rclone/sync.go` — `quoteValue()`, fix logs printf→fmt.Sprintf
-- `internal/rclone/scheduler.go` — Fix logs printf→fmt.Sprintf
+- `internal/rclone/sync.go` — `quoteValue()`, fix logs printf→fmt.Sprintf, PID tracking via sync.Map, cmd.Start()/Wait()
+- `internal/rclone/scheduler.go` — Fix logs printf→fmt.Sprintf, `CleanupStaleRunning()`, `checkStaleRunning()`, skip running backups
+- `cmd/anemone/main.go` — Appel `rclone.CleanupStaleRunning()` au démarrage
 - `web/templates/v2/v2_backups.html` — SSH key section, tabs serveur-side, flash notifications, statut sync cloud
 - `web/templates/v2/v2_rclone_edit.html` — Bouton Supprimer (formaction)
 - `web/templates/v2/v2_restore.html` — Fallback `|| []` pour backups null
 - `internal/i18n/locales/{fr,en}.json` — rclone.deleted/updated/created, v2.backups.status.running
+- `internal/updater/updater.go` — Version bump 0.15.2-beta
 
 ## Handoff Notes
 - **pCloud** : remote configuré via `rclone config`, token OAuth expiré/invalide → `rclone config reconnect pcloud:` pour régénérer
