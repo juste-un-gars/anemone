@@ -258,9 +258,14 @@
         </div>
 
         <!-- Buttons -->
-        <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
-            <a href="/admin/backups?tab=cloud" class="v2-btn" style="text-decoration:none;">{{T .Lang "common.cancel"}}</a>
-            <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "common.save"}}</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <form method="POST" action="/admin/rclone/{{.Backup.ID}}/delete" onsubmit="return confirm('{{T .Lang "rclone.confirm_delete"}}');">
+                <button type="submit" class="v2-btn" style="color:var(--danger);">{{T .Lang "common.delete"}}</button>
+            </form>
+            <div style="display:flex;gap:0.5rem;">
+                <a href="/admin/backups?tab=cloud" class="v2-btn" style="text-decoration:none;">{{T .Lang "common.cancel"}}</a>
+                <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "common.save"}}</button>
+            </div>
         </div>
     </form>
 </div>
