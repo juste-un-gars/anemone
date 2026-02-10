@@ -107,6 +107,9 @@ func main() {
 	// Start automatic USB backup scheduler
 	usbbackup.StartScheduler(db, cfg.DataDir)
 
+	// Cleanup stale rclone "running" statuses from previous run
+	rclone.CleanupStaleRunning(db)
+
 	// Start automatic rclone (cloud) backup scheduler
 	rclone.StartScheduler(db, cfg.DataDir)
 

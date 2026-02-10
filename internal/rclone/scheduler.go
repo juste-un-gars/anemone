@@ -12,8 +12,38 @@ import (
 	"github.com/juste-un-gars/anemone/internal/logger"
 )
 
-// StartScheduler launches the automatic rclone backup scheduler in a goroutine
-// It checks every minute if a sync should be triggered for each backup based on their individual configuration
+// CleanupStaleRunning resets any "running" status left over from a previous process.
+// Should be called on startup before the scheduler starts.
+func CleanupStaleRunning(db *sql.DB) {
+	result, err := db.Exec("UPDATE rclone_backups SET last_status = 'error', last_error = 'sync interrupted (service restart)' WHERE last_status = 'running'")
+	if err != nil {
+		logger.Warn("Rclone: Failed to cleanup stale running statuses", "error", err)
+		return
+	}
+	if rows, _ := result.RowsAffected(); rows > 0 {
+		logger.Info(fmt.Sprintf("Rclone: Reset %d stale running sync(s) from previous run", rows))
+	}
+}
+
+// checkStaleRunning detects backups stuck in "running" status without an active process.
+func checkStaleRunning(db *sql.DB) {
+	backups, err := GetAll(db)
+	if err != nil {
+		return
+	}
+	for _, b := range backups {
+		if b.LastStatus != "running" {
+			continue
+		}
+		if !IsBackupSyncing(b.ID) {
+			logger.Info(fmt.Sprintf("Rclone: Detected stale running status for '%s' (no active process), marking as error", b.Name))
+			UpdateSyncStatus(db, b.ID, "error", "sync process terminated unexpectedly", 0, 0)
+		}
+	}
+}
+
+// StartScheduler launches the automatic rclone backup scheduler in a goroutine.
+// It checks every minute if a sync should be triggered and monitors running syncs.
 func StartScheduler(db *sql.DB, dataDir string) {
 	logger.Info("🔄 Starting rclone backup scheduler...")
 
@@ -25,9 +55,11 @@ func StartScheduler(db *sql.DB, dataDir string) {
 		for {
 			<-ticker.C // Wait for next tick
 
+			// Check for stale "running" statuses (process died without updating DB)
+			checkStaleRunning(db)
+
 			// Check if rclone is installed
 			if !IsRcloneInstalled() {
-				// Silently skip if rclone is not installed
 				continue
 			}
 
@@ -40,6 +72,11 @@ func StartScheduler(db *sql.DB, dataDir string) {
 
 			// Check each backup individually
 			for _, backup := range backups {
+				// Skip if already syncing
+				if backup.LastStatus == "running" {
+					continue
+				}
+
 				// Check if this backup should be synced now
 				if !backup.ShouldSync() {
 					continue
@@ -48,21 +85,22 @@ func StartScheduler(db *sql.DB, dataDir string) {
 				logger.Info(fmt.Sprintf("Rclone Scheduler: Triggering sync for '%s' (frequency: %s)...",
 					backup.Name, backup.SyncFrequency))
 
-				// Perform sync
-				result, syncErr := Sync(db, backup, dataDir)
+				// Perform sync in a goroutine so we don't block other backups
+				go func(b *RcloneBackup) {
+					result, syncErr := Sync(db, b, dataDir)
 
-				// Log results
-				if syncErr != nil {
-					logger.Info(fmt.Sprintf("Rclone Scheduler: Sync to %s failed: %v", backup.Name, syncErr))
-				} else if result != nil {
-					if len(result.Errors) > 0 {
-						logger.Info(fmt.Sprintf("Rclone Scheduler: Sync to %s completed with errors - Files: %d, Errors: %d",
-							backup.Name, result.FilesTransferred, len(result.Errors)))
-					} else {
-						logger.Info(fmt.Sprintf("Rclone Scheduler: Sync to %s completed - Files: %d, %s",
-							backup.Name, result.FilesTransferred, FormatBytes(result.BytesTransferred)))
+					if syncErr != nil {
+						logger.Info(fmt.Sprintf("Rclone Scheduler: Sync to %s failed: %v", b.Name, syncErr))
+					} else if result != nil {
+						if len(result.Errors) > 0 {
+							logger.Info(fmt.Sprintf("Rclone Scheduler: Sync to %s completed with errors - Files: %d, Errors: %d",
+								b.Name, result.FilesTransferred, len(result.Errors)))
+						} else {
+							logger.Info(fmt.Sprintf("Rclone Scheduler: Sync to %s completed - Files: %d, %s",
+								b.Name, result.FilesTransferred, FormatBytes(result.BytesTransferred)))
+						}
 					}
-				}
+				}(backup)
 			}
 		}
 	}()

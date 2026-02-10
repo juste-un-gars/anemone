@@ -14,10 +14,31 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	gosync "sync"
+	"syscall"
 
 	"github.com/juste-un-gars/anemone/internal/logger"
 	"github.com/juste-un-gars/anemone/internal/users"
 )
+
+// activeProcesses tracks running rclone processes per backup ID.
+// Used by the scheduler to detect stale "running" statuses.
+var activeProcesses gosync.Map // map[int]*exec.Cmd
+
+// IsBackupSyncing returns true if a rclone process is actively running for this backup.
+func IsBackupSyncing(backupID int) bool {
+	val, ok := activeProcesses.Load(backupID)
+	if !ok {
+		return false
+	}
+	cmd := val.(*exec.Cmd)
+	if cmd.Process == nil {
+		return false
+	}
+	// Signal 0 checks if process exists without killing it
+	err := cmd.Process.Signal(syscall.Signal(0))
+	return err == nil
+}
 
 // SyncResult contains the result of a sync operation
 type SyncResult struct {
@@ -89,6 +110,9 @@ func Sync(db *sql.DB, backup *RcloneBackup, dataDir string) (*SyncResult, error)
 		return nil, fmt.Errorf("failed to get users: %w", err)
 	}
 
+	// Ensure process tracking is cleaned up when sync finishes
+	defer activeProcesses.Delete(backup.ID)
+
 	// Sync each user's backup directory
 	for _, user := range allUsers {
 		// Source: user's backup directory
@@ -106,8 +130,8 @@ func Sync(db *sql.DB, backup *RcloneBackup, dataDir string) (*SyncResult, error)
 
 		logger.Info(fmt.Sprintf("Rclone: Syncing %s to %s%s", user.Username, backup.DisplayHost(), destPath))
 
-		// Run rclone sync
-		userResult, err := runRcloneSyncDest(sourceDir, dest)
+		// Run rclone sync (tracked by backup ID for process monitoring)
+		userResult, err := runRcloneSyncTracked(sourceDir, dest, backup.ID)
 		if err != nil {
 			errMsg := fmt.Sprintf("user %s: %v", user.Username, err)
 			result.Errors = append(result.Errors, errMsg)
@@ -158,8 +182,8 @@ func SyncUser(db *sql.DB, backup *RcloneBackup, dataDir string, username string)
 
 	logger.Info(fmt.Sprintf("Rclone: Syncing %s to %s%s", username, backup.DisplayHost(), destPath))
 
-	// Run rclone sync
-	userResult, err := runRcloneSyncDest(sourceDir, dest)
+	// Run rclone sync (tracked by backup ID)
+	userResult, err := runRcloneSyncTracked(sourceDir, dest, backup.ID)
 	if err != nil {
 		return nil, fmt.Errorf("sync failed: %w", err)
 	}
@@ -282,8 +306,9 @@ func buildDestination(backup *RcloneBackup, dataDir, destPath string) string {
 		remote, destPath, cryptPass)
 }
 
-// runRcloneSyncDest executes rclone sync command with a pre-built destination and parses the output.
-func runRcloneSyncDest(sourceDir, dest string) (*SyncResult, error) {
+// runRcloneSyncTracked executes rclone sync with process tracking for the given backup ID.
+// The process is stored in activeProcesses so the scheduler can detect stale syncs.
+func runRcloneSyncTracked(sourceDir, dest string, backupID int) (*SyncResult, error) {
 	result := &SyncResult{}
 
 	args := []string{
@@ -303,17 +328,21 @@ func runRcloneSyncDest(sourceDir, dest string) (*SyncResult, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	err := cmd.Run()
+	// Start process and track it
+	if err := cmd.Start(); err != nil {
+		return result, fmt.Errorf("failed to start rclone: %w", err)
+	}
+	activeProcesses.Store(backupID, cmd)
+
+	// Wait for completion
+	err := cmd.Wait()
 
 	// Parse output for stats (even on error, we might have partial results)
 	output := stdout.String() + stderr.String()
 	result.FilesTransferred, result.BytesTransferred = parseRcloneStats(output)
 
 	if err != nil {
-		// Check if it's a real error or just warnings
-		if strings.Contains(stderr.String(), "error") || strings.Contains(stderr.String(), "failed") {
-			return result, fmt.Errorf("rclone error: %s", stderr.String())
-		}
+		return result, fmt.Errorf("rclone error: %s", strings.TrimSpace(stderr.String()))
 	}
 
 	return result, nil
