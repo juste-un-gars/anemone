@@ -56,8 +56,10 @@ type V2BackupsData struct {
 	USBDrives  []V2Drive
 
 	// Cloud tab
-	RcloneConfigs []V2RcloneConfig
-	SSHKeyExists  bool
+	RcloneConfigs    []V2RcloneConfig
+	SSHKeyExists     bool
+	SSHKeyPublicKey  string
+	SSHKeyRelPath    string
 
 	// P2P Sync tab
 	SyncEnabled  bool
@@ -71,6 +73,10 @@ type V2BackupsData struct {
 
 	// Server backup tab
 	ServerBackups []V2ServerBackup
+
+	// Flash notifications
+	Flash     string // message text
+	FlashType string // "success", "error", "info"
 }
 
 // V2USBBackup holds USB backup display data.
@@ -168,7 +174,7 @@ func (s *Server) handleAdminBackups(w http.ResponseWriter, r *http.Request) {
 	data.USBBackups, data.USBDrives = s.getV2USBData(lang)
 
 	// Cloud/Rclone backups
-	data.RcloneConfigs, data.SSHKeyExists = s.getV2RcloneData(lang)
+	data.RcloneConfigs, data.SSHKeyExists, data.SSHKeyPublicKey, data.SSHKeyRelPath = s.getV2RcloneData(lang)
 
 	// P2P sync
 	data.SyncEnabled, data.SyncInterval, data.RecentSyncs = s.getV2SyncData(lang)
@@ -178,6 +184,32 @@ func (s *Server) handleAdminBackups(w http.ResponseWriter, r *http.Request) {
 
 	// Server backups
 	data.ServerBackups = s.getV2ServerBackupData()
+
+	// Flash notifications from query params
+	q := r.URL.Query()
+	switch {
+	case q.Get("syncing") != "":
+		data.Flash = i18n.T(lang, "rclone.sync_started")
+		data.FlashType = "info"
+	case q.Get("test_success") != "":
+		data.Flash = i18n.T(lang, "rclone.test_success")
+		data.FlashType = "success"
+	case q.Get("test_error") != "":
+		data.Flash = q.Get("test_error")
+		data.FlashType = "error"
+	case q.Get("deleted") != "":
+		data.Flash = i18n.T(lang, "rclone.deleted")
+		data.FlashType = "success"
+	case q.Get("updated") != "":
+		data.Flash = i18n.T(lang, "rclone.updated")
+		data.FlashType = "success"
+	case q.Get("success") != "":
+		data.Flash = i18n.T(lang, "rclone.created")
+		data.FlashType = "success"
+	case q.Get("error") != "":
+		data.Flash = q.Get("error")
+		data.FlashType = "error"
+	}
 
 	tmpl := s.loadV2Page("v2_backups.html", s.funcMap)
 	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
@@ -269,11 +301,11 @@ func (s *Server) getV2USBData(lang string) ([]V2USBBackup, []V2Drive) {
 }
 
 // getV2RcloneData retrieves rclone cloud backup data.
-func (s *Server) getV2RcloneData(lang string) ([]V2RcloneConfig, bool) {
+func (s *Server) getV2RcloneData(lang string) ([]V2RcloneConfig, bool, string, string) {
 	backups, err := rclone.GetAll(s.db)
 	if err != nil {
 		logger.Info("Error getting rclone backups: %v", err)
-		return nil, false
+		return nil, false, "", ""
 	}
 
 	var configs []V2RcloneConfig
@@ -300,8 +332,13 @@ func (s *Server) getV2RcloneData(lang string) ([]V2RcloneConfig, bool) {
 
 	keyInfo, err := rclone.GetSSHKeyInfo(s.cfg.DataDir)
 	sshExists := err == nil && keyInfo != nil && keyInfo.Exists
+	var pubKey, relPath string
+	if sshExists {
+		pubKey = keyInfo.PublicKey
+		relPath = keyInfo.RelativePath
+	}
 
-	return configs, sshExists
+	return configs, sshExists, pubKey, relPath
 }
 
 // getV2SyncData retrieves P2P sync configuration and recent syncs.

@@ -150,7 +150,7 @@
         try {
             const response = await fetch('/api/restore/backups');
             if (!response.ok) throw new Error('Failed to load backups');
-            backups = await response.json();
+            backups = await response.json() || [];
             const select = document.getElementById('backup-select');
             if (backups.length === 0) { document.getElementById('no-backups').classList.remove('hidden'); return; }
             backups.forEach(backup => {

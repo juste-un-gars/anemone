@@ -96,7 +96,7 @@ func Sync(db *sql.DB, backup *RcloneBackup, dataDir string) (*SyncResult, error)
 
 		// Check if backup directory exists
 		if _, err := os.Stat(sourceDir); os.IsNotExist(err) {
-			logger.Info("📂 Rclone: No backup directory for user %s, skipping", user.Username)
+			logger.Info(fmt.Sprintf("Rclone: No backup directory for user %s, skipping", user.Username))
 			continue
 		}
 
@@ -104,22 +104,22 @@ func Sync(db *sql.DB, backup *RcloneBackup, dataDir string) (*SyncResult, error)
 		destPath := filepath.Join(backup.RemotePath, "backup", user.Username)
 		dest := buildDestination(backup, dataDir, destPath)
 
-		logger.Info("📤 Rclone: Syncing %s to %s%s", user.Username, backup.DisplayHost(), destPath)
+		logger.Info(fmt.Sprintf("Rclone: Syncing %s to %s%s", user.Username, backup.DisplayHost(), destPath))
 
 		// Run rclone sync
 		userResult, err := runRcloneSyncDest(sourceDir, dest)
 		if err != nil {
 			errMsg := fmt.Sprintf("user %s: %v", user.Username, err)
 			result.Errors = append(result.Errors, errMsg)
-			logger.Info("⚠️  Rclone: Sync failed for %s: %v", user.Username, err)
+			logger.Info(fmt.Sprintf("Rclone: Sync failed for %s: %v", user.Username, err))
 			continue
 		}
 
 		result.FilesTransferred += userResult.FilesTransferred
 		result.BytesTransferred += userResult.BytesTransferred
 
-		logger.Info("✅ Rclone: Synced %s - %d files, %s",
-			user.Username, userResult.FilesTransferred, FormatBytes(userResult.BytesTransferred))
+		logger.Info(fmt.Sprintf("Rclone: Synced %s - %d files, %s",
+			user.Username, userResult.FilesTransferred, FormatBytes(userResult.BytesTransferred)))
 	}
 
 	// Update final status
@@ -130,8 +130,8 @@ func Sync(db *sql.DB, backup *RcloneBackup, dataDir string) (*SyncResult, error)
 		UpdateSyncStatus(db, backup.ID, "success", "", result.FilesTransferred, result.BytesTransferred)
 	}
 
-	logger.Info("📦 Rclone backup completed: %d files, %s",
-		result.FilesTransferred, FormatBytes(result.BytesTransferred))
+	logger.Info(fmt.Sprintf("Rclone backup completed: %d files, %s",
+		result.FilesTransferred, FormatBytes(result.BytesTransferred)))
 
 	return result, nil
 }
@@ -156,7 +156,7 @@ func SyncUser(db *sql.DB, backup *RcloneBackup, dataDir string, username string)
 	destPath := filepath.Join(backup.RemotePath, "backup", username)
 	dest := buildDestination(backup, dataDir, destPath)
 
-	logger.Info("📤 Rclone: Syncing %s to %s%s", username, backup.DisplayHost(), destPath)
+	logger.Info(fmt.Sprintf("Rclone: Syncing %s to %s%s", username, backup.DisplayHost(), destPath))
 
 	// Run rclone sync
 	userResult, err := runRcloneSyncDest(sourceDir, dest)
@@ -208,7 +208,7 @@ func buildS3Remote(backup *RcloneBackup) string {
 	}
 
 	if ep := cfgGet(cfg, "endpoint", ""); ep != "" {
-		parts = append(parts, fmt.Sprintf("endpoint=%s", ep))
+		parts = append(parts, fmt.Sprintf("endpoint=%s", quoteValue(ep)))
 	}
 	if region := cfgGet(cfg, "region", ""); region != "" {
 		parts = append(parts, fmt.Sprintf("region=%s", region))
@@ -217,10 +217,18 @@ func buildS3Remote(backup *RcloneBackup) string {
 		parts = append(parts, fmt.Sprintf("access_key_id=%s", ak))
 	}
 	if sk := cfgGet(cfg, "secret_access_key", ""); sk != "" {
-		parts = append(parts, fmt.Sprintf("secret_access_key=%s", sk))
+		parts = append(parts, fmt.Sprintf("secret_access_key=%s", quoteValue(sk)))
 	}
 
 	return fmt.Sprintf(":s3,%s:", strings.Join(parts, ","))
+}
+
+// quoteValue quotes an rclone connection string value if it contains : or ,
+func quoteValue(v string) string {
+	if strings.ContainsAny(v, ":,") {
+		return "'" + strings.ReplaceAll(v, "'", "''") + "'"
+	}
+	return v
 }
 
 // buildWebDAVRemote builds an rclone WebDAV remote string.
@@ -229,16 +237,16 @@ func buildWebDAVRemote(backup *RcloneBackup) string {
 	parts := []string{}
 
 	if url := cfgGet(cfg, "url", ""); url != "" {
-		parts = append(parts, fmt.Sprintf("url=%s", url))
+		parts = append(parts, fmt.Sprintf("url=%s", quoteValue(url)))
 	}
 	if vendor := cfgGet(cfg, "vendor", ""); vendor != "" {
 		parts = append(parts, fmt.Sprintf("vendor=%s", vendor))
 	}
 	if user := cfgGet(cfg, "user", ""); user != "" {
-		parts = append(parts, fmt.Sprintf("user=%s", user))
+		parts = append(parts, fmt.Sprintf("user=%s", quoteValue(user)))
 	}
 	if pass := cfgGet(cfg, "pass", ""); pass != "" {
-		parts = append(parts, fmt.Sprintf("pass=%s", pass))
+		parts = append(parts, fmt.Sprintf("pass=%s", quoteValue(pass)))
 	}
 
 	return fmt.Sprintf(":webdav,%s:", strings.Join(parts, ","))

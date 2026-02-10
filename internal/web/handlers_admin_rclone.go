@@ -333,7 +333,7 @@ func (s *Server) handleRcloneDelete(w http.ResponseWriter, r *http.Request, id i
 		return
 	}
 
-	http.Redirect(w, r, "/admin/rclone?deleted=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/backups?tab=cloud&deleted=1", http.StatusSeeOther)
 }
 
 // handleRcloneSync triggers a manual sync for a rclone backup
@@ -348,12 +348,12 @@ func (s *Server) handleRcloneSync(w http.ResponseWriter, r *http.Request, id int
 	backup, err := rclone.GetByID(s.db, id)
 	if err != nil {
 		logger.Info("Error getting rclone backup: %v", err)
-		http.Redirect(w, r, "/admin/rclone?error="+i18n.T(lang, "backup_not_found"), http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/backups?tab=cloud&error="+i18n.T(lang, "backup_not_found"), http.StatusSeeOther)
 		return
 	}
 
 	if !rclone.IsRcloneInstalled() {
-		http.Redirect(w, r, "/admin/rclone?error="+i18n.T(lang, "rclone.not_installed"), http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/backups?tab=cloud&error="+i18n.T(lang, "rclone.not_installed"), http.StatusSeeOther)
 		return
 	}
 
@@ -370,7 +370,7 @@ func (s *Server) handleRcloneSync(w http.ResponseWriter, r *http.Request, id int
 		}
 	}()
 
-	http.Redirect(w, r, "/admin/rclone?syncing=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/backups?tab=cloud&syncing=1", http.StatusSeeOther)
 }
 
 // handleRcloneTest tests the SFTP connection for a rclone backup
@@ -385,23 +385,23 @@ func (s *Server) handleRcloneTest(w http.ResponseWriter, r *http.Request, id int
 	backup, err := rclone.GetByID(s.db, id)
 	if err != nil {
 		logger.Info("Error getting rclone backup: %v", err)
-		http.Redirect(w, r, "/admin/rclone?error="+i18n.T(lang, "backup_not_found"), http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/backups?tab=cloud&error="+i18n.T(lang, "backup_not_found"), http.StatusSeeOther)
 		return
 	}
 
 	if !rclone.IsRcloneInstalled() {
-		http.Redirect(w, r, "/admin/rclone?error="+i18n.T(lang, "rclone.not_installed"), http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/backups?tab=cloud&error="+i18n.T(lang, "rclone.not_installed"), http.StatusSeeOther)
 		return
 	}
 
 	err = rclone.TestConnection(backup, s.cfg.DataDir)
 	if err != nil {
 		logger.Info("Rclone connection test failed: %v", err)
-		http.Redirect(w, r, "/admin/rclone?test_error="+err.Error(), http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/backups?tab=cloud&test_error="+err.Error(), http.StatusSeeOther)
 		return
 	}
 
-	http.Redirect(w, r, "/admin/rclone?test_success=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/backups?tab=cloud&test_success=1", http.StatusSeeOther)
 }
 
 // handleRcloneEditForm shows the edit form for a rclone backup
@@ -415,7 +415,7 @@ func (s *Server) handleRcloneEditForm(w http.ResponseWriter, r *http.Request, id
 
 	backup, err := rclone.GetByID(s.db, id)
 	if err != nil {
-		http.Redirect(w, r, "/admin/rclone?error=not_found", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/backups?tab=cloud&error=not_found", http.StatusSeeOther)
 		return
 	}
 
@@ -454,7 +454,7 @@ func (s *Server) handleRcloneEdit(w http.ResponseWriter, r *http.Request, id int
 
 	backup, err := rclone.GetByID(s.db, id)
 	if err != nil {
-		http.Redirect(w, r, "/admin/rclone?error=not_found", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/backups?tab=cloud&error=not_found", http.StatusSeeOther)
 		return
 	}
 

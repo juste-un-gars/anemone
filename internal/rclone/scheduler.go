@@ -6,6 +6,7 @@ package rclone
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/juste-un-gars/anemone/internal/logger"
@@ -33,7 +34,7 @@ func StartScheduler(db *sql.DB, dataDir string) {
 			// Get all enabled rclone backups
 			backups, err := GetEnabled(db)
 			if err != nil {
-				logger.Info("⚠️  Rclone Scheduler: Failed to get backups: %v", err)
+				logger.Info(fmt.Sprintf("Rclone Scheduler: Failed to get backups: %v", err))
 				continue
 			}
 
@@ -44,22 +45,22 @@ func StartScheduler(db *sql.DB, dataDir string) {
 					continue
 				}
 
-				logger.Info("🔄 Rclone Scheduler: Triggering sync for '%s' (frequency: %s)...",
-					backup.Name, backup.SyncFrequency)
+				logger.Info(fmt.Sprintf("Rclone Scheduler: Triggering sync for '%s' (frequency: %s)...",
+					backup.Name, backup.SyncFrequency))
 
 				// Perform sync
 				result, syncErr := Sync(db, backup, dataDir)
 
 				// Log results
 				if syncErr != nil {
-					logger.Info("⚠️  Rclone Scheduler: Sync to %s failed: %v", backup.Name, syncErr)
+					logger.Info(fmt.Sprintf("Rclone Scheduler: Sync to %s failed: %v", backup.Name, syncErr))
 				} else if result != nil {
 					if len(result.Errors) > 0 {
-						logger.Info("⚠️  Rclone Scheduler: Sync to %s completed with errors - Files: %d, Errors: %d",
-							backup.Name, result.FilesTransferred, len(result.Errors))
+						logger.Info(fmt.Sprintf("Rclone Scheduler: Sync to %s completed with errors - Files: %d, Errors: %d",
+							backup.Name, result.FilesTransferred, len(result.Errors)))
 					} else {
-						logger.Info("✅ Rclone Scheduler: Sync to %s completed - Files: %d, %s",
-							backup.Name, result.FilesTransferred, FormatBytes(result.BytesTransferred))
+						logger.Info(fmt.Sprintf("Rclone Scheduler: Sync to %s completed - Files: %d, %s",
+							backup.Name, result.FilesTransferred, FormatBytes(result.BytesTransferred)))
 					}
 				}
 			}

@@ -97,7 +97,7 @@ func (s *Server) handleAPIRestoreBackups(w http.ResponseWriter, r *http.Request)
 		LastModified time.Time `json:"last_modified"`
 	}
 
-	var allBackups []PeerBackup
+	allBackups := make([]PeerBackup, 0)
 
 	// Query each peer for backups
 	// Note: We query ALL peers, even disabled ones, because we want to list
