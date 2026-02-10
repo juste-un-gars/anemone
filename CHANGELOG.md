@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1-beta] - 2026-02-10
+
+### Added
+
+#### Cloud Backup Multi-Provider Support
+- **S3 provider**: Support for AWS S3, Backblaze B2, Wasabi, MinIO, and other S3-compatible storage
+- **WebDAV provider**: Support for Nextcloud, ownCloud, SharePoint, and other WebDAV servers
+- **Named Remote provider**: Support for any rclone-configured remote (pCloud, Google Drive, Dropbox, etc.)
+- **Optional encryption**: Per-destination rclone crypt encryption with password (data encrypted before upload)
+- **Provider badges**: Cloud backup tab now shows colored provider type badges (SFTP/S3/WebDAV/Remote)
+- **Encryption indicator**: Lock icon displayed for encrypted destinations
+- **Add form**: New multi-provider form with conditional fields per provider type
+- **Edit form**: Provider-specific fields with read-only provider badge
+- **rclone in install.sh**: Optional rclone installation via official script during setup
+
+### Changed
+- Cloud backup tab title simplified from "Cloud Backups (SFTP)" to "Cloud Backups"
+- Cloud backup table now shows "Type" and "Destination" columns instead of "Host"
+- `DisplayHost()` method returns appropriate label per provider type
+
+### Security
+- Remote name validation: regex-based sanitization prevents command injection
+- All passwords use `type="password"` input fields, never pre-filled in edit forms
+- Secrets obscured via `rclone obscure` before database storage
+- No sensitive data logged
+
+### Technical
+- New DB columns: `provider_type TEXT`, `provider_config TEXT` (JSON) on `rclone_backups` table
+- Backward compatible: existing SFTP configs work unchanged (`provider_type` defaults to `sftp`)
+- New `internal/rclone/remotes.go`: `ListRemotes()`, `ObscurePassword()` helpers
+- `buildRemoteString()` refactored into provider-specific builders
+- `buildDestination()` wraps with `:crypt` backend when encryption password configured
+- `ProviderDisplayName` template function added to funcMap
+- 25 new i18n keys (FR/EN) for providers, encryption, and validation
+
 ## [0.15.0-beta] - 2026-02-08
 
 ### Changed

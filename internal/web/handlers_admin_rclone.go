@@ -7,6 +7,7 @@ package web
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -16,6 +17,9 @@ import (
 	"github.com/juste-un-gars/anemone/internal/logger"
 	"github.com/juste-un-gars/anemone/internal/rclone"
 )
+
+// validRemoteName matches safe rclone remote names (alphanumeric, dash, underscore, dot).
+var validRemoteName = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]*$`)
 
 // handleAdminRclone displays the rclone backup management page
 func (s *Server) handleAdminRclone(w http.ResponseWriter, r *http.Request) {
@@ -105,52 +109,178 @@ func (s *Server) handleAdminRclone(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleAdminRcloneAdd handles adding a new rclone backup configuration
+// handleAdminRcloneAdd handles GET (show form) and POST (create) for rclone backup configurations
 func (s *Server) handleAdminRcloneAdd(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		s.handleRcloneAddForm(w, r)
+		return
+	}
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	lang := s.getLang(r)
+	providerType := strings.TrimSpace(r.FormValue("provider_type"))
+	if providerType == "" {
+		providerType = rclone.ProviderSFTP
+	}
 
 	name := strings.TrimSpace(r.FormValue("name"))
-	sftpHost := strings.TrimSpace(r.FormValue("sftp_host"))
-	sftpPortStr := strings.TrimSpace(r.FormValue("sftp_port"))
-	sftpUser := strings.TrimSpace(r.FormValue("sftp_user"))
-	sftpKeyPath := strings.TrimSpace(r.FormValue("sftp_key_path"))
 	remotePath := strings.TrimSpace(r.FormValue("remote_path"))
 	enabled := r.FormValue("enabled") == "on"
 
-	if name == "" || sftpHost == "" || sftpUser == "" || remotePath == "" {
-		http.Redirect(w, r, "/admin/rclone?error="+i18n.T(lang, "missing_fields"), http.StatusSeeOther)
+	if name == "" || remotePath == "" {
+		http.Redirect(w, r, "/admin/rclone/add?error="+i18n.T(lang, "missing_fields"), http.StatusSeeOther)
 		return
 	}
 
-	sftpPort := 22
-	if sftpPortStr != "" {
-		if p, err := strconv.Atoi(sftpPortStr); err == nil && p > 0 && p < 65536 {
-			sftpPort = p
-		}
+	backup := &rclone.RcloneBackup{
+		Name:         name,
+		RemotePath:   remotePath,
+		Enabled:      enabled,
+		ProviderType: providerType,
 	}
 
-	backup := &rclone.RcloneBackup{
-		Name:        name,
-		SFTPHost:    sftpHost,
-		SFTPPort:    sftpPort,
-		SFTPUser:    sftpUser,
-		SFTPKeyPath: sftpKeyPath,
-		RemotePath:  remotePath,
-		Enabled:     enabled,
+	switch providerType {
+	case rclone.ProviderSFTP:
+		backup.SFTPHost = strings.TrimSpace(r.FormValue("sftp_host"))
+		backup.SFTPUser = strings.TrimSpace(r.FormValue("sftp_user"))
+		backup.SFTPKeyPath = strings.TrimSpace(r.FormValue("sftp_key_path"))
+		if backup.SFTPHost == "" || backup.SFTPUser == "" {
+			http.Redirect(w, r, "/admin/rclone/add?error="+i18n.T(lang, "missing_fields"), http.StatusSeeOther)
+			return
+		}
+		sftpPort := 22
+		if portStr := r.FormValue("sftp_port"); portStr != "" {
+			if p, err := strconv.Atoi(portStr); err == nil && p > 0 && p < 65536 {
+				sftpPort = p
+			}
+		}
+		backup.SFTPPort = sftpPort
+
+	case rclone.ProviderS3:
+		cfg := map[string]string{
+			"endpoint":          strings.TrimSpace(r.FormValue("s3_endpoint")),
+			"region":            strings.TrimSpace(r.FormValue("s3_region")),
+			"access_key_id":     strings.TrimSpace(r.FormValue("s3_access_key_id")),
+			"secret_access_key": strings.TrimSpace(r.FormValue("s3_secret_access_key")),
+			"s3_provider":       strings.TrimSpace(r.FormValue("s3_provider")),
+		}
+		if cfg["access_key_id"] == "" {
+			http.Redirect(w, r, "/admin/rclone/add?error="+i18n.T(lang, "missing_fields"), http.StatusSeeOther)
+			return
+		}
+		backup.ProviderConfig = cfg
+
+	case rclone.ProviderWebDAV:
+		pass := strings.TrimSpace(r.FormValue("webdav_pass"))
+		if pass != "" {
+			obscured, err := rclone.ObscurePassword(pass)
+			if err == nil {
+				pass = obscured
+			}
+		}
+		cfg := map[string]string{
+			"url":    strings.TrimSpace(r.FormValue("webdav_url")),
+			"vendor": strings.TrimSpace(r.FormValue("webdav_vendor")),
+			"user":   strings.TrimSpace(r.FormValue("webdav_user")),
+			"pass":   pass,
+		}
+		if cfg["url"] == "" {
+			http.Redirect(w, r, "/admin/rclone/add?error="+i18n.T(lang, "missing_fields"), http.StatusSeeOther)
+			return
+		}
+		backup.ProviderConfig = cfg
+
+	case rclone.ProviderRemote:
+		remoteName := strings.TrimSpace(r.FormValue("remote_name"))
+		if remoteName == "" {
+			http.Redirect(w, r, "/admin/rclone/add?error="+i18n.T(lang, "missing_fields"), http.StatusSeeOther)
+			return
+		}
+		// Strip trailing colon if user included it
+		remoteName = strings.TrimSuffix(remoteName, ":")
+		if !validRemoteName.MatchString(remoteName) {
+			http.Redirect(w, r, "/admin/rclone/add?error="+i18n.T(lang, "rclone.remote.invalid_name"), http.StatusSeeOther)
+			return
+		}
+		backup.ProviderConfig = map[string]string{"remote_name": remoteName}
+	}
+
+	// Encryption (optional, all providers)
+	if cryptPass := strings.TrimSpace(r.FormValue("crypt_password")); cryptPass != "" && r.FormValue("crypt_enabled") == "on" {
+		if backup.ProviderConfig == nil {
+			backup.ProviderConfig = map[string]string{}
+		}
+		obscured, err := rclone.ObscurePassword(cryptPass)
+		if err == nil {
+			backup.ProviderConfig["crypt_password"] = obscured
+		}
 	}
 
 	if err := rclone.Create(s.db, backup); err != nil {
 		logger.Info("Error creating rclone backup: %v", err)
-		http.Redirect(w, r, "/admin/rclone?error="+i18n.T(lang, "error_creating"), http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/rclone/add?error="+i18n.T(lang, "error_creating"), http.StatusSeeOther)
 		return
 	}
 
-	http.Redirect(w, r, "/admin/rclone?success=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/backups?tab=cloud&success=1", http.StatusSeeOther)
+}
+
+// handleRcloneAddForm shows the add form for a new rclone backup
+func (s *Server) handleRcloneAddForm(w http.ResponseWriter, r *http.Request) {
+	session, ok := auth.GetSessionFromContext(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	lang := s.getLang(r)
+
+	// Get available named remotes
+	remotes, _ := rclone.ListRemotes()
+
+	// Get SSH key info for SFTP default
+	sshKeyInfo, _ := rclone.GetSSHKeyInfo(s.cfg.DataDir)
+
+	data := struct {
+		V2TemplateData
+		Remotes    []rclone.RemoteInfo
+		SSHKeyPath string
+		Error      string
+	}{
+		V2TemplateData: V2TemplateData{
+			Lang:       lang,
+			Title:      i18n.T(lang, "rclone.add"),
+			ActivePage: "backups",
+			Session:    session,
+		},
+		Remotes: remotes,
+		Error:   r.URL.Query().Get("error"),
+	}
+
+	if sshKeyInfo != nil && sshKeyInfo.Exists {
+		data.SSHKeyPath = sshKeyInfo.RelativePath
+	}
+
+	tmpl := s.loadV2Page("v2_rclone_add.html", s.funcMap)
+	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
+		logger.Info("Template error: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
+}
+
+// handleAdminRcloneListRemotes returns available named remotes as JSON
+func (s *Server) handleAdminRcloneListRemotes(w http.ResponseWriter, r *http.Request) {
+	remotes, err := rclone.ListRemotes()
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(remotes)
 }
 
 // handleAdminRcloneActions handles edit, delete, sync, test actions for rclone backups
@@ -289,9 +419,12 @@ func (s *Server) handleRcloneEditForm(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 
+	remotes, _ := rclone.ListRemotes()
+
 	data := struct {
 		V2TemplateData
-		Backup *rclone.RcloneBackup
+		Backup  *rclone.RcloneBackup
+		Remotes []rclone.RemoteInfo
 	}{
 		V2TemplateData: V2TemplateData{
 			Lang:       lang,
@@ -299,7 +432,8 @@ func (s *Server) handleRcloneEditForm(w http.ResponseWriter, r *http.Request, id
 			ActivePage: "backups",
 			Session:    session,
 		},
-		Backup: backup,
+		Backup:  backup,
+		Remotes: remotes,
 	}
 
 	tmpl := s.loadV2Page("v2_rclone_edit.html", s.funcMap)
@@ -324,17 +458,88 @@ func (s *Server) handleRcloneEdit(w http.ResponseWriter, r *http.Request, id int
 		return
 	}
 
+	// Common fields
 	backup.Name = strings.TrimSpace(r.FormValue("name"))
-	backup.SFTPHost = strings.TrimSpace(r.FormValue("sftp_host"))
-	backup.SFTPUser = strings.TrimSpace(r.FormValue("sftp_user"))
-	backup.SFTPKeyPath = strings.TrimSpace(r.FormValue("sftp_key_path"))
 	backup.RemotePath = strings.TrimSpace(r.FormValue("remote_path"))
 	backup.Enabled = r.FormValue("enabled") == "on"
 
-	// Parse port
-	if portStr := r.FormValue("sftp_port"); portStr != "" {
-		if p, err := strconv.Atoi(portStr); err == nil && p > 0 && p < 65536 {
-			backup.SFTPPort = p
+	// Provider-specific fields (provider type is read-only, kept from DB)
+	switch backup.ProviderType {
+	case rclone.ProviderSFTP:
+		backup.SFTPHost = strings.TrimSpace(r.FormValue("sftp_host"))
+		backup.SFTPUser = strings.TrimSpace(r.FormValue("sftp_user"))
+		backup.SFTPKeyPath = strings.TrimSpace(r.FormValue("sftp_key_path"))
+		if portStr := r.FormValue("sftp_port"); portStr != "" {
+			if p, err := strconv.Atoi(portStr); err == nil && p > 0 && p < 65536 {
+				backup.SFTPPort = p
+			}
+		}
+		if backup.SFTPHost == "" || backup.SFTPUser == "" {
+			http.Redirect(w, r, "/admin/rclone/"+strconv.Itoa(id)+"?error="+i18n.T(lang, "missing_fields"), http.StatusSeeOther)
+			return
+		}
+
+	case rclone.ProviderS3:
+		cfg := backup.ProviderConfig
+		if cfg == nil {
+			cfg = map[string]string{}
+		}
+		cfg["endpoint"] = strings.TrimSpace(r.FormValue("s3_endpoint"))
+		cfg["region"] = strings.TrimSpace(r.FormValue("s3_region"))
+		cfg["access_key_id"] = strings.TrimSpace(r.FormValue("s3_access_key_id"))
+		cfg["s3_provider"] = strings.TrimSpace(r.FormValue("s3_provider"))
+		// Only update secret if provided (non-empty)
+		if sk := strings.TrimSpace(r.FormValue("s3_secret_access_key")); sk != "" {
+			cfg["secret_access_key"] = sk
+		}
+		backup.ProviderConfig = cfg
+
+	case rclone.ProviderWebDAV:
+		cfg := backup.ProviderConfig
+		if cfg == nil {
+			cfg = map[string]string{}
+		}
+		cfg["url"] = strings.TrimSpace(r.FormValue("webdav_url"))
+		cfg["vendor"] = strings.TrimSpace(r.FormValue("webdav_vendor"))
+		cfg["user"] = strings.TrimSpace(r.FormValue("webdav_user"))
+		// Only update password if provided
+		if pass := strings.TrimSpace(r.FormValue("webdav_pass")); pass != "" {
+			obscured, err := rclone.ObscurePassword(pass)
+			if err == nil {
+				cfg["pass"] = obscured
+			}
+		}
+		backup.ProviderConfig = cfg
+
+	case rclone.ProviderRemote:
+		cfg := backup.ProviderConfig
+		if cfg == nil {
+			cfg = map[string]string{}
+		}
+		remoteName := strings.TrimSpace(r.FormValue("remote_name"))
+		remoteName = strings.TrimSuffix(remoteName, ":")
+		if remoteName != "" && !validRemoteName.MatchString(remoteName) {
+			http.Redirect(w, r, "/admin/rclone/"+strconv.Itoa(id)+"?error="+i18n.T(lang, "rclone.remote.invalid_name"), http.StatusSeeOther)
+			return
+		}
+		cfg["remote_name"] = remoteName
+		backup.ProviderConfig = cfg
+	}
+
+	// Encryption
+	if cryptPass := strings.TrimSpace(r.FormValue("crypt_password")); cryptPass != "" {
+		if backup.ProviderConfig == nil {
+			backup.ProviderConfig = map[string]string{}
+		}
+		obscured, err := rclone.ObscurePassword(cryptPass)
+		if err == nil {
+			backup.ProviderConfig["crypt_password"] = obscured
+		}
+	}
+	// Allow disabling encryption
+	if r.FormValue("crypt_enabled") != "on" {
+		if backup.ProviderConfig != nil {
+			delete(backup.ProviderConfig, "crypt_password")
 		}
 	}
 
@@ -343,28 +548,22 @@ func (s *Server) handleRcloneEdit(w http.ResponseWriter, r *http.Request, id int
 	backup.SyncFrequency = strings.TrimSpace(r.FormValue("sync_frequency"))
 	backup.SyncTime = strings.TrimSpace(r.FormValue("sync_time"))
 
-	// Parse day of week (0-6)
 	if dowStr := r.FormValue("sync_day_of_week"); dowStr != "" {
 		if dow, err := strconv.Atoi(dowStr); err == nil {
 			backup.SyncDayOfWeek = &dow
 		}
 	}
-
-	// Parse day of month (1-31)
 	if domStr := r.FormValue("sync_day_of_month"); domStr != "" {
 		if dom, err := strconv.Atoi(domStr); err == nil {
 			backup.SyncDayOfMonth = &dom
 		}
 	}
-
-	// Parse interval minutes
 	if intervalStr := r.FormValue("sync_interval_minutes"); intervalStr != "" {
 		if interval, err := strconv.Atoi(intervalStr); err == nil {
 			backup.SyncIntervalMinutes = interval
 		}
 	}
 
-	// Defaults for schedule
 	if backup.SyncFrequency == "" {
 		backup.SyncFrequency = "daily"
 	}
@@ -375,7 +574,7 @@ func (s *Server) handleRcloneEdit(w http.ResponseWriter, r *http.Request, id int
 		backup.SyncIntervalMinutes = 60
 	}
 
-	if backup.Name == "" || backup.SFTPHost == "" || backup.SFTPUser == "" || backup.RemotePath == "" {
+	if backup.Name == "" || backup.RemotePath == "" {
 		http.Redirect(w, r, "/admin/rclone/"+strconv.Itoa(id)+"?error="+i18n.T(lang, "missing_fields"), http.StatusSeeOther)
 		return
 	}
@@ -386,7 +585,7 @@ func (s *Server) handleRcloneEdit(w http.ResponseWriter, r *http.Request, id int
 		return
 	}
 
-	http.Redirect(w, r, "/admin/rclone?updated=1", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/backups?tab=cloud&updated=1", http.StatusSeeOther)
 }
 
 // handleAdminRcloneKeyInfo returns SSH key information as JSON

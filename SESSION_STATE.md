@@ -5,45 +5,51 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.15.0-beta
-**Last Updated:** 2026-02-08
+**Current Version:** v0.15.1-beta
+**Last Updated:** 2026-02-10
 
 ---
 
 ## Current Session
 
-**Session 12: Module F Cleanup** - Complete ✅
+**Session 13: Cloud Backup Multi-Provider + Chiffrement** - Complete ✅
+
+**Détails :** `.claude/sessions/SESSION_013_cloud_multi_provider.md`
 
 ---
 
-## Session 12: Module F Cleanup
+## Session 13: Cloud Backup Multi-Provider + Chiffrement
 
-**Date:** 2026-02-08
-**Objective:** Nettoyage v2 : supprimer prototype, anciens templates v1, migrer 8 sous-pages
-**Status:** Complete ✅
+**Date:** 2026-02-10
+**Objective:** Ajouter support S3, WebDAV, Named Remote + chiffrement optionnel au module rclone
+**Status:** Complete ✅ — All 6 modules done
 
-### Module F1 : Prototype supprimé ✅
-- Supprimé `cmd/v2preview/main.go`, binaire `v2preview`, `newui.jpg`
+### Modules
+| # | Module | Status |
+|---|--------|--------|
+| 1 | DB Migration + Struct (`provider_type`, `provider_config`) | ✅ |
+| 2 | buildRemoteString multi-provider + ListRemotes | ✅ |
+| 3 | Formulaire d'ajout (GET + POST) multi-provider | ✅ |
+| 4 | Formulaire d'édition + chiffrement (rclone crypt) | ✅ |
+| 5 | Page backups + i18n (badges provider) | ✅ |
+| 6 | FuncMap + polish + sécurité | ✅ |
 
-### Module F2 : 14 templates v1 supprimés ✅
-- dashboard_admin, dashboard_user, admin_users, admin_peers, admin_shares, admin_settings, admin_settings_trash, admin_logs, admin_wireguard, admin_system_update, admin_storage, trash, restore, settings
+### Files Modified (Modules 1-6)
+- `internal/database/migrations.go` — `migrateRcloneMultiProvider()`
+- `internal/rclone/rclone.go` — Struct, constantes, DisplayHost, CRUD, queryBackups
+- `internal/rclone/sync.go` — buildRemoteString, buildDestination (crypt), runRcloneSyncDest, Sync/SyncUser
+- `internal/rclone/remotes.go` — (nouveau) ListRemotes(), ObscurePassword()
+- `internal/web/handlers_admin_rclone.go` — Add/Edit forms multi-provider, list-remotes, crypt handling
+- `internal/web/router.go` — route /admin/rclone/list-remotes
+- `web/templates/v2/v2_rclone_add.html` — (nouveau) formulaire multi-provider
+- `web/templates/v2/v2_rclone_edit.html` — réécrit avec sections provider + chiffrement
+- `internal/i18n/locales/{fr,en}.json` — 22 clés i18n (provider, S3, WebDAV, Remote, crypt)
 
-### Module F3 : 8 sous-pages migrées en v2 ✅
-- **Users (4):** v2_users_add, v2_users_quota, v2_users_token, v2_users_reset_token
-- **Peers (2):** v2_peers_add, v2_peers_edit
-- **Rclone (1):** v2_rclone_edit
-- **USB Backup (1):** v2_usb_backup_edit
+---
 
-### Handlers modifiés
-- `handlers_admin_users.go` — handleAdminUsersAdd, handleAdminUsersActions (token/reset), renderUsersAddError
-- `handlers_user.go` — handleAdminUserQuota
-- `handlers_admin_peers.go` — handleAdminPeersAdd, handleAdminPeersActions (edit), renderPeersAddError
-- `handlers_admin_rclone.go` — handleRcloneEditForm
-- `handlers_admin_usb.go` — handleUSBBackupEditForm
+## Previous Session
 
-### Bilan v2
-- **24 templates v2** (16 main + 8 sub-pages)
-- **Restant en v1 (intentionnel):** auth/setup (7), backup POST error paths (5), pages rares (3)
+**Session 12: Module F Cleanup** - Complete ✅
 
 **Détails :** `.claude/sessions/SESSION_011_v2_ui_redesign.md`
 
@@ -860,6 +866,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 13 | Cloud Backup Multi-Provider + Chiffrement | 2026-02-10 | Complete ✅ |
 | 12 | Module F Cleanup | 2026-02-08 | Complete ✅ |
 | 11 | V2 UI Redesign | 2026-02-08 | Complete ✅ (A-D + F) |
 | 10 | USB Backup Mount Fix | 2026-02-08 | Complete ✅ |
@@ -955,8 +962,11 @@ Sessions 71-74 merged and released. Major features:
 1. **V2 UI Redesign — Module E : Pages auth** (optionnel)
    - Migrer login, setup, activate, reset_password vers v2
    - Style séparé (pas de sidebar, page centrée)
-2. Améliorer la gestion des erreurs WireGuard
-3. Tests automatisés pour WireGuard
-4. Support backends additionnels rclone (S3, Google Drive, etc.)
+2. **API REST JSON pour gestion courante** (optionnel)
+   - Users, Peers, Shares, Settings n'ont pas d'API JSON (form HTML uniquement)
+   - Storage/ZFS et P2P Sync ont déjà des API JSON complètes (`docs/API.md`)
+3. Améliorer la gestion des erreurs WireGuard
+4. Tests automatisés pour WireGuard
+5. Support backends additionnels rclone (S3, Google Drive, etc.)
 
 Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.

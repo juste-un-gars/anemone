@@ -1,14 +1,27 @@
-{{/* Anemone v2 - Rclone edit form */}}
+{{/* Anemone v2 - Rclone edit form (multi-provider + encryption) */}}
 {{define "content"}}
 <!-- Back link -->
 <div style="margin-bottom:1.5rem;">
-    <a href="/admin/backups" style="font-size:0.8125rem;color:var(--info);text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;">
+    <a href="/admin/backups?tab=cloud" style="font-size:0.8125rem;color:var(--info);text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
         {{T .Lang "common.back"}}
     </a>
 </div>
 
 <div class="v2-card" style="margin-bottom:1rem;">
+    <!-- Provider badge -->
+    <div style="margin-bottom:1rem;">
+        {{if eq .Backup.ProviderType "sftp"}}
+            <span class="v2-badge v2-badge-info">SFTP</span>
+        {{else if eq .Backup.ProviderType "s3"}}
+            <span class="v2-badge v2-badge-warning">S3</span>
+        {{else if eq .Backup.ProviderType "webdav"}}
+            <span class="v2-badge v2-badge-success">WebDAV</span>
+        {{else if eq .Backup.ProviderType "remote"}}
+            <span class="v2-badge">Remote</span>
+        {{end}}
+    </div>
+
     <form method="POST" action="/admin/rclone/{{.Backup.ID}}/edit">
         <!-- Name -->
         <div style="margin-bottom:1rem;">
@@ -19,48 +32,122 @@
                    style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
         </div>
 
-        <!-- SFTP Host -->
+        <!-- ===== SFTP Fields ===== -->
+        {{if eq .Backup.ProviderType "sftp"}}
         <div style="margin-bottom:1rem;">
-            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
-                {{T .Lang "rclone.sftp.host"}}
-            </label>
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.sftp.host"}}</label>
             <input type="text" name="sftp_host" value="{{.Backup.SFTPHost}}" required
                    style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
         </div>
-
-        <!-- SFTP Port -->
         <div style="margin-bottom:1rem;">
-            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
-                {{T .Lang "rclone.sftp.port"}}
-            </label>
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.sftp.port"}}</label>
             <input type="number" name="sftp_port" value="{{.Backup.SFTPPort}}" min="1" max="65535"
                    style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
         </div>
-
-        <!-- SFTP User -->
         <div style="margin-bottom:1rem;">
-            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
-                {{T .Lang "rclone.sftp.user"}}
-            </label>
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.sftp.user"}}</label>
             <input type="text" name="sftp_user" value="{{.Backup.SFTPUser}}" required
                    style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
         </div>
-
-        <!-- SSH Key Path -->
         <div style="margin-bottom:1rem;">
-            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
-                {{T .Lang "rclone.sftp.key_path"}}
-            </label>
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.sftp.key_path"}}</label>
             <input type="text" name="sftp_key_path" value="{{.Backup.SFTPKeyPath}}"
                    style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
             <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "rclone.sftp.key_path_hint"}}</div>
         </div>
+        {{end}}
 
-        <!-- Remote Path -->
+        <!-- ===== S3 Fields ===== -->
+        {{if eq .Backup.ProviderType "s3"}}
         <div style="margin-bottom:1rem;">
-            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
-                {{T .Lang "rclone.sftp.remote_path"}}
-            </label>
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.s3.provider"}}</label>
+            <select name="s3_provider"
+                    style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                {{$sp := index .Backup.ProviderConfig "s3_provider"}}
+                <option value="AWS" {{if eq $sp "AWS"}}selected{{end}}>AWS S3</option>
+                <option value="Ceph" {{if eq $sp "Ceph"}}selected{{end}}>Ceph</option>
+                <option value="DigitalOcean" {{if eq $sp "DigitalOcean"}}selected{{end}}>DigitalOcean Spaces</option>
+                <option value="Minio" {{if eq $sp "Minio"}}selected{{end}}>MinIO</option>
+                <option value="Wasabi" {{if eq $sp "Wasabi"}}selected{{end}}>Wasabi</option>
+                <option value="Other" {{if or (eq $sp "Other") (eq $sp "")}}selected{{end}}>{{T .Lang "rclone.s3.other"}}</option>
+            </select>
+        </div>
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.s3.endpoint"}}</label>
+            <input type="text" name="s3_endpoint" value="{{index .Backup.ProviderConfig "endpoint"}}"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+        </div>
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.s3.region"}}</label>
+            <input type="text" name="s3_region" value="{{index .Backup.ProviderConfig "region"}}"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+        </div>
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.s3.access_key_id"}}</label>
+            <input type="text" name="s3_access_key_id" value="{{index .Backup.ProviderConfig "access_key_id"}}"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+        </div>
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.s3.secret_access_key"}}</label>
+            <input type="password" name="s3_secret_access_key" placeholder="({{T .Lang "rclone.enabled"}})"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Leave empty to keep current value</div>
+        </div>
+        {{end}}
+
+        <!-- ===== WebDAV Fields ===== -->
+        {{if eq .Backup.ProviderType "webdav"}}
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.webdav.url"}}</label>
+            <input type="text" name="webdav_url" value="{{index .Backup.ProviderConfig "url"}}"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+        </div>
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.webdav.vendor"}}</label>
+            {{$vendor := index .Backup.ProviderConfig "vendor"}}
+            <select name="webdav_vendor"
+                    style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                <option value="nextcloud" {{if eq $vendor "nextcloud"}}selected{{end}}>Nextcloud</option>
+                <option value="owncloud" {{if eq $vendor "owncloud"}}selected{{end}}>ownCloud</option>
+                <option value="sharepoint" {{if eq $vendor "sharepoint"}}selected{{end}}>SharePoint</option>
+                <option value="other" {{if or (eq $vendor "other") (eq $vendor "")}}selected{{end}}>{{T .Lang "rclone.s3.other"}}</option>
+            </select>
+        </div>
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.webdav.user"}}</label>
+            <input type="text" name="webdav_user" value="{{index .Backup.ProviderConfig "user"}}"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+        </div>
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.webdav.pass"}}</label>
+            <input type="password" name="webdav_pass" placeholder="({{T .Lang "rclone.enabled"}})"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Leave empty to keep current value</div>
+        </div>
+        {{end}}
+
+        <!-- ===== Named Remote Fields ===== -->
+        {{if eq .Backup.ProviderType "remote"}}
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.remote.name"}}</label>
+            {{if .Remotes}}
+            <select name="remote_name"
+                    style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                {{$cur := index $.Backup.ProviderConfig "remote_name"}}
+                {{range .Remotes}}
+                <option value="{{.Name}}" {{if eq .Name $cur}}selected{{end}}>{{.Name}}</option>
+                {{end}}
+            </select>
+            {{else}}
+            <input type="text" name="remote_name" value="{{index .Backup.ProviderConfig "remote_name"}}"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            {{end}}
+        </div>
+        {{end}}
+
+        <!-- Remote Path (common) -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.sftp.remote_path"}}</label>
             <input type="text" name="remote_path" value="{{.Backup.RemotePath}}" required
                    style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
             <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "rclone.sftp.remote_path_hint"}}</div>
@@ -73,11 +160,31 @@
             </label>
         </div>
 
+        <!-- Encryption -->
+        <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-bottom:1.5rem;">
+            <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:1rem;">{{T .Lang "rclone.crypt.enable"}}</div>
+            <div style="margin-bottom:1rem;">
+                <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
+                    <input type="checkbox" name="crypt_enabled" id="cryptEnabled" {{if index .Backup.ProviderConfig "crypt_password"}}checked{{end}}
+                           onchange="document.getElementById('cryptFields').style.display=this.checked?'':'none'">
+                    {{T .Lang "rclone.crypt.enable"}}
+                </label>
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;margin-left:1.5rem;">{{T .Lang "rclone.crypt.password_hint"}}</div>
+            </div>
+            <div id="cryptFields" {{if not (index .Backup.ProviderConfig "crypt_password")}}style="display:none"{{end}}>
+                <div style="margin-bottom:1rem;">
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.crypt.password"}}</label>
+                    <input type="password" name="crypt_password" placeholder="{{if index .Backup.ProviderConfig "crypt_password"}}(configured){{end}}"
+                           style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Leave empty to keep current password</div>
+                </div>
+            </div>
+        </div>
+
         <!-- Schedule -->
         <div style="border-top:1px solid var(--border);padding-top:1.5rem;margin-bottom:1.5rem;">
             <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:1rem;">{{T .Lang "rclone.schedule_title"}}</div>
 
-            <!-- Sync Enabled -->
             <div style="margin-bottom:1rem;">
                 <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
                     <input type="checkbox" name="sync_enabled" id="sync_enabled" {{if .Backup.SyncEnabled}}checked{{end}}
@@ -88,27 +195,19 @@
             </div>
 
             <div id="scheduleOpts" {{if not .Backup.SyncEnabled}}style="display:none"{{end}}>
-                <!-- Frequency -->
                 <div style="margin-bottom:1rem;">
-                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
-                        {{T .Lang "rclone.sync_frequency"}}
-                    </label>
-                    <select id="sync_frequency" name="sync_frequency"
-                            style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;"
-                            onchange="updateRcloneFields()">
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.sync_frequency"}}</label>
+                    <select id="sync_frequency" name="sync_frequency" onchange="updateRcloneFields()"
+                            style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
                         <option value="interval" {{if eq .Backup.SyncFrequency "interval"}}selected{{end}}>{{T .Lang "usb_backup.freq_interval"}}</option>
                         <option value="daily" {{if eq .Backup.SyncFrequency "daily"}}selected{{end}}>{{T .Lang "usb_backup.freq_daily"}}</option>
                         <option value="weekly" {{if eq .Backup.SyncFrequency "weekly"}}selected{{end}}>{{T .Lang "usb_backup.freq_weekly"}}</option>
                         <option value="monthly" {{if eq .Backup.SyncFrequency "monthly"}}selected{{end}}>{{T .Lang "usb_backup.freq_monthly"}}</option>
                     </select>
                 </div>
-
-                <!-- Interval Minutes -->
                 <div id="intervalField" {{if ne .Backup.SyncFrequency "interval"}}style="display:none"{{end}}>
                     <div style="margin-bottom:1rem;">
-                        <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
-                            {{T .Lang "usb_backup.interval_minutes"}}
-                        </label>
+                        <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "usb_backup.interval_minutes"}}</label>
                         <select name="sync_interval_minutes"
                                 style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
                             <option value="15" {{if eq .Backup.SyncIntervalMinutes 15}}selected{{end}}>15 min</option>
@@ -122,24 +221,16 @@
                         </select>
                     </div>
                 </div>
-
-                <!-- Sync Time -->
                 <div id="timeField" {{if eq .Backup.SyncFrequency "interval"}}style="display:none"{{end}}>
                     <div style="margin-bottom:1rem;">
-                        <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
-                            {{T .Lang "usb_backup.sync_time"}}
-                        </label>
+                        <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "usb_backup.sync_time"}}</label>
                         <input type="time" name="sync_time" value="{{.Backup.SyncTime}}"
                                style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
                     </div>
                 </div>
-
-                <!-- Day of Week -->
                 <div id="weekdayField" {{if ne .Backup.SyncFrequency "weekly"}}style="display:none"{{end}}>
                     <div style="margin-bottom:1rem;">
-                        <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
-                            {{T .Lang "usb_backup.day_of_week"}}
-                        </label>
+                        <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "usb_backup.day_of_week"}}</label>
                         <select name="sync_day_of_week"
                                 style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
                             <option value="0" {{if and .Backup.SyncDayOfWeek (eq (deref .Backup.SyncDayOfWeek) 0)}}selected{{end}}>{{T .Lang "common.sunday"}}</option>
@@ -152,13 +243,9 @@
                         </select>
                     </div>
                 </div>
-
-                <!-- Day of Month -->
                 <div id="monthdayField" {{if ne .Backup.SyncFrequency "monthly"}}style="display:none"{{end}}>
                     <div style="margin-bottom:1rem;">
-                        <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
-                            {{T .Lang "usb_backup.day_of_month"}}
-                        </label>
+                        <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "usb_backup.day_of_month"}}</label>
                         <select name="sync_day_of_month"
                                 style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
                             {{range $i := iterate 1 28}}
@@ -172,7 +259,7 @@
 
         <!-- Buttons -->
         <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
-            <a href="/admin/backups" class="v2-btn" style="text-decoration:none;">{{T .Lang "common.cancel"}}</a>
+            <a href="/admin/backups?tab=cloud" class="v2-btn" style="text-decoration:none;">{{T .Lang "common.cancel"}}</a>
             <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "common.save"}}</button>
         </div>
     </form>

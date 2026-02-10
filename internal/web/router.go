@@ -189,6 +189,18 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		}
 		return result
 	}
+	funcMap["ProviderDisplayName"] = func(providerType string) string {
+		switch providerType {
+		case "s3":
+			return "S3"
+		case "webdav":
+			return "WebDAV"
+		case "remote":
+			return "Named Remote"
+		default:
+			return "SFTP"
+		}
+	}
 
 	templates := template.Must(template.New("").Funcs(funcMap).ParseGlob(filepath.Join("web", "templates", "*.html")))
 
@@ -327,6 +339,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// Admin routes - Rclone Cloud Backup
 	mux.HandleFunc("/admin/rclone", auth.RequireAdmin(server.handleAdminRclone))
 	mux.HandleFunc("/admin/rclone/add", auth.RequireAdmin(server.handleAdminRcloneAdd))
+	mux.HandleFunc("/admin/rclone/list-remotes", auth.RequireAdmin(server.handleAdminRcloneListRemotes))
 	mux.HandleFunc("/admin/rclone/key-info", auth.RequireAdmin(server.handleAdminRcloneKeyInfo))
 	mux.HandleFunc("/admin/rclone/generate-key", auth.RequireAdmin(server.handleAdminRcloneGenerateKey))
 	mux.HandleFunc("/admin/rclone/", auth.RequireAdmin(server.handleAdminRcloneActions))

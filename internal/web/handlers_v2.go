@@ -91,12 +91,14 @@ type V2Drive struct {
 
 // V2RcloneConfig holds cloud backup display data.
 type V2RcloneConfig struct {
-	ID         int
-	Name       string
-	Host       string
-	RemotePath string
-	Enabled    bool
-	LastSync   string
+	ID           int
+	Name         string
+	ProviderType string
+	Destination  string
+	RemotePath   string
+	Enabled      bool
+	Encrypted    bool
+	LastSync     string
 }
 
 // V2SyncEntry holds a recent P2P sync log entry.
@@ -280,13 +282,19 @@ func (s *Server) getV2RcloneData(lang string) ([]V2RcloneConfig, bool) {
 		if b.LastSync != nil {
 			lastSync = formatTimeAgo(*b.LastSync, lang)
 		}
+		encrypted := false
+		if v, ok := b.ProviderConfig["crypt_password"]; ok && v != "" {
+			encrypted = true
+		}
 		configs = append(configs, V2RcloneConfig{
-			ID:         b.ID,
-			Name:       b.Name,
-			Host:       b.SFTPHost,
-			RemotePath: b.RemotePath,
-			Enabled:    b.Enabled,
-			LastSync:   lastSync,
+			ID:           b.ID,
+			Name:         b.Name,
+			ProviderType: b.ProviderType,
+			Destination:  b.DisplayHost(),
+			RemotePath:   b.RemotePath,
+			Enabled:      b.Enabled,
+			Encrypted:    encrypted,
+			LastSync:     lastSync,
 		})
 	}
 

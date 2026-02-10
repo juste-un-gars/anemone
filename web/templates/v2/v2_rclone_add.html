@@ -1,0 +1,232 @@
+{{/* Anemone v2 - Rclone add form (multi-provider) */}}
+{{define "content"}}
+<!-- Back link -->
+<div style="margin-bottom:1.5rem;">
+    <a href="/admin/backups?tab=cloud" style="font-size:0.8125rem;color:var(--info);text-decoration:none;display:inline-flex;align-items:center;gap:0.25rem;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 19l-7-7 7-7"/></svg>
+        {{T .Lang "common.back"}}
+    </a>
+</div>
+
+{{if .Error}}
+<div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:0.5rem;padding:0.75rem;margin-bottom:1rem;font-size:0.8125rem;color:var(--error);">
+    {{.Error}}
+</div>
+{{end}}
+
+<div class="v2-card" style="margin-bottom:1rem;">
+    <form method="POST" action="/admin/rclone/add">
+        <!-- Provider Type -->
+        <div style="margin-bottom:1.25rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "rclone.provider_type"}}
+            </label>
+            <select name="provider_type" id="providerType" onchange="switchProvider(this.value)"
+                    style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                <option value="sftp">SFTP</option>
+                <option value="s3">S3 (AWS, Backblaze B2, Wasabi, MinIO)</option>
+                <option value="webdav">WebDAV (Nextcloud, ownCloud)</option>
+                <option value="remote">{{T .Lang "rclone.provider.remote"}}</option>
+            </select>
+        </div>
+
+        <!-- Name -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "rclone.name"}}
+            </label>
+            <input type="text" name="name" required placeholder="Backup Cloud"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+        </div>
+
+        <!-- ===== SFTP Fields ===== -->
+        <div id="sftpFields">
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.sftp.host"}}
+                </label>
+                <input type="text" name="sftp_host" placeholder="192.168.1.100"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.sftp.port"}}
+                </label>
+                <input type="number" name="sftp_port" value="22" min="1" max="65535"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.sftp.user"}}
+                </label>
+                <input type="text" name="sftp_user" placeholder="backup-user"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.sftp.key_path"}}
+                </label>
+                <input type="text" name="sftp_key_path" value="{{.SSHKeyPath}}"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "rclone.sftp.key_path_hint"}}</div>
+            </div>
+        </div>
+
+        <!-- ===== S3 Fields ===== -->
+        <div id="s3Fields" style="display:none;">
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.s3.provider"}}
+                </label>
+                <select name="s3_provider"
+                        style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    <option value="AWS">AWS S3</option>
+                    <option value="Ceph">Ceph</option>
+                    <option value="DigitalOcean">DigitalOcean Spaces</option>
+                    <option value="IBMCOS">IBM COS</option>
+                    <option value="Minio">MinIO</option>
+                    <option value="Wasabi">Wasabi</option>
+                    <option value="Other" selected>{{T .Lang "rclone.s3.other"}}</option>
+                </select>
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.s3.endpoint"}}
+                </label>
+                <input type="text" name="s3_endpoint" placeholder="s3.us-east-1.amazonaws.com"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.s3.region"}}
+                </label>
+                <input type="text" name="s3_region" placeholder="us-east-1"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.s3.access_key_id"}}
+                </label>
+                <input type="text" name="s3_access_key_id"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.s3.secret_access_key"}}
+                </label>
+                <input type="password" name="s3_secret_access_key"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+        </div>
+
+        <!-- ===== WebDAV Fields ===== -->
+        <div id="webdavFields" style="display:none;">
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.webdav.url"}}
+                </label>
+                <input type="text" name="webdav_url" placeholder="https://cloud.example.com/remote.php/dav/files/user/"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.webdav.vendor"}}
+                </label>
+                <select name="webdav_vendor"
+                        style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    <option value="nextcloud">Nextcloud</option>
+                    <option value="owncloud">ownCloud</option>
+                    <option value="sharepoint">SharePoint</option>
+                    <option value="other">{{T .Lang "rclone.s3.other"}}</option>
+                </select>
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.webdav.user"}}
+                </label>
+                <input type="text" name="webdav_user"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.webdav.pass"}}
+                </label>
+                <input type="password" name="webdav_pass"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            </div>
+        </div>
+
+        <!-- ===== Named Remote Fields ===== -->
+        <div id="remoteFields" style="display:none;">
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                    {{T .Lang "rclone.remote.name"}}
+                </label>
+                {{if .Remotes}}
+                <select name="remote_name"
+                        style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    {{range .Remotes}}
+                    <option value="{{.Name}}">{{.Name}}</option>
+                    {{end}}
+                </select>
+                {{else}}
+                <input type="text" name="remote_name" placeholder="myremote"
+                       style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "rclone.remote.no_remotes"}}</div>
+                {{end}}
+            </div>
+        </div>
+
+        <!-- Remote Path (common) -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                {{T .Lang "rclone.sftp.remote_path"}}
+            </label>
+            <input type="text" name="remote_path" required placeholder="/backups/anemone"
+                   style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "rclone.sftp.remote_path_hint"}}</div>
+        </div>
+
+        <!-- Encryption (optional, all providers) -->
+        <div style="border-top:1px solid var(--border);padding-top:1rem;margin-bottom:1rem;">
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;margin-bottom:0.75rem;">
+                <input type="checkbox" name="crypt_enabled" id="cryptEnabled" onchange="document.getElementById('cryptFields').style.display=this.checked?'':'none'">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                {{T .Lang "rclone.crypt.enable"}}
+            </label>
+            <div id="cryptFields" style="display:none;">
+                <div style="margin-bottom:0.75rem;">
+                    <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">
+                        {{T .Lang "rclone.crypt.password"}}
+                    </label>
+                    <input type="password" name="crypt_password" id="cryptPassword"
+                           style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
+                    <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "rclone.crypt.password_hint"}}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Enabled -->
+        <div style="margin-bottom:1.5rem;">
+            <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
+                <input type="checkbox" name="enabled" checked> {{T .Lang "rclone.enabled"}}
+            </label>
+        </div>
+
+        <!-- Buttons -->
+        <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
+            <a href="/admin/backups?tab=cloud" class="v2-btn" style="text-decoration:none;">{{T .Lang "common.cancel"}}</a>
+            <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "common.save"}}</button>
+        </div>
+    </form>
+</div>
+
+<script>
+function switchProvider(pt) {
+    document.getElementById('sftpFields').style.display = pt === 'sftp' ? '' : 'none';
+    document.getElementById('s3Fields').style.display = pt === 's3' ? '' : 'none';
+    document.getElementById('webdavFields').style.display = pt === 'webdav' ? '' : 'none';
+    document.getElementById('remoteFields').style.display = pt === 'remote' ? '' : 'none';
+}
+</script>
+{{end}}

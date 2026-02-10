@@ -8,16 +8,29 @@ package rclone
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 )
 
-// RcloneBackup represents an SFTP backup destination configuration
+// Provider type constants
+const (
+	ProviderSFTP   = "sftp"
+	ProviderS3     = "s3"
+	ProviderWebDAV = "webdav"
+	ProviderRemote = "remote"
+)
+
+// RcloneBackup represents a cloud backup destination configuration
 type RcloneBackup struct {
 	ID       int
 	Name     string // User-friendly name (e.g., "Backup SFTP Principal")
 
-	// SFTP configuration
+	// Provider type: "sftp", "s3", "webdav", "remote"
+	ProviderType   string            // Provider type constant
+	ProviderConfig map[string]string // Provider-specific config (JSON in DB)
+
+	// SFTP configuration (legacy, still used for SFTP provider)
 	SFTPHost     string // Hostname or IP
 	SFTPPort     int    // Default 22
 	SFTPUser     string // SSH username
@@ -47,6 +60,53 @@ type RcloneBackup struct {
 	UpdatedAt time.Time
 }
 
+// DisplayHost returns a display label for the backup destination depending on provider type.
+func (b *RcloneBackup) DisplayHost() string {
+	switch b.ProviderType {
+	case ProviderS3:
+		if ep, ok := b.ProviderConfig["endpoint"]; ok && ep != "" {
+			return ep
+		}
+		return "S3"
+	case ProviderWebDAV:
+		if url, ok := b.ProviderConfig["url"]; ok && url != "" {
+			return url
+		}
+		return "WebDAV"
+	case ProviderRemote:
+		if name, ok := b.ProviderConfig["remote_name"]; ok && name != "" {
+			return name + ":"
+		}
+		return "Remote"
+	default:
+		return b.SFTPHost
+	}
+}
+
+// marshalProviderConfig serializes ProviderConfig to JSON string for DB storage.
+func marshalProviderConfig(config map[string]string) string {
+	if config == nil {
+		return "{}"
+	}
+	data, err := json.Marshal(config)
+	if err != nil {
+		return "{}"
+	}
+	return string(data)
+}
+
+// unmarshalProviderConfig deserializes JSON string from DB to ProviderConfig map.
+func unmarshalProviderConfig(data string) map[string]string {
+	if data == "" {
+		return map[string]string{}
+	}
+	var config map[string]string
+	if err := json.Unmarshal([]byte(data), &config); err != nil {
+		return map[string]string{}
+	}
+	return config
+}
+
 // Create creates a new rclone backup configuration
 func Create(db *sql.DB, backup *RcloneBackup) error {
 	// Set defaults
@@ -62,18 +122,22 @@ func Create(db *sql.DB, backup *RcloneBackup) error {
 	if backup.SyncIntervalMinutes == 0 {
 		backup.SyncIntervalMinutes = 60
 	}
+	if backup.ProviderType == "" {
+		backup.ProviderType = ProviderSFTP
+	}
 
 	query := `INSERT INTO rclone_backups (
 		name, sftp_host, sftp_port, sftp_user, sftp_key_path, sftp_password, remote_path,
 		enabled, sync_enabled, sync_frequency, sync_time, sync_day_of_week, sync_day_of_month,
-		sync_interval_minutes, last_status, created_at, updated_at
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unknown', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
+		sync_interval_minutes, provider_type, provider_config, last_status, created_at, updated_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unknown', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`
 
 	result, err := db.Exec(query,
 		backup.Name, backup.SFTPHost, backup.SFTPPort, backup.SFTPUser,
 		backup.SFTPKeyPath, backup.SFTPPassword, backup.RemotePath,
 		backup.Enabled, backup.SyncEnabled, backup.SyncFrequency, backup.SyncTime,
 		backup.SyncDayOfWeek, backup.SyncDayOfMonth, backup.SyncIntervalMinutes,
+		backup.ProviderType, marshalProviderConfig(backup.ProviderConfig),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create rclone backup: %w", err)
@@ -94,12 +158,13 @@ func GetByID(db *sql.DB, id int) (*RcloneBackup, error) {
 	query := `SELECT id, name, sftp_host, sftp_port, sftp_user, sftp_key_path, sftp_password,
 		remote_path, enabled, sync_enabled, sync_frequency, sync_time, sync_day_of_week,
 		sync_day_of_month, sync_interval_minutes, last_sync, last_status, last_error,
-		files_synced, bytes_synced, created_at, updated_at
+		files_synced, bytes_synced, created_at, updated_at, provider_type, provider_config
 		FROM rclone_backups WHERE id = ?`
 
 	var syncFrequency, syncTime, lastStatus, lastError sql.NullString
 	var syncDayOfWeek, syncDayOfMonth, syncIntervalMinutes sql.NullInt64
 	var sftpKeyPath, sftpPassword sql.NullString
+	var providerType, providerConfig sql.NullString
 
 	err := db.QueryRow(query, id).Scan(
 		&backup.ID, &backup.Name, &backup.SFTPHost, &backup.SFTPPort, &backup.SFTPUser,
@@ -107,7 +172,7 @@ func GetByID(db *sql.DB, id int) (*RcloneBackup, error) {
 		&backup.SyncEnabled, &syncFrequency, &syncTime, &syncDayOfWeek,
 		&syncDayOfMonth, &syncIntervalMinutes, &backup.LastSync, &lastStatus,
 		&lastError, &backup.FilesSynced, &backup.BytesSynced,
-		&backup.CreatedAt, &backup.UpdatedAt,
+		&backup.CreatedAt, &backup.UpdatedAt, &providerType, &providerConfig,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -154,6 +219,13 @@ func GetByID(db *sql.DB, id int) (*RcloneBackup, error) {
 		backup.LastError = lastError.String
 	}
 
+	// Handle provider fields
+	backup.ProviderType = ProviderSFTP
+	if providerType.Valid && providerType.String != "" {
+		backup.ProviderType = providerType.String
+	}
+	backup.ProviderConfig = unmarshalProviderConfig(providerConfig.String)
+
 	return backup, nil
 }
 
@@ -162,10 +234,26 @@ func GetAll(db *sql.DB) ([]*RcloneBackup, error) {
 	query := `SELECT id, name, sftp_host, sftp_port, sftp_user, sftp_key_path, sftp_password,
 		remote_path, enabled, sync_enabled, sync_frequency, sync_time, sync_day_of_week,
 		sync_day_of_month, sync_interval_minutes, last_sync, last_status, last_error,
-		files_synced, bytes_synced, created_at, updated_at
+		files_synced, bytes_synced, created_at, updated_at, provider_type, provider_config
 		FROM rclone_backups ORDER BY created_at DESC`
 
-	rows, err := db.Query(query)
+	return queryBackups(db, query)
+}
+
+// GetEnabled retrieves all enabled rclone backup configurations
+func GetEnabled(db *sql.DB) ([]*RcloneBackup, error) {
+	query := `SELECT id, name, sftp_host, sftp_port, sftp_user, sftp_key_path, sftp_password,
+		remote_path, enabled, sync_enabled, sync_frequency, sync_time, sync_day_of_week,
+		sync_day_of_month, sync_interval_minutes, last_sync, last_status, last_error,
+		files_synced, bytes_synced, created_at, updated_at, provider_type, provider_config
+		FROM rclone_backups WHERE enabled = 1 ORDER BY created_at DESC`
+
+	return queryBackups(db, query)
+}
+
+// queryBackups executes a query and scans rows into RcloneBackup slices.
+func queryBackups(db *sql.DB, query string, args ...interface{}) ([]*RcloneBackup, error) {
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query rclone backups: %w", err)
 	}
@@ -177,6 +265,7 @@ func GetAll(db *sql.DB) ([]*RcloneBackup, error) {
 		var syncFrequency, syncTime, lastStatus, lastError sql.NullString
 		var syncDayOfWeek, syncDayOfMonth, syncIntervalMinutes sql.NullInt64
 		var sftpKeyPath, sftpPassword sql.NullString
+		var providerType, providerConfig sql.NullString
 
 		err := rows.Scan(
 			&backup.ID, &backup.Name, &backup.SFTPHost, &backup.SFTPPort, &backup.SFTPUser,
@@ -184,13 +273,12 @@ func GetAll(db *sql.DB) ([]*RcloneBackup, error) {
 			&backup.SyncEnabled, &syncFrequency, &syncTime, &syncDayOfWeek,
 			&syncDayOfMonth, &syncIntervalMinutes, &backup.LastSync, &lastStatus,
 			&lastError, &backup.FilesSynced, &backup.BytesSynced,
-			&backup.CreatedAt, &backup.UpdatedAt,
+			&backup.CreatedAt, &backup.UpdatedAt, &providerType, &providerConfig,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan rclone backup: %w", err)
 		}
 
-		// Handle nullable fields
 		if sftpKeyPath.Valid {
 			backup.SFTPKeyPath = sftpKeyPath.String
 		}
@@ -198,7 +286,6 @@ func GetAll(db *sql.DB) ([]*RcloneBackup, error) {
 			backup.SFTPPassword = sftpPassword.String
 		}
 
-		// Handle scheduling fields with defaults
 		backup.SyncFrequency = "daily"
 		if syncFrequency.Valid && syncFrequency.String != "" {
 			backup.SyncFrequency = syncFrequency.String
@@ -228,82 +315,11 @@ func GetAll(db *sql.DB) ([]*RcloneBackup, error) {
 			backup.LastError = lastError.String
 		}
 
-		backups = append(backups, backup)
-	}
-
-	return backups, nil
-}
-
-// GetEnabled retrieves all enabled rclone backup configurations
-func GetEnabled(db *sql.DB) ([]*RcloneBackup, error) {
-	query := `SELECT id, name, sftp_host, sftp_port, sftp_user, sftp_key_path, sftp_password,
-		remote_path, enabled, sync_enabled, sync_frequency, sync_time, sync_day_of_week,
-		sync_day_of_month, sync_interval_minutes, last_sync, last_status, last_error,
-		files_synced, bytes_synced, created_at, updated_at
-		FROM rclone_backups WHERE enabled = 1 ORDER BY created_at DESC`
-
-	rows, err := db.Query(query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query enabled rclone backups: %w", err)
-	}
-	defer rows.Close()
-
-	var backups []*RcloneBackup
-	for rows.Next() {
-		backup := &RcloneBackup{}
-		var syncFrequency, syncTime, lastStatus, lastError sql.NullString
-		var syncDayOfWeek, syncDayOfMonth, syncIntervalMinutes sql.NullInt64
-		var sftpKeyPath, sftpPassword sql.NullString
-
-		err := rows.Scan(
-			&backup.ID, &backup.Name, &backup.SFTPHost, &backup.SFTPPort, &backup.SFTPUser,
-			&sftpKeyPath, &sftpPassword, &backup.RemotePath, &backup.Enabled,
-			&backup.SyncEnabled, &syncFrequency, &syncTime, &syncDayOfWeek,
-			&syncDayOfMonth, &syncIntervalMinutes, &backup.LastSync, &lastStatus,
-			&lastError, &backup.FilesSynced, &backup.BytesSynced,
-			&backup.CreatedAt, &backup.UpdatedAt,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan rclone backup: %w", err)
+		backup.ProviderType = ProviderSFTP
+		if providerType.Valid && providerType.String != "" {
+			backup.ProviderType = providerType.String
 		}
-
-		// Handle nullable fields
-		if sftpKeyPath.Valid {
-			backup.SFTPKeyPath = sftpKeyPath.String
-		}
-		if sftpPassword.Valid {
-			backup.SFTPPassword = sftpPassword.String
-		}
-
-		// Handle scheduling fields with defaults
-		backup.SyncFrequency = "daily"
-		if syncFrequency.Valid && syncFrequency.String != "" {
-			backup.SyncFrequency = syncFrequency.String
-		}
-		backup.SyncTime = "02:00"
-		if syncTime.Valid && syncTime.String != "" {
-			backup.SyncTime = syncTime.String
-		}
-		if syncDayOfWeek.Valid {
-			dow := int(syncDayOfWeek.Int64)
-			backup.SyncDayOfWeek = &dow
-		}
-		if syncDayOfMonth.Valid {
-			dom := int(syncDayOfMonth.Int64)
-			backup.SyncDayOfMonth = &dom
-		}
-		backup.SyncIntervalMinutes = 60
-		if syncIntervalMinutes.Valid {
-			backup.SyncIntervalMinutes = int(syncIntervalMinutes.Int64)
-		}
-
-		backup.LastStatus = "unknown"
-		if lastStatus.Valid {
-			backup.LastStatus = lastStatus.String
-		}
-		if lastError.Valid {
-			backup.LastError = lastError.String
-		}
+		backup.ProviderConfig = unmarshalProviderConfig(providerConfig.String)
 
 		backups = append(backups, backup)
 	}
@@ -317,7 +333,8 @@ func Update(db *sql.DB, backup *RcloneBackup) error {
 		name = ?, sftp_host = ?, sftp_port = ?, sftp_user = ?, sftp_key_path = ?,
 		sftp_password = ?, remote_path = ?, enabled = ?, sync_enabled = ?,
 		sync_frequency = ?, sync_time = ?, sync_day_of_week = ?, sync_day_of_month = ?,
-		sync_interval_minutes = ?, updated_at = CURRENT_TIMESTAMP
+		sync_interval_minutes = ?, provider_type = ?, provider_config = ?,
+		updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?`
 
 	_, err := db.Exec(query,
@@ -325,6 +342,7 @@ func Update(db *sql.DB, backup *RcloneBackup) error {
 		backup.SFTPKeyPath, backup.SFTPPassword, backup.RemotePath,
 		backup.Enabled, backup.SyncEnabled, backup.SyncFrequency, backup.SyncTime,
 		backup.SyncDayOfWeek, backup.SyncDayOfMonth, backup.SyncIntervalMinutes,
+		backup.ProviderType, marshalProviderConfig(backup.ProviderConfig),
 		backup.ID,
 	)
 	if err != nil {

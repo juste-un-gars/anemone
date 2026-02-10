@@ -89,9 +89,6 @@ func Sync(db *sql.DB, backup *RcloneBackup, dataDir string) (*SyncResult, error)
 		return nil, fmt.Errorf("failed to get users: %w", err)
 	}
 
-	// Build rclone remote string
-	remote := buildRemoteString(backup, dataDir)
-
 	// Sync each user's backup directory
 	for _, user := range allUsers {
 		// Source: user's backup directory
@@ -103,13 +100,14 @@ func Sync(db *sql.DB, backup *RcloneBackup, dataDir string) (*SyncResult, error)
 			continue
 		}
 
-		// Destination: remote path / username
+		// Destination: remote path / username (with optional crypt wrapping)
 		destPath := filepath.Join(backup.RemotePath, "backup", user.Username)
+		dest := buildDestination(backup, dataDir, destPath)
 
-		logger.Info("📤 Rclone: Syncing %s to %s%s", user.Username, backup.SFTPHost, destPath)
+		logger.Info("📤 Rclone: Syncing %s to %s%s", user.Username, backup.DisplayHost(), destPath)
 
 		// Run rclone sync
-		userResult, err := runRcloneSync(remote, sourceDir, destPath)
+		userResult, err := runRcloneSyncDest(sourceDir, dest)
 		if err != nil {
 			errMsg := fmt.Sprintf("user %s: %v", user.Username, err)
 			result.Errors = append(result.Errors, errMsg)
@@ -154,16 +152,14 @@ func SyncUser(db *sql.DB, backup *RcloneBackup, dataDir string, username string)
 		return nil, fmt.Errorf("backup directory does not exist: %s", sourceDir)
 	}
 
-	// Build rclone remote string
-	remote := buildRemoteString(backup, dataDir)
-
-	// Destination: remote path / username
+	// Destination: remote path / username (with optional crypt wrapping)
 	destPath := filepath.Join(backup.RemotePath, "backup", username)
+	dest := buildDestination(backup, dataDir, destPath)
 
-	logger.Info("📤 Rclone: Syncing %s to %s%s", username, backup.SFTPHost, destPath)
+	logger.Info("📤 Rclone: Syncing %s to %s%s", username, backup.DisplayHost(), destPath)
 
 	// Run rclone sync
-	userResult, err := runRcloneSync(remote, sourceDir, destPath)
+	userResult, err := runRcloneSyncDest(sourceDir, dest)
 	if err != nil {
 		return nil, fmt.Errorf("sync failed: %w", err)
 	}
@@ -174,9 +170,22 @@ func SyncUser(db *sql.DB, backup *RcloneBackup, dataDir string, username string)
 	return result, nil
 }
 
-// buildRemoteString builds the rclone SFTP remote connection string
+// buildRemoteString builds the rclone remote connection string based on provider type.
 func buildRemoteString(backup *RcloneBackup, dataDir string) string {
-	// Format: :sftp,host=HOST,user=USER,port=PORT[,key_file=KEY][,pass=PASS]:
+	switch backup.ProviderType {
+	case ProviderS3:
+		return buildS3Remote(backup)
+	case ProviderWebDAV:
+		return buildWebDAVRemote(backup)
+	case ProviderRemote:
+		return buildNamedRemote(backup)
+	default:
+		return buildSFTPRemote(backup, dataDir)
+	}
+}
+
+// buildSFTPRemote builds an rclone SFTP remote string.
+func buildSFTPRemote(backup *RcloneBackup, dataDir string) string {
 	parts := []string{
 		fmt.Sprintf("host=%s", backup.SFTPHost),
 		fmt.Sprintf("user=%s", backup.SFTPUser),
@@ -184,30 +193,95 @@ func buildRemoteString(backup *RcloneBackup, dataDir string) string {
 	}
 
 	if backup.SFTPKeyPath != "" {
-		// Resolve relative paths (e.g., "certs/rclone_key" -> "/srv/anemone/certs/rclone_key")
 		resolvedKeyPath := ResolveKeyPath(backup.SFTPKeyPath, dataDir)
 		parts = append(parts, fmt.Sprintf("key_file=%s", resolvedKeyPath))
 	}
 
-	// Note: For password auth, rclone expects the password to be obscured
-	// For simplicity, we prioritize key-based auth. Password can be added later.
-
 	return fmt.Sprintf(":sftp,%s:", strings.Join(parts, ","))
 }
 
-// runRcloneSync executes rclone sync command and parses the output
-func runRcloneSync(remote, sourceDir, destPath string) (*SyncResult, error) {
+// buildS3Remote builds an rclone S3 remote string.
+func buildS3Remote(backup *RcloneBackup) string {
+	cfg := backup.ProviderConfig
+	parts := []string{
+		fmt.Sprintf("provider=%s", cfgGet(cfg, "s3_provider", "Other")),
+	}
+
+	if ep := cfgGet(cfg, "endpoint", ""); ep != "" {
+		parts = append(parts, fmt.Sprintf("endpoint=%s", ep))
+	}
+	if region := cfgGet(cfg, "region", ""); region != "" {
+		parts = append(parts, fmt.Sprintf("region=%s", region))
+	}
+	if ak := cfgGet(cfg, "access_key_id", ""); ak != "" {
+		parts = append(parts, fmt.Sprintf("access_key_id=%s", ak))
+	}
+	if sk := cfgGet(cfg, "secret_access_key", ""); sk != "" {
+		parts = append(parts, fmt.Sprintf("secret_access_key=%s", sk))
+	}
+
+	return fmt.Sprintf(":s3,%s:", strings.Join(parts, ","))
+}
+
+// buildWebDAVRemote builds an rclone WebDAV remote string.
+func buildWebDAVRemote(backup *RcloneBackup) string {
+	cfg := backup.ProviderConfig
+	parts := []string{}
+
+	if url := cfgGet(cfg, "url", ""); url != "" {
+		parts = append(parts, fmt.Sprintf("url=%s", url))
+	}
+	if vendor := cfgGet(cfg, "vendor", ""); vendor != "" {
+		parts = append(parts, fmt.Sprintf("vendor=%s", vendor))
+	}
+	if user := cfgGet(cfg, "user", ""); user != "" {
+		parts = append(parts, fmt.Sprintf("user=%s", user))
+	}
+	if pass := cfgGet(cfg, "pass", ""); pass != "" {
+		parts = append(parts, fmt.Sprintf("pass=%s", pass))
+	}
+
+	return fmt.Sprintf(":webdav,%s:", strings.Join(parts, ","))
+}
+
+// buildNamedRemote builds an rclone named remote string.
+func buildNamedRemote(backup *RcloneBackup) string {
+	name := cfgGet(backup.ProviderConfig, "remote_name", "")
+	if name == "" {
+		return ":"
+	}
+	// Named remotes use "remotename:" format
+	return name + ":"
+}
+
+// cfgGet returns a value from config map with a default fallback.
+func cfgGet(cfg map[string]string, key, defaultVal string) string {
+	if v, ok := cfg[key]; ok && v != "" {
+		return v
+	}
+	return defaultVal
+}
+
+// buildDestination builds the full rclone destination string, wrapping with crypt if enabled.
+func buildDestination(backup *RcloneBackup, dataDir, destPath string) string {
+	remote := buildRemoteString(backup, dataDir)
+	cryptPass := cfgGet(backup.ProviderConfig, "crypt_password", "")
+	if cryptPass == "" {
+		return remote + destPath
+	}
+	// Wrap with crypt: the inner remote+path becomes the crypt backend
+	return fmt.Sprintf(":crypt,remote=%s%s,password=%s,filename_encryption=standard:",
+		remote, destPath, cryptPass)
+}
+
+// runRcloneSyncDest executes rclone sync command with a pre-built destination and parses the output.
+func runRcloneSyncDest(sourceDir, dest string) (*SyncResult, error) {
 	result := &SyncResult{}
 
-	// Build rclone command
-	// --stats-one-line: compact output for parsing
-	// --progress: show progress (useful for logs)
-	// --transfers 4: parallel transfers
-	// --checkers 8: parallel checkers
 	args := []string{
 		"sync",
 		sourceDir,
-		remote + destPath,
+		dest,
 		"--stats-one-line",
 		"--stats", "0",
 		"--transfers", "4",

@@ -200,6 +200,11 @@ func Migrate(db *sql.DB) error {
 		return fmt.Errorf("rclone_backups table migration failed: %w", err)
 	}
 
+	// Migration pour ajouter le support multi-provider à rclone_backups
+	if err := migrateRcloneMultiProvider(db); err != nil {
+		return fmt.Errorf("rclone multi-provider migration failed: %w", err)
+	}
+
 	return nil
 }
 
@@ -561,6 +566,47 @@ func migrateRcloneTable(db *sql.DB) error {
 		// Create index for quick lookups
 		if _, err := db.Exec("CREATE INDEX IF NOT EXISTS idx_rclone_backups_enabled ON rclone_backups(enabled)"); err != nil {
 			return fmt.Errorf("failed to create rclone_backups index: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// migrateRcloneMultiProvider adds provider_type and provider_config columns to rclone_backups
+func migrateRcloneMultiProvider(db *sql.DB) error {
+	// Check if table exists first
+	var tableName string
+	err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='rclone_backups'").Scan(&tableName)
+	if err != nil {
+		return nil // Table doesn't exist yet, nothing to migrate
+	}
+
+	rows, err := db.Query("PRAGMA table_info(rclone_backups)")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	existingColumns := make(map[string]bool)
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull, pk int
+		var dfltValue sql.NullString
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		existingColumns[name] = true
+	}
+
+	if !existingColumns["provider_type"] {
+		if _, err := db.Exec("ALTER TABLE rclone_backups ADD COLUMN provider_type TEXT DEFAULT 'sftp'"); err != nil {
+			return fmt.Errorf("failed to add provider_type column: %w", err)
+		}
+	}
+	if !existingColumns["provider_config"] {
+		if _, err := db.Exec("ALTER TABLE rclone_backups ADD COLUMN provider_config TEXT DEFAULT '{}'"); err != nil {
+			return fmt.Errorf("failed to add provider_config column: %w", err)
 		}
 	}
 

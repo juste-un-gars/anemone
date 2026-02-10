@@ -575,6 +575,16 @@ install_wireguard() {
     fi
 }
 
+install_rclone() {
+    # Rclone for cloud backups (optional)
+    if ! command -v rclone &> /dev/null; then
+        log_info "Installing rclone for cloud backups (optional)..."
+        curl -fsSL https://rclone.org/install.sh | bash && log_info "rclone installed ($(rclone version --check 2>/dev/null || rclone version | head -1))" || log_warn "rclone installation failed (optional — install manually later with: curl https://rclone.org/install.sh | sudo bash)"
+    else
+        log_info "rclone already installed ($(rclone version | head -1))"
+    fi
+}
+
 build_binary() {
     log_info "Building Anemone..."
 
@@ -978,6 +988,7 @@ main() {
         log_step "3/8 Installing storage tools..."
         install_storage_tools
         install_wireguard
+        install_rclone
 
         log_step "4/8 Building Anemone..."
         build_binary

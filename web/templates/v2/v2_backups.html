@@ -108,7 +108,8 @@
             <thead>
                 <tr>
                     <th>{{T .Lang "v2.backups.cloud.name"}}</th>
-                    <th>{{T .Lang "v2.backups.cloud.host"}}</th>
+                    <th>{{T .Lang "v2.backups.cloud.type"}}</th>
+                    <th>{{T .Lang "v2.backups.cloud.destination"}}</th>
                     <th>{{T .Lang "v2.backups.cloud.status"}}</th>
                     <th>{{T .Lang "v2.backups.cloud.last_sync"}}</th>
                     <th>{{T .Lang "v2.backups.actions"}}</th>
@@ -118,7 +119,21 @@
                 {{range .RcloneConfigs}}
                 <tr>
                     <td style="font-weight:600;">{{.Name}}</td>
-                    <td style="font-size:0.8125rem;color:var(--text-secondary);">{{.Host}}:{{.RemotePath}}</td>
+                    <td>
+                        {{if eq .ProviderType "s3"}}
+                            <span class="v2-badge" style="background:rgba(245,158,11,0.1);color:#f59e0b;">S3</span>
+                        {{else if eq .ProviderType "webdav"}}
+                            <span class="v2-badge" style="background:rgba(59,130,246,0.1);color:#3b82f6;">WebDAV</span>
+                        {{else if eq .ProviderType "remote"}}
+                            <span class="v2-badge" style="background:rgba(168,85,247,0.1);color:#a855f7;">Remote</span>
+                        {{else}}
+                            <span class="v2-badge" style="background:rgba(34,197,94,0.1);color:#22c55e;">SFTP</span>
+                        {{end}}
+                        {{if .Encrypted}}
+                            <svg style="display:inline;width:14px;height:14px;vertical-align:middle;margin-left:2px;" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" title="{{T $.Lang "v2.backups.cloud.encrypted"}}"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        {{end}}
+                    </td>
+                    <td style="font-size:0.8125rem;color:var(--text-secondary);">{{.Destination}}:{{.RemotePath}}</td>
                     <td>
                         {{if .Enabled}}
                             <span class="v2-badge v2-badge-success">{{T $.Lang "v2.backups.cloud.enabled"}}</span>
