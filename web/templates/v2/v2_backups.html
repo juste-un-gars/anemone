@@ -10,30 +10,30 @@
 {{end}}
 <!-- Tab navigation -->
 <div class="v2-tabs" id="backupTabs">
-    <button class="v2-tab active" data-tab="usb" onclick="switchTab('usb')">
+    <button class="v2-tab{{if eq .ActiveTab "usb"}} active{{end}}" data-tab="usb" onclick="switchTab('usb')">
         <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 1v3"/><path d="M15 1v3"/><path d="M9 20v3"/><path d="M15 20v3"/></svg>
         USB
     </button>
-    <button class="v2-tab" data-tab="cloud" onclick="switchTab('cloud')">
+    <button class="v2-tab{{if eq .ActiveTab "cloud"}} active{{end}}" data-tab="cloud" onclick="switchTab('cloud')">
         <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
         Cloud
     </button>
-    <button class="v2-tab" data-tab="p2p" onclick="switchTab('p2p')">
+    <button class="v2-tab{{if eq .ActiveTab "p2p"}} active{{end}}" data-tab="p2p" onclick="switchTab('p2p')">
         <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
         P2P Sync
     </button>
-    <button class="v2-tab" data-tab="incoming" onclick="switchTab('incoming')">
+    <button class="v2-tab{{if eq .ActiveTab "incoming"}} active{{end}}" data-tab="incoming" onclick="switchTab('incoming')">
         <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Incoming
     </button>
-    <button class="v2-tab" data-tab="server" onclick="switchTab('server')">
+    <button class="v2-tab{{if eq .ActiveTab "server"}} active{{end}}" data-tab="server" onclick="switchTab('server')">
         <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
         Server
     </button>
 </div>
 
 <!-- ===== USB Tab ===== -->
-<div class="v2-tab-panel active" id="tab-usb">
+<div class="v2-tab-panel{{if eq .ActiveTab "usb"}} active{{end}}" id="tab-usb">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
         <div style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);">{{T .Lang "v2.backups.usb.title"}}</div>
         <a href="/admin/usb-backup/add" class="v2-btn v2-btn-primary v2-btn-sm">+ {{T .Lang "v2.backups.add"}}</a>
@@ -104,7 +104,7 @@
 </div>
 
 <!-- ===== Cloud Tab ===== -->
-<div class="v2-tab-panel" id="tab-cloud">
+<div class="v2-tab-panel{{if eq .ActiveTab "cloud"}} active{{end}}" id="tab-cloud">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
         <div style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);">{{T .Lang "v2.backups.cloud.title"}}</div>
         <a href="/admin/rclone/add" class="v2-btn v2-btn-primary v2-btn-sm">+ {{T .Lang "v2.backups.add"}}</a>
@@ -223,7 +223,7 @@
 </div>
 
 <!-- ===== P2P Sync Tab ===== -->
-<div class="v2-tab-panel" id="tab-p2p">
+<div class="v2-tab-panel{{if eq .ActiveTab "p2p"}} active{{end}}" id="tab-p2p">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
         <div style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);">{{T .Lang "v2.backups.p2p.title"}}</div>
         <div style="display:flex;gap:0.5rem;">
@@ -300,7 +300,7 @@
 </div>
 
 <!-- ===== Incoming Tab ===== -->
-<div class="v2-tab-panel" id="tab-incoming">
+<div class="v2-tab-panel{{if eq .ActiveTab "incoming"}} active{{end}}" id="tab-incoming">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
         <div style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);">{{T .Lang "v2.backups.incoming.title"}}</div>
     </div>
@@ -357,7 +357,7 @@
 </div>
 
 <!-- ===== Server Backup Tab ===== -->
-<div class="v2-tab-panel" id="tab-server">
+<div class="v2-tab-panel{{if eq .ActiveTab "server"}} active{{end}}" id="tab-server">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
         <div style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);">{{T .Lang "v2.backups.server.title"}}</div>
         <form method="POST" action="/admin/backup/create" style="display:inline;">

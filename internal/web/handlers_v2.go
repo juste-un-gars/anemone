@@ -74,7 +74,8 @@ type V2BackupsData struct {
 	// Server backup tab
 	ServerBackups []V2ServerBackup
 
-	// Flash notifications
+	// UI state
+	ActiveTab string // "usb", "cloud", "p2p", "incoming", "server"
 	Flash     string // message text
 	FlashType string // "success", "error", "info"
 }
@@ -185,8 +186,14 @@ func (s *Server) handleAdminBackups(w http.ResponseWriter, r *http.Request) {
 	// Server backups
 	data.ServerBackups = s.getV2ServerBackupData()
 
-	// Flash notifications from query params
+	// Active tab from query params
 	q := r.URL.Query()
+	data.ActiveTab = q.Get("tab")
+	if data.ActiveTab == "" {
+		data.ActiveTab = "usb"
+	}
+
+	// Flash notifications from query params
 	switch {
 	case q.Get("syncing") != "":
 		data.Flash = i18n.T(lang, "rclone.sync_started")
