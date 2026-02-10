@@ -17,6 +17,9 @@
 | 6 | WebDAV URL cassée (pCloud) | `:` dans `https://` casse le parsing rclone inline backend | `quoteValue()` : quote les valeurs contenant `:` ou `,` |
 | 7 | Logs `!BADKEY` dans rclone | `logger.Info("msg %s", val)` mais slog attend des paires clé/valeur | `logger.Info(fmt.Sprintf("msg %s", val))` |
 | 8 | Pas de notifications flash sur page backups | Template v2 ne gérait aucun query param | Ajout Flash/FlashType dans struct + affichage conditionnel |
+| 9 | Pas de bouton Supprimer sur page édition cloud | Bouton absent de `v2_rclone_edit.html` | Ajout bouton avec `formaction` pour override l'action du form |
+| 10 | Bouton Supprimer → "destination mise à jour" | Form delete imbriqué dans form edit (HTML interdit) | Remplacé par `formaction` sur le bouton |
+| 11 | Statut sync (running/success/error) pas affiché | `V2RcloneConfig` n'avait pas `LastStatus`, colonne affichait seulement enabled/disabled | Ajout `LastStatus` au struct + affichage conditionnel dans template |
 
 ## Découvertes en cours de session
 
@@ -42,16 +45,18 @@
 
 ## Files Modified
 - `internal/web/handlers_restore.go` — nil slice → empty slice pour API restore
-- `internal/web/handlers_v2.go` — ActiveTab, Flash/FlashType, SSHKeyPublicKey/RelPath dans struct
+- `internal/web/handlers_v2.go` — ActiveTab, Flash/FlashType, SSHKeyPublicKey/RelPath, LastStatus dans V2RcloneConfig
 - `internal/web/handlers_admin_rclone.go` — Redirections v1→v2, query params
 - `internal/rclone/sync.go` — `quoteValue()`, fix logs printf→fmt.Sprintf
 - `internal/rclone/scheduler.go` — Fix logs printf→fmt.Sprintf
-- `web/templates/v2/v2_backups.html` — SSH key section, tabs serveur-side, flash notifications, fix liens
+- `web/templates/v2/v2_backups.html` — SSH key section, tabs serveur-side, flash notifications, statut sync cloud
+- `web/templates/v2/v2_rclone_edit.html` — Bouton Supprimer (formaction)
 - `web/templates/v2/v2_restore.html` — Fallback `|| []` pour backups null
-- `internal/i18n/locales/{fr,en}.json` — rclone.deleted/updated/created
+- `internal/i18n/locales/{fr,en}.json` — rclone.deleted/updated/created, v2.backups.status.running
 
 ## Handoff Notes
-- **pCloud** : doit être configuré via `sudo -u anemone rclone config` + OAuth, puis Type "Remote" dans Anemone
+- **pCloud** : remote configuré via `rclone config`, token OAuth expiré/invalide → `rclone config reconnect pcloud:` pour régénérer
+- **pCloud dans Anemone** : destination créée en Type "Remote" (name=pcloud, path=/AN1), sync lancé mais token invalide
 - **Test SFTP FR1→FR2** : pas encore fait, préparer FR2 (user anemone-backup, authorized_keys)
 - **Logs !BADKEY** : reste ~20+ occurrences dans d'autres packages (sync, trash, manifest, main.go)
 - **Permission denied manifests** : vérifier permissions `/srv/anemone/shares/*/` pour user anemone

@@ -24,7 +24,7 @@
 **Objective:** Corriger bugs rclone (WebDAV, logs), UI backups (tabs, restore, SSH key), tester pCloud
 **Status:** In Progress (paused)
 
-### Bugs corrigés (8)
+### Bugs corrigés (11)
 | # | Bug | Fix |
 |---|-----|-----|
 | 1 | Restore "Erreur chargement backups" (aucun backup) | nil slice → `make([]PeerBackup, 0)` |
@@ -35,9 +35,12 @@
 | 6 | WebDAV URL cassée (pCloud) | `quoteValue()` pour `:` et `,` |
 | 7 | Logs `!BADKEY` rclone | `fmt.Sprintf` au lieu de printf args |
 | 8 | Pas de notifications flash backups | Flash/FlashType dans struct + template |
+| 9 | Pas de bouton Supprimer sur page édition cloud | Bouton `formaction` ajouté |
+| 10 | Bouton Supprimer → "destination mise à jour" | Form imbriqué → `formaction` |
+| 11 | Statut sync cloud pas affiché (running/success/error) | `LastStatus` ajouté au struct + template |
 
 ### En attente
-- **pCloud** : nécessite OAuth (pas WebDAV). Configurer via `sudo -u anemone rclone config` + `rclone authorize "pcloud"`, puis Type "Remote" dans Anemone
+- **pCloud** : remote configuré, token OAuth invalide → `rclone config reconnect pcloud:` puis re-tester sync
 - **Test SFTP FR1→FR2** : pas encore fait
 - **Logs `!BADKEY`** : reste dans handlers_admin_rclone, sync, trash, manifest
 - **Permission denied manifests** : droits écriture `/srv/anemone/shares/*/`

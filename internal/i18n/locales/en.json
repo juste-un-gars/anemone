@@ -1193,6 +1193,7 @@
   "v2.backups.never": "Never",
   "v2.backups.status.success": "Success",
   "v2.backups.status.error": "Error",
+  "v2.backups.status.running": "Running",
 
   "v2.backups.usb.title": "USB Backups",
   "v2.backups.usb.name": "Name",

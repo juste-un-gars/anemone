@@ -143,10 +143,16 @@
                     </td>
                     <td style="font-size:0.8125rem;color:var(--text-secondary);">{{.Destination}}:{{.RemotePath}}</td>
                     <td>
-                        {{if .Enabled}}
-                            <span class="v2-badge v2-badge-success">{{T $.Lang "v2.backups.cloud.enabled"}}</span>
-                        {{else}}
+                        {{if not .Enabled}}
                             <span class="v2-badge v2-badge-warning">{{T $.Lang "v2.backups.cloud.disabled"}}</span>
+                        {{else if eq .LastStatus "running"}}
+                            <span class="v2-badge v2-badge-info">{{T $.Lang "v2.backups.status.running"}}</span>
+                        {{else if eq .LastStatus "success"}}
+                            <span class="v2-badge v2-badge-success">{{T $.Lang "v2.backups.status.success"}}</span>
+                        {{else if eq .LastStatus "error"}}
+                            <span class="v2-badge v2-badge-error">{{T $.Lang "v2.backups.status.error"}}</span>
+                        {{else}}
+                            <span class="v2-badge">{{T $.Lang "v2.backups.cloud.enabled"}}</span>
                         {{end}}
                     </td>
                     <td style="font-size:0.8125rem;color:var(--text-secondary);">{{.LastSync}}</td>

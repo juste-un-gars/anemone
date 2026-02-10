@@ -106,6 +106,7 @@ type V2RcloneConfig struct {
 	Enabled      bool
 	Encrypted    bool
 	LastSync     string
+	LastStatus   string
 }
 
 // V2SyncEntry holds a recent P2P sync log entry.
@@ -334,6 +335,7 @@ func (s *Server) getV2RcloneData(lang string) ([]V2RcloneConfig, bool, string, s
 			Enabled:      b.Enabled,
 			Encrypted:    encrypted,
 			LastSync:     lastSync,
+			LastStatus:   b.LastStatus,
 		})
 	}
 
