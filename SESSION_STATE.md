@@ -12,38 +12,53 @@
 
 ## Current Session
 
-**Session 13: Cloud Backup Multi-Provider + Chiffrement** - Complete ✅
+**Session 14: v2 UI Bugfixes** - Complete ✅
 
-**Détails :** `.claude/sessions/SESSION_013_cloud_multi_provider.md`
+**Détails :** `.claude/sessions/SESSION_014_v2_bugfixes.md`
 
 ---
 
-## Session 13: Cloud Backup Multi-Provider + Chiffrement
+## Session 14: v2 UI Bugfixes
 
 **Date:** 2026-02-10
-**Objective:** Ajouter support S3, WebDAV, Named Remote + chiffrement optionnel au module rclone
-**Status:** Complete ✅ — All 6 modules done
+**Objective:** Corriger tous les boutons/pages cassés dans l'interface v2
+**Status:** Complete ✅
 
-### Modules
-| # | Module | Status |
-|---|--------|--------|
-| 1 | DB Migration + Struct (`provider_type`, `provider_config`) | ✅ |
-| 2 | buildRemoteString multi-provider + ListRemotes | ✅ |
-| 3 | Formulaire d'ajout (GET + POST) multi-provider | ✅ |
-| 4 | Formulaire d'édition + chiffrement (rclone crypt) | ✅ |
-| 5 | Page backups + i18n (badges provider) | ✅ |
-| 6 | FuncMap + polish + sécurité | ✅ |
+### Bugs corrigés
+| # | Bug | Cause | Fix |
+|---|-----|-------|-----|
+| 1 | `/admin/users/add` → Internal Server Error | Template `.Error` manquant dans le struct GET | Ajout `Error string` au data struct |
+| 2 | `/admin/usb-backup/add` → 405 Method Not Allowed | Handler POST uniquement, pas de GET | Ajout GET handler + template `v2_usb_backup_add.html` |
+| 3 | `/shares/add` → 404 / redirige dashboard | Route inexistante, bouton inutile | Supprimé bouton (partages auto-créés par utilisateur) |
+| 4 | P2P "Configurer" → 405 | Lien vers `/admin/sync/config` (POST only) | Changé vers `/admin/peers` |
+| 5 | `/restore` (user) → connexion coupée | `{{${key}}}` JS conflicte avec Go template → panic | Changé placeholders `{{key}}` → `{key}` |
 
-### Files Modified (Modules 1-6)
-- `internal/database/migrations.go` — `migrateRcloneMultiProvider()`
-- `internal/rclone/rclone.go` — Struct, constantes, DisplayHost, CRUD, queryBackups
-- `internal/rclone/sync.go` — buildRemoteString, buildDestination (crypt), runRcloneSyncDest, Sync/SyncUser
-- `internal/rclone/remotes.go` — (nouveau) ListRemotes(), ObscurePassword()
-- `internal/web/handlers_admin_rclone.go` — Add/Edit forms multi-provider, list-remotes, crypt handling
-- `internal/web/router.go` — route /admin/rclone/list-remotes
-- `web/templates/v2/v2_rclone_add.html` — (nouveau) formulaire multi-provider
-- `web/templates/v2/v2_rclone_edit.html` — réécrit avec sections provider + chiffrement
-- `internal/i18n/locales/{fr,en}.json` — 22 clés i18n (provider, S3, WebDAV, Remote, crypt)
+### Release v0.15.1-beta
+- Tag créé et poussé sur GitHub
+- Branche `feature/v2-dashboard-admin` mergée dans `main`
+- Release: https://github.com/juste-un-gars/anemone/releases/tag/v0.15.1-beta
+
+### Files Modified
+- `internal/web/handlers_admin_users.go` — Ajout `Error` au GET data struct
+- `internal/web/handlers_admin_usb.go` — GET handler + redirections corrigées
+- `web/templates/v2/v2_usb_backup_add.html` — (nouveau) formulaire ajout USB backup
+- `web/templates/v2/v2_shares.html` — Supprimé bouton "Ajouter"
+- `web/templates/v2/v2_backups.html` — Lien P2P → `/admin/peers`
+- `web/templates/v2/v2_restore.html` — Fix conflit Go template / JS template literals
+- `internal/i18n/locales/{fr,en}.json` — `usb_backup.select_drive` + fix placeholders restore
+
+### Handoff Notes
+- Rclone multi-provider (Session 13) à tester sur FR1 avec FR2 comme serveur de réception
+- Configurer rclone named remote sur FR1 via `sudo -u anemone rclone config`
+- FR2 : SSH installé (`sudo systemctl enable --now ssh`), créer dossier réception
+
+---
+
+## Previous Session
+
+**Session 13: Cloud Backup Multi-Provider + Chiffrement** - Complete ✅
+
+**Détails :** `.claude/sessions/SESSION_013_cloud_multi_provider.md`
 
 ---
 
@@ -866,6 +881,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 14 | v2 UI Bugfixes | 2026-02-10 | Complete ✅ |
 | 13 | Cloud Backup Multi-Provider + Chiffrement | 2026-02-10 | Complete ✅ |
 | 12 | Module F Cleanup | 2026-02-08 | Complete ✅ |
 | 11 | V2 UI Redesign | 2026-02-08 | Complete ✅ (A-D + F) |
