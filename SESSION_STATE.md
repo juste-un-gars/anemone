@@ -5,48 +5,41 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.15.2-beta
-**Last Updated:** 2026-02-10
+**Current Version:** v0.15.3-beta
+**Last Updated:** 2026-02-11
 
 ---
 
 ## Current Session
 
-**Session 15: Rclone & UI Bugfixes** - Complete ✅
+**Session 16: SSH Key Bugfix** - Complete ✅
 
-**Détails :** `.claude/sessions/SESSION_015_rclone_bugfixes.md`
+**Détails :** `.claude/sessions/SESSION_016_ssh_key_bugfix.md`
 
 ---
 
-## Session 15: Rclone & UI Bugfixes
+## Session 16: SSH Key Bugfix
 
-**Date:** 2026-02-10
-**Objective:** Corriger bugs rclone (WebDAV, logs), UI backups (tabs, restore, SSH key), tester pCloud
+**Date:** 2026-02-11
+**Objective:** Fix SSH key generation error + cleanup !BADKEY log
 **Status:** Complete ✅
 
-### Bugs corrigés (12)
+### Bugs corrigés (2)
 | # | Bug | Fix |
 |---|-----|-----|
-| 1 | Restore "Erreur chargement backups" (aucun backup) | nil slice → `make([]PeerBackup, 0)` |
-| 2 | Section SSH Key absente dans Cloud backup | Section complète : générer/copier/régénérer |
-| 3 | Bouton "Modifier" cloud → 405 | Lien `/admin/rclone/{id}` (GET) |
-| 4 | Sync/Test/Delete → retour page USB | Redirections → `/admin/backups?tab=cloud` |
-| 5 | Onglet Cloud pas sélectionné après redirect | `ActiveTab` côté serveur |
-| 6 | WebDAV URL cassée (pCloud) | `quoteValue()` pour `:` et `,` |
-| 7 | Logs `!BADKEY` rclone | `fmt.Sprintf` au lieu de printf args |
-| 8 | Pas de notifications flash backups | Flash/FlashType dans struct + template |
-| 9 | Pas de bouton Supprimer sur page édition cloud | Bouton `formaction` ajouté |
-| 10 | Bouton Supprimer → "destination mise à jour" | Form imbriqué → `formaction` |
-| 11 | Statut sync cloud pas affiché (running/success/error) | `LastStatus` ajouté au struct + template |
-| 12 | Sync cloud reste bloquée en "running" si process meurt | PID tracking + scheduler vérifie chaque minute + cleanup au démarrage |
+| 1 | Génération clé SSH affiche "Error" malgré succès | JS vérifiait `data.success` mais l'API renvoie `data.exists` |
+| 2 | `!BADKEY` dans les logs génération SSH key | printf-style → slog key-value |
 
-### En attente
-- **Test SFTP FR1→FR2** : pas encore fait
-- **Logs `!BADKEY`** : reste dans handlers_admin_rclone, sync, trash, manifest
-- **Permission denied manifests** : droits écriture `/srv/anemone/shares/*/`
+### Release
+**v0.15.3-beta** — SSH key generation bugfix
 
-### Décision
-- Branche `feature/v2-dashboard-admin` supprimée — tout sur `main` désormais
+---
+
+## Previous Session
+
+**Session 15: Rclone & UI Bugfixes** - Complete ✅
+
+**Détails :** `.claude/sessions/SESSION_015_rclone_bugfixes.md`
 
 ---
 
@@ -885,6 +878,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 16 | SSH Key Bugfix | 2026-02-11 | Complete ✅ |
 | 15 | Rclone & UI Bugfixes | 2026-02-10 | Complete ✅ |
 | 14 | v2 UI Bugfixes | 2026-02-10 | Complete ✅ |
 | 13 | Cloud Backup Multi-Provider + Chiffrement | 2026-02-10 | Complete ✅ |
