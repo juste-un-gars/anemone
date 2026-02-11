@@ -16,7 +16,7 @@
             </div>
         </div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem;">
-            {{if eq .Stats.QuotaInfo.QuotaBackupGB 0.0}}
+            {{if eq .Stats.QuotaInfo.QuotaBackupGB 0}}
                 {{T .Lang "dashboard.user.quota.on"}} &infin; {{T .Lang "dashboard.user.quota.unlimited"}}
             {{else}}
                 {{T .Lang "dashboard.user.quota.on"}} {{.Stats.QuotaInfo.QuotaBackupGB}} GB ({{.Stats.QuotaInfo.PercentBackup | printf "%.1f"}}%)
@@ -52,7 +52,7 @@
             </div>
         </div>
         <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem;">
-            {{if eq .Stats.QuotaInfo.QuotaDataGB 0.0}}
+            {{if eq .Stats.QuotaInfo.QuotaDataGB 0}}
                 {{T .Lang "dashboard.user.quota.on"}} &infin; {{T .Lang "dashboard.user.quota.unlimited"}}
             {{else}}
                 {{T .Lang "dashboard.user.quota.on"}} {{.Stats.QuotaInfo.QuotaDataGB}} GB ({{.Stats.QuotaInfo.PercentData | printf "%.1f"}}%)

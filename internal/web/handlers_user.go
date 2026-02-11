@@ -106,7 +106,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 
 	tmplUser := s.loadV2UserPage("v2_dashboard_user.html", s.funcMap)
 	if err := tmplUser.ExecuteTemplate(w, "v2_base_user", userData); err != nil {
-		logger.Info("Error rendering v2 user dashboard: %v", err)
+		logger.Error("Error rendering v2 user dashboard", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
