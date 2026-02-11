@@ -617,7 +617,7 @@ func (s *Server) handleAdminRcloneGenerateKey(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	logger.Info("SSH key generated for rclone at %s", keyInfo.KeyPath)
+	logger.Info("SSH key generated for rclone", "path", keyInfo.KeyPath)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(keyInfo)

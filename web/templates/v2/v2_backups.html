@@ -214,15 +214,15 @@
     function generateSSHKey() {
         if (!confirm('{{T .Lang "rclone.ssh_key.generate_confirm"}}')) return;
         fetch('/admin/rclone/generate-key', { method: 'POST' })
-            .then(r => r.json())
-            .then(data => { if (data.success) location.reload(); else alert(data.error || 'Error'); })
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(data => { if (data.exists) location.reload(); else alert(data.error || 'Error'); })
             .catch(err => alert('Error: ' + err));
     }
     function regenerateSSHKey() {
         if (!confirm('{{T .Lang "rclone.ssh_key.regenerate_confirm"}}')) return;
         fetch('/admin/rclone/generate-key', { method: 'POST' })
-            .then(r => r.json())
-            .then(data => { if (data.success) location.reload(); else alert(data.error || 'Error'); })
+            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(data => { if (data.exists) location.reload(); else alert(data.error || 'Error'); })
             .catch(err => alert('Error: ' + err));
     }
     </script>
