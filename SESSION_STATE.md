@@ -24,14 +24,15 @@
 **Objective:** Fix SSH key generation error + cleanup !BADKEY log
 **Status:** Complete ✅
 
-### Bugs corrigés (2)
+### Bugs corrigés (3)
 | # | Bug | Fix |
 |---|-----|-----|
 | 1 | Génération clé SSH affiche "Error" malgré succès | JS vérifiait `data.success` mais l'API renvoie `data.exists` |
 | 2 | `!BADKEY` dans les logs génération SSH key | printf-style → slog key-value |
+| 3 | Dashboard utilisateur crashe (QuotaInfo int vs float64) | `eq .QuotaBackupGB 0.0` → `eq .QuotaBackupGB 0` + fix log !BADKEY |
 
 ### Release
-**v0.15.3-beta** — SSH key generation bugfix
+**v0.15.3-beta** — SSH key + user dashboard bugfixes
 
 ---
 

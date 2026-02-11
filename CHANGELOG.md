@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - SSH key generation showed error alert despite key being created successfully (JS checked `data.success` but API returns `data.exists`)
-- `!BADKEY` in logs when generating SSH key (printf-style → slog key-value)
+- User dashboard crash: template compared int `QuotaBackupGB`/`QuotaDataGB` to float `0.0`
+- `!BADKEY` in logs when generating SSH key and rendering user dashboard (printf-style → slog key-value)
 
 ## [0.15.1-beta] - 2026-02-10
 
