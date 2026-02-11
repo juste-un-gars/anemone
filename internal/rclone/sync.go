@@ -302,8 +302,9 @@ func buildDestination(backup *RcloneBackup, dataDir, destPath string) string {
 		return remote + destPath
 	}
 	// Wrap with crypt: the inner remote+path becomes the crypt backend
-	return fmt.Sprintf(":crypt,remote=%s%s,password=%s,filename_encryption=standard:",
-		remote, destPath, cryptPass)
+	// Values containing ':' or ',' must be quoted for rclone inline syntax
+	return fmt.Sprintf(":crypt,remote=%s,password=%s,filename_encryption=standard:",
+		quoteValue(remote+destPath), quoteValue(cryptPass))
 }
 
 // runRcloneSyncTracked executes rclone sync with process tracking for the given backup ID.
