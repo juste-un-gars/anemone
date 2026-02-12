@@ -6,29 +6,37 @@
 > - Ne pas continuer sans validation utilisateur
 
 **Current Version:** v0.15.3-beta
-**Last Updated:** 2026-02-11
+**Last Updated:** 2026-02-12
 
 ---
 
 ## Current Session
 
-**Session 17: Rclone Crypt Fix + !BADKEY Logs** - Complete ✅
+**Session 18: Dashboard Last Backup Fix + Recent Backups Tab** - Complete ✅
 
-**Détails :** `.claude/sessions/SESSION_017_rclone_crypt_badkey.md`
+**Détails :** `.claude/sessions/SESSION_018_recent_backups.md`
 
 ---
 
-## Session 17: Rclone Crypt Fix + !BADKEY Logs
+## Session 18: Dashboard Last Backup Fix + Recent Tab
 
-**Date:** 2026-02-11
-**Objective:** Fix rclone crypt "password not set" error + !BADKEY in manifest/rclone logs
+**Date:** 2026-02-12
+**Objective:** Fix "Last backup" card + add consolidated "Recent" tab to Backups page
 **Status:** Complete ✅
 
-### Bugs corrigés (2)
-| # | Bug | Fix |
-|---|-----|-----|
-| 1 | Rclone crypt sync fails: "password not set in config file" | Quote `remote` value contenant `:` dans syntaxe inline `:crypt,...:` via `quoteValue()` |
-| 2 | `!BADKEY` dans logs manifest/rclone (46 occurrences) | printf-style → `fmt.Sprintf()` dans 6 fichiers |
+### Changes
+| # | Type | Description |
+|---|------|-------------|
+| 1 | Fix | Dashboard "Dernière sauvegarde" now queries rclone_backups + usb_backups in addition to sync_log |
+| 2 | Feature | New "Récent" tab in Backups page — consolidates USB, Cloud, P2P, Server in single sorted view |
+
+---
+
+## Previous Session
+
+**Session 17: Rclone Crypt Fix + !BADKEY Logs** - Complete ✅
+
+**Détails :** `.claude/sessions/SESSION_017_rclone_crypt_badkey.md`
 
 ---
 
@@ -901,6 +909,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 18 | Dashboard Last Backup Fix + Recent Tab | 2026-02-12 | Complete ✅ |
 | 17 | Rclone Crypt Fix + !BADKEY Logs | 2026-02-11 | Complete ✅ |
 | 16 | SSH Key Bugfix | 2026-02-11 | Complete ✅ |
 | 15 | Rclone & UI Bugfixes | 2026-02-10 | Complete ✅ |
