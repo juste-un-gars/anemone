@@ -12,6 +12,28 @@
 
 ## Current Session
 
+**Session 17: Rclone Crypt Fix + !BADKEY Logs** - Complete ✅
+
+**Détails :** `.claude/sessions/SESSION_017_rclone_crypt_badkey.md`
+
+---
+
+## Session 17: Rclone Crypt Fix + !BADKEY Logs
+
+**Date:** 2026-02-11
+**Objective:** Fix rclone crypt "password not set" error + !BADKEY in manifest/rclone logs
+**Status:** Complete ✅
+
+### Bugs corrigés (2)
+| # | Bug | Fix |
+|---|-----|-----|
+| 1 | Rclone crypt sync fails: "password not set in config file" | Quote `remote` value contenant `:` dans syntaxe inline `:crypt,...:` via `quoteValue()` |
+| 2 | `!BADKEY` dans logs manifest/rclone (46 occurrences) | printf-style → `fmt.Sprintf()` dans 6 fichiers |
+
+---
+
+## Previous Session
+
 **Session 16: SSH Key Bugfix** - Complete ✅
 
 **Détails :** `.claude/sessions/SESSION_016_ssh_key_bugfix.md`
@@ -879,6 +901,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 17 | Rclone Crypt Fix + !BADKEY Logs | 2026-02-11 | Complete ✅ |
 | 16 | SSH Key Bugfix | 2026-02-11 | Complete ✅ |
 | 15 | Rclone & UI Bugfixes | 2026-02-10 | Complete ✅ |
 | 14 | v2 UI Bugfixes | 2026-02-10 | Complete ✅ |

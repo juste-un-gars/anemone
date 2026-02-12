@@ -11,6 +11,7 @@ import (
 	"html/template"
 	"net/http"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/juste-un-gars/anemone/internal/auth"
@@ -74,8 +75,11 @@ type V2BackupsData struct {
 	// Server backup tab
 	ServerBackups []V2ServerBackup
 
+	// Recent tab
+	RecentBackups []V2RecentBackup
+
 	// UI state
-	ActiveTab string // "usb", "cloud", "p2p", "incoming", "server"
+	ActiveTab string // "recent", "usb", "cloud", "p2p", "incoming", "server"
 	Flash     string // message text
 	FlashType string // "success", "error", "info"
 }
@@ -136,6 +140,16 @@ type V2ServerBackup struct {
 	Date          string
 }
 
+// V2RecentBackup holds a consolidated recent backup entry across all types.
+type V2RecentBackup struct {
+	Type     string // "usb", "cloud", "p2p", "server"
+	Name     string
+	Status   string // "success", "error", ""
+	Details  string
+	Time     string
+	SortTime time.Time
+}
+
 // loadV2Page parses the v2 base layout with a specific page template.
 func (s *Server) loadV2Page(page string, funcMap template.FuncMap) *template.Template {
 	base := filepath.Join("web", "templates", "v2", "v2_base.html")
@@ -187,11 +201,14 @@ func (s *Server) handleAdminBackups(w http.ResponseWriter, r *http.Request) {
 	// Server backups
 	data.ServerBackups = s.getV2ServerBackupData()
 
+	// Recent backups (consolidated)
+	data.RecentBackups = s.getV2RecentBackups(lang, 10)
+
 	// Active tab from query params
 	q := r.URL.Query()
 	data.ActiveTab = q.Get("tab")
 	if data.ActiveTab == "" {
-		data.ActiveTab = "usb"
+		data.ActiveTab = "recent"
 	}
 
 	// Flash notifications from query params
@@ -446,6 +463,119 @@ func (s *Server) getV2ServerBackupData() []V2ServerBackup {
 		})
 	}
 	return result
+}
+
+// getV2RecentBackups returns the most recent backups across all types.
+func (s *Server) getV2RecentBackups(lang string, limit int) []V2RecentBackup {
+	var all []V2RecentBackup
+
+	// USB backups
+	usbRows, err := s.db.Query(`
+		SELECT name, last_sync, last_status
+		FROM usb_backups WHERE last_sync IS NOT NULL
+		ORDER BY last_sync DESC LIMIT 10
+	`)
+	if err == nil {
+		defer usbRows.Close()
+		for usbRows.Next() {
+			var name, status string
+			var lastSync time.Time
+			if err := usbRows.Scan(&name, &lastSync, &status); err != nil {
+				continue
+			}
+			all = append(all, V2RecentBackup{
+				Type:     "usb",
+				Name:     name,
+				Status:   status,
+				Time:     formatTimeAgo(lastSync, lang),
+				SortTime: lastSync,
+			})
+		}
+	}
+
+	// Cloud (rclone) backups
+	cloudRows, err := s.db.Query(`
+		SELECT name, provider_type, last_sync, last_status
+		FROM rclone_backups WHERE last_sync IS NOT NULL
+		ORDER BY last_sync DESC LIMIT 10
+	`)
+	if err == nil {
+		defer cloudRows.Close()
+		for cloudRows.Next() {
+			var name, provider, status string
+			var lastSync time.Time
+			if err := cloudRows.Scan(&name, &provider, &lastSync, &status); err != nil {
+				continue
+			}
+			all = append(all, V2RecentBackup{
+				Type:     "cloud",
+				Name:     name,
+				Status:   status,
+				Details:  provider,
+				Time:     formatTimeAgo(lastSync, lang),
+				SortTime: lastSync,
+			})
+		}
+	}
+
+	// P2P sync log
+	p2pRows, err := s.db.Query(`
+		SELECT sl.completed_at, sl.status,
+		       COALESCE(u.username, '?') AS username,
+		       COALESCE(p.name, '?') AS peer_name
+		FROM sync_log sl
+		LEFT JOIN users u ON sl.user_id = u.id
+		LEFT JOIN peers p ON sl.peer_id = p.id
+		WHERE sl.completed_at IS NOT NULL
+		ORDER BY sl.started_at DESC LIMIT 10
+	`)
+	if err == nil {
+		defer p2pRows.Close()
+		for p2pRows.Next() {
+			var completedAt time.Time
+			var status, username, peerName string
+			if err := p2pRows.Scan(&completedAt, &status, &username, &peerName); err != nil {
+				continue
+			}
+			all = append(all, V2RecentBackup{
+				Type:     "p2p",
+				Name:     peerName + " → " + username,
+				Status:   status,
+				Time:     formatTimeAgo(completedAt, lang),
+				SortTime: completedAt,
+			})
+		}
+	}
+
+	// Server backups (filesystem)
+	backupDir := filepath.Join(s.cfg.DataDir, "backups", "server")
+	files, err := serverbackup.ListBackups(backupDir)
+	if err == nil {
+		for i, f := range files {
+			if i >= 10 {
+				break
+			}
+			all = append(all, V2RecentBackup{
+				Type:     "server",
+				Name:     f.Filename,
+				Status:   "success",
+				Details:  formatBytes(f.Size),
+				Time:     formatTimeAgo(f.CreatedAt, lang),
+				SortTime: f.CreatedAt,
+			})
+		}
+	}
+
+	// Sort by date descending
+	sort.Slice(all, func(i, j int) bool {
+		return all[i].SortTime.After(all[j].SortTime)
+	})
+
+	// Keep only the top N
+	if len(all) > limit {
+		all = all[:limit]
+	}
+	return all
 }
 
 // formatTimeAgo returns a human-readable relative time string.

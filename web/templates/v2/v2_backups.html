@@ -10,6 +10,10 @@
 {{end}}
 <!-- Tab navigation -->
 <div class="v2-tabs" id="backupTabs">
+    <button class="v2-tab{{if eq .ActiveTab "recent"}} active{{end}}" data-tab="recent" onclick="switchTab('recent')">
+        <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        {{T .Lang "v2.backups.recent.tab"}}
+    </button>
     <button class="v2-tab{{if eq .ActiveTab "usb"}} active{{end}}" data-tab="usb" onclick="switchTab('usb')">
         <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 1v3"/><path d="M15 1v3"/><path d="M9 20v3"/><path d="M15 20v3"/></svg>
         USB
@@ -30,6 +34,61 @@
         <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
         Server
     </button>
+</div>
+
+<!-- ===== Recent Tab ===== -->
+<div class="v2-tab-panel{{if eq .ActiveTab "recent"}} active{{end}}" id="tab-recent">
+    <div style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);margin-bottom:1rem;">{{T .Lang "v2.backups.recent.title"}}</div>
+
+    {{if .RecentBackups}}
+    <div class="v2-card" style="padding:0;overflow:hidden;">
+        <table class="v2-table">
+            <thead>
+                <tr>
+                    <th>{{T .Lang "v2.backups.recent.type"}}</th>
+                    <th>{{T .Lang "v2.backups.recent.name"}}</th>
+                    <th>{{T .Lang "v2.backups.recent.status"}}</th>
+                    <th>{{T .Lang "v2.backups.recent.date"}}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .RecentBackups}}
+                <tr>
+                    <td>
+                        {{if eq .Type "usb"}}
+                            <span class="v2-badge" style="background:rgba(245,158,11,0.1);color:#f59e0b;">{{T $.Lang "v2.backups.recent.type_usb"}}</span>
+                        {{else if eq .Type "cloud"}}
+                            <span class="v2-badge" style="background:rgba(59,130,246,0.1);color:#3b82f6;">{{T $.Lang "v2.backups.recent.type_cloud"}}</span>
+                        {{else if eq .Type "p2p"}}
+                            <span class="v2-badge" style="background:rgba(168,85,247,0.1);color:#a855f7;">{{T $.Lang "v2.backups.recent.type_p2p"}}</span>
+                        {{else if eq .Type "server"}}
+                            <span class="v2-badge" style="background:rgba(34,197,94,0.1);color:#22c55e;">{{T $.Lang "v2.backups.recent.type_server"}}</span>
+                        {{end}}
+                    </td>
+                    <td style="font-weight:600;">{{.Name}}</td>
+                    <td>
+                        {{if eq .Status "success"}}
+                            <span class="v2-badge v2-badge-success">{{T $.Lang "v2.backups.status.success"}}</span>
+                        {{else if eq .Status "error"}}
+                            <span class="v2-badge v2-badge-error">{{T $.Lang "v2.backups.status.error"}}</span>
+                        {{else if eq .Status "running"}}
+                            <span class="v2-badge v2-badge-info">{{T $.Lang "v2.backups.status.running"}}</span>
+                        {{else}}
+                            <span class="v2-badge">{{.Status}}</span>
+                        {{end}}
+                    </td>
+                    <td style="font-size:0.8125rem;color:var(--text-secondary);">{{.Time}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+    {{else}}
+    <div class="v2-card v2-empty">
+        <svg class="v2-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <div style="font-size:0.875rem;">{{T .Lang "v2.backups.recent.empty"}}</div>
+    </div>
+    {{end}}
 </div>
 
 <!-- ===== USB Tab ===== -->

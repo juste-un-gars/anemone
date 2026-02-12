@@ -1246,5 +1246,17 @@
   "v2.backups.server.create": "Create Backup",
   "v2.backups.server.filename": "Filename",
   "v2.backups.server.download": "Download",
-  "v2.backups.server.empty": "No server backups"
+  "v2.backups.server.empty": "No server backups",
+
+  "v2.backups.recent.tab": "Recent",
+  "v2.backups.recent.title": "Recent Backups",
+  "v2.backups.recent.type": "Type",
+  "v2.backups.recent.name": "Name",
+  "v2.backups.recent.status": "Status",
+  "v2.backups.recent.date": "Date",
+  "v2.backups.recent.empty": "No recent backups",
+  "v2.backups.recent.type_usb": "USB",
+  "v2.backups.recent.type_cloud": "Cloud",
+  "v2.backups.recent.type_p2p": "P2P",
+  "v2.backups.recent.type_server": "Server"
 }

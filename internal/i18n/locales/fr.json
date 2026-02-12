@@ -1246,5 +1246,17 @@
   "v2.backups.server.create": "Créer une sauvegarde",
   "v2.backups.server.filename": "Fichier",
   "v2.backups.server.download": "Télécharger",
-  "v2.backups.server.empty": "Aucune sauvegarde serveur"
+  "v2.backups.server.empty": "Aucune sauvegarde serveur",
+
+  "v2.backups.recent.tab": "Récent",
+  "v2.backups.recent.title": "Sauvegardes récentes",
+  "v2.backups.recent.type": "Type",
+  "v2.backups.recent.name": "Nom",
+  "v2.backups.recent.status": "Statut",
+  "v2.backups.recent.date": "Date",
+  "v2.backups.recent.empty": "Aucune sauvegarde récente",
+  "v2.backups.recent.type_usb": "USB",
+  "v2.backups.recent.type_cloud": "Cloud",
+  "v2.backups.recent.type_p2p": "P2P",
+  "v2.backups.recent.type_server": "Serveur"
 }

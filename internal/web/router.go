@@ -597,7 +597,9 @@ func (s *Server) getDashboardStats(session *auth.Session, lang string) *Dashboar
 			stats.PeerStorageUsed = incoming.FormatBytes(totalPeerBytes)
 		}
 
-		// Get last backup time from any user
+		// Get last backup time from all sources (P2P, Cloud, USB)
+		var lastBackupTime time.Time
+
 		var lastSync sql.NullTime
 		err = s.db.QueryRow(`
 			SELECT completed_at
@@ -606,9 +608,32 @@ func (s *Server) getDashboardStats(session *auth.Session, lang string) *Dashboar
 			ORDER BY completed_at DESC
 			LIMIT 1
 		`).Scan(&lastSync)
+		if err == nil && lastSync.Valid && lastSync.Time.After(lastBackupTime) {
+			lastBackupTime = lastSync.Time
+		}
 
-		if err == nil && lastSync.Valid {
-			duration := time.Since(lastSync.Time)
+		var lastRclone sql.NullTime
+		err = s.db.QueryRow(`
+			SELECT last_sync FROM rclone_backups
+			WHERE last_status = 'success'
+			ORDER BY last_sync DESC LIMIT 1
+		`).Scan(&lastRclone)
+		if err == nil && lastRclone.Valid && lastRclone.Time.After(lastBackupTime) {
+			lastBackupTime = lastRclone.Time
+		}
+
+		var lastUSB sql.NullTime
+		err = s.db.QueryRow(`
+			SELECT last_sync FROM usb_backups
+			WHERE last_status = 'success'
+			ORDER BY last_sync DESC LIMIT 1
+		`).Scan(&lastUSB)
+		if err == nil && lastUSB.Valid && lastUSB.Time.After(lastBackupTime) {
+			lastBackupTime = lastUSB.Time
+		}
+
+		if !lastBackupTime.IsZero() {
+			duration := time.Since(lastBackupTime)
 			if duration < time.Hour {
 				stats.LastBackup = tWithParams(lang, "dashboard.user.last_backup.minutes_ago", "minutes", int(duration.Minutes()))
 			} else if duration < 24*time.Hour {
