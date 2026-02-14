@@ -36,8 +36,14 @@
 | 7 | UI | Sidebar link "Fichiers" between Dashboard and Trash |
 | 8 | i18n | 30 translation keys FR + EN |
 
+### Bugfixes
+| # | Bug | Fix |
+|---|-----|-----|
+| 1 | Template EOF panic on `/files` | Modals/JS were outside `{{define "content"}}`, missing `{{end}}` for outer `{{if}}` |
+| 2 | sudo auth failure for mkdir/upload | Use direct `os.Mkdir`/`os.Create` (user owns share), `os.Rename` with sudo fallback for rename/delete |
+
 ### Files Created
-- `internal/web/handlers_files.go` (640 lines) — All handlers + helpers
+- `internal/web/handlers_files.go` (626 lines) — All handlers + helpers
 - `web/templates/v2/v2_files.html` (328 lines) — File browser template
 
 ### Files Modified
@@ -51,7 +57,7 @@
 - Share ownership validation (user can only access own shares)
 - Filename validation (`isValidFileName()` rejects `..`, `/`, `\`, null, dotfiles)
 - Upload size limit via `http.MaxBytesReader`
-- `sudo` for filesystem ops (same pattern as trash.go/shares.go)
+- Direct fs ops for user-owned shares, `sudo /usr/bin/mv` fallback for rename/delete
 
 ---
 
