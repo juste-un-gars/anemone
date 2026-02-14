@@ -402,38 +402,24 @@ func (s *Server) handleFilesUpload(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Write to a temp file, then sudo mv to destination
-		tmpFile, err := os.CreateTemp("", "anemone-upload-*")
+		destFile := filepath.Join(destDir, name)
+
+		// Write directly to destination (user owns the share directory)
+		dst, err := os.Create(destFile)
 		if err != nil {
 			src.Close()
+			logger.Info("Error creating file %s: %v", destFile, err)
 			continue
 		}
-		if _, err := io.Copy(tmpFile, src); err != nil {
+		if _, err := io.Copy(dst, src); err != nil {
 			src.Close()
-			tmpFile.Close()
-			os.Remove(tmpFile.Name())
+			dst.Close()
+			os.Remove(destFile)
+			logger.Info("Error writing file %s: %v", destFile, err)
 			continue
 		}
 		src.Close()
-		tmpFile.Close()
-
-		destFile := filepath.Join(destDir, name)
-
-		// Move with sudo
-		cmd := exec.Command("sudo", "mv", tmpFile.Name(), destFile)
-		if err := cmd.Run(); err != nil {
-			logger.Info("Error moving uploaded file %s: %v", name, err)
-			os.Remove(tmpFile.Name())
-			continue
-		}
-
-		// Set ownership
-		chownCmd := exec.Command("sudo", "chown", fmt.Sprintf("%s:%s", session.Username, session.Username), destFile)
-		chownCmd.Run()
-
-		// Set file permissions (644)
-		chmodCmd := exec.Command("sudo", "chmod", "644", destFile)
-		chmodCmd.Run()
+		dst.Close()
 
 		count++
 	}
@@ -486,18 +472,11 @@ func (s *Server) handleFilesMkdir(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create with sudo
-	cmd := exec.Command("sudo", "mkdir", newDir)
-	if err := cmd.Run(); err != nil {
+	// Create directory (user owns the share directory)
+	if err := os.Mkdir(newDir, 0755); err != nil {
 		logger.Info("Error creating directory %s: %v", newDir, err)
 		jsonError(w, "Failed to create folder", http.StatusInternalServerError)
 		return
-	}
-
-	// Set ownership to user
-	chownCmd := exec.Command("sudo", "chown", fmt.Sprintf("%s:%s", session.Username, session.Username), newDir)
-	if err := chownCmd.Run(); err != nil {
-		logger.Info("Error setting ownership on %s: %v", newDir, err)
 	}
 
 	logger.Info("User %s created folder: %s in share %s", session.Username, req.Name, req.Share)
@@ -553,8 +532,13 @@ func (s *Server) handleFilesRename(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Rename with sudo
-	cmd := exec.Command("sudo", "mv", srcPath, dstPath)
+	// Rename — try direct first, fallback to sudo
+	if err := os.Rename(srcPath, dstPath); err == nil {
+		logger.Info("User %s renamed %s to %s in share %s", session.Username, req.Path, req.NewName, req.Share)
+		jsonSuccess(w)
+		return
+	}
+	cmd := exec.Command("sudo", "/usr/bin/mv", srcPath, dstPath)
 	if err := cmd.Run(); err != nil {
 		logger.Info("Error renaming %s to %s: %v", srcPath, dstPath, err)
 		jsonError(w, "Failed to rename", http.StatusInternalServerError)
@@ -607,8 +591,7 @@ func (s *Server) handleFilesDelete(w http.ResponseWriter, r *http.Request) {
 	trashBase := filepath.Join(share.Path, ".trash", session.Username)
 
 	// Ensure trash directory exists
-	mkdirCmd := exec.Command("sudo", "mkdir", "-p", trashBase)
-	mkdirCmd.Run()
+	os.MkdirAll(trashBase, 0755)
 
 	// Build trash destination preserving relative path structure (keeptree)
 	relPath := filepath.Clean(req.Path)
@@ -624,12 +607,15 @@ func (s *Server) handleFilesDelete(w http.ResponseWriter, r *http.Request) {
 
 	// Ensure parent directory in trash exists
 	trashParent := filepath.Dir(trashDest)
-	mkdirParentCmd := exec.Command("sudo", "mkdir", "-p", trashParent)
-	mkdirParentCmd.Run()
+	os.MkdirAll(trashParent, 0755)
 
-	// Move to trash with sudo
-	cmd := exec.Command("sudo", "mv", absPath, trashDest)
-	if err := cmd.Run(); err != nil {
+	// Move to trash — try direct first, fallback to sudo
+	err = os.Rename(absPath, trashDest)
+	if err != nil {
+		cmd := exec.Command("sudo", "/usr/bin/mv", absPath, trashDest)
+		err = cmd.Run()
+	}
+	if err != nil {
 		logger.Info("Error moving %s to trash: %v", absPath, err)
 		jsonError(w, "Failed to delete", http.StatusInternalServerError)
 		return
