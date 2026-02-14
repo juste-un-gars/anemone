@@ -1314,6 +1314,13 @@
   "onlyoffice.no": "Non",
   "onlyoffice.secret_help": "Ajoutez ANEMONE_OO_SECRET dans votre fichier .env. Générez un secret avec :",
   "onlyoffice.secret_env": "Puis ajoutez ANEMONE_OO_SECRET=votre_secret et ANEMONE_OO_ENABLED=true dans .env",
+  "onlyoffice.setup_guide": "Guide de configuration",
+  "onlyoffice.setup_step1": "Générer une clé secrète",
+  "onlyoffice.setup_step2": "Modifier le fichier de configuration",
+  "onlyoffice.setup_step3": "Ajouter ces lignes dans le fichier",
+  "onlyoffice.setup_step4": "Redémarrer Anemone",
+  "onlyoffice.paste_secret_here": "collez le secret généré ici",
+  "onlyoffice.click_to_copy": "Cliquer pour copier",
 
   "editor.back": "Retour",
   "editor.loading": "Chargement de l'éditeur...",

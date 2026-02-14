@@ -406,11 +406,32 @@ func (s *Server) handleFilesUpload(w http.ResponseWriter, r *http.Request) {
 
 		destFile := filepath.Join(destDir, name)
 
-		// Write directly to destination (user owns the share directory)
+		// Write to destination — try direct first, fallback to tmp + sudo mv
 		dst, err := os.Create(destFile)
 		if err != nil {
+			// Permission denied: write to temp file, then sudo mv
+			tmpFile, err2 := os.CreateTemp("", "anemone-upload-*")
+			if err2 != nil {
+				src.Close()
+				logger.Info("Error creating temp file for %s: %v", destFile, err2)
+				continue
+			}
+			if _, err2 := io.Copy(tmpFile, src); err2 != nil {
+				src.Close()
+				tmpFile.Close()
+				os.Remove(tmpFile.Name())
+				logger.Info("Error writing temp file for %s: %v", destFile, err2)
+				continue
+			}
 			src.Close()
-			logger.Info("Error creating file %s: %v", destFile, err)
+			tmpFile.Close()
+			cmd := exec.Command("sudo", "/usr/bin/mv", tmpFile.Name(), destFile)
+			if err2 := cmd.Run(); err2 != nil {
+				os.Remove(tmpFile.Name())
+				logger.Info("Error moving upload %s: %v", destFile, err2)
+				continue
+			}
+			count++
 			continue
 		}
 		if _, err := io.Copy(dst, src); err != nil {
@@ -474,11 +495,14 @@ func (s *Server) handleFilesMkdir(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create directory (user owns the share directory)
+	// Create directory — try direct first, fallback to sudo
 	if err := os.Mkdir(newDir, 0755); err != nil {
-		logger.Info("Error creating directory %s: %v", newDir, err)
-		jsonError(w, "Failed to create folder", http.StatusInternalServerError)
-		return
+		cmd := exec.Command("sudo", "/bin/mkdir", "-m", "0755", newDir)
+		if err2 := cmd.Run(); err2 != nil {
+			logger.Info("Error creating directory %s: %v (sudo: %v)", newDir, err, err2)
+			jsonError(w, "Failed to create folder", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	logger.Info("User %s created folder: %s in share %s", session.Username, req.Name, req.Share)

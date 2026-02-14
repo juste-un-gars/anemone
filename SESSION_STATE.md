@@ -40,6 +40,13 @@
 | 11 | Feature | Bouton "Modifier" dans le file browser (affiché si OO activé + fichier supporté) |
 | 12 | Feature | Fonction template `IsOOEditable` + `ooDocumentType` pour détecter les formats Office |
 
+### Bugfixes
+| # | Bug | Fix |
+|---|-----|-----|
+| 1 | Upload/mkdir permission denied on shares owned by other users | Added sudo fallback (tmp + sudo mv for upload, sudo mkdir for dirs) |
+| 2 | OnlyOffice admin page lacked setup instructions | Added step-by-step guide with copiable commands |
+| 3 | install.sh used `get.docker.com` convenience script | Replaced with official Docker apt/dnf repository method |
+
 ### Supported File Formats
 - **Word:** doc, docx, odt, txt, rtf, dotx, ott
 - **Spreadsheet:** xls, xlsx, ods, csv, xlsm, xltx, ots
@@ -60,10 +67,11 @@
 - `internal/web/router.go` — Routes + `IsOOEditable` template function
 - `web/templates/v2/v2_base.html` — OnlyOffice sidebar link
 - `web/templates/v2/v2_files.html` — Edit button for editable files
-- `internal/web/handlers_files.go` — `OOEnabled` passed to template
+- `internal/web/handlers_files.go` — `OOEnabled` + sudo fallback for upload/mkdir
 - `go.mod`, `go.sum` — golang-jwt/jwt/v5 dependency
-- `internal/i18n/locales/fr.json` — 28 OnlyOffice + editor keys
-- `internal/i18n/locales/en.json` — 28 OnlyOffice + editor keys
+- `internal/i18n/locales/fr.json` — 35 OnlyOffice + editor keys
+- `internal/i18n/locales/en.json` — 35 OnlyOffice + editor keys
+- `install.sh` — Docker install (official apt/dnf repos) + sudoers for shares mkdir/mv
 
 ### Architecture
 ```
