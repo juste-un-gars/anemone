@@ -188,37 +188,39 @@ func (s *Server) handleAdminOnlyOfficeRemove(w http.ResponseWriter, r *http.Requ
 	s.renderOnlyOfficePage(w, session, s.getLang(r), "Container removed", "")
 }
 
-// onlyOfficeProxy creates a reverse proxy handler for /onlyoffice/* requests.
-// Strips the /onlyoffice prefix and forwards to the OnlyOffice container.
-// No auth required — security is handled by JWT tokens in the editor config.
-func (s *Server) onlyOfficeProxy() http.Handler {
-	target, err := url.Parse(s.cfg.OnlyOfficeURL)
-	if err != nil {
-		logger.Error("Invalid OnlyOffice URL", "url", s.cfg.OnlyOfficeURL, "error", err)
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "OnlyOffice not configured", http.StatusBadGateway)
-		})
-	}
-
-	proxy := httputil.NewSingleHostReverseProxy(target)
-
-	// Custom director to strip /onlyoffice prefix and set Host header
-	originalDirector := proxy.Director
-	proxy.Director = func(req *http.Request) {
-		originalDirector(req)
-		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/onlyoffice")
-		if req.URL.Path == "" {
-			req.URL.Path = "/"
+// onlyOfficeProxyDynamic returns a handler that checks if OnlyOffice is enabled
+// at request time, then proxies to the container. This allows enabling/disabling
+// OnlyOffice from the admin UI without restarting Anemone.
+func (s *Server) onlyOfficeProxyDynamic() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !s.cfg.OnlyOfficeEnabled {
+			http.Error(w, "OnlyOffice is not enabled", http.StatusServiceUnavailable)
+			return
 		}
-		req.Host = target.Host
-	}
 
-	proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
-		logger.Warn("OnlyOffice proxy error", "path", r.URL.Path, "error", err)
-		http.Error(w, "OnlyOffice unavailable", http.StatusBadGateway)
-	}
+		target, err := url.Parse(s.cfg.OnlyOfficeURL)
+		if err != nil {
+			http.Error(w, "OnlyOffice not configured", http.StatusBadGateway)
+			return
+		}
 
-	return proxy
+		proxy := httputil.NewSingleHostReverseProxy(target)
+		originalDirector := proxy.Director
+		proxy.Director = func(req *http.Request) {
+			originalDirector(req)
+			req.URL.Path = strings.TrimPrefix(req.URL.Path, "/onlyoffice")
+			if req.URL.Path == "" {
+				req.URL.Path = "/"
+			}
+			req.Host = target.Host
+		}
+		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+			logger.Warn("OnlyOffice proxy error", "path", r.URL.Path, "error", err)
+			http.Error(w, "OnlyOffice unavailable", http.StatusBadGateway)
+		}
+
+		proxy.ServeHTTP(w, r)
+	})
 }
 
 // renderOnlyOfficePage renders the OnlyOffice admin page.

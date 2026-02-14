@@ -362,12 +362,11 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/admin/restore-users", auth.RequireAdmin(server.handleAdminRestoreUsers))
 	mux.HandleFunc("/admin/restore-users/restore", auth.RequireAdmin(server.handleAdminRestoreUsersRestore))
 
-	// OnlyOffice integration (no session auth — JWT handles security)
-	if cfg.OnlyOfficeEnabled {
-		mux.Handle("/onlyoffice/", server.onlyOfficeProxy())
-		mux.HandleFunc("/api/oo/download", server.handleOODownload)
-		mux.HandleFunc("/api/oo/callback", server.handleOOCallback)
-	}
+	// OnlyOffice integration (always registered — checks cfg.OnlyOfficeEnabled at request time)
+	// Routes must be registered at startup even if OO is disabled, because it can be enabled from the admin UI.
+	mux.Handle("/onlyoffice/", server.onlyOfficeProxyDynamic())
+	mux.HandleFunc("/api/oo/download", server.handleOODownload)
+	mux.HandleFunc("/api/oo/callback", server.handleOOCallback)
 
 	// Admin routes - OnlyOffice
 	mux.HandleFunc("/admin/onlyoffice", auth.RequireAdmin(server.handleAdminOnlyOffice))
