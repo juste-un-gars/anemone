@@ -192,9 +192,13 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	funcMap["IsOOEditable"] = func(filename string) bool {
 		ext := strings.ToLower(filepath.Ext(filename))
 		switch ext {
-		case ".doc", ".docx", ".odt", ".txt", ".rtf", ".dotx", ".ott",
-			".xls", ".xlsx", ".ods", ".csv", ".xlsm", ".xltx", ".ots",
-			".ppt", ".pptx", ".odp", ".ppsx", ".potx", ".otp":
+		case ".doc", ".docm", ".docx", ".dot", ".dotm", ".dotx",
+			".epub", ".fb2", ".fodt", ".htm", ".html", ".md",
+			".mht", ".mhtml", ".odt", ".ott", ".rtf", ".stw", ".sxw", ".txt", ".wps", ".wpt", ".xml",
+			".csv", ".et", ".ett", ".fods", ".ods", ".ots",
+			".sxc", ".xls", ".xlsb", ".xlsm", ".xlsx", ".xltx",
+			".dps", ".dpt", ".fodp", ".odp", ".otp",
+			".pot", ".potm", ".potx", ".pps", ".ppsm", ".ppsx", ".ppt", ".pptm", ".pptx", ".sxi":
 			return true
 		}
 		return false

@@ -363,11 +363,15 @@ func (s *Server) handleFilesEdit(w http.ResponseWriter, r *http.Request) {
 // Returns "word", "cell", "slide", or "" if unsupported.
 func ooDocumentType(ext string) string {
 	switch ext {
-	case "doc", "docx", "odt", "txt", "rtf", "html", "htm", "dotx", "ott":
+	case "doc", "docm", "docx", "dot", "dotm", "dotx",
+		"epub", "fb2", "fodt", "htm", "html", "md",
+		"mht", "mhtml", "odt", "ott", "rtf", "stw", "sxw", "txt", "wps", "wpt", "xml":
 		return "word"
-	case "xls", "xlsx", "ods", "csv", "xlsm", "xltx", "ots":
+	case "csv", "et", "ett", "fods", "ods", "ots",
+		"sxc", "xls", "xlsb", "xlsm", "xlsx", "xltx":
 		return "cell"
-	case "ppt", "pptx", "odp", "ppsx", "potx", "otp":
+	case "dps", "dpt", "fodp", "odp", "otp",
+		"pot", "potm", "potx", "pps", "ppsm", "ppsx", "ppt", "pptm", "pptx", "sxi":
 		return "slide"
 	default:
 		return ""
