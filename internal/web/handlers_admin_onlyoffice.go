@@ -12,7 +12,9 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/juste-un-gars/anemone/internal/auth"
 	"github.com/juste-un-gars/anemone/internal/logger"
@@ -106,6 +108,20 @@ func (s *Server) handleAdminOnlyOfficeStart(w http.ResponseWriter, r *http.Reque
 		s.renderOnlyOfficePage(w, session, s.getLang(r), "", err.Error())
 		return
 	}
+
+	// Patch TLS config in background (container needs time to initialize)
+	go func() {
+		// Wait for container services to start before patching
+		for i := 0; i < 30; i++ {
+			check := exec.Command("docker", "exec", onlyoffice.ContainerName,
+				"test", "-f", "/etc/onlyoffice/documentserver/local.json")
+			if check.Run() == nil {
+				break
+			}
+			time.Sleep(2 * time.Second)
+		}
+		onlyoffice.PatchTLSConfig()
+	}()
 
 	// Auto-enable OnlyOffice
 	s.cfg.OnlyOfficeEnabled = true

@@ -186,8 +186,7 @@ func StartScheduler(db *sql.DB, dataDir string) {
 
 			// Sleep until next 4 AM
 			duration := time.Until(next4AM)
-			logger.Info("Next automatic server backup scheduled for: %s (in %v)",
-				next4AM.Format("2006-01-02 15:04:05"), duration.Round(time.Minute))
+			logger.Info("Next automatic server backup scheduled", "at", next4AM.Format("2006-01-02 15:04:05"), "in", duration.Round(time.Minute))
 
 			time.Sleep(duration)
 

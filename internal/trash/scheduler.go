@@ -33,7 +33,7 @@ func StartCleanupScheduler(db *sql.DB, getRetentionDays func() (int, error)) {
 
 		// Wait until 3 AM
 		duration := time.Until(next3AM)
-		logger.Info("🗑️  Next trash cleanup scheduled for: %s (in %s)", next3AM.Format("2006-01-02 15:04:05"), duration.Round(time.Minute))
+		logger.Info("🗑️  Next trash cleanup scheduled", "at", next3AM.Format("2006-01-02 15:04:05"), "in", duration.Round(time.Minute))
 		time.Sleep(duration)
 
 		// Create ticker for daily cleanup at 3 AM
@@ -57,7 +57,7 @@ func runCleanup(db *sql.DB, getRetentionDays func() (int, error)) {
 	// Get current retention days setting
 	retentionDays, err := getRetentionDays()
 	if err != nil {
-		logger.Info("⚠️  Trash cleanup: Failed to get retention days: %v", err)
+		logger.Info("⚠️  Trash cleanup: Failed to get retention days", "error", err)
 		return
 	}
 
@@ -66,17 +66,17 @@ func runCleanup(db *sql.DB, getRetentionDays func() (int, error)) {
 		return
 	}
 
-	logger.Info("🗑️  Trash cleanup: Running with %d days retention...", retentionDays)
+	logger.Info("🗑️  Trash cleanup: Running", "retention_days", retentionDays)
 
 	// Run cleanup for all users
 	totalDeleted, err := CleanupAllUserTrash(db, retentionDays)
 	if err != nil {
-		logger.Info("⚠️  Trash cleanup: Failed: %v", err)
+		logger.Info("⚠️  Trash cleanup: Failed", "error", err)
 		return
 	}
 
 	if totalDeleted > 0 {
-		logger.Info("✅ Trash cleanup: Completed - Deleted %d old item(s)", totalDeleted)
+		logger.Info("✅ Trash cleanup: Completed", "deleted_items", totalDeleted)
 	} else {
 		logger.Info("✅ Trash cleanup: Completed - No old items to delete")
 	}

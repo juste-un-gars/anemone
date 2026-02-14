@@ -42,16 +42,16 @@ func checkForUpdates(db *sql.DB) {
 	// Check if we already checked recently (skip if checked within last 6 hours)
 	lastCheck, err := GetLastUpdateCheck(db)
 	if err != nil {
-		logger.Info("⚠️  Failed to get last update check time: %v", err)
+		logger.Info("⚠️  Failed to get last update check time", "error", err)
 	} else if !lastCheck.IsZero() && time.Since(lastCheck) < 6*time.Hour {
-		logger.Info("⏭️  Skipping update check (last check was %v ago)", time.Since(lastCheck).Round(time.Minute))
+		logger.Info("⏭️  Skipping update check", "last_check_ago", time.Since(lastCheck).Round(time.Minute))
 		return
 	}
 
 	// Perform the check
 	info, err := CheckUpdate()
 	if err != nil {
-		logger.Info("⚠️  Failed to check for updates: %v", err)
+		logger.Info("⚠️  Failed to check for updates", "error", err)
 		return
 	}
 

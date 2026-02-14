@@ -33,7 +33,7 @@ func GenerateOrLoadCertificate(cfg *CertConfig) error {
 	// Check if certificate already exists
 	if _, err := os.Stat(cfg.CertPath); err == nil {
 		if _, err := os.Stat(cfg.KeyPath); err == nil {
-			logger.Info("🔒 Using existing TLS certificate: %s", cfg.CertPath)
+			logger.Info("🔒 Using existing TLS certificate", "path", cfg.CertPath)
 			return nil
 		}
 	}

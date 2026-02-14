@@ -8,6 +8,7 @@
 package web
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -54,6 +55,7 @@ func (s *Server) handleOODownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	logger.Info("OO download: serving file", "path", absPath, "user", claims.UserID)
 	http.ServeFile(w, r, absPath)
 }
 
@@ -113,9 +115,13 @@ func (s *Server) handleOOCallback(w http.ResponseWriter, r *http.Request) {
 // downloadAndSaveOOFile downloads the edited file from OnlyOffice and saves it.
 // The document key format is: userID-shareName-filePath (encoded by the editor handler).
 func (s *Server) downloadAndSaveOOFile(docKey, downloadURL string) error {
-	// Parse the document key to find the target file
+	// Decode base64url-encoded document key
+	decoded, err := base64.URLEncoding.DecodeString(docKey)
+	if err != nil {
+		return fmt.Errorf("invalid base64 document key: %w", err)
+	}
 	// Key format: "userID:shareName:relativePath:modtime"
-	parts := strings.SplitN(docKey, ":", 4)
+	parts := strings.SplitN(string(decoded), ":", 4)
 	if len(parts) < 3 {
 		return fmt.Errorf("invalid document key: %s", docKey)
 	}
@@ -271,7 +277,9 @@ func (s *Server) handleFilesEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Document key unique per file version (forces re-download on external changes)
-	docKey := fmt.Sprintf("%d:%s:%s:%d", session.UserID, shareName, relPath, info.ModTime().Unix())
+	// Base64url-encoded because OnlyOffice only accepts [0-9-.a-zA-Z_=] in keys
+	rawKey := fmt.Sprintf("%d:%s:%s:%d", session.UserID, shareName, relPath, info.ModTime().Unix())
+	docKey := base64.URLEncoding.EncodeToString([]byte(rawKey))
 
 	fileToken, err := onlyoffice.SignFileToken(s.cfg.OnlyOfficeSecret, session.UserID, shareName, relPath)
 	if err != nil {

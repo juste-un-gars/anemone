@@ -12,6 +12,46 @@
 
 ## Current Session
 
+**Session 21: OnlyOffice Auto-Config + Bugfixes** - In Progress
+
+**Détails :** `.claude/sessions/SESSION_021_onlyoffice_autoconfig.md`
+
+---
+
+## Session 21: OnlyOffice Auto-Config + Bugfixes
+
+**Date:** 2026-02-14
+**Objective:** Rendre OnlyOffice configurable depuis l'interface web + corriger les bugs de chargement
+**Status:** In Progress — 8 fixes commités, download OO à résoudre
+
+### Completed
+| # | Type | Description |
+|---|------|-------------|
+| 1 | Feature | Config OO stockée en DB (`system_config`), auto-génération secret JWT |
+| 2 | Feature | Flow simplifié : Pull → Start → tout automatique (pas de .env) |
+| 3 | Fix | Tous les formats OnlyOffice supportés (md, epub, fb2, docm, xlsb, pptm...) |
+| 4 | Fix | CSP `'unsafe-eval'` pour SDK OnlyOffice |
+| 5 | Fix | Routes proxy enregistrées inconditionnellement (activation OO après démarrage) |
+| 6 | Fix | **Document key base64url** — `:` dans docKey rejeté par OO (pattern `[0-9-.a-zA-Z_=]`) |
+| 7 | Fix | **TLS patch via docker exec** — `rejectUnauthorized: false` + attente supervisor ready |
+| 8 | Fix | **!BADKEY logs** — 10 messages slog corrigés dans 4 fichiers (updater, trash, serverbackup, tls) |
+| 9 | Fix | **Docker --add-host** — `host.docker.internal:host-gateway` pour résolution réseau container→hôte |
+
+### Unresolved — "Échec du téléchargement"
+- Le container OnlyOffice ne tente JAMAIS le download (pas de requête GET /api/oo/download)
+- Les callbacks fonctionnent (status 1/4) → le container PEUT atteindre Anemone en HTTPS
+- `rejectUnauthorized: false` ne s'applique pas au download de fichier d'OO
+- **Solution prévue** : ajouter un listener HTTP interne (port 8080) pour les échanges OO, sans TLS
+- URL download = `http://host.docker.internal:8080/api/oo/download?token=JWT`
+
+### Bugs connus (non corrigés)
+- Permission denied sur manifests marc (shares marc:marc, Anemone tourne en franck)
+- `!BADKEY` restant dans ~50 fichiers (printf-style dans slog) — refactoring massif à planifier
+
+---
+
+## Previous Session
+
 **Session 20: OnlyOffice Integration** - Complete ✅
 
 **Détails :** `.claude/sessions/SESSION_020_onlyoffice.md`
@@ -1023,6 +1063,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 21 | OnlyOffice Auto-Config + Bugfixes | 2026-02-14 | In Progress |
 | 20 | OnlyOffice Integration | 2026-02-14 | Complete ✅ |
 | 19 | Web File Browser | 2026-02-14 | Complete ✅ |
 | 18 | Dashboard Last Backup Fix + Recent Tab | 2026-02-12 | Complete ✅ |
