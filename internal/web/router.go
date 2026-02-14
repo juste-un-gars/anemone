@@ -353,6 +353,14 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/admin/system/update/check", auth.RequireAdmin(server.handleAdminSystemUpdateCheck))
 	mux.HandleFunc("/admin/system/update/install", auth.RequireAdmin(server.handleAdminSystemUpdateInstall))
 
+	// User routes - File browser
+	mux.HandleFunc("/files", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleFiles)))
+	mux.HandleFunc("/api/files/download", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleFilesDownload)))
+	mux.HandleFunc("/api/files/upload", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleFilesUpload)))
+	mux.HandleFunc("/api/files/mkdir", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleFilesMkdir)))
+	mux.HandleFunc("/api/files/rename", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleFilesRename)))
+	mux.HandleFunc("/api/files/delete", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleFilesDelete)))
+
 	// User routes (with restore check)
 	mux.HandleFunc("/trash", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleTrash)))
 	mux.HandleFunc("/trash/", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleTrashActions)))
