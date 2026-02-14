@@ -88,6 +88,26 @@ func main() {
 		}
 	}
 
+	// Load OnlyOffice config from DB (env vars take precedence)
+	if os.Getenv("ANEMONE_OO_SECRET") == "" {
+		if secret, err := sysconfig.GetOnlyOfficeSetting(db, "secret"); err == nil && secret != "" {
+			cfg.OnlyOfficeSecret = secret
+		}
+	}
+	if os.Getenv("ANEMONE_OO_ENABLED") == "" {
+		if enabled, err := sysconfig.GetOnlyOfficeSetting(db, "enabled"); err == nil && enabled != "" {
+			cfg.OnlyOfficeEnabled = enabled == "true"
+		}
+	}
+	if os.Getenv("ANEMONE_OO_URL") == "" {
+		if ooURL, err := sysconfig.GetOnlyOfficeSetting(db, "url"); err == nil && ooURL != "" {
+			cfg.OnlyOfficeURL = ooURL
+		}
+	}
+	if cfg.OnlyOfficeEnabled {
+		logger.Info("OnlyOffice document editing enabled", "url", cfg.OnlyOfficeURL)
+	}
+
 	// Sync current version in database with code version
 	if err := updater.SyncVersionWithDB(db); err != nil {
 		logger.Warn("Failed to sync version with DB", "error", err)

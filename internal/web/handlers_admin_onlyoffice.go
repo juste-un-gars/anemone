@@ -4,18 +4,41 @@
 
 // This file handles OnlyOffice Document Server administration.
 // Manages Docker container lifecycle: pull, start, stop, restart, remove.
+// Configuration is stored in database (system_config table) for web UI management.
 package web
 
 import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/juste-un-gars/anemone/internal/auth"
 	"github.com/juste-un-gars/anemone/internal/logger"
 	"github.com/juste-un-gars/anemone/internal/onlyoffice"
+	"github.com/juste-un-gars/anemone/internal/sysconfig"
 )
+
+// loadOnlyOfficeConfig loads OnlyOffice settings from DB into cfg.
+// Environment variables take precedence over DB values.
+func (s *Server) loadOnlyOfficeConfig() {
+	if os.Getenv("ANEMONE_OO_SECRET") == "" {
+		if secret, err := sysconfig.GetOnlyOfficeSetting(s.db, "secret"); err == nil && secret != "" {
+			s.cfg.OnlyOfficeSecret = secret
+		}
+	}
+	if os.Getenv("ANEMONE_OO_URL") == "" {
+		if ooURL, err := sysconfig.GetOnlyOfficeSetting(s.db, "url"); err == nil && ooURL != "" {
+			s.cfg.OnlyOfficeURL = ooURL
+		}
+	}
+	if os.Getenv("ANEMONE_OO_ENABLED") == "" {
+		if enabled, err := sysconfig.GetOnlyOfficeSetting(s.db, "enabled"); err == nil && enabled != "" {
+			s.cfg.OnlyOfficeEnabled = enabled == "true"
+		}
+	}
+}
 
 // handleAdminOnlyOffice displays the OnlyOffice admin page.
 func (s *Server) handleAdminOnlyOffice(w http.ResponseWriter, r *http.Request) {
@@ -25,6 +48,7 @@ func (s *Server) handleAdminOnlyOffice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.loadOnlyOfficeConfig()
 	lang := s.getLang(r)
 	s.renderOnlyOfficePage(w, session, lang, "", "")
 }
@@ -48,31 +72,57 @@ func (s *Server) handleAdminOnlyOfficePull(w http.ResponseWriter, r *http.Reques
 }
 
 // handleAdminOnlyOfficeStart starts the OnlyOffice container.
+// Auto-generates a JWT secret if none exists and enables OnlyOffice.
 func (s *Server) handleAdminOnlyOfficeStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/admin/onlyoffice", http.StatusSeeOther)
 		return
 	}
 
-	secret := s.cfg.OnlyOfficeSecret
-	if secret == "" {
-		session, _ := auth.GetSessionFromContext(r)
-		s.renderOnlyOfficePage(w, session, s.getLang(r), "", "ANEMONE_OO_SECRET is not configured")
-		return
+	s.loadOnlyOfficeConfig()
+
+	// Auto-generate secret if not configured
+	if s.cfg.OnlyOfficeSecret == "" {
+		secret, err := sysconfig.GenerateOnlyOfficeSecret()
+		if err != nil {
+			logger.Error("Failed to generate OnlyOffice secret", "error", err)
+			session, _ := auth.GetSessionFromContext(r)
+			s.renderOnlyOfficePage(w, session, s.getLang(r), "", "Failed to generate secret: "+err.Error())
+			return
+		}
+		if err := sysconfig.SetOnlyOfficeSetting(s.db, "secret", secret); err != nil {
+			logger.Error("Failed to save OnlyOffice secret", "error", err)
+			session, _ := auth.GetSessionFromContext(r)
+			s.renderOnlyOfficePage(w, session, s.getLang(r), "", "Failed to save secret: "+err.Error())
+			return
+		}
+		s.cfg.OnlyOfficeSecret = secret
+		logger.Info("OnlyOffice JWT secret auto-generated and saved to database")
 	}
 
-	if err := onlyoffice.StartContainer(secret, s.cfg.OnlyOfficeURL); err != nil {
+	if err := onlyoffice.StartContainer(s.cfg.OnlyOfficeSecret, s.cfg.OnlyOfficeURL); err != nil {
 		logger.Error("Failed to start OnlyOffice container", "error", err)
 		session, _ := auth.GetSessionFromContext(r)
 		s.renderOnlyOfficePage(w, session, s.getLang(r), "", err.Error())
 		return
 	}
 
+	// Auto-enable OnlyOffice
+	s.cfg.OnlyOfficeEnabled = true
+	if err := sysconfig.SetOnlyOfficeSetting(s.db, "enabled", "true"); err != nil {
+		logger.Warn("Failed to save OnlyOffice enabled state", "error", err)
+	}
+	// Save URL to DB so it persists across restarts
+	if err := sysconfig.SetOnlyOfficeSetting(s.db, "url", s.cfg.OnlyOfficeURL); err != nil {
+		logger.Warn("Failed to save OnlyOffice URL", "error", err)
+	}
+
+	logger.Info("OnlyOffice started and enabled")
 	session, _ := auth.GetSessionFromContext(r)
 	s.renderOnlyOfficePage(w, session, s.getLang(r), "Container started", "")
 }
 
-// handleAdminOnlyOfficeStop stops the OnlyOffice container.
+// handleAdminOnlyOfficeStop stops the OnlyOffice container and disables editing.
 func (s *Server) handleAdminOnlyOfficeStop(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/admin/onlyoffice", http.StatusSeeOther)
@@ -84,6 +134,12 @@ func (s *Server) handleAdminOnlyOfficeStop(w http.ResponseWriter, r *http.Reques
 		session, _ := auth.GetSessionFromContext(r)
 		s.renderOnlyOfficePage(w, session, s.getLang(r), "", err.Error())
 		return
+	}
+
+	// Disable OnlyOffice when stopped
+	s.cfg.OnlyOfficeEnabled = false
+	if err := sysconfig.SetOnlyOfficeSetting(s.db, "enabled", "false"); err != nil {
+		logger.Warn("Failed to save OnlyOffice enabled state", "error", err)
 	}
 
 	session, _ := auth.GetSessionFromContext(r)
@@ -120,6 +176,12 @@ func (s *Server) handleAdminOnlyOfficeRemove(w http.ResponseWriter, r *http.Requ
 		session, _ := auth.GetSessionFromContext(r)
 		s.renderOnlyOfficePage(w, session, s.getLang(r), "", err.Error())
 		return
+	}
+
+	// Disable OnlyOffice when removed
+	s.cfg.OnlyOfficeEnabled = false
+	if err := sysconfig.SetOnlyOfficeSetting(s.db, "enabled", "false"); err != nil {
+		logger.Warn("Failed to save OnlyOffice enabled state", "error", err)
 	}
 
 	session, _ := auth.GetSessionFromContext(r)

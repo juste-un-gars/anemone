@@ -6,7 +6,9 @@
 package sysconfig
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"strconv"
 )
@@ -82,4 +84,40 @@ func SetLogLevel(db *sql.DB, level string) error {
 	}
 
 	return nil
+}
+
+// GetOnlyOfficeSetting returns a single OnlyOffice setting from database.
+// Returns empty string if not configured.
+func GetOnlyOfficeSetting(db *sql.DB, key string) (string, error) {
+	var value string
+	err := db.QueryRow("SELECT value FROM system_config WHERE key = ?", "oo_"+key).Scan(&value)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("failed to get oo_%s: %w", key, err)
+	}
+	return value, nil
+}
+
+// SetOnlyOfficeSetting stores a single OnlyOffice setting in database.
+func SetOnlyOfficeSetting(db *sql.DB, key, value string) error {
+	query := `INSERT INTO system_config (key, value, updated_at)
+		VALUES (?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+
+	_, err := db.Exec(query, "oo_"+key, value)
+	if err != nil {
+		return fmt.Errorf("failed to set oo_%s: %w", key, err)
+	}
+	return nil
+}
+
+// GenerateOnlyOfficeSecret generates a random 32-byte hex secret for OnlyOffice JWT.
+func GenerateOnlyOfficeSecret() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate secret: %w", err)
+	}
+	return hex.EncodeToString(b), nil
 }

@@ -1310,6 +1310,8 @@
   "onlyoffice.config.secret": "Secret JWT",
   "onlyoffice.config.secret_set": "Configuré",
   "onlyoffice.config.secret_missing": "Non configuré",
+  "onlyoffice.config.secret_auto": "Auto (au démarrage)",
+  "onlyoffice.hint_click_start": "Cliquez sur « Démarrer » pour lancer OnlyOffice. Le secret JWT sera généré automatiquement. Aucune configuration manuelle nécessaire.",
   "onlyoffice.yes": "Oui",
   "onlyoffice.no": "Non",
   "onlyoffice.secret_help": "Ajoutez ANEMONE_OO_SECRET dans votre fichier .env. Générez un secret avec :",
