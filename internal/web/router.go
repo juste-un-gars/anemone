@@ -189,6 +189,16 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		}
 		return result
 	}
+	funcMap["IsOOEditable"] = func(filename string) bool {
+		ext := strings.ToLower(filepath.Ext(filename))
+		switch ext {
+		case ".doc", ".docx", ".odt", ".txt", ".rtf", ".dotx", ".ott",
+			".xls", ".xlsx", ".ods", ".csv", ".xlsm", ".xltx", ".ots",
+			".ppt", ".pptx", ".odp", ".ppsx", ".potx", ".otp":
+			return true
+		}
+		return false
+	}
 	funcMap["ProviderDisplayName"] = func(providerType string) string {
 		switch providerType {
 		case "s3":
@@ -348,6 +358,21 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/admin/restore-users", auth.RequireAdmin(server.handleAdminRestoreUsers))
 	mux.HandleFunc("/admin/restore-users/restore", auth.RequireAdmin(server.handleAdminRestoreUsersRestore))
 
+	// OnlyOffice integration (no session auth — JWT handles security)
+	if cfg.OnlyOfficeEnabled {
+		mux.Handle("/onlyoffice/", server.onlyOfficeProxy())
+		mux.HandleFunc("/api/oo/download", server.handleOODownload)
+		mux.HandleFunc("/api/oo/callback", server.handleOOCallback)
+	}
+
+	// Admin routes - OnlyOffice
+	mux.HandleFunc("/admin/onlyoffice", auth.RequireAdmin(server.handleAdminOnlyOffice))
+	mux.HandleFunc("/admin/onlyoffice/pull", auth.RequireAdmin(server.handleAdminOnlyOfficePull))
+	mux.HandleFunc("/admin/onlyoffice/start", auth.RequireAdmin(server.handleAdminOnlyOfficeStart))
+	mux.HandleFunc("/admin/onlyoffice/stop", auth.RequireAdmin(server.handleAdminOnlyOfficeStop))
+	mux.HandleFunc("/admin/onlyoffice/restart", auth.RequireAdmin(server.handleAdminOnlyOfficeRestart))
+	mux.HandleFunc("/admin/onlyoffice/remove", auth.RequireAdmin(server.handleAdminOnlyOfficeRemove))
+
 	// Admin routes - System updates
 	mux.HandleFunc("/admin/system/update", auth.RequireAdmin(server.handleAdminSystemUpdate))
 	mux.HandleFunc("/admin/system/update/check", auth.RequireAdmin(server.handleAdminSystemUpdateCheck))
@@ -355,6 +380,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 
 	// User routes - File browser
 	mux.HandleFunc("/files", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleFiles)))
+	mux.HandleFunc("/files/edit", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleFilesEdit)))
 	mux.HandleFunc("/api/files/download", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleFilesDownload)))
 	mux.HandleFunc("/api/files/upload", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleFilesUpload)))
 	mux.HandleFunc("/api/files/mkdir", auth.RequireAuth(auth.RequireRestoreCheck(server.db, server.handleFilesMkdir)))
@@ -468,8 +494,8 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		// Prevent MIME sniffing (force browser to respect Content-Type)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 
-		// Prevent clickjacking (don't allow embedding in iframes)
-		w.Header().Set("X-Frame-Options", "DENY")
+		// Prevent clickjacking (allow same-origin framing for OnlyOffice editor)
+		w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 
 		// XSS Protection (legacy but still useful)
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
@@ -478,7 +504,9 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		// default-src 'self' - Only load resources from same origin
 		// style-src 'self' 'unsafe-inline' - Allow inline styles (needed for some UI)
 		// script-src 'self' - Only execute scripts from same origin
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'")
+		// frame-src 'self' - Allow iframes from same origin (OnlyOffice editor)
+		// frame-ancestors 'self' - Allow being framed by same origin only
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'")
 
 		// Referrer Policy - Don't leak referrer to external sites
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")

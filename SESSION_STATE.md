@@ -12,6 +12,75 @@
 
 ## Current Session
 
+**Session 20: OnlyOffice Integration** - Complete ✅
+
+**Détails :** `.claude/sessions/SESSION_020_onlyoffice.md`
+
+---
+
+## Session 20: OnlyOffice Integration
+
+**Date:** 2026-02-14
+**Objective:** Intégrer OnlyOffice Document Server pour édition de documents dans le navigateur
+**Status:** Complete ✅ — Modules A-F terminés
+
+### All Modules Completed (A-F)
+| # | Type | Description |
+|---|------|-------------|
+| 1 | Feature | Page admin `/admin/onlyoffice` — gestion Docker (pull/start/stop/restart/remove) |
+| 2 | Feature | Reverse proxy `/onlyoffice/*` → container Docker (httputil.ReverseProxy) |
+| 3 | Feature | JWT signing (HS256) pour communication sécurisée Anemone ↔ OnlyOffice |
+| 4 | Feature | `GET /api/oo/download?token=JWT` — sert les fichiers au container |
+| 5 | Feature | `POST /api/oo/callback` — reçoit les fichiers édités, sauvegarde atomique |
+| 6 | Security | CSP ajustée : `frame-src 'self'`, `frame-ancestors 'self'`, `X-Frame-Options: SAMEORIGIN` |
+| 7 | Config | 3 variables env : `ANEMONE_OO_ENABLED`, `ANEMONE_OO_URL`, `ANEMONE_OO_SECRET` |
+| 8 | i18n | 28 clés traduction FR + EN (admin + éditeur + file browser) |
+| 9 | UI | Lien sidebar "OnlyOffice" dans section System |
+| 10 | Feature | Page éditeur plein écran `GET /files/edit?share=X&path=Y` avec config JWT signée |
+| 11 | Feature | Bouton "Modifier" dans le file browser (affiché si OO activé + fichier supporté) |
+| 12 | Feature | Fonction template `IsOOEditable` + `ooDocumentType` pour détecter les formats Office |
+
+### Supported File Formats
+- **Word:** doc, docx, odt, txt, rtf, dotx, ott
+- **Spreadsheet:** xls, xlsx, ods, csv, xlsm, xltx, ots
+- **Presentation:** ppt, pptx, odp, ppsx, potx, otp
+
+### Files Created
+- `internal/onlyoffice/docker.go` — Docker container management
+- `internal/onlyoffice/jwt.go` — JWT sign/verify
+- `internal/onlyoffice/jwt_test.go` — 3 unit tests
+- `internal/web/handlers_admin_onlyoffice.go` — Admin page + reverse proxy
+- `internal/web/handlers_onlyoffice_api.go` — Download/callback API + editor handler
+- `web/templates/v2/v2_onlyoffice.html` — Admin page template
+- `web/templates/v2/v2_editor.html` — Full-screen editor template
+
+### Files Modified
+- `internal/config/config.go` — 3 OnlyOffice config fields
+- `.env.example` — OnlyOffice env vars documentation
+- `internal/web/router.go` — Routes + `IsOOEditable` template function
+- `web/templates/v2/v2_base.html` — OnlyOffice sidebar link
+- `web/templates/v2/v2_files.html` — Edit button for editable files
+- `internal/web/handlers_files.go` — `OOEnabled` passed to template
+- `go.mod`, `go.sum` — golang-jwt/jwt/v5 dependency
+- `internal/i18n/locales/fr.json` — 28 OnlyOffice + editor keys
+- `internal/i18n/locales/en.json` — 28 OnlyOffice + editor keys
+
+### Architecture
+```
+Browser → GET /files/edit?share=X&path=Y
+  → handleFilesEdit: auth, resolve path, check type, build editor config
+  → Sign JWT download token + Sign full editor config as JWT
+  → Render v2_editor.html (standalone full-screen)
+  → Browser loads /onlyoffice/web-apps/apps/api/documents/api.js (proxied)
+  → OnlyOffice JS initializes editor with signed config
+  → OnlyOffice server downloads file via GET /api/oo/download?token=JWT
+  → On save: OnlyOffice POSTs to /api/oo/callback → atomic file replacement
+```
+
+---
+
+## Previous Session
+
 **Session 19: Web File Browser** - Complete ✅
 
 **Détails :** `.claude/sessions/SESSION_019_file_browser.md`
@@ -946,6 +1015,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 20 | OnlyOffice Integration | 2026-02-14 | Complete ✅ |
 | 19 | Web File Browser | 2026-02-14 | Complete ✅ |
 | 18 | Dashboard Last Backup Fix + Recent Tab | 2026-02-12 | Complete ✅ |
 | 17 | Rclone Crypt Fix + !BADKEY Logs | 2026-02-11 | Complete ✅ |
@@ -1045,10 +1115,11 @@ Sessions 71-74 merged and released. Major features:
 
 ## Next Steps
 
-1. **V2 UI Redesign — Module E : Pages auth** (optionnel)
+1. ~~**Session 20 : OnlyOffice Integration**~~ — Complete ✅
+2. **V2 UI Redesign — Module E : Pages auth** (optionnel)
    - Migrer login, setup, activate, reset_password vers v2
    - Style séparé (pas de sidebar, page centrée)
-2. **API REST JSON pour gestion courante** (optionnel)
+3. **API REST JSON pour gestion courante** (optionnel)
    - Users, Peers, Shares, Settings n'ont pas d'API JSON (form HTML uniquement)
    - Storage/ZFS et P2P Sync ont déjà des API JSON complètes (`docs/API.md`)
 

@@ -585,6 +585,47 @@ install_rclone() {
     fi
 }
 
+install_docker() {
+    # Docker for OnlyOffice document editing (optional)
+    if command -v docker &> /dev/null; then
+        log_info "Docker already installed ($(docker --version 2>/dev/null | head -1))"
+    else
+        log_info "Installing Docker for OnlyOffice document editing (optional)..."
+        if [ "$PKG_MANAGER" = "apt" ]; then
+            # Official Docker install for Debian/Ubuntu
+            # https://docs.docker.com/engine/install/ubuntu/
+            apt install -y ca-certificates curl
+            install -m 0755 -d /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/$(. /etc/os-release && echo "$ID")/gpg -o /etc/apt/keyrings/docker.asc
+            chmod a+r /etc/apt/keyrings/docker.asc
+            tee /etc/apt/sources.list.d/docker.sources > /dev/null <<DOCKEREOF
+Types: deb
+URIs: https://download.docker.com/linux/$(. /etc/os-release && echo "$ID")
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Signed-By: /etc/apt/keyrings/docker.asc
+DOCKEREOF
+            apt update
+            apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
+                && log_info "Docker installed" \
+                || { log_warn "Docker installation failed (optional — see https://docs.docker.com/engine/install/)"; return; }
+        elif [ "$PKG_MANAGER" = "dnf" ]; then
+            # Official Docker install for Fedora/RHEL
+            # https://docs.docker.com/engine/install/fedora/
+            dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo 2>/dev/null \
+                || dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo 2>/dev/null
+            dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
+                && log_info "Docker installed" \
+                || { log_warn "Docker installation failed (optional — see https://docs.docker.com/engine/install/)"; return; }
+        fi
+        systemctl enable --now docker 2>/dev/null || true
+    fi
+    # Add service user to docker group so Anemone can manage containers without sudo
+    if [ -n "$SERVICE_USER" ] && ! id -nG "$SERVICE_USER" 2>/dev/null | grep -qw docker; then
+        usermod -aG docker "$SERVICE_USER" && log_info "User $SERVICE_USER added to docker group" || log_warn "Failed to add $SERVICE_USER to docker group"
+    fi
+}
+
 build_binary() {
     log_info "Building Anemone..."
 
@@ -989,6 +1030,7 @@ main() {
         install_storage_tools
         install_wireguard
         install_rclone
+        install_docker
 
         log_step "4/8 Building Anemone..."
         build_binary

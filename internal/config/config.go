@@ -29,6 +29,11 @@ type Config struct {
 	// Logging configuration
 	LogLevel string // "debug", "info", "warn", "error" (default: "warn")
 	LogDir   string // Directory for log files (default: DataDir/logs)
+
+	// OnlyOffice integration
+	OnlyOfficeEnabled bool   // Enable OnlyOffice document editing
+	OnlyOfficeURL     string // Internal URL of OnlyOffice container (e.g., http://localhost:8443)
+	OnlyOfficeSecret  string // JWT shared secret for OnlyOffice communication
 }
 
 // Load reads configuration from environment variables or defaults
@@ -78,6 +83,10 @@ func Load() (*Config, error) {
 		TLSKeyPath:   getEnv("TLS_KEY_PATH", ""),
 		LogLevel:     getEnv("ANEMONE_LOG_LEVEL", ""), // Empty = use DB setting or default
 		LogDir:       logDir,
+
+		OnlyOfficeEnabled: getBoolEnv("ANEMONE_OO_ENABLED", false),
+		OnlyOfficeURL:     getEnv("ANEMONE_OO_URL", "http://localhost:9980"),
+		OnlyOfficeSecret:  getEnv("ANEMONE_OO_SECRET", ""),
 	}
 
 	// If custom cert/key not provided, use auto-generated ones

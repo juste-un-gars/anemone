@@ -290,6 +290,7 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 		Breadcrumb   []BreadcrumbItem
 		CurrentShare string
 		CurrentPath  string
+		OOEnabled    bool
 	}{
 		V2TemplateData: V2TemplateData{
 			Lang:       lang,
@@ -302,6 +303,7 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 		Breadcrumb:   breadcrumb,
 		CurrentShare: currentShare,
 		CurrentPath:  relPath,
+		OOEnabled:    s.cfg.OnlyOfficeEnabled,
 	}
 
 	tmpl := s.loadV2UserPage("v2_files.html", s.funcMap)

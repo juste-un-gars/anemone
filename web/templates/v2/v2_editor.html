@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.FileName}} - {{ServerName}}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1a2e; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100vh; display: flex; flex-direction: column; }
+        .editor-header {
+            display: flex; align-items: center; gap: 0.75rem;
+            padding: 0.5rem 1rem; background: #16213e;
+            border-bottom: 1px solid rgba(255,255,255,0.1); flex-shrink: 0;
+        }
+        .editor-header a {
+            color: #6366f1; text-decoration: none; display: flex;
+            align-items: center; gap: 0.25rem; font-size: 0.875rem;
+        }
+        .editor-header a:hover { color: #818cf8; }
+        .editor-header .filename { font-weight: 600; font-size: 0.9375rem; }
+        #editor-container { flex: 1; }
+        .editor-loading {
+            display: flex; align-items: center; justify-content: center;
+            height: 100%; color: #888; font-size: 0.9375rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-header">
+        <a href="{{.BackURL}}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            {{T .Lang "editor.back"}}
+        </a>
+        <span class="filename">{{.FileName}}</span>
+    </div>
+    <div id="editor-container">
+        <div class="editor-loading">{{T .Lang "editor.loading"}}</div>
+    </div>
+    <script src="/onlyoffice/web-apps/apps/api/documents/api.js"></script>
+    <script>
+        var docEditor = new DocsAPI.DocEditor("editor-container", {{.ConfigJSON}});
+    </script>
+</body>
+</html>
