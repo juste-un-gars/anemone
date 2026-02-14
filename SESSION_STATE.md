@@ -6,29 +6,60 @@
 > - Ne pas continuer sans validation utilisateur
 
 **Current Version:** v0.15.3-beta
-**Last Updated:** 2026-02-12
+**Last Updated:** 2026-02-14
 
 ---
 
 ## Current Session
 
-**Session 18: Dashboard Last Backup Fix + Recent Backups Tab** - Complete ✅
+**Session 19: Web File Browser** - Complete ✅
 
-**Détails :** `.claude/sessions/SESSION_018_recent_backups.md`
+**Détails :** `.claude/sessions/SESSION_019_file_browser.md`
 
 ---
 
-## Session 18: Dashboard Last Backup Fix + Recent Tab
+## Session 19: Web File Browser
 
-**Date:** 2026-02-12
-**Objective:** Fix "Last backup" card + add consolidated "Recent" tab to Backups page
+**Date:** 2026-02-14
+**Objective:** Add a web file browser for users to browse, upload, download, create folders, rename and delete files
 **Status:** Complete ✅
 
 ### Changes
 | # | Type | Description |
 |---|------|-------------|
-| 1 | Fix | Dashboard "Dernière sauvegarde" now queries rclone_backups + usb_backups in addition to sync_log |
-| 2 | Feature | New "Récent" tab in Backups page — consolidates USB, Cloud, P2P, Server in single sorted view |
+| 1 | Feature | New file browser at `/files` — browse shares, navigate folders with breadcrumb |
+| 2 | Feature | Upload files (multipart, progress bar, 2GB limit) |
+| 3 | Feature | Download files via `/api/files/download` |
+| 4 | Feature | Create folders via `/api/files/mkdir` |
+| 5 | Feature | Rename files/folders via `/api/files/rename` |
+| 6 | Feature | Delete files → moved to `.trash/{username}/` (Samba recycle pattern) |
+| 7 | UI | Sidebar link "Fichiers" between Dashboard and Trash |
+| 8 | i18n | 30 translation keys FR + EN |
+
+### Files Created
+- `internal/web/handlers_files.go` (640 lines) — All handlers + helpers
+- `web/templates/v2/v2_files.html` (328 lines) — File browser template
+
+### Files Modified
+- `internal/web/router.go` — 6 routes
+- `web/templates/v2/v2_base_user.html` — Sidebar link
+- `internal/i18n/locales/en.json` — 30 keys
+- `internal/i18n/locales/fr.json` — 30 keys
+
+### Security
+- Path traversal protection via `resolveSharePath()` + `isPathTraversal()` + `filepath.EvalSymlinks()`
+- Share ownership validation (user can only access own shares)
+- Filename validation (`isValidFileName()` rejects `..`, `/`, `\`, null, dotfiles)
+- Upload size limit via `http.MaxBytesReader`
+- `sudo` for filesystem ops (same pattern as trash.go/shares.go)
+
+---
+
+## Previous Session
+
+**Session 18: Dashboard Last Backup Fix + Recent Backups Tab** - Complete ✅
+
+**Détails :** `.claude/sessions/SESSION_018_recent_backups.md`
 
 ---
 
@@ -909,6 +940,7 @@ Sessions 71-74 merged and released. Major features:
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 19 | Web File Browser | 2026-02-14 | Complete ✅ |
 | 18 | Dashboard Last Backup Fix + Recent Tab | 2026-02-12 | Complete ✅ |
 | 17 | Rclone Crypt Fix + !BADKEY Logs | 2026-02-11 | Complete ✅ |
 | 16 | SSH Key Bugfix | 2026-02-11 | Complete ✅ |
@@ -1013,8 +1045,5 @@ Sessions 71-74 merged and released. Major features:
 2. **API REST JSON pour gestion courante** (optionnel)
    - Users, Peers, Shares, Settings n'ont pas d'API JSON (form HTML uniquement)
    - Storage/ZFS et P2P Sync ont déjà des API JSON complètes (`docs/API.md`)
-3. Améliorer la gestion des erreurs WireGuard
-4. Tests automatisés pour WireGuard
-5. Support backends additionnels rclone (S3, Google Drive, etc.)
 
 Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.
