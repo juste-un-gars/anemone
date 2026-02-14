@@ -22,9 +22,10 @@
 
 **Date:** 2026-02-14
 **Objective:** Rendre OnlyOffice configurable depuis l'interface web + corriger les bugs de chargement
-**Status:** In Progress — 8 fixes commités, download OO à résoudre
+**Status:** In Progress — **Éditeur fonctionne, sauvegarde à tester (sudo mv déployé)**
+**Serveur de test :** FR2 (192.168.83.37)
 
-### Completed
+### Completed (commités)
 | # | Type | Description |
 |---|------|-------------|
 | 1 | Feature | Config OO stockée en DB (`system_config`), auto-génération secret JWT |
@@ -37,12 +38,29 @@
 | 8 | Fix | **!BADKEY logs** — 10 messages slog corrigés dans 4 fichiers (updater, trash, serverbackup, tls) |
 | 9 | Fix | **Docker --add-host** — `host.docker.internal:host-gateway` pour résolution réseau container→hôte |
 
-### Unresolved — "Échec du téléchargement"
-- Le container OnlyOffice ne tente JAMAIS le download (pas de requête GET /api/oo/download)
-- Les callbacks fonctionnent (status 1/4) → le container PEUT atteindre Anemone en HTTPS
-- `rejectUnauthorized: false` ne s'applique pas au download de fichier d'OO
-- **Solution prévue** : ajouter un listener HTTP interne (port 8080) pour les échanges OO, sans TLS
-- URL download = `http://host.docker.internal:8080/api/oo/download?token=JWT`
+### Fixes appliqués (non commités, déployés sur FR2)
+| # | Type | Description |
+|---|------|-------------|
+| 10 | Fix | URL download/callback = `http://host.docker.internal:8080` (HTTP, pas HTTPS) |
+| 11 | Fix | Serveur HTTP auto-start quand OO activé (`main.go`) |
+| 12 | Fix | **Reverse proxy Host header** — `req.Host = incomingHost` (adresse navigateur) |
+| 13 | Fix | Headers `X-Forwarded-Host/Proto/Prefix` dans le proxy pour OO |
+| 14 | Fix | **Auto-patch container** — `PatchContainerConfig()` : TLS + SSRF (idempotent) |
+| 15 | Fix | **Bug PatchContainerConfig** — skip check `grep rejectUnauthorized` toujours vrai → supprimé |
+| 16 | **Arch** | **HTTPS direct port** — Container OO mappe `9980:443`, certs TLS Anemone montés, navigateur accède directement à OO sans proxy subpath. Résout Editor.bin URL + WebSocket. |
+| 17 | Fix | **CSP dynamique** — Override CSP sur page éditeur pour autoriser `https://{host}:9980` |
+| 18 | Fix | **TLS InsecureSkipVerify** — Client HTTP Anemone accepte cert auto-signé OO lors du callback save |
+| 19 | Fix | **Sudo mv pour sauvegarde OO** — Fallback `sudo /usr/bin/mv` quand le share appartient à un autre user |
+
+### Problème résolu : Editor.bin URL
+- **Cause racine :** `httputil.ReverseProxy` ne gère pas WebSocket. OO utilise Socket.IO (WebSocket) pour les connexions éditeur. Le proxy Go ne forwardait pas les connexions WebSocket, donc OO voyait `Host: localhost:9980` et générait des URLs `http://localhost:9980/cache/...` inaccessibles au navigateur.
+- **Solution :** Approche "port séparé" — OO sert HTTPS directement sur `:9980` avec les certs TLS d'Anemone. Le navigateur charge `api.js` depuis `https://{host}:9980/` sans passer par le proxy. Plus de problème de Host header.
+- **Suivi détaillé :** `.claude/debug_onlyoffice.md`
+
+### À tester (prochaine session)
+- [ ] Sauvegarde fichier (callback status=2 → download → sudo mv)
+- [ ] Réinstallation propre (container OO créé via admin UI avec HTTPS)
+- [ ] Acceptation certificat OO (:9980) depuis navigateur client
 
 ### Bugs connus (non corrigés)
 - Permission denied sur manifests marc (shares marc:marc, Anemone tourne en franck)

@@ -177,8 +177,9 @@ func main() {
 		}()
 	}
 
-	// Start HTTP server if enabled (disabled by default for security)
-	if cfg.EnableHTTP {
+	// Start HTTP server if enabled, or if OnlyOffice needs it for container communication.
+	// OnlyOffice container downloads files via HTTP (avoids self-signed cert issues with HTTPS).
+	if cfg.EnableHTTP || cfg.OnlyOfficeEnabled {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

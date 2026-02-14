@@ -8,14 +8,17 @@
 package web
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -139,8 +142,14 @@ func (s *Server) downloadAndSaveOOFile(docKey, downloadURL string) error {
 		return fmt.Errorf("path resolution failed: %w", err)
 	}
 
-	// Download the edited file from OnlyOffice
-	resp, err := http.Get(downloadURL)
+	// Download the edited file from OnlyOffice.
+	// Use InsecureSkipVerify because OO serves HTTPS with Anemone's self-signed cert.
+	ooClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	resp, err := ooClient.Get(downloadURL)
 	if err != nil {
 		return fmt.Errorf("failed to download from OO: %w", err)
 	}
@@ -150,11 +159,20 @@ func (s *Server) downloadAndSaveOOFile(docKey, downloadURL string) error {
 		return fmt.Errorf("OO download returned status %d", resp.StatusCode)
 	}
 
-	// Write to a temp file first, then rename (atomic save)
+	// Write to a temp file first, then rename (atomic save).
+	// Try writing next to the target file; if permission denied (share owned
+	// by another user), fall back to system temp dir + sudo mv.
 	tmpFile := absPath + ".oo-tmp"
 	f, err := os.Create(tmpFile)
+	useSudo := false
 	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
+		// Permission denied — use system temp dir + sudo mv
+		f, err = os.CreateTemp("", "anemone-oo-save-*")
+		if err != nil {
+			return fmt.Errorf("failed to create temp file: %w", err)
+		}
+		tmpFile = f.Name()
+		useSudo = true
 	}
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
@@ -164,9 +182,17 @@ func (s *Server) downloadAndSaveOOFile(docKey, downloadURL string) error {
 	}
 	f.Close()
 
-	if err := os.Rename(tmpFile, absPath); err != nil {
-		os.Remove(tmpFile)
-		return fmt.Errorf("failed to replace file: %w", err)
+	if useSudo {
+		cmd := exec.Command("sudo", "/usr/bin/mv", tmpFile, absPath)
+		if err := cmd.Run(); err != nil {
+			os.Remove(tmpFile)
+			return fmt.Errorf("failed to move file (sudo): %w", err)
+		}
+	} else {
+		if err := os.Rename(tmpFile, absPath); err != nil {
+			os.Remove(tmpFile)
+			return fmt.Errorf("failed to replace file: %w", err)
+		}
 	}
 
 	logger.Info("OO file saved", "path", absPath, "user", userID)
@@ -288,14 +314,13 @@ func (s *Server) handleFilesEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Build URLs reachable from the OnlyOffice container
-	scheme := "https"
-	if r.TLS == nil {
-		scheme = "http"
-	}
-	baseURL := fmt.Sprintf("%s://%s", scheme, r.Host)
+	// Build URLs reachable from the OnlyOffice container via Docker bridge network.
+	// Uses HTTP (not HTTPS) to avoid self-signed certificate issues.
+	// host.docker.internal resolves to the host machine from inside the container.
+	baseURL := fmt.Sprintf("http://host.docker.internal:%s", s.cfg.Port)
 	downloadURL := fmt.Sprintf("%s/api/oo/download?token=%s", baseURL, fileToken)
 	callbackURL := fmt.Sprintf("%s/api/oo/callback", baseURL)
+	logger.Info("OO editor: URLs generated", "downloadURL", downloadURL, "callbackURL", callbackURL, "secret_len", len(s.cfg.OnlyOfficeSecret))
 
 	// Back URL points to parent directory in file browser
 	parentDir := filepath.Dir(relPath)
@@ -342,18 +367,39 @@ func (s *Server) handleFilesEdit(w http.ResponseWriter, r *http.Request) {
 
 	configJSON, _ := json.Marshal(editorConfig)
 
+	// Build OO external URL: browser connects directly to OO via HTTPS on its own port.
+	// This avoids the subpath reverse proxy which can't handle WebSocket/Socket.IO.
+	ooURL, _ := url.Parse(s.cfg.OnlyOfficeURL)
+	ooPort := ooURL.Port()
+	if ooPort == "" {
+		ooPort = "9980"
+	}
+	browserHost, _, err := net.SplitHostPort(r.Host)
+	if err != nil {
+		browserHost = r.Host // no port in Host header
+	}
+	ooExternalURL := fmt.Sprintf("https://%s:%s", browserHost, ooPort)
+
+	// Override CSP to allow loading OnlyOffice resources from its dedicated port
+	ooOrigin := ooExternalURL
+	w.Header().Set("Content-Security-Policy", fmt.Sprintf(
+		"default-src 'self' %[1]s; script-src 'self' 'unsafe-inline' 'unsafe-eval' %[1]s; style-src 'self' 'unsafe-inline'; img-src 'self' data: %[1]s; font-src 'self' %[1]s; connect-src 'self' %[1]s wss://%[2]s:%[3]s; frame-src 'self' %[1]s; frame-ancestors 'self'",
+		ooOrigin, browserHost, ooPort))
+
 	data := struct {
 		Lang       string
 		Title      string
 		FileName   string
 		ConfigJSON template.JS
 		BackURL    string
+		OOURL      string
 	}{
 		Lang:       lang,
 		Title:      filepath.Base(absPath),
 		FileName:   filepath.Base(absPath),
 		ConfigJSON: template.JS(configJSON),
 		BackURL:    backURL,
+		OOURL:      ooExternalURL,
 	}
 
 	tmpl := template.Must(

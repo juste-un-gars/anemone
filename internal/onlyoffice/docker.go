@@ -52,9 +52,11 @@ func PullImage() error {
 }
 
 // StartContainer starts the OnlyOffice container.
-// If container doesn't exist, it creates a new one.
+// If container doesn't exist, it creates a new one with HTTPS enabled.
+// certPath/keyPath are mounted into the container so the browser can connect
+// directly via HTTPS (avoids subpath reverse proxy + WebSocket issues).
 // If container exists but is stopped, it starts it.
-func StartContainer(secret, ooURL string) error {
+func StartContainer(secret, ooURL, certPath, keyPath string) error {
 	status := ContainerStatus()
 
 	if status == "running" {
@@ -81,12 +83,21 @@ func StartContainer(secret, ooURL string) error {
 	args := []string{
 		"run", "-d",
 		"--name", ContainerName,
-		"-p", fmt.Sprintf("%s:80", port),
+		"-p", fmt.Sprintf("%s:443", port),
 		"-e", fmt.Sprintf("JWT_SECRET=%s", secret),
 		"--add-host=host.docker.internal:host-gateway",
 		"--restart=always",
-		ImageName,
 	}
+
+	// Mount TLS certs so OO serves HTTPS directly (browser connects without proxy)
+	if certPath != "" && keyPath != "" {
+		args = append(args,
+			"-v", fmt.Sprintf("%s:/var/www/onlyoffice/Data/certs/onlyoffice.crt:ro", certPath),
+			"-v", fmt.Sprintf("%s:/var/www/onlyoffice/Data/certs/onlyoffice.key:ro", keyPath),
+		)
+	}
+
+	args = append(args, ImageName)
 
 	cmd := exec.Command("docker", args...)
 	output, err := cmd.CombinedOutput()
@@ -97,10 +108,12 @@ func StartContainer(secret, ooURL string) error {
 	return nil
 }
 
-// PatchTLSConfig patches the OnlyOffice container config to accept self-signed
-// certificates. This is done via docker exec after the container is running.
+// PatchContainerConfig patches the OnlyOffice container config for:
+// - Self-signed TLS certificate acceptance (rejectUnauthorized: false)
+// - Private IP access for Docker bridge network (allowPrivateIPAddress: true)
+// This is done via docker exec after the container is running.
 // Call this in a goroutine after StartContainer.
-func PatchTLSConfig() {
+func PatchContainerConfig() {
 	// Wait for supervisor to be ready (up to 120 seconds)
 	for i := 0; i < 60; i++ {
 		check := exec.Command("docker", "exec", ContainerName,
@@ -111,41 +124,35 @@ func PatchTLSConfig() {
 		time.Sleep(2 * time.Second)
 	}
 
-	// Check if patch is already applied
-	check := exec.Command("docker", "exec", ContainerName,
-		"grep", "-q", "rejectUnauthorized", "/etc/onlyoffice/documentserver/local.json")
-	if check.Run() == nil {
-		logger.Info("OnlyOffice TLS patch already applied")
-		return
-	}
-
-	// Use python3 (available in the container) to read, patch, and write config
-	// This avoids shell escaping issues with JSON containing private keys
-	script := `
+	configScript := `
 import json
 p = '/etc/onlyoffice/documentserver/local.json'
 with open(p) as f:
     cfg = json.load(f)
-cfg.setdefault('services', {}).setdefault('CoAuthoring', {}).setdefault('requestDefaults', {})['rejectUnauthorized'] = False
+ca = cfg.setdefault('services', {}).setdefault('CoAuthoring', {})
+ca.setdefault('requestDefaults', {})['rejectUnauthorized'] = False
+agent = ca.setdefault('request-filtering-agent', {})
+agent['allowPrivateIPAddress'] = True
+agent['allowMetaIPAddress'] = True
 with open(p, 'w') as f:
     json.dump(cfg, f, indent=2)
-print('OK')
+print('OK: local.json patched')
 `
-	patchCmd := exec.Command("docker", "exec", ContainerName, "python3", "-c", script)
+	patchCmd := exec.Command("docker", "exec", ContainerName, "python3", "-c", configScript)
 	if out, err := patchCmd.CombinedOutput(); err != nil {
-		logger.Warn("OnlyOffice TLS patch failed", "error", err, "output", string(out))
+		logger.Warn("OnlyOffice config patch failed", "error", err, "output", string(out))
 		return
 	}
 
-	// Restart docservice and converter to pick up config change
+	// Restart docservice and converter to pick up config changes
 	restart := exec.Command("docker", "exec", ContainerName,
 		"supervisorctl", "restart", "ds:docservice", "ds:converter")
 	if out, err := restart.CombinedOutput(); err != nil {
-		logger.Warn("OnlyOffice TLS patch: restart services failed", "error", err, "output", string(out))
+		logger.Warn("OnlyOffice patch: restart services failed", "error", err, "output", string(out))
 		return
 	}
 
-	logger.Info("OnlyOffice TLS patch applied (self-signed certs accepted)")
+	logger.Info("OnlyOffice container patched (SSRF + TLS)")
 }
 
 // StopContainer stops the OnlyOffice container.

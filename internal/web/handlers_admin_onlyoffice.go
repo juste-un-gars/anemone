@@ -102,14 +102,14 @@ func (s *Server) handleAdminOnlyOfficeStart(w http.ResponseWriter, r *http.Reque
 		logger.Info("OnlyOffice JWT secret auto-generated and saved to database")
 	}
 
-	if err := onlyoffice.StartContainer(s.cfg.OnlyOfficeSecret, s.cfg.OnlyOfficeURL); err != nil {
+	if err := onlyoffice.StartContainer(s.cfg.OnlyOfficeSecret, s.cfg.OnlyOfficeURL, s.cfg.TLSCertPath, s.cfg.TLSKeyPath); err != nil {
 		logger.Error("Failed to start OnlyOffice container", "error", err)
 		session, _ := auth.GetSessionFromContext(r)
 		s.renderOnlyOfficePage(w, session, s.getLang(r), "", err.Error())
 		return
 	}
 
-	// Patch TLS config in background (container needs time to initialize)
+	// Patch container config in background (container needs time to initialize)
 	go func() {
 		// Wait for container services to start before patching
 		for i := 0; i < 30; i++ {
@@ -120,7 +120,7 @@ func (s *Server) handleAdminOnlyOfficeStart(w http.ResponseWriter, r *http.Reque
 			}
 			time.Sleep(2 * time.Second)
 		}
-		onlyoffice.PatchTLSConfig()
+		onlyoffice.PatchContainerConfig()
 	}()
 
 	// Auto-enable OnlyOffice
@@ -220,6 +220,14 @@ func (s *Server) onlyOfficeProxyDynamic() http.Handler {
 			return
 		}
 
+		// Capture original request info before proxy cloning
+		incomingHost := r.Host
+		incomingScheme := "http"
+		if r.TLS != nil {
+			incomingScheme = "https"
+		}
+		logger.Info("OO proxy", "host", incomingHost, "scheme", incomingScheme, "path", r.URL.Path)
+
 		proxy := httputil.NewSingleHostReverseProxy(target)
 		originalDirector := proxy.Director
 		proxy.Director = func(req *http.Request) {
@@ -228,7 +236,16 @@ func (s *Server) onlyOfficeProxyDynamic() http.Handler {
 			if req.URL.Path == "" {
 				req.URL.Path = "/"
 			}
-			req.Host = target.Host
+			// Keep req.Host as the original browser host (NOT target.Host).
+			// OO uses the Host header to generate Editor.bin cache URLs.
+			// If we set it to target.Host (localhost:9980), the browser gets
+			// unreachable URLs like http://localhost:9980/cache/...
+			req.Host = incomingHost
+
+			// Set forwarding headers for OO to build correct URLs
+			req.Header.Set("X-Forwarded-Host", incomingHost)
+			req.Header.Set("X-Forwarded-Proto", incomingScheme)
+			req.Header.Set("X-Forwarded-Prefix", "/onlyoffice")
 		}
 		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 			logger.Warn("OnlyOffice proxy error", "path", r.URL.Path, "error", err)
