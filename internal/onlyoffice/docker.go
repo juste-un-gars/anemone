@@ -82,6 +82,7 @@ func StartContainer(secret, ooURL string) error {
 		"--name", ContainerName,
 		"-p", fmt.Sprintf("%s:80", port),
 		"-e", fmt.Sprintf("JWT_SECRET=%s", secret),
+		"-e", "NODE_TLS_REJECT_UNAUTHORIZED=0",
 		"--restart=always",
 		ImageName,
 	}
