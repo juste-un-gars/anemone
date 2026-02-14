@@ -510,7 +510,7 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		// script-src 'self' - Only execute scripts from same origin
 		// frame-src 'self' - Allow iframes from same origin (OnlyOffice editor)
 		// frame-ancestors 'self' - Allow being framed by same origin only
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'")
 
 		// Referrer Policy - Don't leak referrer to external sites
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
