@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0-beta] - 2026-02-15
+
+### Security
+- **Go 1.22.2 → 1.26.0**: 24 stdlib vulnerabilities fixed (govulncheck clean)
+- **Dependencies updated**: go-sqlite3 1.14.34, x/crypto 0.48.0, x/sys 0.41.0
+- **Rate limiting on /login**: 5 attempts per 15 min per IP AND per username, 15 min lockout (HTTP 429)
+- **CSRF protection**: Double-submit cookie on all public forms (SameSite=Strict)
+- **Cookie security**: All cookies Secure=true, HttpOnly, SameSite=Strict
+- **Auth timing fix**: Constant-time bcrypt dummy check for non-existent users
+- **HTTP timeouts (SlowLoris)**: ReadHeader=10s, Read=30s, Write=60s, Idle=120s
+- **Token race condition fix**: MarkAsUsed atomic (bool, error), consumed before action
+- **Session IP binding**: IP mismatch invalidates session with security log
+- **Account lockout**: After 5 failed attempts, account locked for 15 min
+- **RememberMe reduced**: 30 days → 14 days
+- **CSP hardened**: Removed unsafe-eval, added object-src 'none' + base-uri 'self'
+- **HTTP method restriction**: /login accepts GET/POST only (405 otherwise)
+- **SSRF protection**: ValidatePeerAddress() blocks loopback, link-local, metadata IPs
+- **Rclone injection fix**: quoteValue() on SFTP host/user/key_file
+- **Tar bomb protection**: maxFileSize=10GB, maxTotalSize=50GB with io.LimitReader
+- **IP spoofing fix**: Removed getClientIP(), uses RemoteAddr only (no spoofable proxy headers)
+- **CSP Host injection fix**: isValidHostname() validates Host header before CSP injection
+
+### Added
+- **Admin Security page** (`/admin/security`): View blocked IPs, locked accounts, unlock accounts
+- **Admin unlock button**: Unlock locked accounts from /admin/users (with "Locked" badge)
+- **Security retest**: Full 32-point security retest on FR2 (all PASS)
+
+### Fixed
+- **install.sh**: Now checks Go version against go.mod requirement
+- **restore_server.sh**: Aligned with install.sh patterns
+
+### Removed
+- **SECURITY_FIXES_2026-01-13.md**: Superseded by comprehensive audit report
+
 ## [0.20.0-beta] - 2026-02-15
 
 ### Added
@@ -513,7 +547,8 @@ https://github.com/juste-un-gars/anemone
 
 ---
 
-[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.20.0-beta...HEAD
+[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.21.0-beta...HEAD
+[0.21.0-beta]: https://github.com/juste-un-gars/anemone/compare/v0.20.0-beta...v0.21.0-beta
 [0.20.0-beta]: https://github.com/juste-un-gars/anemone/compare/v0.15.3-beta...v0.20.0-beta
 [0.15.3-beta]: https://github.com/juste-un-gars/anemone/compare/v0.15.0-beta...v0.15.3-beta
 [0.15.0-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.6-beta...v0.15.0-beta

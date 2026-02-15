@@ -705,4 +705,4 @@ Reverse proxy to OnlyOffice Document Server (dynamic routing).
 ---
 
 **Last Updated:** 2026-02-15
-**Version:** 0.20.0-beta
+**Version:** 0.21.0-beta

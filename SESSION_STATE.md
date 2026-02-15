@@ -5,118 +5,99 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.20.0-beta
+**Current Version:** v0.21.0-beta
 **Last Updated:** 2026-02-15
 
 ---
 
 ## Current Session
 
-**Session 25: Corrections Securite Prioritaires** - En cours (vagues 1-5 terminees, audit complet)
-
-**Détails :** `.claude/sessions/SESSION_025_security_fixes.md`
-**Rapport audit :** `SECURITY_AUDIT_2026-02-15.md` (racine, NE PAS committer)
+**Session 26: Retest Securite FR2** - Complete
 
 ---
 
-## Session 25: Corrections Securite Prioritaires
+## Session 26: Retest Securite FR2
+
+**Date:** 2026-02-15
+**Objective:** Retest complet securite sur FR2 apres reinstallation
+**Status:** Complete (32/32 tests PASS)
+
+### Resultat retest : 32/32 PASS
+
+#### 1. Reconnaissance (4/4)
+- [x] TLS TLSv1.3 + ECDSA, X25519
+- [x] Headers securite : HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+- [x] CSP : `unsafe-eval` absent, `object-src 'none'`, `base-uri 'self'`
+- [x] HTTP :8080 = connection refused
+
+#### 2. Tests non authentifies (5/5)
+- [x] /dashboard, /admin/*, /files, /settings → 303 /login
+- [x] Sync API /api/sync/manifest sans auth = 401
+- [x] /.env, /.git/config, /debug/pprof = non exposes (303)
+- [x] Path traversal /static/../../../etc/passwd = 303
+- [x] Path traversal encode %2f = 404
+
+#### 3. Rate limiting + brute-force (3/3)
+- [x] 5 echecs /login → 6e = HTTP 429
+- [x] Rate limit par username (marc) → 6e = HTTP 429
+- [x] PUT/DELETE/PATCH/OPTIONS /login = 405
+
+#### 4. CSRF (2/2)
+- [x] POST /login sans CSRF token = 403
+- [x] Cookie CSRF : Secure + SameSite=Strict
+
+#### 5. Cookies + sessions (3/3)
+- [x] anemone_session : HttpOnly + Secure
+- [x] Session sans remember_me = ~2h
+- [x] Session avec remember_me = 14 jours
+
+#### 6. Auth timing (1/1)
+- [x] User existant ~3.6ms vs inexistant ~4.2ms (ecart <2ms, bruit reseau)
+
+#### 7. Admin (2/2)
+- [x] /admin/security accessible admin = 200, contenu OK
+- [x] Marc → /admin/* = 403
+
+#### 8. OnlyOffice (3/3)
+- [x] Config DB : oo_enabled=true, oo_url=localhost:9980
+- [x] Host `<script>` → CSP default (pas d'injection)
+- [x] Host `evil.com` → CSP default (session non reconnue)
+
+#### 9. IDOR (5/5)
+- [x] Marc → /admin/users, /security, /settings, /logs, /peers = 403
+- [x] Marc → /files?path=../../admin = erreurs (pas de fuite)
+- [x] Marc → /files?path=/ = erreurs (pas de fuite)
+- [x] Marc → /files (propres fichiers) = 200
+- [x] Marc → /api/files/list?user=admin = 303
+
+**Rapport complet :** `SECURITY_FIXES_2026-02-15.md`
+
+---
+
+## Session 25: Corrections Securite Prioritaires - Complete
 
 **Date:** 2026-02-15
 **Objective:** Corriger les vulns identifiees en session 24
-**Status:** En cours (vagues 1+2+3+4+5 done, audit complet)
+**Status:** Complete (vagues 1-5 done, audit complet, retest FR2 OK)
 
-### Corrections appliquees (vague 1)
-| # | Correction | Statut |
-|---|-----------|--------|
-| 1 | Go 1.22.2 → 1.26.0 + deps a jour (24 vulns stdlib corrigees) | DONE |
-| 2 | Rate limiting /login (5 tentatives/15min, lockout 15min) | DONE + teste FR2 |
-| 3 | Cookie Secure=true (activation_key, setup_key) | DONE |
-| 4 | Restriction methodes HTTP /login (GET/POST only, 405 sinon) | DONE + teste FR2 |
-| 5 | Protection CSRF formulaires publics (double-submit cookie) | DONE + teste FR2 |
-| 6 | Deploy + test complet sur FR2 | DONE |
-
-### Corrections appliquees (vague 2)
-| # | Correction | Statut |
-|---|-----------|--------|
-| 7 | A3 : Timing side-channel — DummyCheckPassword bcrypt constant-time | DONE + teste FR2 |
-| 8 | G3 : HTTP Timeouts SlowLoris — http.Server avec timeouts | DONE + teste FR2 |
-| 9 | A5 : Race condition tokens — MarkAsUsed atomique + avant activation/reset | DONE |
-| 10 | Bug CSRF middleware — token passe via context au premier GET | DONE + teste FR2 |
-
-### Corrections appliquees (vague 3)
-| # | Correction | Statut |
-|---|-----------|--------|
-| 11 | A4 : Rate limiting par username en plus de l'IP (anti brute-force distribue) | DONE + teste FR2 |
-| 12 | A7 : Validation IP en session — mismatch = session invalidee | DONE + teste FR2 |
-| 13 | Bouton admin "Debloquer" compte dans /admin/users (badge Verrouille) | DONE + teste FR2 |
-
-### Corrections appliquees (vague 4)
-| # | Correction | Statut |
-|---|-----------|--------|
-| 14 | Page /admin/security : IPs bloquees + comptes verrouilles + deblocage | DONE + teste FR2 |
-| A10 | CSP : retrait unsafe-eval, ajout object-src 'none' + base-uri 'self' | DONE + deploy FR2 |
-| A11 | RememberMe 30j → 14j | DONE + deploy FR2 |
-| I1 | SSRF : ValidatePeerAddress() bloque loopback/link-local/metadata | DONE + deploy FR2 |
-| I2 | Injection rclone : quoteValue() sur SFTP host/user/key_file | DONE + deploy FR2 |
-| G5 | Bombe tar : limite 10Go/fichier + 50Go total + io.LimitReader | DONE + deploy FR2 |
-
-### Corrections appliquees (vague 5)
-| # | Correction | Statut |
-|---|-----------|--------|
-| A6 | X-Forwarded-For spoofable : suppression getClientIP(), utilise clientIP() (RemoteAddr only) | DONE |
-| I4 | CSP Host injection : isValidHostname() valide browserHost avant injection dans CSP | DONE |
-| Phase 8 | Audit IDOR : 10 endpoints testes, 5 sync API acceptes (design P2P + chiffrement E2E) | DONE |
-| Phase 9 | Audit XSS : 7 vecteurs testes, aucune vuln critique (html/template auto-escaping) | DONE |
-| Phase 10 | Rapport final complete dans SECURITY_AUDIT_2026-02-15.md | DONE |
-
-### Findings acceptes (pas de correction)
-| # | Finding | Severite | Raison |
-|---|---------|----------|--------|
-| G2 | InsecureSkipVerify: true | HIGH | Necessaire pour certs auto-signes P2P |
-| A9 | Complexite mdp (min 8 chars) | MEDIUM | Choix utilisateur |
-| A12 | Token admin TTL 5 min | MEDIUM | Acceptable |
-| A14 | Timeout inactivite session | LOW | Mitigue par IP binding + 14j max |
-| ID1-5 | Acces cross-user sync API | MEDIUM | Design P2P, chiffrement E2E |
-| G4 | MD5 integrite fichiers | MEDIUM | Content-addressable, pas securite |
-
-### Resume technique
-- **Go** : 1.26.0, go-sqlite3 1.14.34, x/crypto 0.48.0, x/sys 0.41.0
-- **CSRF** : double-submit cookie avec context (fix premier GET)
-- **Rate limiting** : 5 tentatives / 15 min par IP ET par username, lockout 15 min
-- **Session IP binding** : mismatch IP = session invalidee + log
-- **Admin unlock** : bouton debloquer compte dans /admin/users + badge Verrouille
-- **Cookies** : tous Secure=true + SameSite=Strict
-- **HTTP timeouts** : ReadHeader=10s, Read=30s, Write=60s, Idle=120s
-- **Tokens** : MarkAsUsed atomique `(bool, error)`, consomme avant action
-- **CSP** : unsafe-eval retire, object-src 'none', base-uri 'self' (unsafe-inline garde : 180+ handlers inline)
-- **RememberMe** : 14 jours (etait 30j)
-- **SSRF** : ValidatePeerAddress() dans peers.go, appelee au create/update peer
-- **Rclone** : quoteValue() sur SFTP host/user/key_file dans buildSFTPRemote
-- **Tar bomb** : maxFileSize=10Go, maxTotalSize=50Go, io.LimitReader dans ExtractTarGz
-- **Page /admin/security** : handler + template + routes + i18n FR/EN + lien sidebar
-- **IP detection** : clientIP() utilise seulement RemoteAddr (pas de proxy headers spoofables)
-- **CSP Host** : isValidHostname() valide le Host header avant usage dans CSP OnlyOffice
-- **IDOR** : Endpoints protege-session OK, sync API accepte (design P2P + chiffrement E2E)
-- **XSS** : Aucune vuln trouvee (html/template auto-escaping)
-- **Build OK, tests OK, audit securite COMPLET**
+**Details :** `.claude/sessions/SESSION_025_security_fixes.md`
+**Rapport audit :** `SECURITY_AUDIT_2026-02-15.md` (racine, NE PAS committer)
 
 ---
 
 ## Previous Sessions
 
 **Session 24: Audit de Securite** - Complete
-
-**Détails :** `.claude/sessions/SESSION_024_security_audit.md`
+**Details :** `.claude/sessions/SESSION_024_security_audit.md`
 
 **Session 23: ZFS Wizard Fix + Documentation Cleanup** - Complete
-
-**Détails :** `.claude/sessions/SESSION_023_docs_cleanup.md`
+**Details :** `.claude/sessions/SESSION_023_docs_cleanup.md`
 
 ---
 
-## Bugs connus (non corrigés)
+## Bugs connus (non corriges)
 - Permission denied sur manifests marc (shares marc:marc, Anemone tourne en franck)
-- ZFS wizard : retour arrière ne ré-affiche pas pool name/mountpoint (workaround : redémarrer Anemone)
+- ZFS wizard : retour arriere ne re-affiche pas pool name/mountpoint (workaround : redemarrer Anemone)
 
 ---
 
@@ -124,7 +105,8 @@
 
 | # | Name | Date | Status |
 |---|------|------|--------|
-| 25 | Corrections Securite Prioritaires | 2026-02-15 | En cours |
+| 26 | Retest Securite FR2 | 2026-02-15 | Complete |
+| 25 | Corrections Securite Prioritaires | 2026-02-15 | Complete |
 | 24 | Audit de Securite | 2026-02-15 | Complete |
 | 23 | ZFS Wizard Fix + Documentation Cleanup | 2026-02-15 | Complete |
 | 22 | !BADKEY Fix + Bugfixes + Release v0.20.0-beta | 2026-02-15 | Complete |
@@ -136,10 +118,6 @@
 | 16 | SSH Key Bugfix | 2026-02-11 | Complete |
 
 ---
-
-## Next Steps
-
-1. **Audit securite COMPLET** — toutes les corrections deployees sur FR2
 
 ## Ameliorations futures (non urgentes)
 

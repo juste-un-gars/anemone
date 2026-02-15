@@ -4,7 +4,7 @@
 
 ---
 
-> **v0.20.0-beta** - This project is under active development. Use in production at your own risk.
+> **v0.21.0-beta** - This project is under active development. Use in production at your own risk.
 > See [DISCLAIMER](#disclaimer) for liability limitations.
 
 ---
