@@ -132,4 +132,4 @@ See AGPL v3.0 license (sections 15 and 16) for details.
 ![Dashboard](docs/sc1.png)
 ![Dashboard](docs/sc2.png)
 ![Dashboard](docs/sc3.png)
-![Dashboard](docs/sc4.png)
+![Dashboard](docs/sc5.png)
