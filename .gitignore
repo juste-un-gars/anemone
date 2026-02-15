@@ -77,7 +77,7 @@ SESSION_STATE.md
 .claude/sessions/
 CHECKFILES.md
 TESTS_ANEMONE.md
-SECURITY_AUDIT.md
+SECURITY_AUDIT*.md
 _audit_temp/
 
 # Temporary/debug files
