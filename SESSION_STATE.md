@@ -139,7 +139,12 @@
 
 ## Next Steps
 
-1. **Deploy vague 5 sur FR2** — binaire + templates
-2. **A10 full** — Refactor JS inline pour retirer unsafe-inline du CSP (optionnel, gros chantier)
+1. **Audit securite COMPLET** — toutes les corrections deployees sur FR2
+
+## Ameliorations futures (non urgentes)
+
+| # | Description | Effort | Impact |
+|---|-------------|--------|--------|
+| A10 full | Retirer `unsafe-inline` du CSP : externaliser JS inline (32 fichiers, 140 onclick) dans fichiers .js + data-attributes | ~2-3 jours | Defense en profondeur (aucun XSS trouve, risque theorique) |
 
 Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.
