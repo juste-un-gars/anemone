@@ -261,15 +261,19 @@ sudo journalctl -u anemone -p err
 
 ### Enable Debug Mode
 
+Change log level from the web UI (Admin → System Logs) or via environment variable:
+
 ```bash
-# Edit service
-sudo systemctl edit anemone
+ANEMONE_LOG_LEVEL=debug
+sudo systemctl restart anemone
+```
 
-# Add environment variable
-[Service]
-Environment="DEBUG=true"
+### Setup Wizard Issues
 
-# Restart
+If the setup wizard gets stuck or you need to reconfigure storage options:
+
+```bash
+# Restart Anemone to reset the wizard state
 sudo systemctl restart anemone
 ```
 
@@ -282,6 +286,133 @@ sudo systemctl restart anemone
 | "no such table" | Migration failed | Delete DB and restart |
 | "TLS handshake error" | Certificate issue | Check cert paths |
 | "address already in use" | Port conflict | Check for other services on 8443 |
+
+## Advanced Sync Diagnostics
+
+### Understanding Sync Phases
+
+A synchronization goes through several phases:
+
+1. **Building local manifest** (can take 15-30 minutes for 40k+ files)
+   - Scans all files in the share and calculates SHA256 hashes
+   - CPU usage: 40-70%
+2. **Fetching remote manifest** (2-5 seconds)
+3. **Comparing manifests** (1-2 seconds)
+4. **Uploading files** (depends on dataset size and network speed)
+
+### Check Sync Status
+
+```bash
+# Check if a sync is currently running
+sqlite3 /srv/anemone/db/anemone.db "SELECT id, user_id, peer_id, started_at, status FROM sync_log WHERE status = 'running';"
+
+# View recent sync history
+sqlite3 /srv/anemone/db/anemone.db "SELECT id, started_at, completed_at, status, files_synced, bytes_synced, error_message FROM sync_log ORDER BY started_at DESC LIMIT 5;"
+```
+
+### Identify Zombie Syncs (Stuck > 2 Hours)
+
+```bash
+sqlite3 /srv/anemone/db/anemone.db "SELECT id, user_id, peer_id, started_at,
+  CAST((julianday('now') - julianday(started_at)) * 24 AS INT) || 'h' AS duration
+  FROM sync_log
+  WHERE status = 'running'
+  AND datetime(started_at) < datetime('now', '-2 hours');"
+```
+
+### Clean Up Zombie Syncs
+
+```bash
+sqlite3 /srv/anemone/db/anemone.db "UPDATE sync_log
+  SET status = 'error',
+      completed_at = CURRENT_TIMESTAMP,
+      error_message = 'Sync timeout - manually cleaned'
+  WHERE status = 'running'
+  AND datetime(started_at) < datetime('now', '-2 hours');"
+```
+
+### Monitor Memory During Sync
+
+```bash
+watch -n 1 'free -h; echo "---"; ps aux | grep anemone | grep -v grep'
+```
+
+If RAM keeps growing or OOM killer appears, upgrade to v0.9.8-beta+ (chunked encryption with 128MB chunks).
+
+### Estimate BuildManifest Duration
+
+| Files | Estimated time |
+|-------|---------------|
+| ~1,000 | 30 seconds |
+| ~10,000 | 5 minutes |
+| ~40,000 | 15-20 minutes |
+| ~100,000 | 45-60 minutes |
+
+```bash
+# Count files in a share
+find /srv/anemone/shares/USERNAME/SHARENAME -type f | wc -l
+```
+
+## Database Queries
+
+### List All Users
+
+```bash
+sqlite3 /srv/anemone/db/anemone.db "SELECT id, username, is_admin, is_active, created_at FROM users;"
+```
+
+### View Sync Statistics
+
+```bash
+sqlite3 /srv/anemone/db/anemone.db "SELECT
+  COUNT(*) as total_syncs,
+  SUM(files_synced) as total_files,
+  ROUND(SUM(bytes_synced) / 1024.0 / 1024.0 / 1024.0, 2) || ' GB' as total_data
+  FROM sync_log
+  WHERE status = 'success';"
+```
+
+### Verify Database Integrity
+
+```bash
+sqlite3 /srv/anemone/db/anemone.db "PRAGMA integrity_check;"
+# Expected output: ok
+```
+
+### Backup Database Manually
+
+```bash
+cp /srv/anemone/db/anemone.db /srv/anemone/db/anemone.db.backup-$(date +%Y%m%d-%H%M%S)
+```
+
+## Maintenance
+
+### All-in-One Health Check
+
+```bash
+echo "=== Service Status ===" && sudo systemctl status anemone --no-pager
+echo -e "\n=== Running Syncs ===" && sqlite3 /srv/anemone/db/anemone.db "SELECT COUNT(*) FROM sync_log WHERE status='running';"
+echo -e "\n=== Disk Space ===" && df -h /srv/anemone
+echo -e "\n=== Memory Usage ===" && free -h
+```
+
+### Update Issues
+
+**"go: command not found" during update:**
+
+```bash
+# Add Go to PATH
+echo 'export PATH=$PATH:/usr/local/go/bin' | sudo tee /etc/profile.d/go.sh
+source /etc/profile.d/go.sh
+```
+
+**Git tag conflict during update:**
+
+```bash
+cd ~/anemone
+git tag -d [conflicting_tag]
+# Then retry update from web interface
+```
 
 ## Getting Help
 
