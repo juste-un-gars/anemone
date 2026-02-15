@@ -346,7 +346,11 @@ func (s *Server) handleFilesDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Info("User %s downloading file: %s from share %s", session.Username, relPath, shareName)
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filepath.Base(absPath)))
+	if r.URL.Query().Get("inline") == "1" {
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, filepath.Base(absPath)))
+	} else {
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filepath.Base(absPath)))
+	}
 	http.ServeFile(w, r, absPath)
 }
 

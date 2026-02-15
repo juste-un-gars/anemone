@@ -8,6 +8,7 @@
 package web
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -21,6 +22,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/juste-un-gars/anemone/internal/auth"
 	"github.com/juste-un-gars/anemone/internal/logger"
@@ -117,6 +119,8 @@ func (s *Server) handleOOCallback(w http.ResponseWriter, r *http.Request) {
 
 // downloadAndSaveOOFile downloads the edited file from OnlyOffice and saves it.
 // The document key format is: userID-shareName-filePath (encoded by the editor handler).
+// For non-native formats (md, txt, odt, csv...), OnlyOffice saves in its native
+// format (docx/xlsx/pptx). We use the Conversion API to convert back to the original format.
 func (s *Server) downloadAndSaveOOFile(docKey, downloadURL string) error {
 	// Decode base64url-encoded document key
 	decoded, err := base64.URLEncoding.DecodeString(docKey)
@@ -142,14 +146,33 @@ func (s *Server) downloadAndSaveOOFile(docKey, downloadURL string) error {
 		return fmt.Errorf("path resolution failed: %w", err)
 	}
 
-	// Download the edited file from OnlyOffice.
+	// Check if the original format needs conversion.
+	// OO always saves in native format (docx/xlsx/pptx); for other formats
+	// we must convert back via the Conversion API.
+	origExt := strings.ToLower(strings.TrimPrefix(filepath.Ext(relPath), "."))
+	actualDownloadURL := downloadURL
+
+	if !isNativeOOFormat(origExt) {
+		nativeFmt := nativeOOFormat(origExt)
+		logger.Info("OO conversion needed", "from", nativeFmt, "to", origExt, "file", relPath)
+
+		convertedURL, err := s.convertViaOO(downloadURL, nativeFmt, origExt, docKey)
+		if err != nil {
+			logger.Error("OO conversion failed, saving native format", "error", err)
+			// Fall through: save native format as fallback (better than losing data)
+		} else {
+			actualDownloadURL = convertedURL
+		}
+	}
+
+	// Download the (possibly converted) file from OnlyOffice.
 	// Use InsecureSkipVerify because OO serves HTTPS with Anemone's self-signed cert.
 	ooClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}
-	resp, err := ooClient.Get(downloadURL)
+	resp, err := ooClient.Get(actualDownloadURL)
 	if err != nil {
 		return fmt.Errorf("failed to download from OO: %w", err)
 	}
@@ -197,6 +220,94 @@ func (s *Server) downloadAndSaveOOFile(docKey, downloadURL string) error {
 
 	logger.Info("OO file saved", "path", absPath, "user", userID)
 	return nil
+}
+
+// isNativeOOFormat returns true if the extension is a native OnlyOffice format
+// that doesn't need conversion after save (OO saves in these formats natively).
+func isNativeOOFormat(ext string) bool {
+	switch ext {
+	case "docx", "xlsx", "pptx":
+		return true
+	}
+	return false
+}
+
+// nativeOOFormat returns the native OO format that a given extension gets
+// converted to internally. E.g. "md" → "docx", "csv" → "xlsx", "odp" → "pptx".
+func nativeOOFormat(ext string) string {
+	switch ooDocumentType(ext) {
+	case "cell":
+		return "xlsx"
+	case "slide":
+		return "pptx"
+	default:
+		return "docx"
+	}
+}
+
+// convertViaOO calls the OnlyOffice Conversion API to convert a file from
+// one format to another. Returns the URL of the converted file.
+func (s *Server) convertViaOO(fileURL, fromExt, toExt, key string) (string, error) {
+	convPayload := map[string]interface{}{
+		"async":      false,
+		"filetype":   fromExt,
+		"key":        fmt.Sprintf("conv_%d", time.Now().UnixNano()),
+		"outputtype": toExt,
+		"url":        fileURL,
+	}
+
+	// Sign the conversion request with JWT
+	token, err := onlyoffice.SignEditorConfig(s.cfg.OnlyOfficeSecret, convPayload)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign conversion request: %w", err)
+	}
+	convPayload["token"] = token
+
+	body, _ := json.Marshal(convPayload)
+
+	// OO container serves HTTPS; ensure we use https:// for the conversion API
+	ooBase := strings.TrimRight(s.cfg.OnlyOfficeURL, "/")
+	ooBase = strings.Replace(ooBase, "http://", "https://", 1)
+	convURL := ooBase + "/ConvertService.ashx"
+	req, err := http.NewRequest("POST", convURL, bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("failed to create conversion request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	ooClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+	resp, err := ooClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("conversion API call failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("conversion API returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		FileURL string `json:"fileUrl"`
+		Error   int    `json:"error"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to parse conversion response: %w", err)
+	}
+	if result.Error != 0 {
+		return "", fmt.Errorf("conversion error code: %d", result.Error)
+	}
+	if result.FileURL == "" {
+		return "", fmt.Errorf("conversion returned empty fileUrl")
+	}
+
+	logger.Info("OO conversion done", "from", fromExt, "to", toExt, "resultURL", result.FileURL)
+	return result.FileURL, nil
 }
 
 // resolveSharePathByUserID resolves a file path using user ID instead of session.
@@ -415,17 +526,20 @@ func (s *Server) handleFilesEdit(w http.ResponseWriter, r *http.Request) {
 
 // ooDocumentType returns the OnlyOffice document type for a file extension.
 // Returns "word", "cell", "slide", or "" if unsupported.
+// Only includes formats that support roundtrip (can be converted back via the
+// Conversion API after editing). Legacy formats (doc, xls, ppt) and formats
+// without output support (md, xml, etc.) are excluded.
 func ooDocumentType(ext string) string {
 	switch ext {
-	case "doc", "docm", "docx", "dot", "dotm", "dotx",
-		"epub", "fb2", "fodt", "htm", "html", "md",
-		"mht", "mhtml", "odt", "ott", "rtf", "stw", "sxw", "txt", "wps", "wpt", "xml":
+	case "docx", "docm", "dotx", "dotm",
+		"odt", "ott", "rtf", "txt",
+		"epub", "fb2", "htm", "html":
 		return "word"
-	case "csv", "et", "ett", "fods", "ods", "ots",
-		"sxc", "xls", "xlsb", "xlsm", "xlsx", "xltx":
+	case "xlsx", "xlsm", "xltx",
+		"ods", "ots", "csv":
 		return "cell"
-	case "dps", "dpt", "fodp", "odp", "otp",
-		"pot", "potm", "potx", "pps", "ppsm", "ppsx", "ppt", "pptm", "pptx", "sxi":
+	case "pptx", "pptm", "ppsx", "ppsm", "potx", "potm",
+		"odp", "otp":
 		return "slide"
 	default:
 		return ""

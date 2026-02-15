@@ -1270,6 +1270,7 @@
   "files.column.modified": "Modifié",
   "files.column.actions": "Actions",
   "files.action.download": "Télécharger",
+  "files.action.view": "Voir",
   "files.action.rename": "Renommer",
   "files.action.delete": "Supprimer",
   "files.upload": "Uploader",

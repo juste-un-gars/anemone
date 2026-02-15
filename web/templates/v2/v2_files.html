@@ -129,6 +129,11 @@
                             {{T $.Lang "files.action.edit"}}
                         </a>
                         {{end}}
+                        {{if IsViewable .Name}}
+                        <a href="/api/files/download?share={{$.CurrentShare}}&path={{.Path}}&inline=1" target="_blank" class="v2-btn" style="font-size:0.75rem;padding:0.25rem 0.5rem;background:rgba(139,92,246,0.12);color:#a78bfa;border:1px solid rgba(139,92,246,0.2);text-decoration:none;">
+                            {{T $.Lang "files.action.view"}}
+                        </a>
+                        {{end}}
                         <a href="/api/files/download?share={{$.CurrentShare}}&path={{.Path}}" class="v2-btn" style="font-size:0.75rem;padding:0.25rem 0.5rem;background:rgba(99,102,241,0.12);color:var(--info);border:1px solid rgba(99,102,241,0.2);text-decoration:none;">
                             {{T $.Lang "files.action.download"}}
                         </a>

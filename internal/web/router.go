@@ -192,13 +192,21 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	funcMap["IsOOEditable"] = func(filename string) bool {
 		ext := strings.ToLower(filepath.Ext(filename))
 		switch ext {
-		case ".doc", ".docm", ".docx", ".dot", ".dotm", ".dotx",
-			".epub", ".fb2", ".fodt", ".htm", ".html", ".md",
-			".mht", ".mhtml", ".odt", ".ott", ".rtf", ".stw", ".sxw", ".txt", ".wps", ".wpt", ".xml",
-			".csv", ".et", ".ett", ".fods", ".ods", ".ots",
-			".sxc", ".xls", ".xlsb", ".xlsm", ".xlsx", ".xltx",
-			".dps", ".dpt", ".fodp", ".odp", ".otp",
-			".pot", ".potm", ".potx", ".pps", ".ppsm", ".ppsx", ".ppt", ".pptm", ".pptx", ".sxi":
+		case ".docx", ".docm", ".dotx", ".dotm",
+			".odt", ".ott", ".rtf", ".txt",
+			".epub", ".fb2", ".htm", ".html",
+			".xlsx", ".xlsm", ".xltx",
+			".ods", ".ots", ".csv",
+			".pptx", ".pptm", ".ppsx", ".ppsm", ".potx", ".potm",
+			".odp", ".otp":
+			return true
+		}
+		return false
+	}
+	funcMap["IsViewable"] = func(filename string) bool {
+		ext := strings.ToLower(filepath.Ext(filename))
+		switch ext {
+		case ".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp":
 			return true
 		}
 		return false
