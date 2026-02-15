@@ -389,13 +389,31 @@ install_gcc() {
 }
 
 install_go() {
-    if command -v go &> /dev/null; then
-        GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
-        log_info "Go already installed: $GO_VERSION"
-        return
+    # Read minimum Go version from go.mod (e.g. "go 1.26" -> "1.26")
+    REQUIRED_GO=""
+    if [ -f "$INSTALL_DIR/go.mod" ]; then
+        REQUIRED_GO=$(grep '^go ' "$INSTALL_DIR/go.mod" | awk '{print $2}')
     fi
 
-    log_info "Installing Go..."
+    # Check if Go is already installed and meets the minimum version
+    if command -v go &> /dev/null; then
+        GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+        if [ -n "$REQUIRED_GO" ]; then
+            # Compare versions: check if installed >= required
+            GO_OK=$(printf '%s\n%s\n' "$REQUIRED_GO" "$GO_VERSION" | sort -V | head -n1)
+            if [ "$GO_OK" = "$REQUIRED_GO" ]; then
+                log_info "Go already installed ($GO_VERSION >= $REQUIRED_GO required)"
+                return
+            else
+                log_warn "Go $GO_VERSION is too old (need >= $REQUIRED_GO), upgrading..."
+            fi
+        else
+            log_info "Go already installed: $GO_VERSION"
+            return
+        fi
+    else
+        log_info "Installing Go..."
+    fi
 
     # Detect architecture
     ARCH=$(uname -m)
@@ -435,24 +453,24 @@ install_go() {
     tar -C /usr/local -xzf "$GO_TARBALL"
     rm "$GO_TARBALL"
 
-    # Configure PATH
+    # Configure PATH (prioritize /usr/local/go over distro package)
     cat > /etc/profile.d/go.sh <<'EOF'
-export PATH=$PATH:/usr/local/go/bin
+export PATH=/usr/local/go/bin:$PATH
 export GOPATH=$HOME/go
 export PATH=$PATH:$GOPATH/bin
 EOF
     chmod +x /etc/profile.d/go.sh
 
-    # Apply to current session
-    export PATH=$PATH:/usr/local/go/bin
+    # Apply to current session (prepend so /usr/local/go/bin wins over /usr/bin/go)
+    export PATH=/usr/local/go/bin:$PATH
     export GOPATH=$HOME/go
     export PATH=$PATH:$GOPATH/bin
 
-    if ! command -v go &> /dev/null; then
-        log_error "Failed to install Go"
+    if ! go version | grep -q "$LATEST_GO"; then
+        log_error "Failed to install Go (still using old version)"
         exit 1
     fi
-    log_info "Go installed"
+    log_info "Go installed: $(go version | awk '{print $3}')"
     cd "$INSTALL_DIR"
 }
 
