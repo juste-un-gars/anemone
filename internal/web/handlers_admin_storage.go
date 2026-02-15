@@ -32,7 +32,7 @@ func (s *Server) handleAdminStorage(w http.ResponseWriter, r *http.Request) {
 	// Get storage overview
 	overview, err := storage.GetStorageOverview()
 	if err != nil {
-		logger.Info("Error getting storage overview: %v", err)
+		logger.Info("Error getting storage overview", "error", err)
 		// Continue with empty overview
 		overview = &storage.StorageOverview{}
 	}
@@ -75,7 +75,7 @@ func (s *Server) handleAdminStorageAPI(w http.ResponseWriter, r *http.Request) {
 
 	overview, err := storage.GetStorageOverview()
 	if err != nil {
-		logger.Info("Error getting storage overview: %v", err)
+		logger.Info("Error getting storage overview", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -120,7 +120,7 @@ func (s *Server) handleAdminStoragePoolScrub(w http.ResponseWriter, r *http.Requ
 	}
 
 	if err != nil {
-		logger.Info("Error %sing scrub on pool %s: %v", action, poolName, err)
+		logger.Info("Error ing scrub on pool", "action", action, "pool_name", poolName, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -157,7 +157,7 @@ func (s *Server) handleAdminStorageDiskSMART(w http.ResponseWriter, r *http.Requ
 
 	smartInfo, err := storage.GetSMARTInfo(devicePath)
 	if err != nil {
-		logger.Info("Error getting SMART info for %s: %v", devicePath, err)
+		logger.Info("Error getting SMART info for", "device_path", devicePath, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -228,7 +228,7 @@ func (s *Server) handleAdminVerifyPassword(w http.ResponseWriter, r *http.Reques
 
 	token, err := verifier.VerifyPassword(s.db, session.UserID, req.Password, ip)
 	if err != nil {
-		logger.Info("Password verification failed for user %d from %s: %v", session.UserID, ip, err)
+		logger.Info("Password verification failed for user from", "user_id", session.UserID, "ip", ip, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
 		json.NewEncoder(w).Encode(map[string]interface{}{

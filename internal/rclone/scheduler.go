@@ -6,7 +6,6 @@ package rclone
 
 import (
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/juste-un-gars/anemone/internal/logger"
@@ -21,7 +20,7 @@ func CleanupStaleRunning(db *sql.DB) {
 		return
 	}
 	if rows, _ := result.RowsAffected(); rows > 0 {
-		logger.Info(fmt.Sprintf("Rclone: Reset %d stale running sync(s) from previous run", rows))
+		logger.Info("Rclone: Reset stale running sync(s) from previous run", "rows", rows)
 	}
 }
 
@@ -36,7 +35,7 @@ func checkStaleRunning(db *sql.DB) {
 			continue
 		}
 		if !IsBackupSyncing(b.ID) {
-			logger.Info(fmt.Sprintf("Rclone: Detected stale running status for '%s' (no active process), marking as error", b.Name))
+			logger.Info("Rclone: Detected stale running status for '' (no active process), marking as error", "name", b.Name)
 			UpdateSyncStatus(db, b.ID, "error", "sync process terminated unexpectedly", 0, 0)
 		}
 	}
@@ -66,7 +65,7 @@ func StartScheduler(db *sql.DB, dataDir string) {
 			// Get all enabled rclone backups
 			backups, err := GetEnabled(db)
 			if err != nil {
-				logger.Info(fmt.Sprintf("Rclone Scheduler: Failed to get backups: %v", err))
+				logger.Info("Rclone Scheduler: Failed to get backups", "error", err)
 				continue
 			}
 
@@ -82,22 +81,19 @@ func StartScheduler(db *sql.DB, dataDir string) {
 					continue
 				}
 
-				logger.Info(fmt.Sprintf("Rclone Scheduler: Triggering sync for '%s' (frequency: %s)...",
-					backup.Name, backup.SyncFrequency))
+				logger.Info("Rclone Scheduler: Triggering sync for '' (frequency: )...", "name", backup.Name, "sync_frequency", backup.SyncFrequency)
 
 				// Perform sync in a goroutine so we don't block other backups
 				go func(b *RcloneBackup) {
 					result, syncErr := Sync(db, b, dataDir)
 
 					if syncErr != nil {
-						logger.Info(fmt.Sprintf("Rclone Scheduler: Sync to %s failed: %v", b.Name, syncErr))
+						logger.Info("Rclone Scheduler: Sync to failed", "name", b.Name, "sync_err", syncErr)
 					} else if result != nil {
 						if len(result.Errors) > 0 {
-							logger.Info(fmt.Sprintf("Rclone Scheduler: Sync to %s completed with errors - Files: %d, Errors: %d",
-								b.Name, result.FilesTransferred, len(result.Errors)))
+							logger.Info("Rclone Scheduler: Sync to completed with errors - Files: , Errors", "name", b.Name, "files_transferred", result.FilesTransferred, "errors", len(result.Errors))
 						} else {
-							logger.Info(fmt.Sprintf("Rclone Scheduler: Sync to %s completed - Files: %d, %s",
-								b.Name, result.FilesTransferred, FormatBytes(result.BytesTransferred)))
+							logger.Info("Rclone Scheduler: Sync to completed - Files:", "name", b.Name, "files_transferred", result.FilesTransferred, "bytes_transferred", FormatBytes(result.BytesTransferred))
 						}
 					}
 				}(backup)

@@ -57,15 +57,15 @@ func checkForUpdates(db *sql.DB) {
 
 	// Save to database
 	if err := SaveUpdateInfo(db, info); err != nil {
-		logger.Info("⚠️  Failed to save update info: %v", err)
+		logger.Info("Failed to save update info", "error", err)
 		return
 	}
 
 	// Log result
 	if info.Available {
-		logger.Info("🎉 New version available: %s → %s", info.CurrentVersion, info.LatestVersion)
-		logger.Info("📦 Release URL: %s", info.ReleaseURL)
+		logger.Info("New version available:", "current_version", info.CurrentVersion, "latest_version", info.LatestVersion)
+		logger.Info("Release URL", "release_url", info.ReleaseURL)
 	} else {
-		logger.Info("✅ You are running the latest version (%s)", info.CurrentVersion)
+		logger.Info("You are running the latest version", "current_version", info.CurrentVersion)
 	}
 }

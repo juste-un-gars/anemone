@@ -47,7 +47,7 @@ func PerformAutoUpdate(targetVersion string) error {
 		return fmt.Errorf("failed to start auto-update script: %w", err)
 	}
 
-	logger.Info("🚀 Auto-update process started (PID: %d)", cmd.Process.Pid)
+	logger.Info("Auto-update process started", "pid", cmd.Process.Pid)
 	logger.Info("📝 Update log: /tmp/anemone-update.log")
 
 	// Don't wait for the command to finish - let it run independently

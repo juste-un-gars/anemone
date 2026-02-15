@@ -36,10 +36,10 @@ func main() {
 	sharesDir := filepath.Join(*dataDir, "shares")
 
 	logger.Info("🪸 Anemone Share Migration Tool")
-	logger.Info("Data dir: %s", *dataDir)
-	logger.Info("Database: %s", dbPath)
-	logger.Info("Shares dir: %s", sharesDir)
-	logger.Info("Dry run: %v", *dryRun)
+	logger.Info("Data dir", "data_dir", *dataDir)
+	logger.Info("Database", "db_path", dbPath)
+	logger.Info("Shares dir", "shares_dir", sharesDir)
+	logger.Info("Dry run", "dry_run", *dryRun)
 	logger.Info("")
 
 	// Open database
@@ -69,7 +69,7 @@ func main() {
 		return
 	}
 
-	logger.Info("Found %d shares to process\n", len(allShares))
+	logger.Info("Found shares to process", "all_shares", len(allShares))
 
 	successCount := 0
 	skipCount := 0
@@ -77,13 +77,13 @@ func main() {
 
 	for _, share := range allShares {
 		logger.Info("\n---")
-		logger.Info("Processing share: %s (ID: %d, User ID: %d)", share.Name, share.ID, share.UserID)
-		logger.Info("  Path: %s", share.Path)
+		logger.Info("Processing share", "name", share.Name, "id", share.ID, "user_id", share.UserID)
+		logger.Info("Path", "path", share.Path)
 
 		// Get user info for quota
 		user, err := users.GetByID(db, share.UserID)
 		if err != nil {
-			logger.Info("  ❌ ERROR: Failed to get user info: %v", err)
+			logger.Info("ERROR: Failed to get user info", "error", err)
 			errorCount++
 			continue
 		}
@@ -100,7 +100,7 @@ func main() {
 			}
 		}
 
-		logger.Info("  User: %s (Quota: %dGB)", user.Username, quotaGB)
+		logger.Info("User: (Quota: GB)", "username", user.Username, "quota_gb", quotaGB)
 
 		// Check if path exists
 		info, err := os.Stat(share.Path)
@@ -110,7 +110,7 @@ func main() {
 				skipCount++
 				continue
 			}
-			logger.Info("  ❌ ERROR: Failed to stat path: %v", err)
+			logger.Info("ERROR: Failed to stat path", "error", err)
 			errorCount++
 			continue
 		}
@@ -131,9 +131,9 @@ func main() {
 
 		if *dryRun {
 			if isSubvol {
-				logger.Info("  [DRY RUN] Would update quota to %dGB", quotaGB)
+				logger.Info("[DRY RUN] Would update quota to GB", "quota_gb", quotaGB)
 			} else {
-				logger.Info("  [DRY RUN] Would migrate to subvolume with %dGB quota", quotaGB)
+				logger.Info("[DRY RUN] Would migrate to subvolume with GB quota", "quota_gb", quotaGB)
 			}
 			successCount++
 			continue
@@ -142,29 +142,29 @@ func main() {
 		// Perform migration
 		if isSubvol {
 			// Just update quota
-			logger.Info("  🔄 Updating quota to %dGB...", quotaGB)
+			logger.Info("Updating quota to GB...", "quota_gb", quotaGB)
 			if err := qm.UpdateQuota(share.Path, quotaGB); err != nil {
-				logger.Info("  ❌ ERROR: Failed to update quota: %v", err)
+				logger.Info("ERROR: Failed to update quota", "error", err)
 				errorCount++
 				continue
 			}
 			logger.Info("  ✅ Quota updated successfully")
 		} else {
 			// Full migration: regular dir → subvolume with quota
-			logger.Info("  🔄 Migrating to subvolume with %dGB quota...", quotaGB)
+			logger.Info("Migrating to subvolume with GB quota...", "quota_gb", quotaGB)
 
 			backupPath := share.Path + ".backup"
 
 			// Step 1: Rename original directory to .backup
 			if err := os.Rename(share.Path, backupPath); err != nil {
-				logger.Info("  ❌ ERROR: Failed to rename original: %v", err)
+				logger.Info("ERROR: Failed to rename original", "error", err)
 				errorCount++
 				continue
 			}
 
 			// Step 2: Create subvolume with quota (no owner - will be set by cp -a)
 			if err := qm.CreateQuotaDir(share.Path, quotaGB, ""); err != nil {
-				logger.Info("  ❌ ERROR: Failed to create subvolume: %v", err)
+				logger.Info("ERROR: Failed to create subvolume", "error", err)
 				// Rollback
 				os.Rename(backupPath, share.Path)
 				errorCount++
@@ -175,7 +175,7 @@ func main() {
 			logger.Info("  📦 Copying data...")
 			cmd := exec.Command("cp", "-a", backupPath+"/.", share.Path+"/")
 			if output, err := cmd.CombinedOutput(); err != nil {
-				logger.Info("  ❌ ERROR: Failed to copy data: %v\nOutput: %s", err, output)
+				logger.Info("ERROR: Failed to copy data: \nOutput", "error", err, "output", output)
 				// Rollback
 				qm.RemoveQuotaDir(share.Path)
 				os.Rename(backupPath, share.Path)
@@ -186,12 +186,12 @@ func main() {
 			// Step 4: Verify ownership
 			cmd = exec.Command("sudo", "/usr/bin/chown", "-R", fmt.Sprintf("%s:%s", user.Username, user.Username), share.Path)
 			if err := cmd.Run(); err != nil {
-				logger.Info("  ⚠️  WARNING: Failed to set ownership: %v", err)
+				logger.Info("WARNING: Failed to set ownership", "error", err)
 			}
 
 			// Step 5: Keep backup for safety
-			logger.Info("  💾 Original data backed up to: %s", backupPath)
-			logger.Info("  ⚠️  IMPORTANT: Verify the share works, then manually remove: sudo rm -rf %s", backupPath)
+			logger.Info("Original data backed up to", "backup_path", backupPath)
+			logger.Info("IMPORTANT: Verify the share works, then manually remove: sudo rm -rf", "backup_path", backupPath)
 
 			logger.Info("  ✅ Migration completed successfully")
 		}
@@ -202,9 +202,9 @@ func main() {
 	// Summary
 	logger.Info("\n" + strings.Repeat("=", 50))
 	logger.Info("Migration Summary:")
-	logger.Info("  ✅ Success: %d", successCount)
-	logger.Info("  ⏭️  Skipped: %d", skipCount)
-	logger.Info("  ❌ Errors: %d", errorCount)
+	logger.Info("Success", "success_count", successCount)
+	logger.Info("Skipped", "skip_count", skipCount)
+	logger.Info("Errors", "error_count", errorCount)
 	logger.Info(strings.Repeat("=", 50))
 
 	if *dryRun {
@@ -215,7 +215,7 @@ func main() {
 		logger.Info("\nNext steps:")
 		logger.Info("  1. Test SMB access to verify shares work correctly")
 		logger.Info("  2. Once verified, remove backup directories:")
-		logger.Info("     sudo rm -rf %s/*/.backup", sharesDir)
+		logger.Info("sudo rm -rf /*/.backup", "shares_dir", sharesDir)
 	}
 }
 

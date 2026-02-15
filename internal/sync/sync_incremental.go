@@ -87,7 +87,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		// Use configured timeout
 		timeoutDuration := time.Duration(req.PeerTimeoutHours) * time.Hour
 		ctx, cancel = context.WithTimeout(context.Background(), timeoutDuration)
-		logger.Info("⏱️  Sync timeout: %d hours", req.PeerTimeoutHours)
+		logger.Info("Sync timeout configured", "hours", req.PeerTimeoutHours)
 	} else {
 		// No timeout (0 = disabled)
 		ctx, cancel = context.WithCancel(context.Background())
@@ -222,19 +222,18 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	}
 
 	// Debug log for manifests
-	logger.Info("📊 Sync user %d to peer %d:", req.UserID, req.PeerID)
-	logger.Info("   Local manifest has %d files", len(localManifest.Files))
+	logger.Info("Sync started", "user_id", req.UserID, "peer_id", req.PeerID)
+	logger.Info("Local manifest loaded", "file_count", len(localManifest.Files))
 	if remoteManifest != nil {
-		logger.Info("   Remote manifest has %d files", len(remoteManifest.Files))
+		logger.Info("Remote manifest loaded", "file_count", len(remoteManifest.Files))
 	} else {
 		logger.Info("   Remote manifest is nil (first sync)")
 	}
 
 	// Debug log for delta
-	logger.Info("   Delta: %d to add, %d to update, %d to delete",
-		len(delta.ToAdd), len(delta.ToUpdate), len(delta.ToDelete))
+	logger.Info("Sync delta computed", "to_add", len(delta.ToAdd), "to_update", len(delta.ToUpdate), "to_delete", len(delta.ToDelete))
 	if len(delta.ToDelete) > 0 {
-		logger.Info("🗑️  Files to delete: %v", delta.ToDelete)
+		logger.Info("Files to delete", "to_delete", delta.ToDelete)
 	}
 
 	// Create progress manifest - starts as copy of remote (or new if remote is nil)
@@ -259,9 +258,9 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	defer func() {
 		if syncErr != nil && uploadedCount > 0 {
 			// Save progress manifest to enable resumable sync
-			logger.Info("⚠️  Sync error occurred after uploading %d files - saving progress manifest for resumable sync", uploadedCount)
+			logger.Info("Sync error occurred after uploading files - saving progress manifest for resumable sync", "uploaded_count", uploadedCount)
 			if manifestErr := uploadManifestToRemote(ctx, client, req, progressManifest, shareName, encryptionKey); manifestErr != nil {
-				logger.Info("❌ Failed to save progress manifest: %v", manifestErr)
+				logger.Info("Failed to save progress manifest", "manifest_err", manifestErr)
 			} else {
 				logger.Info("✅ Progress manifest saved successfully - next sync will resume from here")
 			}
@@ -276,7 +275,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	lastLoggedCount := 0
 
 	if totalFiles > 0 {
-		logger.Info("📤 Starting upload: %d files to sync", totalFiles)
+		logger.Info("Starting upload", "total_files", totalFiles)
 	}
 
 	for _, relativePath := range filesToUpload {
@@ -312,9 +311,9 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 
 		// Save progress manifest every 500 files (checkpoint for resumable sync)
 		if uploadedCount%500 == 0 {
-			logger.Info("💾 Checkpoint: saving progress manifest after %d files...", uploadedCount)
+			logger.Info("Checkpoint: saving progress manifest after files...", "uploaded_count", uploadedCount)
 			if manifestErr := uploadManifestToRemote(ctx, client, req, progressManifest, shareName, encryptionKey); manifestErr != nil {
-				logger.Info("⚠️  Warning: failed to save progress manifest checkpoint: %v", manifestErr)
+				logger.Info("Warning: failed to save progress manifest checkpoint", "manifest_err", manifestErr)
 			} else {
 				logger.Info("✅ Progress manifest checkpoint saved successfully")
 			}
@@ -323,7 +322,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		// Log progress every 100 files
 		if uploadedCount-lastLoggedCount >= 100 {
 			percentage := (uploadedCount * 100) / totalFiles
-			logger.Info("   📊 Upload progress: %d/%d files (%d%%)", uploadedCount, totalFiles, percentage)
+			logger.Info("Upload progress: / files (%%)", "uploaded_count", uploadedCount, "total_files", totalFiles, "percentage", percentage)
 			lastLoggedCount = uploadedCount
 		}
 	}
@@ -367,7 +366,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		// Remove deleted file from progress manifest
 		delete(progressManifest.Files, relativePath)
 
-		logger.Info("✅ Deleted obsolete file on peer: %s (encrypted: %s)", relativePath, remoteMeta.EncryptedPath)
+		logger.Info("Deleted obsolete file on peer", "relative_path", relativePath, "encrypted_path", remoteMeta.EncryptedPath)
 	}
 
 	// Save final progress manifest (reflects actual state on peer)
@@ -383,7 +382,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	// Cleanup orphaned files on peer (files that exist physically but not in manifest)
 	if err := cleanupOrphanedFiles(ctx, client, req, localManifest, shareName); err != nil {
 		// Log error but don't fail the sync - cleanup is best-effort
-		logger.Info("⚠️  Warning: Failed to cleanup orphaned files: %v", err)
+		logger.Info("Warning: Failed to cleanup orphaned files", "error", err)
 	}
 
 	// Upload source server info (unencrypted metadata for display purposes)
@@ -410,7 +409,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	// Log final upload stats
 	if totalFiles > 0 {
 		gbSynced := float64(totalBytes) / 1024.0 / 1024.0 / 1024.0
-		logger.Info("✅ Upload complete: %d files, %.2f GB synced", totalFiles, gbSynced)
+		logger.Info("Upload complete: files, GB synced", "total_files", totalFiles, "gb_synced", gbSynced)
 	} else {
 		logger.Info("✅ Sync complete: No changes detected")
 	}
@@ -483,7 +482,7 @@ func cleanupOrphanedFiles(ctx context.Context, client *http.Client, req *SyncReq
 
 	// Delete orphaned files
 	if len(orphanedFiles) > 0 {
-		logger.Info("🧹 Found %d orphaned file(s) to clean up on peer", len(orphanedFiles))
+		logger.Info("Found orphaned file(s) to clean up on peer", "orphaned_files", len(orphanedFiles))
 
 		for _, orphanedFile := range orphanedFiles {
 			deleteURL := fmt.Sprintf("https://%s:%d/api/sync/file?source_server=%s&user_id=%d&share_name=%s&path=%s",
@@ -491,7 +490,7 @@ func cleanupOrphanedFiles(ctx context.Context, client *http.Client, req *SyncReq
 
 			deleteReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, deleteURL, nil)
 			if err != nil {
-				logger.Info("⚠️  Failed to create delete request for orphaned file %s: %v", orphanedFile, err)
+				logger.Info("Failed to create delete request for orphaned file", "orphaned_file", orphanedFile, "error", err)
 				continue
 			}
 
@@ -502,17 +501,17 @@ func cleanupOrphanedFiles(ctx context.Context, client *http.Client, req *SyncReq
 
 			resp, err := client.Do(deleteReq)
 			if err != nil {
-				logger.Info("⚠️  Failed to delete orphaned file %s: %v", orphanedFile, err)
+				logger.Info("Failed to delete orphaned file", "orphaned_file", orphanedFile, "error", err)
 				continue
 			}
 			resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
-				logger.Info("⚠️  Failed to delete orphaned file %s: status %d", orphanedFile, resp.StatusCode)
+				logger.Info("Failed to delete orphaned file", "orphaned_file", orphanedFile, "status_code", resp.StatusCode)
 				continue
 			}
 
-			logger.Info("✅ Deleted orphaned file: %s", orphanedFile)
+			logger.Info("Deleted orphaned file", "orphaned_file", orphanedFile)
 		}
 	}
 

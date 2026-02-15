@@ -85,11 +85,11 @@ func SyncConfig(db *sql.DB, backup *USBBackup, configInfo *ConfigBackupInfo, mas
 		bytesCopied, err := copyFileEncrypted(configInfo.DBPath, dbDest, masterKey)
 		if err != nil {
 			result.Errors = append(result.Errors, fmt.Sprintf("database: %v", err))
-			logger.Info("⚠️  USB backup: failed to backup database: %v", err)
+			logger.Info("USB backup: failed to backup database", "error", err)
 		} else {
 			result.FilesAdded++
 			result.BytesSynced += bytesCopied
-			logger.Info("✅ USB backup: database backed up (%s)", FormatBytes(bytesCopied))
+			logger.Info("USB backup: database backed up", "bytes_copied", FormatBytes(bytesCopied))
 		}
 	}
 
@@ -131,7 +131,7 @@ func SyncConfig(db *sql.DB, backup *USBBackup, configInfo *ConfigBackupInfo, mas
 			bytesCopied, err := copyFileEncrypted(configInfo.SMBConf, smbDest, masterKey)
 			if err != nil {
 				result.Errors = append(result.Errors, fmt.Sprintf("smb.conf: %v", err))
-				logger.Info("⚠️  USB backup: failed to backup smb.conf: %v", err)
+				logger.Info("USB backup: failed to backup smb.conf", "error", err)
 			} else {
 				result.FilesAdded++
 				result.BytesSynced += bytesCopied
@@ -161,7 +161,7 @@ func SyncConfig(db *sql.DB, backup *USBBackup, configInfo *ConfigBackupInfo, mas
 		UpdateSyncStatus(db, backup.ID, "success", "", result.FilesAdded, result.BytesSynced)
 	}
 
-	logger.Info("📦 USB config backup completed: %d files, %s", result.FilesAdded, FormatBytes(result.BytesSynced))
+	logger.Info("USB config backup completed: files", "files_added", result.FilesAdded, "bytes_synced", FormatBytes(result.BytesSynced))
 	return result, nil
 }
 
@@ -207,13 +207,13 @@ func SyncAllShares(db *sql.DB, backup *USBBackup, masterKey string, serverName s
 			continue
 		}
 
-		logger.Info("📂 USB backup: syncing share %s (ID: %d)", share.Name, share.ID)
+		logger.Info("USB backup: syncing share", "name", share.Name, "id", share.ID)
 
 		shareResult, err := syncShare(db, backup, share, masterKey, serverName)
 		if err != nil {
 			errMsg := fmt.Sprintf("share %s: %v", share.Name, err)
 			result.Errors = append(result.Errors, errMsg)
-			logger.Info("⚠️  USB backup error for share %s: %v", share.Name, err)
+			logger.Info("USB backup error for share", "name", share.Name, "error", err)
 			continue
 		}
 
@@ -233,8 +233,7 @@ func SyncAllShares(db *sql.DB, backup *USBBackup, masterKey string, serverName s
 		UpdateSyncStatus(db, backup.ID, "success", "", totalFiles, result.BytesSynced)
 	}
 
-	logger.Info("📦 USB backup completed: %d shares, %d files, %s",
-		sharesBackedUp, totalFiles, FormatBytes(result.BytesSynced))
+	logger.Info("USB backup completed: shares, files", "shares_backed_up", sharesBackedUp, "total_files", totalFiles, "bytes_synced", FormatBytes(result.BytesSynced))
 
 	return result, nil
 }
@@ -258,15 +257,14 @@ func syncShare(db *sql.DB, backup *USBBackup, share *shares.Share, masterKey str
 	// Load remote manifest from USB
 	remoteManifest, err := loadManifest(destDir)
 	if err != nil {
-		logger.Info("📦 No existing manifest on USB for %s, full backup needed", share.Name)
+		logger.Info("No existing manifest on USB for , full backup needed", "name", share.Name)
 		remoteManifest = &BackupManifest{Files: make(map[string]FileMetadata)}
 	}
 
 	// Calculate delta
 	toAdd, toUpdate, toDelete := compareManifests(localManifest, remoteManifest)
 
-	logger.Info("📊 Share %s: %d to add, %d to update, %d to delete",
-		share.Name, len(toAdd), len(toUpdate), len(toDelete))
+	logger.Info("Share sync delta", "name", share.Name, "to_add", len(toAdd), "to_update", len(toUpdate), "to_delete", len(toDelete))
 
 	// Copy new and updated files (encrypted)
 	for _, relPath := range append(toAdd, toUpdate...) {

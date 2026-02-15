@@ -29,7 +29,7 @@ func StartScheduler(db *sql.DB, dataDir string) {
 			// Get all enabled USB backups
 			backups, err := GetEnabled(db)
 			if err != nil {
-				logger.Info("⚠️  USB Scheduler: Failed to get backups: %v", err)
+				logger.Info("USB Scheduler: Failed to get backups", "error", err)
 				continue
 			}
 
@@ -40,12 +40,12 @@ func StartScheduler(db *sql.DB, dataDir string) {
 					continue
 				}
 
-				logger.Info("🔄 USB Scheduler: Triggering sync for '%s' (frequency: %s)...", backup.Name, backup.SyncFrequency)
+				logger.Info("USB Scheduler: Triggering sync for '' (frequency: )...", "name", backup.Name, "sync_frequency", backup.SyncFrequency)
 
 				// Get master key
 				var masterKey string
 				if err := db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
-					logger.Info("⚠️  USB Scheduler: Failed to get master key: %v", err)
+					logger.Info("USB Scheduler: Failed to get master key", "error", err)
 					continue
 				}
 
@@ -82,14 +82,12 @@ func StartScheduler(db *sql.DB, dataDir string) {
 
 				// Log results
 				if syncErr != nil {
-					logger.Info("⚠️  USB Scheduler: Sync to %s failed: %v", backup.Name, syncErr)
+					logger.Info("USB Scheduler: Sync to failed", "name", backup.Name, "sync_err", syncErr)
 				} else if result != nil {
 					if len(result.Errors) > 0 {
-						logger.Info("⚠️  USB Scheduler: Sync to %s completed with errors - Added: %d, Updated: %d, Deleted: %d, Errors: %d",
-							backup.Name, result.FilesAdded, result.FilesUpdated, result.FilesDeleted, len(result.Errors))
+						logger.Info("USB Scheduler: Sync to completed with errors - Added: , Updated: , Deleted: , Errors", "name", backup.Name, "files_added", result.FilesAdded, "files_updated", result.FilesUpdated, "files_deleted", result.FilesDeleted, "errors", len(result.Errors))
 					} else {
-						logger.Info("✅ USB Scheduler: Sync to %s completed - Added: %d, Updated: %d, Deleted: %d, %s",
-							backup.Name, result.FilesAdded, result.FilesUpdated, result.FilesDeleted, FormatBytes(result.BytesSynced))
+						logger.Info("USB Scheduler: Sync to completed - Added: , Updated: , Deleted:", "name", backup.Name, "files_added", result.FilesAdded, "files_updated", result.FilesUpdated, "files_deleted", result.FilesDeleted, "bytes_synced", FormatBytes(result.BytesSynced))
 					}
 				}
 			}

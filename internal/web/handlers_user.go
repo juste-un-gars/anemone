@@ -61,7 +61,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		var err error
 		updateInfo, err = updater.GetUpdateInfo(s.db)
 		if err != nil {
-			logger.Info("Warning: Failed to get update info: %v", err)
+			logger.Info("Warning: Failed to get update info", "error", err)
 			// Continue without update info rather than failing
 		}
 	}
@@ -84,7 +84,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 
 		tmpl := s.loadV2Page("v2_dashboard.html", s.funcMap)
 		if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
-			logger.Info("Error rendering v2 dashboard: %v", err)
+			logger.Info("Error rendering v2 dashboard", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 		return
@@ -125,7 +125,7 @@ func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
 	// Get user info
 	user, err := users.GetByID(s.db, session.UserID)
 	if err != nil {
-		logger.Info("Error getting user: %v", err)
+		logger.Info("Error getting user", "error", err)
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
@@ -133,7 +133,7 @@ func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
 	// Get user's shares
 	userShares, err := shares.GetByUser(s.db, session.UserID)
 	if err != nil {
-		logger.Info("Error getting shares: %v", err)
+		logger.Info("Error getting shares", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -148,7 +148,7 @@ func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
 	for _, share := range userShares {
 		items, err := trash.ListTrashItems(share.Path, user.Username)
 		if err != nil {
-			logger.Info("Error listing trash for share %s: %v", share.Name, err)
+			logger.Info("Error listing trash for share", "name", share.Name, "error", err)
 			continue
 		}
 
@@ -175,7 +175,7 @@ func (s *Server) handleTrash(w http.ResponseWriter, r *http.Request) {
 
 	tmpl := s.loadV2UserPage("v2_trash.html", s.funcMap)
 	if err := tmpl.ExecuteTemplate(w, "v2_base_user", data); err != nil {
-		logger.Info("Error rendering v2 trash template: %v", err)
+		logger.Info("Error rendering v2 trash template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -239,32 +239,32 @@ func (s *Server) handleTrashActions(w http.ResponseWriter, r *http.Request) {
 	case "restore":
 		err = trash.RestoreItem(targetShare.Path, user.Username, relPath)
 		if err != nil {
-			logger.Info("Error restoring item: %v", err)
+			logger.Info("Error restoring item", "error", err)
 			http.Error(w, fmt.Sprintf("Failed to restore: %v", err), http.StatusInternalServerError)
 			return
 		}
-		logger.Info("User %s restored file: %s from %s", user.Username, relPath, shareName)
+		logger.Info("User restored file: from", "username", user.Username, "rel_path", relPath, "share_name", shareName)
 		w.WriteHeader(http.StatusOK)
 
 	case "delete":
 		err = trash.DeleteItem(targetShare.Path, user.Username, relPath)
 		if err != nil {
-			logger.Info("Error deleting item: %v", err)
+			logger.Info("Error deleting item", "error", err)
 			http.Error(w, fmt.Sprintf("Failed to delete: %v", err), http.StatusInternalServerError)
 			return
 		}
-		logger.Info("User %s permanently deleted file: %s from %s", user.Username, relPath, shareName)
+		logger.Info("User permanently deleted file: from", "username", user.Username, "rel_path", relPath, "share_name", shareName)
 		w.WriteHeader(http.StatusOK)
 
 	case "empty":
 		// Empty entire trash for this share
 		err = trash.EmptyTrash(targetShare.Path, user.Username)
 		if err != nil {
-			logger.Info("Error emptying trash: %v", err)
+			logger.Info("Error emptying trash", "error", err)
 			http.Error(w, fmt.Sprintf("Failed to empty trash: %v", err), http.StatusInternalServerError)
 			return
 		}
-		logger.Info("User %s emptied trash for share %s", user.Username, shareName)
+		logger.Info("User emptied trash for share", "username", user.Username, "share_name", shareName)
 		w.WriteHeader(http.StatusOK)
 
 	default:
@@ -284,7 +284,7 @@ func (s *Server) handleAdminShares(w http.ResponseWriter, r *http.Request) {
 	// Get all shares
 	allShares, err := shares.GetAll(s.db)
 	if err != nil {
-		logger.Info("Error getting shares: %v", err)
+		logger.Info("Error getting shares", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -312,7 +312,7 @@ func (s *Server) handleAdminShares(w http.ResponseWriter, r *http.Request) {
 
 	tmpl := s.loadV2Page("v2_shares.html", s.funcMap)
 	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
-		logger.Info("Error rendering shares template: %v", err)
+		logger.Info("Error rendering shares template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -342,7 +342,7 @@ func (s *Server) handleSyncShare(w http.ResponseWriter, r *http.Request) {
 	// Get share
 	share, err := shares.GetByID(s.db, shareID)
 	if err != nil {
-		logger.Info("Error getting share: %v", err)
+		logger.Info("Error getting share", "error", err)
 		http.Error(w, "Share not found", http.StatusNotFound)
 		return
 	}
@@ -364,7 +364,7 @@ func (s *Server) handleSyncShare(w http.ResponseWriter, r *http.Request) {
 	// Get all enabled peers
 	allPeers, err := peers.GetAll(s.db)
 	if err != nil {
-		logger.Info("Error getting peers: %v", err)
+		logger.Info("Error getting peers", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -386,7 +386,7 @@ func (s *Server) handleSyncShare(w http.ResponseWriter, r *http.Request) {
 	// Get server name for manifest identification
 	serverName, err := sync.GetServerName(s.db)
 	if err != nil {
-		logger.Info("Error getting server name: %v", err)
+		logger.Info("Error getting server name", "error", err)
 		http.Error(w, "Failed to get server name", http.StatusInternalServerError)
 		return
 	}
@@ -413,10 +413,10 @@ func (s *Server) handleSyncShare(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errorCount++
 			lastError = err.Error()
-			logger.Info("Error syncing to peer %s: %v", peer.Name, err)
+			logger.Info("Error syncing to peer", "name", peer.Name, "error", err)
 		} else {
 			successCount++
-			logger.Info("Successfully synced share %d to peer %s (incremental)", shareID, peer.Name)
+			logger.Info("Successfully synced share to peer (incremental)", "share_id", shareID, "name", peer.Name)
 		}
 	}
 
@@ -461,7 +461,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 
 	tmpl := s.loadV2UserPage("v2_settings_user.html", s.funcMap)
 	if err := tmpl.ExecuteTemplate(w, "v2_base_user", data); err != nil {
-		logger.Info("Error rendering v2 settings template: %v", err)
+		logger.Info("Error rendering v2 settings template", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -485,7 +485,7 @@ func (s *Server) handleSettingsLanguage(w http.ResponseWriter, r *http.Request) 
 
 	// Update user language in database
 	if err := users.UpdateUserLanguage(s.db, session.UserID, language); err != nil {
-		logger.Info("Error updating user language: %v", err)
+		logger.Info("Error updating user language", "error", err)
 		http.Redirect(w, r, "/settings?error=Failed+to+update+language", http.StatusSeeOther)
 		return
 	}
@@ -537,14 +537,14 @@ func (s *Server) handleSettingsPassword(w http.ResponseWriter, r *http.Request) 
 	var masterKey string
 	err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
 	if err != nil {
-		logger.Info("Error getting master key: %v", err)
+		logger.Info("Error getting master key", "error", err)
 		http.Redirect(w, r, "/settings?error=System+configuration+error", http.StatusSeeOther)
 		return
 	}
 
 	// Change password (DB + SMB)
 	if err := users.ChangePassword(s.db, session.UserID, currentPassword, newPassword, masterKey); err != nil {
-		logger.Info("Error changing password for user %d: %v", session.UserID, err)
+		logger.Info("Error changing password for user", "user_id", session.UserID, "error", err)
 
 		// Check for specific error messages
 		errMsg := err.Error()
@@ -574,7 +574,7 @@ func (s *Server) handleAdminUserQuota(w http.ResponseWriter, r *http.Request, us
 		// Display quota edit form
 		user, err := users.GetByID(s.db, userID)
 		if err != nil {
-			logger.Info("Error getting user: %v", err)
+			logger.Info("Error getting user", "error", err)
 			http.NotFound(w, r)
 			return
 		}
@@ -582,7 +582,7 @@ func (s *Server) handleAdminUserQuota(w http.ResponseWriter, r *http.Request, us
 		// Get quota info
 		quotaInfo, err := quota.GetUserQuota(s.db, userID)
 		if err != nil {
-			logger.Info("Error getting quota info: %v", err)
+			logger.Info("Error getting quota info", "error", err)
 			http.Error(w, "Failed to get quota information", http.StatusInternalServerError)
 			return
 		}
@@ -604,7 +604,7 @@ func (s *Server) handleAdminUserQuota(w http.ResponseWriter, r *http.Request, us
 
 		tmpl := s.loadV2Page("v2_users_quota.html", s.funcMap)
 		if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
-			logger.Info("Error rendering quota template: %v", err)
+			logger.Info("Error rendering quota template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -633,7 +633,7 @@ func (s *Server) handleAdminUserQuota(w http.ResponseWriter, r *http.Request, us
 
 		// Update quota in database
 		if err := quota.UpdateUserQuota(s.db, userID, quotaTotalGB, quotaBackupGB); err != nil {
-			logger.Info("Error updating quota: %v", err)
+			logger.Info("Error updating quota", "error", err)
 			http.Error(w, "Failed to update quota", http.StatusInternalServerError)
 			return
 		}
@@ -649,24 +649,23 @@ func (s *Server) handleAdminUserQuota(w http.ResponseWriter, r *http.Request, us
 			if err == nil {
 				// Update backup quota
 				if err := qm.UpdateQuota(backupPath, quotaBackupGB); err != nil {
-					logger.Info("Warning: Failed to update Btrfs quota for backup: %v", err)
+					logger.Info("Warning: Failed to update Btrfs quota for backup", "error", err)
 				} else {
-					logger.Info("Updated Btrfs quota for %s: %dGB", backupPath, quotaBackupGB)
+					logger.Info("Updated Btrfs quota for : GB", "backup_path", backupPath, "quota_backup_gb", quotaBackupGB)
 				}
 
 				// Update data quota
 				if err := qm.UpdateQuota(dataPath, quotaDataGB); err != nil {
-					logger.Info("Warning: Failed to update Btrfs quota for data: %v", err)
+					logger.Info("Warning: Failed to update Btrfs quota for data", "error", err)
 				} else {
-					logger.Info("Updated Btrfs quota for %s: %dGB", dataPath, quotaDataGB)
+					logger.Info("Updated Btrfs quota for : GB", "data_path", dataPath, "quota_data_gb", quotaDataGB)
 				}
 			} else {
-				logger.Info("Warning: Failed to initialize quota manager: %v", err)
+				logger.Info("Warning: Failed to initialize quota manager", "error", err)
 			}
 		}
 
-		logger.Info("Admin %s updated quotas for user %d: backup=%dGB, data=%dGB, total=%dGB",
-			session.Username, userID, quotaBackupGB, quotaDataGB, quotaTotalGB)
+		logger.Info("Admin updated quotas for user : backup=GB, data=GB, total=GB", "username", session.Username, "user_id", userID, "quota_backup_gb", quotaBackupGB, "quota_data_gb", quotaDataGB, "quota_total_gb", quotaTotalGB)
 
 		// Redirect back to users page with success message
 		http.Redirect(w, r, "/admin/users?success="+i18n.T(lang, "users.quota.success"), http.StatusSeeOther)

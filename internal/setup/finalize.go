@@ -73,7 +73,7 @@ func FinalizeSetup(opts FinalizeOptions) (*FinalizeResult, error) {
 	if opts.DataDir != defaultDataDir {
 		if err := updateSudoersDataDir(defaultDataDir, opts.DataDir); err != nil {
 			// Non-fatal: log warning but continue
-			logger.Info("Warning: Failed to update sudoers for custom path: %v", err)
+			logger.Info("Warning: Failed to update sudoers for custom path", "error", err)
 		}
 	}
 
@@ -263,7 +263,7 @@ func FinalizeImport(opts FinalizeOptions) error {
 	if opts.DataDir != defaultDataDir {
 		if err := updateSudoersDataDir(defaultDataDir, opts.DataDir); err != nil {
 			// Non-fatal: log warning but continue
-			logger.Info("Warning: Failed to update sudoers for custom path: %v", err)
+			logger.Info("Warning: Failed to update sudoers for custom path", "error", err)
 		}
 	}
 
@@ -276,7 +276,7 @@ func FinalizeImport(opts FinalizeOptions) error {
 	// 4. Open existing database to regenerate Samba config
 	db, err := database.Init(dbPath)
 	if err != nil {
-		logger.Info("Warning: Failed to open database for Samba config: %v", err)
+		logger.Info("Warning: Failed to open database for Samba config", "error", err)
 	} else {
 		defer db.Close()
 
@@ -301,13 +301,13 @@ func FinalizeImport(opts FinalizeOptions) error {
 		}
 
 		if err := smb.GenerateConfig(db, smbCfg); err != nil {
-			logger.Info("Warning: Failed to generate Samba config: %v", err)
+			logger.Info("Warning: Failed to generate Samba config", "error", err)
 		} else {
 			logger.Info("Generated Samba configuration")
 
 			// Reload Samba
 			if err := smb.ReloadConfig(); err != nil {
-				logger.Info("Warning: Failed to reload Samba: %v", err)
+				logger.Info("Warning: Failed to reload Samba", "error", err)
 			} else {
 				logger.Info("Reloaded Samba configuration")
 			}
@@ -317,7 +317,7 @@ func FinalizeImport(opts FinalizeOptions) error {
 		// After OS reinstall, users don't exist - we need to recreate them
 		masterKey, err := getMasterKey(db)
 		if err != nil {
-			logger.Info("Warning: Failed to get master key: %v", err)
+			logger.Info("Warning: Failed to get master key", "error", err)
 		} else {
 			// Get all activated users with their encrypted passwords
 			userRows, err := db.Query(`
@@ -326,7 +326,7 @@ func FinalizeImport(opts FinalizeOptions) error {
 				WHERE activated_at IS NOT NULL AND password_encrypted IS NOT NULL
 			`)
 			if err != nil {
-				logger.Info("Warning: Failed to query users: %v", err)
+				logger.Info("Warning: Failed to query users", "error", err)
 			} else {
 				defer userRows.Close()
 				for userRows.Next() {
@@ -335,7 +335,7 @@ func FinalizeImport(opts FinalizeOptions) error {
 					var passwordEncrypted []byte
 					var activatedAt *string
 					if err := userRows.Scan(&userID, &username, &passwordEncrypted, &activatedAt); err != nil {
-						logger.Info("Warning: Failed to scan user: %v", err)
+						logger.Info("Warning: Failed to scan user", "error", err)
 						continue
 					}
 
@@ -343,15 +343,15 @@ func FinalizeImport(opts FinalizeOptions) error {
 					if len(passwordEncrypted) > 0 {
 						plainPassword, err := crypto.DecryptPassword(passwordEncrypted, masterKey)
 						if err != nil {
-							logger.Info("Warning: Failed to decrypt password for user %s: %v", username, err)
+							logger.Info("Warning: Failed to decrypt password for user", "username", username, "error", err)
 							continue
 						}
 
 						// Create system user and set SMB password
 						if err := smb.AddSMBUser(username, plainPassword); err != nil {
-							logger.Info("Warning: Failed to create SMB user %s: %v", username, err)
+							logger.Info("Warning: Failed to create SMB user", "username", username, "error", err)
 						} else {
-							logger.Info("Created system user and SMB account for: %s", username)
+							logger.Info("Created system user and SMB account", "username", username)
 						}
 					}
 				}
@@ -361,7 +361,7 @@ func FinalizeImport(opts FinalizeOptions) error {
 		// 6. Fix ownership of share directories
 		shareRows, err := db.Query("SELECT u.username, s.path FROM users u JOIN shares s ON u.id = s.user_id")
 		if err != nil {
-			logger.Info("Warning: Failed to query shares for ownership fix: %v", err)
+			logger.Info("Warning: Failed to query shares for ownership fix", "error", err)
 		} else {
 			defer shareRows.Close()
 			for shareRows.Next() {
@@ -372,15 +372,15 @@ func FinalizeImport(opts FinalizeOptions) error {
 				// Fix ownership of the share directory
 				cmd := exec.Command("sudo", "chown", "-R", username+":"+username, sharePath)
 				if err := cmd.Run(); err != nil {
-					logger.Info("Warning: Failed to fix ownership for %s: %v", sharePath, err)
+					logger.Info("Warning: Failed to fix ownership", "path", sharePath, "error", err)
 				} else {
-					logger.Info("Fixed ownership for share: %s -> %s", sharePath, username)
+					logger.Info("Fixed ownership for share", "path", sharePath, "owner", username)
 				}
 			}
 		}
 	}
 
-	logger.Info("Import finalized: data directory = %s", opts.DataDir)
+	logger.Info("Import finalized", "data_directory", opts.DataDir)
 	return nil
 }
 

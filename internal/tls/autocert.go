@@ -124,9 +124,9 @@ func GenerateOrLoadCertificate(cfg *CertConfig) error {
 	}
 
 	logger.Info("✅ Self-signed certificate generated successfully")
-	logger.Info("   Certificate: %s", cfg.CertPath)
-	logger.Info("   Private Key: %s", cfg.KeyPath)
-	logger.Info("   Valid for: 10 years (until %s)", notAfter.Format("2006-01-02"))
+	logger.Info("Certificate", "cert_path", cfg.CertPath)
+	logger.Info("Private Key", "key_path", cfg.KeyPath)
+	logger.Info("Valid for: 10 years (until )", "format", notAfter.Format("2006-01-02"))
 	logger.Info("   ⚠️  Your browser will show a security warning - this is normal for self-signed certificates")
 
 	return nil

@@ -65,11 +65,11 @@ func CreateServerBackup(db *sql.DB, backupDir string) (string, error) {
 		return "", fmt.Errorf("failed to write backup file: %w", err)
 	}
 
-	logger.Info("Server backup created: %s (%d bytes)", filename, len(encryptedData))
+	logger.Info("Server backup created", "filename", filename, "size", len(encryptedData))
 
 	// Clean old backups
 	if err := CleanOldBackups(backupDir, MaxBackups); err != nil {
-		logger.Info("Warning: failed to clean old backups: %v", err)
+		logger.Info("Warning: failed to clean old backups", "error", err)
 	}
 
 	return filepath, nil
@@ -128,9 +128,9 @@ func CleanOldBackups(backupDir string, maxBackups int) error {
 	// Delete old backups
 	for i := maxBackups; i < len(backups); i++ {
 		if err := os.Remove(backups[i].Path); err != nil {
-			logger.Info("Warning: failed to remove old backup %s: %v", backups[i].Filename, err)
+			logger.Info("Warning: failed to remove old backup", "filename", backups[i].Filename, "error", err)
 		} else {
-			logger.Info("Removed old backup: %s", backups[i].Filename)
+			logger.Info("Removed old backup", "filename", backups[i].Filename)
 		}
 	}
 
@@ -194,9 +194,9 @@ func StartScheduler(db *sql.DB, dataDir string) {
 			logger.Info("Creating automatic server backup...")
 			backupPath, err := CreateServerBackup(db, backupDir)
 			if err != nil {
-				logger.Info("❌ Automatic backup failed: %v", err)
+				logger.Info("Automatic backup failed", "error", err)
 			} else {
-				logger.Info("✅ Automatic server backup created: %s", backupPath)
+				logger.Info("Automatic server backup created", "path", backupPath)
 			}
 
 			// Sleep a bit to avoid creating multiple backups if the clock changes

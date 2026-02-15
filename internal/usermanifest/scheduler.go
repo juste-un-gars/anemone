@@ -6,7 +6,6 @@ package usermanifest
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/juste-un-gars/anemone/internal/logger"
 	"strings"
 	"time"
@@ -32,14 +31,14 @@ func StartScheduler(db *sql.DB, sharesDir string, intervalMinutes int) {
 		return
 	}
 
-	logger.Info(fmt.Sprintf("📋 Starting user manifest scheduler (every %d minutes)...", intervalMinutes))
+	logger.Info("Starting user manifest scheduler (every minutes)...", "interval_minutes", intervalMinutes)
 
 	// Run initial generation after a short delay (let server start fully)
 	go func() {
 		time.Sleep(30 * time.Second)
 		logger.Info("📋 Running initial manifest generation...")
 		if err := GenerateAllManifests(db); err != nil {
-			logger.Info(fmt.Sprintf("⚠️  Initial manifest generation failed: %v", err))
+			logger.Info("Initial manifest generation failed", "error", err)
 		}
 	}()
 
@@ -51,7 +50,7 @@ func StartScheduler(db *sql.DB, sharesDir string, intervalMinutes int) {
 		for range ticker.C {
 			logger.Info("📋 Running scheduled manifest generation...")
 			if err := GenerateAllManifests(db); err != nil {
-				logger.Info(fmt.Sprintf("⚠️  Scheduled manifest generation failed: %v", err))
+				logger.Info("Scheduled manifest generation failed", "error", err)
 			}
 		}
 	}()
@@ -89,7 +88,7 @@ func GenerateAllManifests(db *sql.DB) error {
 		// Get username for this share
 		username, err := getUsername(db, share.UserID)
 		if err != nil {
-			logger.Info(fmt.Sprintf("⚠️  Failed to get username for share %s: %v", share.Name, err))
+			logger.Info("Failed to get username for share", "name", share.Name, "error", err)
 			errorCount++
 			continue
 		}
@@ -97,14 +96,14 @@ func GenerateAllManifests(db *sql.DB) error {
 		// Build manifest
 		manifest, err := BuildUserManifest(share.Path, share.Name, shareType, username)
 		if err != nil {
-			logger.Info(fmt.Sprintf("⚠️  Failed to build manifest for %s: %v", share.Name, err))
+			logger.Info("Failed to build manifest for", "name", share.Name, "error", err)
 			errorCount++
 			continue
 		}
 
 		// Write manifest
 		if err := WriteManifest(manifest, share.Path); err != nil {
-			logger.Info(fmt.Sprintf("⚠️  Failed to write manifest for %s: %v", share.Name, err))
+			logger.Info("Failed to write manifest for", "name", share.Name, "error", err)
 			errorCount++
 			continue
 		}
@@ -116,11 +115,10 @@ func GenerateAllManifests(db *sql.DB) error {
 
 	elapsed := time.Since(startTime)
 
-	logger.Info(fmt.Sprintf("✅ Manifest generation complete in %v: %d shares processed (%d files, %s)",
-		elapsed.Round(time.Millisecond), successCount, totalFiles, FormatSize(totalSize)))
+	logger.Info("Manifest generation complete in : shares processed ( files, )", "round", elapsed.Round(time.Millisecond), "success_count", successCount, "total_files", totalFiles, "total_size", FormatSize(totalSize))
 
 	if errorCount > 0 {
-		logger.Info(fmt.Sprintf("⚠️  %d shares had errors", errorCount))
+		logger.Info("shares had errors", "error_count", errorCount)
 	}
 
 	return nil

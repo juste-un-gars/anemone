@@ -6,7 +6,6 @@ package web
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -40,7 +39,7 @@ func (s *Server) handleAdminRclone(w http.ResponseWriter, r *http.Request) {
 	// Get all rclone backup configurations
 	backups, err := rclone.GetAll(s.db)
 	if err != nil {
-		logger.Info(fmt.Sprintf("Error getting rclone backups: %v", err))
+		logger.Info("Error getting rclone backups", "error", err)
 		backups = []*rclone.RcloneBackup{}
 	}
 
@@ -105,7 +104,7 @@ func (s *Server) handleAdminRclone(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_rclone.html", data); err != nil {
-		logger.Info(fmt.Sprintf("Template error: %v", err))
+		logger.Info("Template error", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -221,7 +220,7 @@ func (s *Server) handleAdminRcloneAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := rclone.Create(s.db, backup); err != nil {
-		logger.Info(fmt.Sprintf("Error creating rclone backup: %v", err))
+		logger.Info("Error creating rclone backup", "error", err)
 		http.Redirect(w, r, "/admin/rclone/add?error="+i18n.T(lang, "error_creating"), http.StatusSeeOther)
 		return
 	}
@@ -266,7 +265,7 @@ func (s *Server) handleRcloneAddForm(w http.ResponseWriter, r *http.Request) {
 
 	tmpl := s.loadV2Page("v2_rclone_add.html", s.funcMap)
 	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
-		logger.Info(fmt.Sprintf("Template error: %v", err))
+		logger.Info("Template error", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -329,7 +328,7 @@ func (s *Server) handleRcloneDelete(w http.ResponseWriter, r *http.Request, id i
 	}
 
 	if err := rclone.Delete(s.db, id); err != nil {
-		logger.Info(fmt.Sprintf("Error deleting rclone backup: %v", err))
+		logger.Info("Error deleting rclone backup", "error", err)
 		http.Error(w, "Error deleting backup", http.StatusInternalServerError)
 		return
 	}
@@ -348,7 +347,7 @@ func (s *Server) handleRcloneSync(w http.ResponseWriter, r *http.Request, id int
 
 	backup, err := rclone.GetByID(s.db, id)
 	if err != nil {
-		logger.Info(fmt.Sprintf("Error getting rclone backup: %v", err))
+		logger.Info("Error getting rclone backup", "error", err)
 		http.Redirect(w, r, "/admin/backups?tab=cloud&error="+i18n.T(lang, "backup_not_found"), http.StatusSeeOther)
 		return
 	}
@@ -364,10 +363,9 @@ func (s *Server) handleRcloneSync(w http.ResponseWriter, r *http.Request, id int
 		result, syncErr := rclone.Sync(s.db, backup, dataDir)
 
 		if syncErr != nil {
-			logger.Info(fmt.Sprintf("Rclone backup sync error: %v", syncErr))
+			logger.Info("Rclone backup sync error", "sync_err", syncErr)
 		} else if result != nil {
-			logger.Info(fmt.Sprintf("Rclone backup sync completed: %d files, %s",
-				result.FilesTransferred, rclone.FormatBytes(result.BytesTransferred)))
+			logger.Info("Rclone backup sync completed: files", "files_transferred", result.FilesTransferred, "format_bytes", rclone.FormatBytes(result.BytesTransferred))
 		}
 	}()
 
@@ -385,7 +383,7 @@ func (s *Server) handleRcloneTest(w http.ResponseWriter, r *http.Request, id int
 
 	backup, err := rclone.GetByID(s.db, id)
 	if err != nil {
-		logger.Info(fmt.Sprintf("Error getting rclone backup: %v", err))
+		logger.Info("Error getting rclone backup", "error", err)
 		http.Redirect(w, r, "/admin/backups?tab=cloud&error="+i18n.T(lang, "backup_not_found"), http.StatusSeeOther)
 		return
 	}
@@ -397,7 +395,7 @@ func (s *Server) handleRcloneTest(w http.ResponseWriter, r *http.Request, id int
 
 	err = rclone.TestConnection(backup, s.cfg.DataDir)
 	if err != nil {
-		logger.Info(fmt.Sprintf("Rclone connection test failed: %v", err))
+		logger.Info("Rclone connection test failed", "error", err)
 		http.Redirect(w, r, "/admin/backups?tab=cloud&test_error="+err.Error(), http.StatusSeeOther)
 		return
 	}
@@ -439,7 +437,7 @@ func (s *Server) handleRcloneEditForm(w http.ResponseWriter, r *http.Request, id
 
 	tmpl := s.loadV2Page("v2_rclone_edit.html", s.funcMap)
 	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
-		logger.Info(fmt.Sprintf("Template error: %v", err))
+		logger.Info("Template error", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -581,7 +579,7 @@ func (s *Server) handleRcloneEdit(w http.ResponseWriter, r *http.Request, id int
 	}
 
 	if err := rclone.Update(s.db, backup); err != nil {
-		logger.Info(fmt.Sprintf("Error updating rclone backup: %v", err))
+		logger.Info("Error updating rclone backup", "error", err)
 		http.Redirect(w, r, "/admin/rclone/"+strconv.Itoa(id)+"?error="+i18n.T(lang, "error_updating"), http.StatusSeeOther)
 		return
 	}
@@ -593,7 +591,7 @@ func (s *Server) handleRcloneEdit(w http.ResponseWriter, r *http.Request, id int
 func (s *Server) handleAdminRcloneKeyInfo(w http.ResponseWriter, r *http.Request) {
 	keyInfo, err := rclone.GetSSHKeyInfo(s.cfg.DataDir)
 	if err != nil {
-		logger.Info(fmt.Sprintf("Error getting SSH key info: %v", err))
+		logger.Info("Error getting SSH key info", "error", err)
 		http.Error(w, "Error getting key info", http.StatusInternalServerError)
 		return
 	}
@@ -611,7 +609,7 @@ func (s *Server) handleAdminRcloneGenerateKey(w http.ResponseWriter, r *http.Req
 
 	keyInfo, err := rclone.GenerateSSHKey(s.cfg.DataDir)
 	if err != nil {
-		logger.Info(fmt.Sprintf("Error generating SSH key: %v", err))
+		logger.Info("Error generating SSH key", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})

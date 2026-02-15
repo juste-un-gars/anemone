@@ -240,7 +240,7 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 	// Get user's shares
 	userShares, err := shares.GetByUser(s.db, session.UserID)
 	if err != nil {
-		logger.Info("Error getting shares: %v", err)
+		logger.Info("Error getting shares", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -260,7 +260,7 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 	if shareName != "" {
 		absPath, share, err := s.resolveSharePath(session, shareName, relPath)
 		if err != nil {
-			logger.Info("Error resolving share path: %v", err)
+			logger.Info("Error resolving share path", "error", err)
 			http.Error(w, i18n.T(lang, "files.error.access_denied"), http.StatusForbidden)
 			return
 		}
@@ -274,7 +274,7 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 
 		files, err = listDirectory(absPath, share.Path)
 		if err != nil {
-			logger.Info("Error listing directory: %v", err)
+			logger.Info("Error listing directory", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -308,7 +308,7 @@ func (s *Server) handleFiles(w http.ResponseWriter, r *http.Request) {
 
 	tmpl := s.loadV2UserPage("v2_files.html", s.funcMap)
 	if err := tmpl.ExecuteTemplate(w, "v2_base_user", data); err != nil {
-		logger.Info("Error rendering v2 files template: %v", err)
+		logger.Info("Error rendering v2 files template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -330,7 +330,7 @@ func (s *Server) handleFilesDownload(w http.ResponseWriter, r *http.Request) {
 
 	absPath, _, err := s.resolveSharePath(session, shareName, relPath)
 	if err != nil {
-		logger.Info("Download denied for user %d: %v", session.UserID, err)
+		logger.Info("Download denied for user", "user_id", session.UserID, "error", err)
 		http.Error(w, "Access denied", http.StatusForbidden)
 		return
 	}
@@ -345,7 +345,7 @@ func (s *Server) handleFilesDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Info("User %s downloading file: %s from share %s", session.Username, relPath, shareName)
+	logger.Info("User downloading file: from share", "username", session.Username, "rel_path", relPath, "share_name", shareName)
 	if r.URL.Query().Get("inline") == "1" {
 		w.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, filepath.Base(absPath)))
 	} else {
@@ -417,14 +417,14 @@ func (s *Server) handleFilesUpload(w http.ResponseWriter, r *http.Request) {
 			tmpFile, err2 := os.CreateTemp("", "anemone-upload-*")
 			if err2 != nil {
 				src.Close()
-				logger.Info("Error creating temp file for %s: %v", destFile, err2)
+				logger.Info("Error creating temp file for", "dest_file", destFile, "err2", err2)
 				continue
 			}
 			if _, err2 := io.Copy(tmpFile, src); err2 != nil {
 				src.Close()
 				tmpFile.Close()
 				os.Remove(tmpFile.Name())
-				logger.Info("Error writing temp file for %s: %v", destFile, err2)
+				logger.Info("Error writing temp file for", "dest_file", destFile, "err2", err2)
 				continue
 			}
 			src.Close()
@@ -432,7 +432,7 @@ func (s *Server) handleFilesUpload(w http.ResponseWriter, r *http.Request) {
 			cmd := exec.Command("sudo", "/usr/bin/mv", tmpFile.Name(), destFile)
 			if err2 := cmd.Run(); err2 != nil {
 				os.Remove(tmpFile.Name())
-				logger.Info("Error moving upload %s: %v", destFile, err2)
+				logger.Info("Error moving upload", "dest_file", destFile, "err2", err2)
 				continue
 			}
 			count++
@@ -442,7 +442,7 @@ func (s *Server) handleFilesUpload(w http.ResponseWriter, r *http.Request) {
 			src.Close()
 			dst.Close()
 			os.Remove(destFile)
-			logger.Info("Error writing file %s: %v", destFile, err)
+			logger.Info("Error writing file", "dest_file", destFile, "error", err)
 			continue
 		}
 		src.Close()
@@ -451,7 +451,7 @@ func (s *Server) handleFilesUpload(w http.ResponseWriter, r *http.Request) {
 		count++
 	}
 
-	logger.Info("User %s uploaded %d file(s) to share %s path %s", session.Username, count, shareName, relPath)
+	logger.Info("User uploaded file(s) to share path", "username", session.Username, "count", count, "share_name", shareName, "rel_path", relPath)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"success":true,"count":%d}`, count)
@@ -503,13 +503,13 @@ func (s *Server) handleFilesMkdir(w http.ResponseWriter, r *http.Request) {
 	if err := os.Mkdir(newDir, 0755); err != nil {
 		cmd := exec.Command("sudo", "/bin/mkdir", "-m", "0755", newDir)
 		if err2 := cmd.Run(); err2 != nil {
-			logger.Info("Error creating directory %s: %v (sudo: %v)", newDir, err, err2)
+			logger.Info("Error creating directory", "new_dir", newDir, "error", err, "sudo_error", err2)
 			jsonError(w, "Failed to create folder", http.StatusInternalServerError)
 			return
 		}
 	}
 
-	logger.Info("User %s created folder: %s in share %s", session.Username, req.Name, req.Share)
+	logger.Info("User created folder: in share", "username", session.Username, "name", req.Name, "share", req.Share)
 	jsonSuccess(w)
 }
 
@@ -564,18 +564,18 @@ func (s *Server) handleFilesRename(w http.ResponseWriter, r *http.Request) {
 
 	// Rename — try direct first, fallback to sudo
 	if err := os.Rename(srcPath, dstPath); err == nil {
-		logger.Info("User %s renamed %s to %s in share %s", session.Username, req.Path, req.NewName, req.Share)
+		logger.Info("User renamed to in share", "username", session.Username, "path", req.Path, "new_name", req.NewName, "share", req.Share)
 		jsonSuccess(w)
 		return
 	}
 	cmd := exec.Command("sudo", "/usr/bin/mv", srcPath, dstPath)
 	if err := cmd.Run(); err != nil {
-		logger.Info("Error renaming %s to %s: %v", srcPath, dstPath, err)
+		logger.Info("Error renaming to", "src_path", srcPath, "dst_path", dstPath, "error", err)
 		jsonError(w, "Failed to rename", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Info("User %s renamed %s to %s in share %s", session.Username, req.Path, req.NewName, req.Share)
+	logger.Info("User renamed to in share", "username", session.Username, "path", req.Path, "new_name", req.NewName, "share", req.Share)
 	jsonSuccess(w)
 }
 
@@ -646,11 +646,11 @@ func (s *Server) handleFilesDelete(w http.ResponseWriter, r *http.Request) {
 		err = cmd.Run()
 	}
 	if err != nil {
-		logger.Info("Error moving %s to trash: %v", absPath, err)
+		logger.Info("Error moving to trash", "abs_path", absPath, "error", err)
 		jsonError(w, "Failed to delete", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Info("User %s deleted %s from share %s (moved to trash)", session.Username, req.Path, req.Share)
+	logger.Info("User deleted from share (moved to trash)", "username", session.Username, "path", req.Path, "share", req.Share)
 	jsonSuccess(w)
 }

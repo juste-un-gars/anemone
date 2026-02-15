@@ -54,7 +54,7 @@ func (s *Server) handleRestoreWarning(w http.ResponseWriter, r *http.Request) {
 		// Get master key for password decryption
 		var masterKey string
 		if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
-			logger.Info("Error getting master key: %v", err)
+			logger.Info("Error getting master key", "error", err)
 		} else {
 			client := &http.Client{
 				Transport: &http.Transport{
@@ -76,7 +76,7 @@ func (s *Server) handleRestoreWarning(w http.ResponseWriter, r *http.Request) {
 				if peer.Password != nil && len(*peer.Password) > 0 {
 					peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
 					if err != nil {
-						logger.Info("Error decrypting peer password: %v", err)
+						logger.Info("Error decrypting peer password", "error", err)
 						continue
 					}
 					req.Header.Set("X-Sync-Password", peerPassword)
@@ -128,7 +128,7 @@ func (s *Server) handleRestoreWarning(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "restore_warning.html", data); err != nil {
-		logger.Info("Error rendering restore warning template: %v", err)
+		logger.Info("Error rendering restore warning template", "error", err)
 	}
 }
 
@@ -148,12 +148,12 @@ func (s *Server) handleRestoreWarningAcknowledge(w http.ResponseWriter, r *http.
 	// Update user's restore_acknowledged flag
 	_, err := s.db.Exec("UPDATE users SET restore_acknowledged = 1 WHERE id = ?", session.UserID)
 	if err != nil {
-		logger.Info("Error updating restore_acknowledged: %v", err)
+		logger.Info("Error updating restore_acknowledged", "error", err)
 		http.Error(w, "Failed to acknowledge restore", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Info("User %s acknowledged server restore (manual restore)", session.Username)
+	logger.Info("User acknowledged server restore (manual restore)", "username", session.Username)
 
 	// Redirect to dashboard
 	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
@@ -196,7 +196,7 @@ func (s *Server) handleRestoreWarningBulk(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	logger.Info("User %s starting bulk restore from peer %d share %s source %s", session.Username, peerID, shareName, sourceServer)
+	logger.Info("User starting bulk restore from peer share source", "username", session.Username, "peer_id", peerID, "share_name", shareName, "source_server", sourceServer)
 
 	// Start bulk restore in background
 	go func() {
@@ -204,11 +204,11 @@ func (s *Server) handleRestoreWarningBulk(w http.ResponseWriter, r *http.Request
 		// For now, we'll just do the restore and mark as complete
 		err := bulkrestore.BulkRestoreFromPeer(s.db, session.UserID, peerID, shareName, sourceServer, s.cfg.DataDir, nil)
 		if err != nil {
-			logger.Info("Bulk restore failed for user %s: %v", session.Username, err)
+			logger.Info("Bulk restore failed for user", "username", session.Username, "error", err)
 		} else {
 			// Mark restore as completed
 			s.db.Exec("UPDATE users SET restore_acknowledged = 1, restore_completed = 1 WHERE id = ?", session.UserID)
-			logger.Info("Bulk restore completed successfully for user %s", session.Username)
+			logger.Info("Bulk restore completed successfully for user", "username", session.Username)
 		}
 	}()
 

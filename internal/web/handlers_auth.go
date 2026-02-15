@@ -33,7 +33,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "login.html", data); err != nil {
-			logger.Info("Error rendering login template: %v", err)
+			logger.Info("Error rendering login template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -60,7 +60,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if err := s.templates.ExecuteTemplate(w, "login.html", data); err != nil {
-				logger.Info("Error rendering login template: %v", err)
+				logger.Info("Error rendering login template", "error", err)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			}
 			return
@@ -77,7 +77,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		sm := auth.GetSessionManager()
 		session, err := sm.CreateSessionWithOptions(user.ID, user.Username, user.IsAdmin, rememberMe, userAgent, ipAddress)
 		if err != nil {
-			logger.Info("Error creating session: %v", err)
+			logger.Info("Error creating session", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -88,7 +88,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		// Update last login
 		user.UpdateLastLogin(s.db)
 
-		logger.Info("User logged in: %s (admin: %v)", user.Username, user.IsAdmin)
+		logger.Info("User logged in", "username", user.Username, "is_admin", user.IsAdmin)
 
 		// Redirect to dashboard
 		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
@@ -103,7 +103,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		// Delete session
 		sm := auth.GetSessionManager()
 		sm.DeleteSession(session.ID)
-		logger.Info("User logged out: %s", session.Username)
+		logger.Info("User logged out", "username", session.Username)
 	}
 
 	// Clear cookie
@@ -175,7 +175,7 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "activate.html", data); err != nil {
-			logger.Info("Error rendering activate template: %v", err)
+			logger.Info("Error rendering activate template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -233,7 +233,7 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 		var masterKey string
 		err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
 		if err != nil {
-			logger.Info("Error getting master key: %v", err)
+			logger.Info("Error getting master key", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -241,27 +241,27 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 		// Activate user (sets password and generates encryption key)
 		encryptionKey, err := users.ActivateUser(s.db, token.UserID, password, masterKey)
 		if err != nil {
-			logger.Info("Error activating user: %v", err)
+			logger.Info("Error activating user", "error", err)
 			http.Error(w, "Failed to activate user", http.StatusInternalServerError)
 			return
 		}
 
 		// Mark token as used
 		if err := token.MarkAsUsed(s.db); err != nil {
-			logger.Info("Error marking token as used: %v", err)
+			logger.Info("Error marking token as used", "error", err)
 		}
 
-		logger.Info("User activated: %s (ID: %d)", token.Username, token.UserID)
+		logger.Info("User activated", "username", token.Username, "user_id", token.UserID)
 
 		// Create SMB user with same password
 		if err := smb.AddSMBUser(token.Username, password); err != nil {
-			logger.Info("Warning: Failed to create SMB user: %v", err)
+			logger.Info("Warning: Failed to create SMB user", "error", err)
 		}
 
 		// Get user info to retrieve quotas
 		user, err := users.GetByID(s.db, token.UserID)
 		if err != nil {
-			logger.Info("Warning: Failed to get user info: %v", err)
+			logger.Info("Warning: Failed to get user info", "error", err)
 			// Default quotas if we can't retrieve them
 			user = &users.User{
 				QuotaBackupGB: 50,
@@ -278,7 +278,7 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 		// Initialize quota manager for creating directories with quota enforcement
 		qm, err := quota.NewQuotaManager(s.cfg.SharesDir)
 		if err != nil {
-			logger.Info("Warning: Failed to initialize quota manager: %v", err)
+			logger.Info("Warning: Failed to initialize quota manager", "error", err)
 			qm = nil // Will create regular directories as fallback
 		}
 
@@ -288,9 +288,9 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 		backupPath := filepath.Join(s.cfg.SharesDir, token.Username, "backup")
 		if qm != nil {
 			if err := qm.CreateQuotaDir(backupPath, user.QuotaBackupGB, owner); err != nil {
-				logger.Info("Warning: Failed to create backup quota directory: %v", err)
+				logger.Info("Warning: Failed to create backup quota directory", "error", err)
 			} else {
-				logger.Info("Created backup subvolume with %dGB quota (owner: %s)", user.QuotaBackupGB, token.Username)
+				logger.Info("Created backup subvolume", "quota_gb", user.QuotaBackupGB, "owner", token.Username)
 			}
 		}
 
@@ -302,17 +302,17 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			SyncEnabled: true,
 		}
 		if err := shares.Create(s.db, backupShare, token.Username); err != nil {
-			logger.Info("Warning: Failed to create backup share: %v", err)
+			logger.Info("Warning: Failed to create backup share", "error", err)
 		} else {
-			logger.Info("Created backup share: backup_%s", token.Username)
+			logger.Info("Created backup share: backup_", "username", token.Username)
 		}
 
 		dataPath := filepath.Join(s.cfg.SharesDir, token.Username, "data")
 		if qm != nil {
 			if err := qm.CreateQuotaDir(dataPath, dataQuotaGB, owner); err != nil {
-				logger.Info("Warning: Failed to create data quota directory: %v", err)
+				logger.Info("Warning: Failed to create data quota directory", "error", err)
 			} else {
-				logger.Info("Created data subvolume with %dGB quota (owner: %s)", dataQuotaGB, token.Username)
+				logger.Info("Created data subvolume", "quota_gb", dataQuotaGB, "owner", token.Username)
 			}
 		}
 
@@ -324,9 +324,9 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			SyncEnabled: false,
 		}
 		if err := shares.Create(s.db, dataShare, token.Username); err != nil {
-			logger.Info("Warning: Failed to create data share: %v", err)
+			logger.Info("Warning: Failed to create data share", "error", err)
 		} else {
-			logger.Info("Created data share: data_%s", token.Username)
+			logger.Info("Created data share: data_", "username", token.Username)
 		}
 
 		// Regenerate SMB config
@@ -341,7 +341,7 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			DfreePath:  dfreePath,
 		}
 		if err := smb.GenerateConfig(s.db, smbCfg); err != nil {
-			logger.Info("Warning: Failed to regenerate SMB config: %v", err)
+			logger.Info("Warning: Failed to regenerate SMB config", "error", err)
 		} else {
 			// Try to reload smbd (requires sudoers configuration)
 			if err := smb.ReloadConfig(); err != nil {
@@ -376,7 +376,7 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "activate_success.html", data); err != nil {
-			logger.Info("Error rendering activation success template: %v", err)
+			logger.Info("Error rendering activation success template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -419,7 +419,7 @@ func (s *Server) handleResetPasswordForm(w http.ResponseWriter, r *http.Request)
 	// Get token from database
 	token, err := reset.GetTokenByString(s.db, tokenString)
 	if err != nil {
-		logger.Info("Token not found: %v", err)
+		logger.Info("Token not found", "error", err)
 		data := struct {
 			Lang    string
 			Title   string
@@ -430,7 +430,7 @@ func (s *Server) handleResetPasswordForm(w http.ResponseWriter, r *http.Request)
 			Error: i18n.T(lang, "reset.token_invalid"),
 		}
 		if err := s.templates.ExecuteTemplate(w, "reset_password.html", data); err != nil {
-			logger.Info("Error rendering reset password template: %v", err)
+			logger.Info("Error rendering reset password template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 		return
@@ -448,7 +448,7 @@ func (s *Server) handleResetPasswordForm(w http.ResponseWriter, r *http.Request)
 			Error: i18n.T(lang, "reset.token_invalid"),
 		}
 		if err := s.templates.ExecuteTemplate(w, "reset_password.html", data); err != nil {
-			logger.Info("Error rendering reset password template: %v", err)
+			logger.Info("Error rendering reset password template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		}
 		return
@@ -457,7 +457,7 @@ func (s *Server) handleResetPasswordForm(w http.ResponseWriter, r *http.Request)
 	// Get user info
 	user, err := users.GetByID(s.db, token.UserID)
 	if err != nil {
-		logger.Info("Error getting user: %v", err)
+		logger.Info("Error getting user", "error", err)
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
@@ -478,7 +478,7 @@ func (s *Server) handleResetPasswordForm(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "reset_password.html", data); err != nil {
-		logger.Info("Error rendering reset password template: %v", err)
+		logger.Info("Error rendering reset password template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -527,7 +527,7 @@ func (s *Server) handleResetPasswordSubmit(w http.ResponseWriter, r *http.Reques
 	// Get user
 	user, err := users.GetByID(s.db, token.UserID)
 	if err != nil {
-		logger.Info("Error getting user: %v", err)
+		logger.Info("Error getting user", "error", err)
 		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=User+not+found", tokenString), http.StatusSeeOther)
 		return
 	}
@@ -536,7 +536,7 @@ func (s *Server) handleResetPasswordSubmit(w http.ResponseWriter, r *http.Reques
 	var masterKey string
 	err = s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
 	if err != nil {
-		logger.Info("Error getting master key: %v", err)
+		logger.Info("Error getting master key", "error", err)
 		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=System+configuration+error", tokenString), http.StatusSeeOther)
 		return
 	}
@@ -544,18 +544,18 @@ func (s *Server) handleResetPasswordSubmit(w http.ResponseWriter, r *http.Reques
 	// Reset password (update DB + SMB)
 	err = users.ResetPassword(s.db, user.ID, user.Username, newPassword, masterKey)
 	if err != nil {
-		logger.Info("Error resetting password: %v", err)
+		logger.Info("Error resetting password", "error", err)
 		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=Failed+to+reset+password", tokenString), http.StatusSeeOther)
 		return
 	}
 
 	// Mark token as used
 	if err := token.MarkAsUsed(s.db); err != nil {
-		logger.Info("Error marking token as used: %v", err)
+		logger.Info("Error marking token as used", "error", err)
 		// Non-critical, continue
 	}
 
-	logger.Info("Password reset successfully for user: %s", user.Username)
+	logger.Info("Password reset successfully for user", "username", user.Username)
 
 	// Redirect to login with success message
 	http.Redirect(w, r, "/login?success=Password+reset+successfully", http.StatusSeeOther)

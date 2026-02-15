@@ -32,7 +32,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "setup.html", data); err != nil {
-			logger.Info("Error rendering setup template: %v", err)
+			logger.Info("Error rendering setup template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -71,7 +71,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		// Generate master key for encrypting user keys
 		masterKeyBytes := make([]byte, 32)
 		if _, err := rand.Read(masterKeyBytes); err != nil {
-			logger.Info("Error generating master key: %v", err)
+			logger.Info("Error generating master key", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -80,17 +80,17 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		// Create first admin user with language preference
 		user, encryptionKey, err := users.CreateFirstAdmin(s.db, username, password, email, masterKey, language)
 		if err != nil {
-			logger.Info("Error creating admin user: %v", err)
+			logger.Info("Error creating admin user", "error", err)
 			http.Error(w, "Failed to create admin user", http.StatusInternalServerError)
 			return
 		}
 
-		logger.Info("Created admin user: %s (ID: %d)", user.Username, user.ID)
+		logger.Info("Created admin user", "username", user.Username, "id", user.ID)
 
 		// Save system configuration
 		tx, err := s.db.Begin()
 		if err != nil {
-			logger.Info("Error starting transaction: %v", err)
+			logger.Info("Error starting transaction", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -106,14 +106,14 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		for key, value := range configs {
 			_, err = tx.Exec("INSERT OR REPLACE INTO system_config (key, value, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)", key, value)
 			if err != nil {
-				logger.Info("Error saving config %s: %v", key, err)
+				logger.Info("Error saving config", "key", key, "error", err)
 				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				return
 			}
 		}
 
 		if err := tx.Commit(); err != nil {
-			logger.Info("Error committing transaction: %v", err)
+			logger.Info("Error committing transaction", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -121,7 +121,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		// Generate random sync authentication password (secure by default)
 		syncPasswordBytes := make([]byte, 24) // 24 bytes = 192 bits
 		if _, err := rand.Read(syncPasswordBytes); err != nil {
-			logger.Info("Error generating sync password: %v", err)
+			logger.Info("Error generating sync password", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -130,7 +130,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 
 		// Save sync password hash to database
 		if err := syncauth.SetSyncAuthPassword(s.db, syncPassword); err != nil {
-			logger.Info("Error setting sync password: %v", err)
+			logger.Info("Error setting sync password", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -156,7 +156,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "setup_success.html", data); err != nil {
-			logger.Info("Error rendering success template: %v", err)
+			logger.Info("Error rendering success template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}

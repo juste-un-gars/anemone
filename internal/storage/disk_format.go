@@ -540,7 +540,7 @@ func UnmountDisk(mountPath string, eject bool) error {
 		cmd = exec.Command("sudo", "rmdir", mountPath)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			// Not critical if removal fails (directory might not be empty)
-			logger.Info("Note: Could not remove mount point directory %s: %v - %s", mountPath, err, strings.TrimSpace(string(output)))
+			logger.Info("Note: Could not remove mount point directory :", "mount_path", mountPath, "error", err, "trim_space", strings.TrimSpace(string(output)))
 		}
 	}
 
@@ -708,6 +708,6 @@ func AddToFstab(device, mountPath string, sharedAccess bool) error {
 		return fmt.Errorf("failed to update fstab: %s - %w", strings.TrimSpace(string(output)), err)
 	}
 
-	logger.Info("Added fstab entry for %s (UUID=%s) at %s", device, uuid, mountPath)
+	logger.Info("Added fstab entry for (UUID=) at", "device", device, "uuid", uuid, "mount_path", mountPath)
 	return nil
 }

@@ -120,7 +120,7 @@ func Sync(db *sql.DB, backup *RcloneBackup, dataDir string) (*SyncResult, error)
 
 		// Check if backup directory exists
 		if _, err := os.Stat(sourceDir); os.IsNotExist(err) {
-			logger.Info(fmt.Sprintf("Rclone: No backup directory for user %s, skipping", user.Username))
+			logger.Info("Rclone: No backup directory for user , skipping", "username", user.Username)
 			continue
 		}
 
@@ -128,22 +128,21 @@ func Sync(db *sql.DB, backup *RcloneBackup, dataDir string) (*SyncResult, error)
 		destPath := filepath.Join(backup.RemotePath, "backup", user.Username)
 		dest := buildDestination(backup, dataDir, destPath)
 
-		logger.Info(fmt.Sprintf("Rclone: Syncing %s to %s%s", user.Username, backup.DisplayHost(), destPath))
+		logger.Info("Rclone: Syncing to", "username", user.Username, "display_host", backup.DisplayHost(), "dest_path", destPath)
 
 		// Run rclone sync (tracked by backup ID for process monitoring)
 		userResult, err := runRcloneSyncTracked(sourceDir, dest, backup.ID)
 		if err != nil {
 			errMsg := fmt.Sprintf("user %s: %v", user.Username, err)
 			result.Errors = append(result.Errors, errMsg)
-			logger.Info(fmt.Sprintf("Rclone: Sync failed for %s: %v", user.Username, err))
+			logger.Info("Rclone: Sync failed for", "username", user.Username, "error", err)
 			continue
 		}
 
 		result.FilesTransferred += userResult.FilesTransferred
 		result.BytesTransferred += userResult.BytesTransferred
 
-		logger.Info(fmt.Sprintf("Rclone: Synced %s - %d files, %s",
-			user.Username, userResult.FilesTransferred, FormatBytes(userResult.BytesTransferred)))
+		logger.Info("Rclone: Synced - files", "username", user.Username, "files_transferred", userResult.FilesTransferred, "bytes_transferred", FormatBytes(userResult.BytesTransferred))
 	}
 
 	// Update final status
@@ -154,8 +153,7 @@ func Sync(db *sql.DB, backup *RcloneBackup, dataDir string) (*SyncResult, error)
 		UpdateSyncStatus(db, backup.ID, "success", "", result.FilesTransferred, result.BytesTransferred)
 	}
 
-	logger.Info(fmt.Sprintf("Rclone backup completed: %d files, %s",
-		result.FilesTransferred, FormatBytes(result.BytesTransferred)))
+	logger.Info("Rclone backup completed: files", "files_transferred", result.FilesTransferred, "bytes_transferred", FormatBytes(result.BytesTransferred))
 
 	return result, nil
 }
@@ -180,7 +178,7 @@ func SyncUser(db *sql.DB, backup *RcloneBackup, dataDir string, username string)
 	destPath := filepath.Join(backup.RemotePath, "backup", username)
 	dest := buildDestination(backup, dataDir, destPath)
 
-	logger.Info(fmt.Sprintf("Rclone: Syncing %s to %s%s", username, backup.DisplayHost(), destPath))
+	logger.Info("Rclone: Syncing to", "username", username, "display_host", backup.DisplayHost(), "dest_path", destPath)
 
 	// Run rclone sync (tracked by backup ID)
 	userResult, err := runRcloneSyncTracked(sourceDir, dest, backup.ID)

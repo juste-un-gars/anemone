@@ -31,7 +31,7 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 	// Get all users
 	allUsers, err := users.GetAllUsers(s.db)
 	if err != nil {
-		logger.Info("Error getting users: %v", err)
+		logger.Info("Error getting users", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -51,7 +51,7 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 
 	tmpl := s.loadV2Page("v2_users.html", s.funcMap)
 	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
-		logger.Info("Error rendering users template: %v", err)
+		logger.Info("Error rendering users template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -84,7 +84,7 @@ func (s *Server) handleAdminUsersAdd(w http.ResponseWriter, r *http.Request) {
 
 		tmpl := s.loadV2Page("v2_users_add.html", s.funcMap)
 		if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
-			logger.Info("Error rendering add user template: %v", err)
+			logger.Info("Error rendering add user template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -138,22 +138,22 @@ func (s *Server) handleAdminUsersAdd(w http.ResponseWriter, r *http.Request) {
 		// Create pending user
 		user, err := users.CreatePendingUser(s.db, username, email, isAdmin, quotaTotal, quotaBackup)
 		if err != nil {
-			logger.Info("Error creating user: %v", err)
+			logger.Info("Error creating user", "error", err)
 			http.Error(w, "Failed to create user", http.StatusInternalServerError)
 			return
 		}
 
-		logger.Info("Created pending user: %s (ID: %d)", user.Username, user.ID)
+		logger.Info("Created pending user", "username", user.Username, "id", user.ID)
 
 		// Create activation token
 		token, err := activation.CreateActivationToken(s.db, user.ID, user.Username, user.Email)
 		if err != nil {
-			logger.Info("Error creating activation token: %v", err)
+			logger.Info("Error creating activation token", "error", err)
 			http.Error(w, "Failed to create activation token", http.StatusInternalServerError)
 			return
 		}
 
-		logger.Info("Created activation token for user %s (expires: %v)", user.Username, token.ExpiresAt)
+		logger.Info("Created activation token for user", "username", user.Username, "expires_at", token.ExpiresAt)
 
 		// Redirect to token display page
 		http.Redirect(w, r, fmt.Sprintf("/admin/users/%d/token", user.ID), http.StatusSeeOther)
@@ -214,7 +214,7 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 		// Display activation token
 		user, err := users.GetByID(s.db, userID)
 		if err != nil {
-			logger.Info("Error getting user: %v", err)
+			logger.Info("Error getting user", "error", err)
 			http.NotFound(w, r)
 			return
 		}
@@ -235,7 +235,7 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 		if token == nil {
 			token, err = activation.CreateActivationToken(s.db, user.ID, user.Username, user.Email)
 			if err != nil {
-				logger.Info("Error creating token: %v", err)
+				logger.Info("Error creating token", "error", err)
 				http.Error(w, "Failed to create token", http.StatusInternalServerError)
 				return
 			}
@@ -279,7 +279,7 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 
 		tmpl := s.loadV2Page("v2_users_token.html", s.funcMap)
 		if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
-			logger.Info("Error rendering token template: %v", err)
+			logger.Info("Error rendering token template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -288,7 +288,7 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 		// Generate password reset token
 		user, err := users.GetByID(s.db, userID)
 		if err != nil {
-			logger.Info("Error getting user: %v", err)
+			logger.Info("Error getting user", "error", err)
 			http.NotFound(w, r)
 			return
 		}
@@ -296,7 +296,7 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 		// Create reset token
 		token, err := reset.CreatePasswordResetToken(s.db, user.ID)
 		if err != nil {
-			logger.Info("Error creating reset token: %v", err)
+			logger.Info("Error creating reset token", "error", err)
 			http.Error(w, "Failed to create reset token", http.StatusInternalServerError)
 			return
 		}
@@ -337,7 +337,7 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 
 		tmpl := s.loadV2Page("v2_users_reset_token.html", s.funcMap)
 		if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
-			logger.Info("Error rendering reset token template: %v", err)
+			logger.Info("Error rendering reset token template", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -362,12 +362,12 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 
 		err := users.DeleteUser(s.db, userID, s.cfg.DataDir, s.cfg.SharesDir)
 		if err != nil {
-			logger.Info("Error deleting user: %v", err)
+			logger.Info("Error deleting user", "error", err)
 			http.Error(w, "Failed to delete user", http.StatusInternalServerError)
 			return
 		}
 
-		logger.Info("User %d deleted by admin %s", userID, session.Username)
+		logger.Info("User deleted by admin", "user_id", userID, "username", session.Username)
 		w.WriteHeader(http.StatusOK)
 
 	default:

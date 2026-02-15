@@ -238,7 +238,7 @@ func (s *Server) handleAdminBackups(w http.ResponseWriter, r *http.Request) {
 
 	tmpl := s.loadV2Page("v2_backups.html", s.funcMap)
 	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
-		logger.Info("Error rendering v2 backups: %v", err)
+		logger.Info("Error rendering v2 backups", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -256,7 +256,7 @@ func (s *Server) getRecentActivity(lang string, limit int) []V2Activity {
 		LIMIT ?
 	`, limit)
 	if err != nil {
-		logger.Info("Error querying recent activity: %v", err)
+		logger.Info("Error querying recent activity", "error", err)
 		return nil
 	}
 	defer rows.Close()
@@ -290,7 +290,7 @@ func (s *Server) getRecentActivity(lang string, limit int) []V2Activity {
 func (s *Server) getV2USBData(lang string) ([]V2USBBackup, []V2Drive) {
 	backups, err := usbbackup.GetAll(s.db)
 	if err != nil {
-		logger.Info("Error getting USB backups: %v", err)
+		logger.Info("Error getting USB backups", "error", err)
 		return nil, nil
 	}
 
@@ -312,7 +312,7 @@ func (s *Server) getV2USBData(lang string) ([]V2USBBackup, []V2Drive) {
 
 	drives, err := usbbackup.DetectDrives()
 	if err != nil {
-		logger.Info("Error detecting drives: %v", err)
+		logger.Info("Error detecting drives", "error", err)
 		return v2backups, nil
 	}
 	var v2drives []V2Drive
@@ -329,7 +329,7 @@ func (s *Server) getV2USBData(lang string) ([]V2USBBackup, []V2Drive) {
 func (s *Server) getV2RcloneData(lang string) ([]V2RcloneConfig, bool, string, string) {
 	backups, err := rclone.GetAll(s.db)
 	if err != nil {
-		logger.Info("Error getting rclone backups: %v", err)
+		logger.Info("Error getting rclone backups", "error", err)
 		return nil, false, "", ""
 	}
 
@@ -371,7 +371,7 @@ func (s *Server) getV2RcloneData(lang string) ([]V2RcloneConfig, bool, string, s
 func (s *Server) getV2SyncData(lang string) (bool, string, []V2SyncEntry) {
 	cfg, err := syncconfig.Get(s.db)
 	if err != nil {
-		logger.Info("Error getting sync config: %v", err)
+		logger.Info("Error getting sync config", "error", err)
 		return false, "", nil
 	}
 
@@ -391,7 +391,7 @@ func (s *Server) getV2SyncData(lang string) (bool, string, []V2SyncEntry) {
 		LIMIT 20
 	`)
 	if err != nil {
-		logger.Info("Error querying sync log: %v", err)
+		logger.Info("Error querying sync log", "error", err)
 		return cfg.Enabled, interval, nil
 	}
 	defer rows.Close()
@@ -425,7 +425,7 @@ func (s *Server) getV2SyncData(lang string) (bool, string, []V2SyncEntry) {
 func (s *Server) getV2IncomingData() ([]V2IncomingBackup, int, string) {
 	backups, err := incoming.ScanIncomingBackups(s.db, s.cfg.IncomingDir)
 	if err != nil {
-		logger.Info("Error scanning incoming backups: %v", err)
+		logger.Info("Error scanning incoming backups", "error", err)
 		return nil, 0, "0 B"
 	}
 
@@ -450,7 +450,7 @@ func (s *Server) getV2ServerBackupData() []V2ServerBackup {
 	backupDir := filepath.Join(s.cfg.DataDir, "backups", "server")
 	files, err := serverbackup.ListBackups(backupDir)
 	if err != nil {
-		logger.Info("Error listing server backups: %v", err)
+		logger.Info("Error listing server backups", "error", err)
 		return nil
 	}
 

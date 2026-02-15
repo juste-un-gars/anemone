@@ -40,7 +40,7 @@ func NewSetupWizardServer(dataDir, lang string) *SetupWizardServer {
 	// Create translator instance for template functions
 	translator, err := i18n.New()
 	if err != nil {
-		logger.Info("Warning: Failed to create translator: %v", err)
+		logger.Info("Warning: Failed to create translator", "error", err)
 	}
 
 	// Load only setup wizard template with i18n support
@@ -117,7 +117,7 @@ func (s *SetupWizardServer) handleWizard(w http.ResponseWriter, r *http.Request)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.templates.ExecuteTemplate(w, "setup_wizard.html", data); err != nil {
-		logger.Info("Error rendering setup wizard template: %v", err)
+		logger.Info("Error rendering setup wizard template", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -126,7 +126,7 @@ func (s *SetupWizardServer) handleWizard(w http.ResponseWriter, r *http.Request)
 func (s *SetupWizardServer) handleStorageOptions(w http.ResponseWriter, r *http.Request) {
 	options, err := setup.GetStorageOptions()
 	if err != nil {
-		logger.Info("Error getting storage options: %v", err)
+		logger.Info("Error getting storage options", "error", err)
 		http.Error(w, "Failed to get storage options", http.StatusInternalServerError)
 		return
 	}
@@ -139,7 +139,7 @@ func (s *SetupWizardServer) handleStorageOptions(w http.ResponseWriter, r *http.
 func (s *SetupWizardServer) handleDisks(w http.ResponseWriter, r *http.Request) {
 	disks, err := setup.GetAvailableDisks()
 	if err != nil {
-		logger.Info("Error getting available disks: %v", err)
+		logger.Info("Error getting available disks", "error", err)
 		http.Error(w, "Failed to get available disks", http.StatusInternalServerError)
 		return
 	}
@@ -232,7 +232,7 @@ func (s *SetupWizardServer) handleStorageConfig(w http.ResponseWriter, r *http.R
 		// Create the separate incoming directory
 		if err == nil {
 			if createErr := setup.SetupIncomingDirectory(config.IncomingDir); createErr != nil {
-				logger.Info("Error creating separate incoming directory: %v", createErr)
+				logger.Info("Error creating separate incoming directory", "create_err", createErr)
 				http.Error(w, "Failed to create incoming directory: "+createErr.Error(), http.StatusInternalServerError)
 				return
 			}
@@ -240,14 +240,14 @@ func (s *SetupWizardServer) handleStorageConfig(w http.ResponseWriter, r *http.R
 	}
 
 	if err != nil {
-		logger.Info("Error setting up storage: %v", err)
+		logger.Info("Error setting up storage", "error", err)
 		http.Error(w, "Failed to setup storage: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Save configuration
 	if err := s.manager.SetStorageConfig(config); err != nil {
-		logger.Info("Error saving storage config: %v", err)
+		logger.Info("Error saving storage config", "error", err)
 		http.Error(w, "Failed to save configuration", http.StatusInternalServerError)
 		return
 	}
@@ -255,7 +255,7 @@ func (s *SetupWizardServer) handleStorageConfig(w http.ResponseWriter, r *http.R
 	// For import_existing, mark admin as already created (skip admin step)
 	if config.StorageType == "import_existing" {
 		if err := s.manager.SetAdminCreated("imported"); err != nil {
-			logger.Info("Error marking admin as created: %v", err)
+			logger.Info("Error marking admin as created", "error", err)
 			http.Error(w, "Failed to mark admin as created", http.StatusInternalServerError)
 			return
 		}
@@ -328,14 +328,14 @@ func (s *SetupWizardServer) handleAdmin(w http.ResponseWriter, r *http.Request) 
 	})
 
 	if err != nil {
-		logger.Info("Error finalizing setup: %v", err)
+		logger.Info("Error finalizing setup", "error", err)
 		http.Error(w, "Failed to create admin account: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Mark admin as created
 	if err := s.manager.SetAdminCreated(req.Username); err != nil {
-		logger.Info("Error marking admin created: %v", err)
+		logger.Info("Error marking admin created", "error", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -368,7 +368,7 @@ func (s *SetupWizardServer) handleFinalize(w http.ResponseWriter, r *http.Reques
 			SharesDir:   state.Config.SharesDir,
 			IncomingDir: state.Config.IncomingDir,
 		}); err != nil {
-			logger.Info("Error finalizing import: %v", err)
+			logger.Info("Error finalizing import", "error", err)
 			http.Error(w, "Failed to finalize import: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -376,7 +376,7 @@ func (s *SetupWizardServer) handleFinalize(w http.ResponseWriter, r *http.Reques
 
 	// Mark as finalized (keep state file so step-6 shows restart message)
 	if err := s.manager.Finalize(); err != nil {
-		logger.Info("Error finalizing setup: %v", err)
+		logger.Info("Error finalizing setup", "error", err)
 		http.Error(w, "Failed to finalize setup", http.StatusInternalServerError)
 		return
 	}
@@ -458,7 +458,7 @@ func (s *SetupWizardServer) handleRestoreValidate(w http.ResponseWriter, r *http
 	// Validate and decrypt backup
 	result, serverBackup, err := setup.ValidateBackup(encryptedData, passphrase)
 	if err != nil {
-		logger.Info("Backup validation failed: %v", err)
+		logger.Info("Backup validation failed", "error", err)
 		// Return the result with error info (not http error)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)
@@ -522,7 +522,7 @@ func (s *SetupWizardServer) handleRestoreExecute(w http.ResponseWriter, r *http.
 	}
 
 	if err := setup.ExecuteRestore(serverBackup, opts); err != nil {
-		logger.Info("Restore failed: %v", err)
+		logger.Info("Restore failed", "error", err)
 		http.Error(w, "Restore failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -534,12 +534,12 @@ func (s *SetupWizardServer) handleRestoreExecute(w http.ResponseWriter, r *http.
 
 	// Mark setup as finalized (keep state file so step-6 shows restart message)
 	if err := s.manager.Finalize(); err != nil {
-		logger.Info("Warning: Failed to finalize setup after restore: %v", err)
+		logger.Info("Warning: Failed to finalize setup after restore", "error", err)
 	}
 
 	// Don't cleanup state file - we need it to show "restart required" page
 
-	logger.Info("Server restored successfully from backup: %s", serverBackup.ServerName)
+	logger.Info("Server restored successfully from backup", "server_name", serverBackup.ServerName)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{

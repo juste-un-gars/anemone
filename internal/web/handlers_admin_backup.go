@@ -47,7 +47,7 @@ func (s *Server) handleAdminBackupExport(w http.ResponseWriter, r *http.Request)
 			Session: session,
 		}
 		if err := s.templates.ExecuteTemplate(w, "admin_backup_export.html", data); err != nil {
-			logger.Info("Error rendering backup export template: %v", err)
+			logger.Info("Error rendering backup export template", "error", err)
 		}
 		return
 	}
@@ -80,7 +80,7 @@ func (s *Server) handleAdminBackupExport(w http.ResponseWriter, r *http.Request)
 	// Export configuration
 	backup, err := backupPkg.ExportConfiguration(s.db, serverName)
 	if err != nil {
-		logger.Info("Error exporting configuration: %v", err)
+		logger.Info("Error exporting configuration", "error", err)
 		http.Error(w, "Failed to export configuration", http.StatusInternalServerError)
 		return
 	}
@@ -88,7 +88,7 @@ func (s *Server) handleAdminBackupExport(w http.ResponseWriter, r *http.Request)
 	// Encrypt backup
 	encryptedData, err := backupPkg.EncryptBackup(backup, passphrase)
 	if err != nil {
-		logger.Info("Error encrypting backup: %v", err)
+		logger.Info("Error encrypting backup", "error", err)
 		http.Error(w, "Failed to encrypt backup", http.StatusInternalServerError)
 		return
 	}
@@ -104,7 +104,7 @@ func (s *Server) handleAdminBackupExport(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 	w.Write(encryptedData)
 
-	logger.Info("Admin exported server configuration (backup size: %d bytes)", len(encryptedData))
+	logger.Info("Admin exported server configuration (backup size: bytes)", "encrypted_data", len(encryptedData))
 }
 
 // handleAdminBackup displays the list of server backups
@@ -130,7 +130,7 @@ func (s *Server) handleAdminBackup(w http.ResponseWriter, r *http.Request) {
 	// List all backups
 	backupFiles, err := serverbackup.ListBackups(backupDir)
 	if err != nil {
-		logger.Info("Error listing backups: %v", err)
+		logger.Info("Error listing backups", "error", err)
 		http.Error(w, "Failed to list backups", http.StatusInternalServerError)
 		return
 	}
@@ -170,7 +170,7 @@ func (s *Server) handleAdminBackup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_backup.html", data); err != nil {
-		logger.Info("Error rendering backup template: %v", err)
+		logger.Info("Error rendering backup template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -189,12 +189,12 @@ func (s *Server) handleAdminBackupCreate(w http.ResponseWriter, r *http.Request)
 	// Create backup
 	backupPath, err := serverbackup.CreateServerBackup(s.db, backupDir)
 	if err != nil {
-		logger.Info("Error creating manual backup: %v", err)
+		logger.Info("Error creating manual backup", "error", err)
 		http.Error(w, "Failed to create backup", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Info("Manual server backup created: %s", backupPath)
+	logger.Info("Manual server backup created", "backup_path", backupPath)
 
 	// Redirect back to server backup tab
 	http.Redirect(w, r, "/admin/backups?tab=server", http.StatusSeeOther)
@@ -235,7 +235,7 @@ func (s *Server) handleAdminBackupDownload(w http.ResponseWriter, r *http.Reques
 	// Re-encrypt backup with user passphrase
 	reEncryptedData, err := serverbackup.ReEncryptBackup(s.db, backupPath, passphrase)
 	if err != nil {
-		logger.Info("Error re-encrypting backup: %v", err)
+		logger.Info("Error re-encrypting backup", "error", err)
 		http.Error(w, "Failed to prepare backup for download", http.StatusInternalServerError)
 		return
 	}
@@ -247,7 +247,7 @@ func (s *Server) handleAdminBackupDownload(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusOK)
 	w.Write(reEncryptedData)
 
-	logger.Info("Admin downloaded backup %s (re-encrypted, size: %d bytes)", filename, len(reEncryptedData))
+	logger.Info("Admin downloaded backup (re-encrypted, size: bytes)", "filename", filename, "re_encrypted_data", len(reEncryptedData))
 }
 
 // handleAdminBackupDelete deletes a server backup file
@@ -283,12 +283,12 @@ func (s *Server) handleAdminBackupDelete(w http.ResponseWriter, r *http.Request)
 
 	// Delete the backup file
 	if err := os.Remove(backupPath); err != nil {
-		logger.Info("Error deleting backup %s: %v", filename, err)
+		logger.Info("Error deleting backup", "filename", filename, "error", err)
 		http.Error(w, "Failed to delete backup", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Info("Admin deleted backup %s", filename)
+	logger.Info("Admin deleted backup", "filename", filename)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Backup deleted successfully"))
 }
@@ -307,7 +307,7 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 	// Get current server name to filter backups
 	currentServerName, err := sync.GetServerName(s.db)
 	if err != nil {
-		logger.Info("Error getting server name: %v", err)
+		logger.Info("Error getting server name", "error", err)
 		http.Error(w, "Failed to get server name", http.StatusInternalServerError)
 		return
 	}
@@ -315,7 +315,7 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 	// Get all users (except admin)
 	rows, err := s.db.Query("SELECT id, username FROM users WHERE is_admin = 0 ORDER BY username")
 	if err != nil {
-		logger.Info("Error getting users: %v", err)
+		logger.Info("Error getting users", "error", err)
 		http.Error(w, "Failed to get users", http.StatusInternalServerError)
 		return
 	}
@@ -338,7 +338,7 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 	// Get master key for password decryption
 	var masterKey string
 	if err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey); err != nil {
-		logger.Info("Error getting master key: %v", err)
+		logger.Info("Error getting master key", "error", err)
 		http.Error(w, "System configuration error", http.StatusInternalServerError)
 		return
 	}
@@ -354,7 +354,7 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 		// Get all peers
 		allPeers, err := peers.GetAll(s.db)
 		if err != nil {
-			logger.Info("Error getting peers: %v", err)
+			logger.Info("Error getting peers", "error", err)
 			continue
 		}
 
@@ -385,7 +385,7 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 			if peer.Password != nil && len(*peer.Password) > 0 {
 				peerPassword, err := peers.DecryptPeerPassword(peer.Password, masterKey)
 				if err != nil {
-					logger.Info("Error decrypting peer password: %v", err)
+					logger.Info("Error decrypting peer password", "error", err)
 					continue
 				}
 				req.Header.Set("X-Sync-Password", peerPassword)
@@ -443,7 +443,7 @@ func (s *Server) handleAdminRestoreUsers(w http.ResponseWriter, r *http.Request)
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_restore_users.html", data); err != nil {
-		logger.Info("Error executing template: %v", err)
+		logger.Info("Error executing template", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	}
 }
@@ -509,16 +509,15 @@ func (s *Server) handleAdminRestoreUsersRestore(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	logger.Info("Admin %s starting bulk restore for user %s (id %d) from peer %d share %s source %s",
-		session.Username, username, userID, peerID, shareName, sourceServer)
+	logger.Info("Admin starting bulk restore for user (id ) from peer share source", "username", session.Username, "username2", username, "user_id", userID, "peer_id", peerID, "share_name", shareName, "source_server", sourceServer)
 
 	// Start bulk restore in background
 	go func() {
 		err := bulkrestore.BulkRestoreFromPeer(s.db, userID, peerID, shareName, sourceServer, s.cfg.DataDir, nil)
 		if err != nil {
-			logger.Info("Admin bulk restore failed for user %s: %v", username, err)
+			logger.Info("Admin bulk restore failed for user", "username", username, "error", err)
 		} else {
-			logger.Info("Admin bulk restore completed successfully for user %s", username)
+			logger.Info("Admin bulk restore completed successfully for user", "username", username)
 		}
 	}()
 
@@ -544,7 +543,7 @@ func (s *Server) handleAdminSystemUpdate(w http.ResponseWriter, r *http.Request)
 	// Get update info
 	updateInfo, err := updater.GetUpdateInfo(s.db)
 	if err != nil {
-		logger.Info("Error getting update info: %v", err)
+		logger.Info("Error getting update info", "error", err)
 		updateInfo = &updater.UpdateInfo{
 			CurrentVersion: updater.GetCurrentVersion(),
 			LatestVersion:  updater.GetCurrentVersion(),
@@ -555,7 +554,7 @@ func (s *Server) handleAdminSystemUpdate(w http.ResponseWriter, r *http.Request)
 	// Get last check time
 	lastCheck, err := updater.GetLastUpdateCheck(s.db)
 	if err != nil {
-		logger.Info("Error getting last update check: %v", err)
+		logger.Info("Error getting last update check", "error", err)
 	}
 
 	data := struct {
@@ -577,7 +576,7 @@ func (s *Server) handleAdminSystemUpdate(w http.ResponseWriter, r *http.Request)
 
 	tmpl := s.loadV2Page("v2_system_update.html", s.funcMap)
 	if err := tmpl.ExecuteTemplate(w, "v2_base", data); err != nil {
-		logger.Info("Error rendering system update template: %v", err)
+		logger.Info("Error rendering system update template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -596,7 +595,7 @@ func (s *Server) handleAdminSystemUpdateCheck(w http.ResponseWriter, r *http.Req
 	logger.Info("🔍 Manual update check triggered by admin")
 	info, err := updater.CheckUpdate()
 	if err != nil {
-		logger.Info("Error checking for updates: %v", err)
+		logger.Info("Error checking for updates", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
@@ -607,14 +606,14 @@ func (s *Server) handleAdminSystemUpdateCheck(w http.ResponseWriter, r *http.Req
 
 	// Save to database
 	if err := updater.SaveUpdateInfo(s.db, info); err != nil {
-		logger.Info("Error saving update info: %v", err)
+		logger.Info("Error saving update info", "error", err)
 	}
 
 	// Log result
 	if info.Available {
-		logger.Info("✨ Update available: %s → %s", info.CurrentVersion, info.LatestVersion)
+		logger.Info("Update available:", "current_version", info.CurrentVersion, "latest_version", info.LatestVersion)
 	} else {
-		logger.Info("✅ Up to date: %s", info.CurrentVersion)
+		logger.Info("Up to date", "current_version", info.CurrentVersion)
 	}
 
 	// Return result
@@ -638,7 +637,7 @@ func (s *Server) handleAdminSystemUpdateInstall(w http.ResponseWriter, r *http.R
 	// Get update info from database
 	updateInfo, err := updater.GetUpdateInfo(s.db)
 	if err != nil {
-		logger.Info("Error getting update info: %v", err)
+		logger.Info("Error getting update info", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
@@ -659,11 +658,11 @@ func (s *Server) handleAdminSystemUpdateInstall(w http.ResponseWriter, r *http.R
 	}
 
 	// Launch the auto-update script
-	logger.Info("🚀 Starting automatic update: %s → %s", updateInfo.CurrentVersion, updateInfo.LatestVersion)
+	logger.Info("Starting automatic update:", "current_version", updateInfo.CurrentVersion, "latest_version", updateInfo.LatestVersion)
 
 	// No password needed - sudo NOPASSWD should be configured for systemctl restart
 	if err := updater.PerformAutoUpdate(updateInfo.LatestVersion); err != nil {
-		logger.Info("Error starting auto-update: %v", err)
+		logger.Info("Error starting auto-update", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
@@ -675,7 +674,7 @@ func (s *Server) handleAdminSystemUpdateInstall(w http.ResponseWriter, r *http.R
 	// Return success response
 	// The update script will continue in the background
 	logger.Info("✅ Auto-update script launched successfully")
-	logger.Info("📝 Update log: %s", updater.GetUpdateLogPath())
+	logger.Info("Update log", "get_update_log_path", updater.GetUpdateLogPath())
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{

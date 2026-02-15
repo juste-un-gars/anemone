@@ -30,7 +30,7 @@ func Start(db *sql.DB) {
 			// Get all peers
 			allPeers, err := peers.GetAll(db)
 			if err != nil {
-				logger.Info("⚠️  Scheduler: Failed to get peers: %v", err)
+				logger.Info("Scheduler: Failed to get peers", "error", err)
 				continue
 			}
 
@@ -41,23 +41,21 @@ func Start(db *sql.DB) {
 					continue
 				}
 
-				logger.Info("🔄 Scheduler: Triggering sync to peer '%s' (frequency: %s)...", peer.Name, peer.SyncFrequency)
+				logger.Info("Scheduler: Triggering sync to peer '' (frequency: )...", "name", peer.Name, "sync_frequency", peer.SyncFrequency)
 
 				// Perform sync for this peer
 				successCount, errorCount, lastError := sync.SyncPeer(db, peer.ID, peer.Name, peer.Address, peer.Port, peer.Password, peer.SyncTimeoutHours)
 
 				// Update last sync timestamp for this peer
 				if err := peers.UpdateLastSync(db, peer.ID); err != nil {
-					logger.Info("⚠️  Scheduler: Failed to update last_sync for peer %s: %v", peer.Name, err)
+					logger.Info("Scheduler: Failed to update last_sync for peer", "name", peer.Name, "error", err)
 				}
 
 				// Log results
 				if errorCount > 0 {
-					logger.Info("⚠️  Scheduler: Sync to %s completed with errors - Success: %d, Errors: %d, Last error: %s",
-						peer.Name, successCount, errorCount, lastError)
+					logger.Info("Scheduler: Sync to completed with errors - Success: , Errors: , Last error", "name", peer.Name, "success_count", successCount, "error_count", errorCount, "last_error", lastError)
 				} else {
-					logger.Info("✅ Scheduler: Sync to %s completed successfully - %d shares synchronized",
-						peer.Name, successCount)
+					logger.Info("Scheduler: Sync to completed successfully - shares synchronized", "name", peer.Name, "success_count", successCount)
 				}
 			}
 		}

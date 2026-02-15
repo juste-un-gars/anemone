@@ -158,7 +158,7 @@ func (sm *SessionManager) GetSession(sessionID string) (*Session, error) {
 func (sm *SessionManager) DeleteSession(sessionID string) {
 	_, err := sm.db.Exec("DELETE FROM sessions WHERE id = ?", sessionID)
 	if err != nil {
-		logger.Info("Failed to delete session: %v", err)
+		logger.Info("Failed to delete session", "error", err)
 	}
 }
 
@@ -239,11 +239,11 @@ func (sm *SessionManager) cleanupExpiredSessions() {
 	for range ticker.C {
 		result, err := sm.db.Exec("DELETE FROM sessions WHERE expires_at < CURRENT_TIMESTAMP")
 		if err != nil {
-			logger.Info("Failed to cleanup expired sessions: %v", err)
+			logger.Info("Failed to cleanup expired sessions", "error", err)
 			continue
 		}
 		if count, _ := result.RowsAffected(); count > 0 {
-			logger.Info("Cleaned up %d expired sessions", count)
+			logger.Info("Cleaned up expired sessions", "count", count)
 		}
 	}
 }

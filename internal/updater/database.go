@@ -141,7 +141,7 @@ func SyncVersionWithDB(db *sql.DB) error {
 
 	// If DB version differs from code version, update it
 	if dbVersion != Version {
-		logger.Info("📝 Syncing version: DB has '%s', code has '%s' - updating DB", dbVersion, Version)
+		logger.Info("Syncing version: DB has '', code has '' - updating DB", "db_version", dbVersion, "version", Version)
 
 		_, err = db.Exec(`
 			INSERT OR REPLACE INTO system_info (key, value, updated_at)
@@ -151,7 +151,7 @@ func SyncVersionWithDB(db *sql.DB) error {
 			return fmt.Errorf("failed to update current_version in DB: %w", err)
 		}
 
-		logger.Info("✅ Database version updated to %s", Version)
+		logger.Info("Database version updated to", "version", Version)
 	}
 
 	return nil

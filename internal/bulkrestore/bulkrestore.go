@@ -143,8 +143,7 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, s
 		progressChan <- progress
 	}
 
-	logger.Info("Starting bulk restore for user %d from peer %s: %d files, %d bytes",
-		userID, peer.Name, progress.TotalFiles, progress.TotalBytes)
+	logger.Info("Starting bulk restore", "user_id", userID, "peer", peer.Name, "total_files", progress.TotalFiles, "total_bytes", progress.TotalBytes)
 
 	// Determine target directory based on share name
 	// For standard shares (backup/data), use the share name directly
@@ -178,13 +177,13 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, s
 			if err := os.MkdirAll(dirPath, 0755); err != nil {
 				errMsg := fmt.Sprintf("Failed to create directory %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
-				logger.Info("Error: %s", errMsg)
+				logger.Info("Error creating directory", "path", filePath, "error", err)
 				continue
 			}
 
 			// Set directory ownership to user
 			if err := setOwnership(dirPath, user.Username); err != nil {
-				logger.Info("Warning: Failed to set ownership for directory %s: %v", filePath, err)
+				logger.Info("Warning: Failed to set ownership for directory", "path", filePath, "error", err)
 			}
 		} else {
 			// Download and decrypt file
@@ -195,7 +194,7 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, s
 			if err != nil {
 				errMsg := fmt.Sprintf("Failed to create request for %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
-				logger.Info("Error: %s", errMsg)
+				logger.Info("Error creating request", "path", filePath, "error", err)
 				continue
 			}
 
@@ -205,7 +204,7 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, s
 				if err != nil {
 					errMsg := fmt.Sprintf("Failed to decrypt peer password: %v", err)
 					progress.Errors = append(progress.Errors, errMsg)
-					logger.Info("Error: %s", errMsg)
+					logger.Info("Error decrypting peer password", "error", err)
 					continue
 				}
 				req.Header.Set("X-Sync-Password", peerPassword)
@@ -215,7 +214,7 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, s
 			if err != nil {
 				errMsg := fmt.Sprintf("Failed to download %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
-				logger.Info("Error: %s", errMsg)
+				logger.Info("Error downloading file", "path", filePath, "error", err)
 				continue
 			}
 
@@ -223,7 +222,7 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, s
 				resp.Body.Close()
 				errMsg := fmt.Sprintf("Failed to download %s: status %d", filePath, resp.StatusCode)
 				progress.Errors = append(progress.Errors, errMsg)
-				logger.Info("Error: %s", errMsg)
+				logger.Info("Error downloading file", "path", filePath, "status", resp.StatusCode)
 				continue
 			}
 
@@ -233,7 +232,7 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, s
 			if err != nil {
 				errMsg := fmt.Sprintf("Failed to read %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
-				logger.Info("Error: %s", errMsg)
+				logger.Info("Error reading file", "path", filePath, "error", err)
 				continue
 			}
 
@@ -242,7 +241,7 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, s
 			if err != nil {
 				errMsg := fmt.Sprintf("Failed to decrypt %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
-				logger.Info("Error: %s", errMsg)
+				logger.Info("Error decrypting file", "path", filePath, "error", err)
 				continue
 			}
 
@@ -254,29 +253,29 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, s
 			if err := os.MkdirAll(parentDir, 0755); err != nil {
 				errMsg := fmt.Sprintf("Failed to create parent directory for %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
-				logger.Info("Error: %s", errMsg)
+				logger.Info("Error creating parent directory", "path", filePath, "error", err)
 				continue
 			}
 
 			// Set parent directory ownership (important for subdirectories)
 			if err := setOwnership(parentDir, user.Username); err != nil {
-				logger.Info("Warning: Failed to set ownership for parent directory of %s: %v", filePath, err)
+				logger.Info("Warning: Failed to set ownership for parent directory", "path", filePath, "error", err)
 			}
 
 			if err := os.WriteFile(targetFilePath, decryptedData, 0644); err != nil {
 				errMsg := fmt.Sprintf("Failed to write %s: %v", filePath, err)
 				progress.Errors = append(progress.Errors, errMsg)
-				logger.Info("Error: %s", errMsg)
+				logger.Info("Error writing file", "path", filePath, "error", err)
 				continue
 			}
 
 			// Set file ownership to user
 			if err := setOwnership(targetFilePath, user.Username); err != nil {
-				logger.Info("Warning: Failed to set ownership for %s: %v", filePath, err)
+				logger.Info("Warning: Failed to set ownership", "path", filePath, "error", err)
 			}
 
 			progress.ProcessedBytes += file.Size
-			logger.Info("Restored file: %s (%d bytes)", filePath, file.Size)
+			logger.Info("Restored file", "path", filePath, "size", file.Size)
 		}
 
 		if progressChan != nil {
@@ -284,8 +283,7 @@ func BulkRestoreFromPeer(db *sql.DB, userID int, peerID int, shareName string, s
 		}
 	}
 
-	logger.Info("Bulk restore completed for user %d: %d files, %d bytes, %d errors",
-		userID, progress.ProcessedFiles, progress.ProcessedBytes, len(progress.Errors))
+	logger.Info("Bulk restore completed", "user_id", userID, "files", progress.ProcessedFiles, "bytes", progress.ProcessedBytes, "errors", len(progress.Errors))
 
 	return nil
 }

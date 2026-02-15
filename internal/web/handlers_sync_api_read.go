@@ -95,7 +95,7 @@ func (s *Server) handleAPISyncListPhysicalFiles(w http.ResponseWriter, r *http.R
 	})
 
 	if err != nil {
-		logger.Info("Error listing files in %s: %v", backupDir, err)
+		logger.Info("Error listing files in", "backup_dir", backupDir, "error", err)
 		http.Error(w, "Failed to list files", http.StatusInternalServerError)
 		return
 	}
@@ -112,7 +112,7 @@ func (s *Server) handleAPISyncListPhysicalFiles(w http.ResponseWriter, r *http.R
 	}
 	w.Write(filesJSON)
 
-	logger.Info("Listed %d physical files for user %d, share %s", len(files), userID, shareName)
+	logger.Info("Listed physical files for user , share", "files", len(files), "user_id", userID, "share_name", shareName)
 }
 
 // handleAPISyncListUserBackups lists available backups for a given user on this peer
@@ -155,7 +155,7 @@ func (s *Server) handleAPISyncListUserBackups(w http.ResponseWriter, r *http.Req
 			w.Write([]byte("[]"))
 			return
 		}
-		logger.Info("Error reading backups directory: %v", err)
+		logger.Info("Error reading backups directory", "error", err)
 		http.Error(w, "Failed to read backups directory", http.StatusInternalServerError)
 		return
 	}
@@ -257,7 +257,7 @@ func (s *Server) handleAPISyncDownloadEncryptedManifest(w http.ResponseWriter, r
 	// Read encrypted manifest
 	encryptedData, err := os.ReadFile(manifestPath)
 	if err != nil {
-		logger.Info("Error reading encrypted manifest: %v", err)
+		logger.Info("Error reading encrypted manifest", "error", err)
 		http.Error(w, "Failed to read manifest", http.StatusInternalServerError)
 		return
 	}
@@ -268,7 +268,7 @@ func (s *Server) handleAPISyncDownloadEncryptedManifest(w http.ResponseWriter, r
 	w.WriteHeader(http.StatusOK)
 	w.Write(encryptedData)
 
-	logger.Info("Sent encrypted manifest for user %d share %s", userID, shareName)
+	logger.Info("Sent encrypted manifest for user share", "user_id", userID, "share_name", shareName)
 }
 
 // handleAPISyncDownloadEncryptedFile downloads an encrypted file without decrypting it
@@ -321,7 +321,7 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 	// This prevents path traversal attacks like /srv/anemone/backups_evil/../etc/passwd
 	relPath, err := filepath.Rel(absBackupPath, absFilePath)
 	if err != nil || strings.HasPrefix(relPath, "..") || filepath.IsAbs(relPath) {
-		logger.Info("Security: Attempted path traversal: %s (relative: %s)", filePath, relPath)
+		logger.Info("Security: Attempted path traversal", "file_path", filePath, "rel_path", relPath)
 		http.Error(w, "Invalid file path", http.StatusForbidden)
 		return
 	}
@@ -333,7 +333,7 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 		return
 	}
 	if err != nil {
-		logger.Info("Error accessing file: %v", err)
+		logger.Info("Error accessing file", "error", err)
 		http.Error(w, "Failed to access file", http.StatusInternalServerError)
 		return
 	}
@@ -341,7 +341,7 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 	// Open encrypted file
 	encryptedFile, err := os.Open(encryptedFilePath)
 	if err != nil {
-		logger.Info("Error opening encrypted file: %v", err)
+		logger.Info("Error opening encrypted file", "error", err)
 		http.Error(w, "Failed to open file", http.StatusInternalServerError)
 		return
 	}
@@ -357,5 +357,5 @@ func (s *Server) handleAPISyncDownloadEncryptedFile(w http.ResponseWriter, r *ht
 	// Stream the encrypted file
 	io.Copy(w, encryptedFile)
 
-	logger.Info("Sent encrypted file %s for user %d share %s", filePath, userID, shareName)
+	logger.Info("Sent encrypted file for user share", "file_path", filePath, "user_id", userID, "share_name", shareName)
 }

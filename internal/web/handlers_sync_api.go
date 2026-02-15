@@ -29,7 +29,7 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 
 	// Parse multipart form (max 10GB)
 	if err := r.ParseMultipartForm(10 << 30); err != nil {
-		logger.Info("Error parsing multipart form: %v", err)
+		logger.Info("Error parsing multipart form", "error", err)
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
@@ -52,7 +52,7 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 	// Find matching share in local database
 	userShares, err := shares.GetByUser(s.db, userID)
 	if err != nil {
-		logger.Info("Error getting user shares: %v", err)
+		logger.Info("Error getting user shares", "error", err)
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
 	}
@@ -66,7 +66,7 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if targetShare == nil {
-		logger.Info("No matching share found for user %d, share %s", userID, shareName)
+		logger.Info("No matching share found for user , share", "user_id", userID, "share_name", shareName)
 		http.Error(w, "Share not found", http.StatusNotFound)
 		return
 	}
@@ -74,7 +74,7 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 	// Get archive file
 	file, _, err := r.FormFile("archive")
 	if err != nil {
-		logger.Info("Error getting archive file: %v", err)
+		logger.Info("Error getting archive file", "error", err)
 		http.Error(w, "Missing archive file", http.StatusBadRequest)
 		return
 	}
@@ -88,7 +88,7 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 		// Get user's encryption key
 		encryptionKey, err := sync.GetUserEncryptionKey(s.db, userID)
 		if err != nil {
-			logger.Info("Error getting encryption key: %v", err)
+			logger.Info("Error getting encryption key", "error", err)
 			http.Error(w, "Failed to get encryption key", http.StatusInternalServerError)
 			return
 		}
@@ -96,7 +96,7 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 		// Decrypt archive
 		var decryptedBuf bytes.Buffer
 		if err := crypto.DecryptStream(file, &decryptedBuf, encryptionKey); err != nil {
-			logger.Info("Error decrypting archive: %v", err)
+			logger.Info("Error decrypting archive", "error", err)
 			http.Error(w, fmt.Sprintf("Failed to decrypt archive: %v", err), http.StatusInternalServerError)
 			return
 		}
@@ -105,12 +105,12 @@ func (s *Server) handleAPISyncReceive(w http.ResponseWriter, r *http.Request) {
 
 	// Extract archive to local share path
 	if err := sync.ExtractTarGz(reader, targetShare.Path); err != nil {
-		logger.Info("Error extracting archive: %v", err)
+		logger.Info("Error extracting archive", "error", err)
 		http.Error(w, fmt.Sprintf("Failed to extract archive: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	logger.Info("Successfully received and extracted sync to: %s (user %d, share %s)", targetShare.Path, userID, shareName)
+	logger.Info("Successfully received and extracted sync to: (user , share )", "path", targetShare.Path, "user_id", userID, "share_name", shareName)
 
 	// Return success
 	w.Header().Set("Content-Type", "application/json")
@@ -168,7 +168,7 @@ func (s *Server) handleAPISyncManifestGet(w http.ResponseWriter, r *http.Request
 	// Read encrypted manifest
 	encryptedData, err := os.ReadFile(manifestPath)
 	if err != nil {
-		logger.Info("Error reading manifest file: %v", err)
+		logger.Info("Error reading manifest file", "error", err)
 		http.Error(w, "Failed to read manifest", http.StatusInternalServerError)
 		return
 	}
@@ -212,7 +212,7 @@ func (s *Server) handleAPISyncManifestPut(w http.ResponseWriter, r *http.Request
 	// Read encrypted manifest from request body
 	encryptedData, err := io.ReadAll(r.Body)
 	if err != nil {
-		logger.Info("Error reading request body: %v", err)
+		logger.Info("Error reading request body", "error", err)
 		http.Error(w, "Failed to read manifest data", http.StatusBadRequest)
 		return
 	}
@@ -221,7 +221,7 @@ func (s *Server) handleAPISyncManifestPut(w http.ResponseWriter, r *http.Request
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
 	backupDir := filepath.Join(s.cfg.IncomingDir, sourceServer, backupDirName)
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		logger.Info("Error creating backup directory: %v", err)
+		logger.Info("Error creating backup directory", "error", err)
 		http.Error(w, "Failed to create backup directory", http.StatusInternalServerError)
 		return
 	}
@@ -229,12 +229,12 @@ func (s *Server) handleAPISyncManifestPut(w http.ResponseWriter, r *http.Request
 	// Write encrypted manifest
 	manifestPath := filepath.Join(backupDir, ".anemone-manifest.json.enc")
 	if err := os.WriteFile(manifestPath, encryptedData, 0644); err != nil {
-		logger.Info("Error writing manifest file: %v", err)
+		logger.Info("Error writing manifest file", "error", err)
 		http.Error(w, "Failed to write manifest", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Info("Successfully updated manifest for user %d, share %s", userID, shareName)
+	logger.Info("Successfully updated manifest for user , share", "user_id", userID, "share_name", shareName)
 
 	// Return success
 	w.Header().Set("Content-Type", "application/json")
@@ -267,7 +267,7 @@ func (s *Server) handleAPISyncSourceInfo(w http.ResponseWriter, r *http.Request)
 	// Read JSON data from request body
 	sourceInfoData, err := io.ReadAll(r.Body)
 	if err != nil {
-		logger.Info("Error reading request body: %v", err)
+		logger.Info("Error reading request body", "error", err)
 		http.Error(w, "Failed to read source info data", http.StatusBadRequest)
 		return
 	}
@@ -282,7 +282,7 @@ func (s *Server) handleAPISyncSourceInfo(w http.ResponseWriter, r *http.Request)
 	backupDirName := fmt.Sprintf("%d_%s", userID, shareName)
 	backupDir := filepath.Join(s.cfg.IncomingDir, sourceServer, backupDirName)
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
-		logger.Info("Error creating backup directory: %v", err)
+		logger.Info("Error creating backup directory", "error", err)
 		http.Error(w, "Failed to create backup directory", http.StatusInternalServerError)
 		return
 	}
@@ -290,12 +290,12 @@ func (s *Server) handleAPISyncSourceInfo(w http.ResponseWriter, r *http.Request)
 	// Write source info file (unencrypted metadata)
 	sourceInfoPath := filepath.Join(backupDir, ".source-info.json")
 	if err := os.WriteFile(sourceInfoPath, sourceInfoData, 0644); err != nil {
-		logger.Info("Error writing source info file: %v", err)
+		logger.Info("Error writing source info file", "error", err)
 		http.Error(w, "Failed to write source info", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Info("Successfully updated source info for user %d, share %s", userID, shareName)
+	logger.Info("Successfully updated source info for user , share", "user_id", userID, "share_name", shareName)
 
 	// Return success
 	w.Header().Set("Content-Type", "application/json")
@@ -321,7 +321,7 @@ func (s *Server) handleAPISyncFile(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request) {
 	// Parse multipart form (max 10GB)
 	if err := r.ParseMultipartForm(10 << 30); err != nil {
-		logger.Info("Error parsing multipart form: %v", err)
+		logger.Info("Error parsing multipart form", "error", err)
 		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
@@ -357,7 +357,7 @@ func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request)
 	// Get file from multipart form
 	file, _, err := r.FormFile("file")
 	if err != nil {
-		logger.Info("Error getting file: %v", err)
+		logger.Info("Error getting file", "error", err)
 		http.Error(w, "Missing file", http.StatusBadRequest)
 		return
 	}
@@ -370,7 +370,7 @@ func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request)
 
 	// Create parent directory if needed
 	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
-		logger.Info("Error creating directory: %v", err)
+		logger.Info("Error creating directory", "error", err)
 		http.Error(w, "Failed to create directory", http.StatusInternalServerError)
 		return
 	}
@@ -378,19 +378,19 @@ func (s *Server) handleAPISyncFileUpload(w http.ResponseWriter, r *http.Request)
 	// Write file to disk
 	outFile, err := os.Create(targetPath)
 	if err != nil {
-		logger.Info("Error creating file: %v", err)
+		logger.Info("Error creating file", "error", err)
 		http.Error(w, "Failed to create file", http.StatusInternalServerError)
 		return
 	}
 	defer outFile.Close()
 
 	if _, err := io.Copy(outFile, file); err != nil {
-		logger.Info("Error writing file: %v", err)
+		logger.Info("Error writing file", "error", err)
 		http.Error(w, "Failed to write file", http.StatusInternalServerError)
 		return
 	}
 
-	logger.Info("Successfully uploaded file: %s (user %d, share %s)", relativePath, userID, shareName)
+	logger.Info("Successfully uploaded file: (user , share )", "relative_path", relativePath, "user_id", userID, "share_name", shareName)
 
 	// Return success
 	w.Header().Set("Content-Type", "application/json")
@@ -436,9 +436,9 @@ func (s *Server) handleAPISyncFileDelete(w http.ResponseWriter, r *http.Request)
 	if err := os.Remove(targetPath); err != nil {
 		if os.IsNotExist(err) {
 			// File already doesn't exist - that's OK
-			logger.Info("File already deleted: %s", relativePath)
+			logger.Info("File already deleted", "relative_path", relativePath)
 		} else {
-			logger.Info("Error deleting file: %v", err)
+			logger.Info("Error deleting file", "error", err)
 			http.Error(w, "Failed to delete file", http.StatusInternalServerError)
 			return
 		}
@@ -447,7 +447,7 @@ func (s *Server) handleAPISyncFileDelete(w http.ResponseWriter, r *http.Request)
 	// Clean up empty parent directories
 	cleanEmptyParentDirs(filepath.Dir(targetPath), backupDir)
 
-	logger.Info("Successfully deleted file: %s (user %d, share %s)", relativePath, userID, shareName)
+	logger.Info("Successfully deleted file: (user , share )", "relative_path", relativePath, "user_id", userID, "share_name", shareName)
 
 	// Return success
 	w.Header().Set("Content-Type", "application/json")
@@ -505,7 +505,7 @@ func (s *Server) handleAPISyncDeleteUserBackup(w http.ResponseWriter, r *http.Re
 	pattern := fmt.Sprintf("%d_*", userID)
 	matches, err := filepath.Glob(filepath.Join(incomingDir, pattern))
 	if err != nil {
-		logger.Info("Error globbing backup directories: %v", err)
+		logger.Info("Error globbing backup directories", "error", err)
 		http.Error(w, "Failed to find backup directories", http.StatusInternalServerError)
 		return
 	}
@@ -516,11 +516,11 @@ func (s *Server) handleAPISyncDeleteUserBackup(w http.ResponseWriter, r *http.Re
 		// Delete the entire backup directory (using sudo for permission)
 		cmd := exec.Command("sudo", "rm", "-rf", backupDir)
 		if err := cmd.Run(); err != nil {
-			logger.Info("Warning: failed to delete backup directory %s: %v", backupDir, err)
+			logger.Info("Warning: failed to delete backup directory", "backup_dir", backupDir, "error", err)
 			continue
 		}
 		deletedCount++
-		logger.Info("Deleted backup directory: %s", backupDir)
+		logger.Info("Deleted backup directory", "backup_dir", backupDir)
 	}
 
 	// Return success
@@ -528,7 +528,7 @@ func (s *Server) handleAPISyncDeleteUserBackup(w http.ResponseWriter, r *http.Re
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"success": true, "message": "User backup deleted", "deleted_directories": %d}`, deletedCount)
 
-	logger.Info("Deleted %d backup director(ies) for user %d from source %s", deletedCount, userID, sourceServer)
+	logger.Info("Deleted backup director(ies) for user from source", "deleted_count", deletedCount, "user_id", userID, "source_server", sourceServer)
 }
 
 
@@ -562,11 +562,11 @@ func cleanEmptyParentDirs(dir, stopDir string) {
 		// Try to remove empty directory
 		if err := os.Remove(dir); err != nil {
 			// Failed to remove (permissions, etc.), stop
-			logger.Info("Could not remove empty directory %s: %v", dir, err)
+			logger.Info("Could not remove empty directory", "dir", dir, "error", err)
 			return
 		}
 
-		logger.Info("Removed empty directory: %s", dir)
+		logger.Info("Removed empty directory", "dir", dir)
 
 		// Move up to parent directory
 		dir = filepath.Dir(dir)

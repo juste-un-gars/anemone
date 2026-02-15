@@ -110,7 +110,7 @@ func BuildUserManifest(sharePath, shareName, shareType, username string) (*UserM
 		if err != nil {
 			// Log but continue on permission errors
 			if os.IsPermission(err) {
-				logger.Info(fmt.Sprintf("⚠️  Permission denied: %s", path))
+				logger.Info("Permission denied", "path", path)
 				return nil
 			}
 			return err
@@ -164,7 +164,7 @@ func BuildUserManifest(sharePath, shareName, shareType, username string) (*UserM
 			var calcErr error
 			hash, calcErr = calculateChecksum(path)
 			if calcErr != nil {
-				logger.Info(fmt.Sprintf("⚠️  Failed to calculate checksum for %s: %v", relPath, calcErr))
+				logger.Info("Failed to calculate checksum for", "rel_path", relPath, "calc_err", calcErr)
 				return nil // Skip this file but continue
 			}
 			checksumCalculated++
@@ -188,8 +188,7 @@ func BuildUserManifest(sharePath, shareName, shareType, username string) (*UserM
 	}
 
 	if checksumCalculated > 0 || checksumReused > 0 {
-		logger.Info(fmt.Sprintf("   📊 %s: %d files (%d checksums calculated, %d reused from cache)",
-			shareName, manifest.FileCount, checksumCalculated, checksumReused))
+		logger.Info("files ( checksums calculated, reused from cache)", "share_name", shareName, "file_count", manifest.FileCount, "checksum_calculated", checksumCalculated, "checksum_reused", checksumReused)
 	}
 
 	return manifest, nil
@@ -243,7 +242,7 @@ func loadCachedManifest(sharePath string) *UserManifest {
 
 	var manifest UserManifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
-		logger.Info(fmt.Sprintf("⚠️  Failed to parse existing manifest: %v", err))
+		logger.Info("Failed to parse existing manifest", "error", err)
 		return nil
 	}
 

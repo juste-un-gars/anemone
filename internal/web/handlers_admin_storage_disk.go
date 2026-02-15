@@ -25,7 +25,7 @@ func (s *Server) handleAdminStorageDisksAvailable(w http.ResponseWriter, r *http
 
 	disks, err := storage.GetAvailableDisks()
 	if err != nil {
-		logger.Info("Error listing available disks: %v", err)
+		logger.Info("Error listing available disks", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -66,7 +66,7 @@ func (s *Server) handleAdminStorageDiskFormat(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := storage.FormatDisk(req); err != nil {
-		logger.Info("Error formatting disk %s: %v", req.Device, err)
+		logger.Info("Error formatting disk", "device", req.Device, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -78,18 +78,18 @@ func (s *Server) handleAdminStorageDiskFormat(w http.ResponseWriter, r *http.Req
 	var fstabError string
 	if req.Mount && req.MountPath != "" {
 		if err := storage.MountDisk(req.Device, req.MountPath, req.SharedAccess); err != nil {
-			logger.Info("Warning: Failed to mount disk %s at %s: %v", req.Device, req.MountPath, err)
+			logger.Info("Warning: Failed to mount disk at", "device", req.Device, "mount_path", req.MountPath, "error", err)
 			mountError = err.Error()
 		} else {
-			logger.Info("Mounted disk %s at %s (shared: %v)", req.Device, req.MountPath, req.SharedAccess)
+			logger.Info("Mounted disk", "device", req.Device, "mount_path", req.MountPath, "shared_access", req.SharedAccess)
 
 			// Add to fstab if persistent mount requested
 			if req.Persistent {
 				if err := storage.AddToFstab(req.Device, req.MountPath, req.SharedAccess); err != nil {
-					logger.Info("Warning: Failed to add to fstab: %v", err)
+					logger.Info("Warning: Failed to add to fstab", "error", err)
 					fstabError = err.Error()
 				} else {
-					logger.Info("Added to fstab: %s at %s", req.Device, req.MountPath)
+					logger.Info("Added to fstab: at", "device", req.Device, "mount_path", req.MountPath)
 				}
 			}
 		}
@@ -136,7 +136,7 @@ func (s *Server) handleAdminStorageDiskUnmount(w http.ResponseWriter, r *http.Re
 	}
 
 	if err := storage.UnmountDisk(req.MountPath, req.Eject); err != nil {
-		logger.Info("Error unmounting disk at %s: %v", req.MountPath, err)
+		logger.Info("Error unmounting disk at", "mount_path", req.MountPath, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -147,7 +147,7 @@ func (s *Server) handleAdminStorageDiskUnmount(w http.ResponseWriter, r *http.Re
 	if req.Eject {
 		action = "ejected"
 	}
-	logger.Info("Disk %s at %s", action, req.MountPath)
+	logger.Info("Disk at", "action", action, "mount_path", req.MountPath)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -190,7 +190,7 @@ func (s *Server) handleAdminStorageDiskMount(w http.ResponseWriter, r *http.Requ
 	}
 
 	if err := storage.MountDisk(req.Device, req.MountPath, req.SharedAccess); err != nil {
-		logger.Info("Error mounting disk %s at %s: %v", req.Device, req.MountPath, err)
+		logger.Info("Error mounting disk at", "device", req.Device, "mount_path", req.MountPath, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -201,11 +201,11 @@ func (s *Server) handleAdminStorageDiskMount(w http.ResponseWriter, r *http.Requ
 	if req.Persistent {
 		if err := storage.AddToFstab(req.Device, req.MountPath, req.SharedAccess); err != nil {
 			// Mount succeeded, but fstab failed - log warning but don't fail the request
-			logger.Info("Warning: Mounted disk but failed to add to fstab: %v", err)
+			logger.Info("Warning: Mounted disk but failed to add to fstab", "error", err)
 		}
 	}
 
-	logger.Info("Mounted disk %s at %s (persistent: %v, shared: %v)", req.Device, req.MountPath, req.Persistent, req.SharedAccess)
+	logger.Info("Mounted disk", "device", req.Device, "mount_path", req.MountPath, "persistent", req.Persistent, "shared_access", req.SharedAccess)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success":    true,
@@ -244,7 +244,7 @@ func (s *Server) handleAdminStorageDiskWipe(w http.ResponseWriter, r *http.Reque
 	}
 
 	if err := storage.WipeDisk(req); err != nil {
-		logger.Info("Error wiping disk %s: %v", req.Device, err)
+		logger.Info("Error wiping disk", "device", req.Device, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})

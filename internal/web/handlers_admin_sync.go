@@ -38,7 +38,7 @@ func (s *Server) handleAdminSync(w http.ResponseWriter, r *http.Request) {
 	// Get sync configuration
 	config, err := syncconfig.Get(s.db)
 	if err != nil {
-		logger.Info("Error getting sync config: %v", err)
+		logger.Info("Error getting sync config", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -66,7 +66,7 @@ func (s *Server) handleAdminSync(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := s.db.Query(query)
 	if err != nil {
-		logger.Info("Error getting recent syncs: %v", err)
+		logger.Info("Error getting recent syncs", "error", err)
 		// Continue with empty list
 	}
 
@@ -77,7 +77,7 @@ func (s *Server) handleAdminSync(w http.ResponseWriter, r *http.Request) {
 			var rs RecentSync
 			var startedAtStr, completedAtStr sql.NullString
 			if err := rows.Scan(&rs.Username, &rs.PeerName, &startedAtStr, &completedAtStr, &rs.Status, &rs.FilesSynced, &rs.BytesSynced); err != nil {
-				logger.Info("Error scanning sync log: %v", err)
+				logger.Info("Error scanning sync log", "error", err)
 				continue
 			}
 			// Parse SQLite datetime strings (try multiple formats)
@@ -131,7 +131,7 @@ func (s *Server) handleAdminSync(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_sync.html", data); err != nil {
-		logger.Info("Error rendering admin_sync template: %v", err)
+		logger.Info("Error rendering admin_sync template", "error", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
@@ -192,13 +192,12 @@ func (s *Server) handleAdminSyncConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := syncconfig.Update(s.db, config); err != nil {
-		logger.Info("Error updating sync config: %v", err)
+		logger.Info("Error updating sync config", "error", err)
 		http.Redirect(w, r, "/admin/sync?error=Failed+to+update+configuration", http.StatusSeeOther)
 		return
 	}
 
-	logger.Info("Admin %s updated sync config: enabled=%v, interval=%s, fixed_hour=%d",
-		session.Username, enabled, interval, fixedHour)
+	logger.Info("Admin updated sync config: enabled=, interval=, fixed_hour", "username", session.Username, "enabled", enabled, "interval", interval, "fixed_hour", fixedHour)
 
 	http.Redirect(w, r, "/admin/sync?success=Configuration+enregistrée+avec+succès", http.StatusSeeOther)
 }
@@ -216,14 +215,14 @@ func (s *Server) handleAdminSyncForce(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Info("Admin %s triggered forced synchronization of all users", session.Username)
+	logger.Info("Admin triggered forced synchronization of all users", "username", session.Username)
 
 	// Run SyncAllUsers
 	successCount, errorCount, lastError := sync.SyncAllUsers(s.db)
 
 	// Update last_sync timestamp
 	if err := syncconfig.UpdateLastSync(s.db); err != nil {
-		logger.Info("Warning: Failed to update last_sync: %v", err)
+		logger.Info("Warning: Failed to update last_sync", "error", err)
 	}
 
 	// Redirect with result message
@@ -256,7 +255,7 @@ func (s *Server) handleAdminIncoming(w http.ResponseWriter, r *http.Request) {
 	// Scan incoming backups directory
 	backups, err := incoming.ScanIncomingBackups(s.db, s.cfg.IncomingDir)
 	if err != nil {
-		logger.Info("Error scanning incoming backups: %v", err)
+		logger.Info("Error scanning incoming backups", "error", err)
 		http.Error(w, "Failed to scan incoming backups", http.StatusInternalServerError)
 		return
 	}
@@ -288,7 +287,7 @@ func (s *Server) handleAdminIncoming(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "admin_incoming.html", data); err != nil {
-		logger.Info("Template error: %v", err)
+		logger.Info("Template error", "error", err)
 		http.Error(w, "Template error", http.StatusInternalServerError)
 	}
 }
@@ -334,19 +333,19 @@ func (s *Server) handleAdminIncomingDelete(w http.ResponseWriter, r *http.Reques
 	// Use filepath.Rel to properly check if path is within directory
 	relPath, err := filepath.Rel(absIncomingDir, absBackupPath)
 	if err != nil || strings.HasPrefix(relPath, "..") || filepath.IsAbs(relPath) {
-		logger.Info("Security: Attempted to delete path outside incoming directory: %s", backupPath)
+		logger.Info("Security: Attempted to delete path outside incoming directory", "backup_path", backupPath)
 		http.Redirect(w, r, "/admin/incoming?error=Invalid+backup+path", http.StatusSeeOther)
 		return
 	}
 
 	// Delete the backup
 	if err := incoming.DeleteIncomingBackup(backupPath, s.cfg.IncomingDir); err != nil {
-		logger.Info("Error deleting backup %s: %v", backupPath, err)
+		logger.Info("Error deleting backup", "backup_path", backupPath, "error", err)
 		http.Redirect(w, r, "/admin/incoming?error=Failed+to+delete+backup", http.StatusSeeOther)
 		return
 	}
 
-	logger.Info("Admin %s deleted incoming backup: %s", session.Username, backupPath)
+	logger.Info("Admin deleted incoming backup", "username", session.Username, "backup_path", backupPath)
 	http.Redirect(w, r, "/admin/incoming?success=Backup+deleted+successfully", http.StatusSeeOther)
 }
 
@@ -374,6 +373,6 @@ func parseSQLiteDateTimeSync(s string) time.Time {
 	}
 
 	// Log error if no format worked
-	logger.Info("Warning: Could not parse datetime string: %q", s)
+	logger.Info("Warning: Could not parse datetime string", "s", s)
 	return time.Time{}
 }

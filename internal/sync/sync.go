@@ -166,7 +166,7 @@ func CleanupZombieSyncs(db *sql.DB) error {
 		var id, userID, peerID int
 		var startedAt string
 		if err := rows.Scan(&id, &userID, &peerID, &startedAt); err != nil {
-			logger.Info("⚠️  Failed to scan zombie sync: %v", err)
+			logger.Info("Failed to scan zombie sync", "error", err)
 			continue
 		}
 
@@ -179,16 +179,16 @@ func CleanupZombieSyncs(db *sql.DB) error {
 
 		_, err := db.Exec(updateQuery, id)
 		if err != nil {
-			logger.Info("⚠️  Failed to cleanup zombie sync ID %d: %v", id, err)
+			logger.Info("Failed to cleanup zombie sync ID", "id", id, "error", err)
 			continue
 		}
 
-		logger.Info("🧹 Cleaned up zombie sync: ID=%d, User=%d, Peer=%d, Started=%s", id, userID, peerID, startedAt)
+		logger.Info("Cleaned up zombie sync: ID=, User=, Peer=, Started", "id", id, "user_id", userID, "peer_id", peerID, "started_at", startedAt)
 		zombieCount++
 	}
 
 	if zombieCount > 0 {
-		logger.Info("✅ Cleaned up %d zombie sync(s)", zombieCount)
+		logger.Info("Cleaned up zombie sync(s)", "zombie_count", zombieCount)
 	}
 
 	return nil

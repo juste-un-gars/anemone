@@ -47,7 +47,7 @@ func (s *Server) handleAdminStoragePoolCreate(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := storage.CreatePool(req); err != nil {
-		logger.Info("Error creating pool: %v", err)
+		logger.Info("Error creating pool", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -93,7 +93,7 @@ func (s *Server) handleAdminStoragePoolDestroy(w http.ResponseWriter, r *http.Re
 	force := r.URL.Query().Get("force") == "true"
 
 	if err := storage.DestroyPool(poolName, force); err != nil {
-		logger.Info("Error destroying pool %s: %v", poolName, err)
+		logger.Info("Error destroying pool", "pool_name", poolName, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -138,7 +138,7 @@ func (s *Server) handleAdminStoragePoolExport(w http.ResponseWriter, r *http.Req
 	force := r.URL.Query().Get("force") == "true"
 
 	if err := storage.ExportPool(poolName, force); err != nil {
-		logger.Info("Error exporting pool %s: %v", poolName, err)
+		logger.Info("Error exporting pool", "pool_name", poolName, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -162,7 +162,7 @@ func (s *Server) handleAdminStoragePoolsImportable(w http.ResponseWriter, r *htt
 
 	pools, err := storage.ListImportablePools()
 	if err != nil {
-		logger.Info("Error listing importable pools: %v", err)
+		logger.Info("Error listing importable pools", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -207,7 +207,7 @@ func (s *Server) handleAdminStoragePoolImport(w http.ResponseWriter, r *http.Req
 	}
 
 	if err := storage.ImportPool(req.Name, req.Force, req.AltRoot); err != nil {
-		logger.Info("Error importing pool %s: %v", req.Name, err)
+		logger.Info("Error importing pool", "name", req.Name, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -269,7 +269,7 @@ func (s *Server) handleAdminStoragePoolAddVDev(w http.ResponseWriter, r *http.Re
 	}
 
 	if err := storage.AddVDev(opts); err != nil {
-		logger.Info("Error adding vdev to pool %s: %v", poolName, err)
+		logger.Info("Error adding vdev to pool", "pool_name", poolName, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -331,7 +331,7 @@ func (s *Server) handleAdminStoragePoolReplace(w http.ResponseWriter, r *http.Re
 	}
 
 	if err := storage.ReplaceDisk(opts); err != nil {
-		logger.Info("Error replacing disk in pool %s: %v", poolName, err)
+		logger.Info("Error replacing disk in pool", "pool_name", poolName, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -377,7 +377,7 @@ func (s *Server) handleAdminStorageDatasetCreate(w http.ResponseWriter, r *http.
 	}
 
 	if err := storage.CreateDataset(req); err != nil {
-		logger.Info("Error creating dataset: %v", err)
+		logger.Info("Error creating dataset", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -425,7 +425,7 @@ func (s *Server) handleAdminStorageDatasetDelete(w http.ResponseWriter, r *http.
 	force := r.URL.Query().Get("force") == "true"
 
 	if err := storage.DeleteDataset(name, recursive, force); err != nil {
-		logger.Info("Error deleting dataset %s: %v", name, err)
+		logger.Info("Error deleting dataset", "name", name, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -473,7 +473,7 @@ func (s *Server) handleAdminStorageDatasetUpdate(w http.ResponseWriter, r *http.
 	}
 
 	if err := storage.SetDatasetProperty(req.Name, req.Property, req.Value); err != nil {
-		logger.Info("Error setting property on dataset %s: %v", req.Name, err)
+		logger.Info("Error setting property on dataset", "name", req.Name, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -507,7 +507,7 @@ func (s *Server) handleAdminStorageDatasetList(w http.ResponseWriter, r *http.Re
 
 	datasets, err := storage.ListDatasets(parent)
 	if err != nil {
-		logger.Info("Error listing datasets: %v", err)
+		logger.Info("Error listing datasets", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -545,7 +545,7 @@ func (s *Server) handleAdminStorageSnapshotCreate(w http.ResponseWriter, r *http
 	_ = session
 
 	if err := storage.CreateSnapshot(req); err != nil {
-		logger.Info("Error creating snapshot: %v", err)
+		logger.Info("Error creating snapshot", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -592,7 +592,7 @@ func (s *Server) handleAdminStorageSnapshotDelete(w http.ResponseWriter, r *http
 	force := r.URL.Query().Get("force") == "true"
 
 	if err := storage.DeleteSnapshot(name, recursive, force); err != nil {
-		logger.Info("Error deleting snapshot %s: %v", name, err)
+		logger.Info("Error deleting snapshot", "name", name, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -626,7 +626,7 @@ func (s *Server) handleAdminStorageSnapshotList(w http.ResponseWriter, r *http.R
 	}
 
 	if err != nil {
-		logger.Info("Error listing snapshots: %v", err)
+		logger.Info("Error listing snapshots", "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -667,7 +667,7 @@ func (s *Server) handleAdminStorageSnapshotRollback(w http.ResponseWriter, r *ht
 	}
 
 	if err := storage.Rollback(req); err != nil {
-		logger.Info("Error rolling back to snapshot %s: %v", req.Snapshot, err)
+		logger.Info("Error rolling back to snapshot", "snapshot", req.Snapshot, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
