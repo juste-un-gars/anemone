@@ -30,6 +30,20 @@
 
 ## Quick Install
 
+### Option 1: Latest release (recommended)
+
+```bash
+sudo apt update
+curl -sL https://api.github.com/repos/juste-un-gars/anemone/releases/latest \
+  | grep tarball_url | cut -d '"' -f 4 \
+  | xargs curl -sL -o anemone.tar.gz
+mkdir anemone && tar xzf anemone.tar.gz -C anemone --strip-components=1
+cd anemone
+sudo ./install.sh
+```
+
+### Option 2: Latest development (git)
+
 ```bash
 sudo apt update
 git clone https://github.com/juste-un-gars/anemone.git

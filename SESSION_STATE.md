@@ -5,39 +5,41 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.15.3-beta (prochaine: v0.20.0-beta)
+**Current Version:** v0.20.0-beta
 **Last Updated:** 2026-02-15
 
 ---
 
 ## Current Session
 
-**Session 22: !BADKEY Fix + Release v0.20.0-beta** - Planned
+**Session 22: !BADKEY Fix + Bugfixes + Release v0.20.0-beta** - Complete ✅
 
 **Détails :** `.claude/sessions/SESSION_022_badkey_release.md`
 
 ---
 
-## Session 22: !BADKEY Fix + Release v0.20.0-beta
+## Session 22: !BADKEY Fix + Bugfixes + Release v0.20.0-beta
 
-**Date:** (prochaine session)
-**Objective:** Corriger 482 appels slog printf-style → key-value, release v0.20.0-beta
-**Status:** Planned
+**Date:** 2026-02-15
+**Objective:** Corriger !BADKEY slog, fix bugs installation/OnlyOffice, release v0.20.0-beta
+**Status:** Complete ✅
 
-### Plan
-1. **Commiter session 21** — 6 fichiers non commités (conversion API + roundtrip formats + PDF viewer)
-2. **Fix !BADKEY** — Convertir ~482 `logger.Info("msg %s", val)` → `logger.Info("msg", "key", val)` dans ~40 fichiers
-3. **Version bump** — `0.15.3-beta` → `0.20.0-beta`
-4. **Release** — CHANGELOG, tag, GitHub release
+### Completed (7 items)
+| # | Type | Description |
+|---|------|-------------|
+| 1 | Fix | !BADKEY slog — ~482 appels printf-style → key-value |
+| 2 | Fix | Logs directory manquant dans install.sh |
+| 3 | Fix | Docker HTTP security — écoute docker0 bridge uniquement |
+| 4 | Chore | Version bump 0.15.3-beta → 0.20.0-beta |
+| 5 | Docs | CHANGELOG.md complet |
+| 6 | Docs | README.md — téléchargement dernière release |
+| 7 | Release | v0.20.0-beta — GitHub release |
 
-### Contenu release v0.20.0-beta
-| Session | Feature |
-|---------|---------|
-| 18 | Dashboard dernières sauvegardes (toutes sources) |
-| 19 | Web File Browser (browse, upload, download, mkdir, rename, delete) |
-| 20 | OnlyOffice Integration (édition documents dans le navigateur) |
-| 21 | OnlyOffice auto-config, conversion API, formats roundtrip-safe, PDF viewer |
-| 22 | Fix !BADKEY slog (~482 occurrences) |
+### Tests validés (FR2)
+- [x] Installation propre
+- [x] Service démarre
+- [x] OnlyOffice fonctionne
+- [x] Compilation, tests, go vet OK
 
 ---
 
@@ -46,37 +48,6 @@
 **Session 21: OnlyOffice Auto-Config + Bugfixes** - Complete ✅
 
 **Détails :** `.claude/sessions/SESSION_021_onlyoffice_autoconfig.md`
-
----
-
-## Session 21: OnlyOffice Auto-Config + Bugfixes
-
-**Date:** 2026-02-14 → 2026-02-15
-**Objective:** Rendre OnlyOffice configurable depuis l'interface web + corriger les bugs
-**Status:** Complete ✅
-**Serveur de test :** FR2 (192.168.83.37)
-
-### Completed (22 items)
-| # | Type | Description |
-|---|------|-------------|
-| 1-9 | Feature/Fix | Config OO en DB, auto-config, CSP, routes, base64url key, TLS, !BADKEY, Docker |
-| 10-19 | Fix | Download URL HTTP, HTTP server, proxy headers, auto-patch, HTTPS direct port, CSP dynamique, TLS skip verify, sudo mv |
-| 20 | Fix | **Conversion API** — Formats non-natifs reconvertis avant sauvegarde |
-| 21 | Fix | **Formats roundtrip-safe** — Retrait md, doc, xls, ppt (non-roundtrip) |
-| 22 | Feature | **Bouton "Voir"** — PDF/images ouverts dans navigateur |
-
-### Tests validés (FR2)
-- [x] Sauvegarde fichier OO ✅
-- [x] Bouton "Modifier" absent pour .md ✅
-- [x] Bouton "Voir" pour PDF ✅
-
-### 6 fichiers non commités
-- `internal/web/handlers_onlyoffice_api.go` — Conversion API + formats roundtrip
-- `internal/web/handlers_files.go` — Content-Disposition inline
-- `internal/web/router.go` — IsOOEditable + IsViewable
-- `web/templates/v2/v2_files.html` — Bouton "Voir"
-- `internal/i18n/locales/fr.json` — Clé files.action.view
-- `internal/i18n/locales/en.json` — Clé files.action.view
 
 ---
 
@@ -106,7 +77,6 @@
 
 ## Bugs connus (non corrigés)
 - Permission denied sur manifests marc (shares marc:marc, Anemone tourne en franck)
-- `!BADKEY` dans ~482 appels logger — **session 22**
 
 ---
 
@@ -114,7 +84,7 @@
 
 | # | Name | Date | Status |
 |---|------|------|--------|
-| 22 | !BADKEY Fix + Release v0.20.0-beta | (next) | Planned |
+| 22 | !BADKEY Fix + Bugfixes + Release v0.20.0-beta | 2026-02-15 | Complete ✅ |
 | 21 | OnlyOffice Auto-Config + Bugfixes | 2026-02-15 | Complete ✅ |
 | 20 | OnlyOffice Integration | 2026-02-14 | Complete ✅ |
 | 19 | Web File Browser | 2026-02-14 | Complete ✅ |
@@ -129,8 +99,7 @@
 
 ## Next Steps
 
-1. **Session 22** — Fix !BADKEY + Release v0.20.0-beta
-2. **V2 UI Redesign — Module E : Pages auth** (optionnel)
-3. **API REST JSON pour gestion courante** (optionnel)
+1. **V2 UI Redesign — Module E : Pages auth** (optionnel)
+2. **API REST JSON pour gestion courante** (optionnel)
 
 Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.

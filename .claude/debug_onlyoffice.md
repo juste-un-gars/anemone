@@ -1,9 +1,10 @@
 # Debug OnlyOffice - Suivi des tests
 
-**Date :** 2026-02-14
+**Date :** 2026-02-14 → 2026-02-15
 **Serveur de test :** FR2 (192.168.83.37)
 **Version OO :** 9.2.1 (Docker `onlyoffice/documentserver`)
-**Anemone :** v0.15.3-beta (binaire custom avec debug logs)
+**Anemone :** v0.20.0-beta
+**Statut :** RÉSOLU — Tous les problèmes corrigés
 
 ---
 
@@ -12,9 +13,10 @@
 ~~Le container OnlyOffice ne telecharge JAMAIS le fichier a editer.~~
 → **RÉSOLU** : Le download serveur-a-serveur fonctionne depuis Test 6.
 
-## Probleme actuel (BLOQUANT)
+## Probleme 2 (RÉSOLU)
 
-L'editeur affiche "Echec du telechargement" car l'URL `Editor.bin` pointe vers `http://localhost:9980/cache/...` — inaccessible au navigateur. OO genere cette URL a partir du Host header de la connexion Socket.IO, qui est `localhost:9980` au lieu de l'adresse externe.
+~~L'editeur affiche "Echec du telechargement" car l'URL `Editor.bin` pointe vers `http://localhost:9980/cache/...`~~
+→ **RÉSOLU** : Architecture HTTPS direct port (session 21) + HTTP server sur docker0 bridge IP (session 22).
 
 ### Symptomes actuels
 - Download serveur-a-serveur : **OK** (`OO download: serving file`)

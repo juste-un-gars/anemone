@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0-beta] - 2026-02-15
+
+### Added
+
+#### Web File Browser (Session 19)
+- **Browse shares**: Navigate user shares and directories from the web interface
+- **Upload files**: Upload files to any share directory
+- **Download files**: Download files directly from the browser
+- **Create directories**: Create new folders from the file browser
+- **Rename files/directories**: Rename items inline
+- **Delete files**: Move files to trash from the file browser
+
+#### OnlyOffice Document Editing (Sessions 20-21)
+- **Edit documents in browser**: Open and edit DOCX, XLSX, PPTX and other Office formats directly in the web interface via OnlyOffice
+- **Auto-configuration**: OnlyOffice setup entirely from web UI — no manual .env configuration needed
+- **Docker integration**: Automatic container pull, creation, and configuration
+- **JWT authentication**: Secure communication between Anemone and OnlyOffice with auto-generated secrets
+- **HTTPS direct port**: OnlyOffice container serves HTTPS on port 9980 with Anemone's TLS certificates
+- **Format conversion API**: Non-native formats (ODT, RTF, etc.) automatically converted before save
+- **Roundtrip-safe formats only**: Only formats that survive edit-save cycles are offered for editing
+- **PDF/Image viewer**: "View" button opens PDF and image files directly in the browser
+
+#### Dashboard Improvements (Session 18)
+- **Recent backups tab**: Dashboard now shows last backups from all sources (peers, cloud, USB)
+
+### Fixed
+- **!BADKEY in logs**: Converted all ~482 printf-style slog calls to key-value format across ~40 files
+- **Logger crash on startup**: Installer now creates logs directory; error messages show path and permissions to fix
+- **Docker HTTP security**: Internal HTTP server binds to docker0 bridge IP only (not exposed to network)
+- **OnlyOffice Editor.bin URL**: Resolved by HTTPS direct port architecture (bypasses proxy WebSocket issues)
+- **OnlyOffice save permission denied**: Fallback to `sudo mv` for files owned by other users
+- **OnlyOffice TLS certificate**: `InsecureSkipVerify` for self-signed cert communication
+- **OnlyOffice SSRF protection**: Container auto-patched to allow private IP addresses
+- **OnlyOffice CSP**: Dynamic Content-Security-Policy for editor pages
+- **Rclone crypt password parsing**: Fixed parsing of obscured passwords
+- **User dashboard crash**: Template compared int to float64
+
+### Security
+- **HTTP server not exposed**: When HTTPS is active, internal HTTP for Docker listens only on docker0 bridge interface (172.17.x.x), not on all network interfaces
+
 ## [0.15.3-beta] - 2026-02-11
 
 ### Fixed
@@ -473,7 +513,9 @@ https://github.com/juste-un-gars/anemone
 
 ---
 
-[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.15.0-beta...HEAD
+[Unreleased]: https://github.com/juste-un-gars/anemone/compare/v0.20.0-beta...HEAD
+[0.20.0-beta]: https://github.com/juste-un-gars/anemone/compare/v0.15.3-beta...v0.20.0-beta
+[0.15.3-beta]: https://github.com/juste-un-gars/anemone/compare/v0.15.0-beta...v0.15.3-beta
 [0.15.0-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.6-beta...v0.15.0-beta
 [0.13.6-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.5-beta...v0.13.6-beta
 [0.13.5-beta]: https://github.com/juste-un-gars/anemone/compare/v0.13.4-beta...v0.13.5-beta
