@@ -41,7 +41,7 @@ type RotatingWriter struct {
 func NewRotatingWriter(dir, prefix string, retentionDays, maxSizeMB int) (*RotatingWriter, error) {
 	// Create directory if it doesn't exist
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, fmt.Errorf("create log directory: %w", err)
+		return nil, fmt.Errorf("cannot create log directory %q: %w — check that the parent directory exists and is owned by the Anemone service user", dir, err)
 	}
 
 	rw := &RotatingWriter{
@@ -104,7 +104,7 @@ func (rw *RotatingWriter) rotate() error {
 
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		return fmt.Errorf("open log file: %w", err)
+		return fmt.Errorf("cannot open log file %q: %w — check permissions on %s", path, err, rw.dir)
 	}
 
 	rw.currentFile = f
