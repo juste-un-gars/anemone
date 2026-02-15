@@ -71,6 +71,7 @@
 
             <!-- Confirmation Checkboxes -->
             <form id="confirm-form" action="/activate/confirm" method="POST">
+                {{CSRFField .CSRFToken}}
                 <div class="space-y-3 mb-6">
                     <div class="flex items-start">
                         <div class="flex items-center h-5">

@@ -35,6 +35,7 @@
         <!-- Setup Form -->
         <div class="bg-white shadow-xl rounded-lg p-8">
             <form id="setup-form" method="POST" action="/setup" class="space-y-6">
+                {{CSRFField .CSRFToken}}
                 <!-- Language Selection -->
                 <div>
                     <label for="language" class="block text-sm font-medium text-gray-700">

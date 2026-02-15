@@ -12,47 +12,69 @@
 
 ## Current Session
 
-**Session 24: Audit de Securite** - En pause (reprise prochaine session)
+**Session 25: Corrections Securite Prioritaires** - Paused
 
-**Détails :** `.claude/sessions/SESSION_024_security_audit.md`
-**Rapport :** `SECURITY_AUDIT_2026-02-15.md` (racine, NE PAS committer)
+**Détails :** `.claude/sessions/SESSION_025_security_fixes.md`
+**Rapport audit :** `SECURITY_AUDIT_2026-02-15.md` (racine, NE PAS committer)
 
 ---
 
-## Session 24: Audit de Securite
+## Session 25: Corrections Securite Prioritaires
 
 **Date:** 2026-02-15
-**Objective:** Audit de securite complet - pentest FR2 + analyse statique
-**Status:** En pause - phase audit terminee, corrections a faire
+**Objective:** Corriger les vulns identifiees en session 24
+**Status:** Paused (corrections prioritaires faites, audit a finir plus tard)
 
-### Fait
-| # | Phase | Resultat |
-|---|-------|----------|
-| 1 | Reconnaissance (139 routes, TLS, headers) | OK - headers presents |
-| 2 | Tests non authentifies (routes, sync API, path traversal, SQLi) | OK - protege |
-| 3 | Rate limiting login | CRITICAL - absent |
-| 4 | Revue code auth/sessions | 3 CRITICAL, 5 HIGH, 5 MEDIUM |
-| 5 | Revue code injections | SQL/path/cmd = SAFE, 2 MEDIUM |
-| 6 | gosec | 580 findings (7 math/rand, 6 InsecureSkipVerify) |
-| 7 | govulncheck | 24 vulns stdlib (Go 1.22.2 obsolete) |
-| 8 | staticcheck | 29 findings (code mort, rien critique) |
+### Corrections appliquees
+| # | Correction | Statut |
+|---|-----------|--------|
+| 1 | Go 1.22.2 → 1.26.0 + deps a jour (24 vulns stdlib corrigees) | DONE |
+| 2 | Rate limiting /login (5 tentatives/15min, lockout 15min) | DONE + teste FR2 |
+| 3 | Cookie Secure=true (activation_key, setup_key) | DONE |
+| 4 | Restriction methodes HTTP /login (GET/POST only, 405 sinon) | DONE + teste FR2 |
+| 5 | Protection CSRF formulaires publics (double-submit cookie) | DONE + teste FR2 |
+| 6 | Deploy + test complet sur FR2 | DONE |
 
-### Prochaine session : Corrections prioritaires
-1. Mettre a jour Go (1.22.2 -> 1.24.13+) - 24 vulns stdlib
-2. Rate limiting /login - brute force illimite
-3. Cookie Secure=true - cle chiffrement en clair
-4. Protection CSRF - formulaires critiques
-5. Restreindre methodes HTTP (TRACE/PUT/DELETE sur /login)
+### Bug resolu
+- Rate limiting + CSRF + restriction methodes ne fonctionnaient pas sur FR2
+- **Cause** : service unit `ExecStart=/home/franck/anemone/anemone`, deploiements precedents copiaient vers `/usr/local/bin/anemone` (mauvais chemin)
+- **Fix** : deployer vers `/home/franck/anemone/anemone` sur FR2
 
-### Reporte
-- Tests authentifies (IDOR, privilege escalation) - scenario extreme
-- Tests XSS
+### Reste a faire (audit securite)
+| # | Finding | Severite | Statut |
+|---|---------|----------|--------|
+| A3 | Enumeration utilisateurs (timing side-channel) | CRITICAL | NON CORRIGE |
+| A4 | Verrouillage par compte (pas seulement par IP) | HIGH | PARTIEL |
+| A5 | Race condition tokens activation | HIGH | NON CORRIGE |
+| A7 | Validation IP en session | HIGH | NON CORRIGE |
+| G2 | InsecureSkipVerify: true (14 instances) | HIGH | NON CORRIGE (attendu: certs auto-signes P2P) |
+| G3 | Timeouts HTTP (SlowLoris) | HIGH | NON CORRIGE |
+| A9 | Complexite mdp (min 8 chars seulement) | MEDIUM | NON CORRIGE |
+| A10 | CSP trop permissif (unsafe-inline/eval) | MEDIUM | NON CORRIGE |
+| A11 | RememberMe 30j trop long | MEDIUM | NON CORRIGE |
+| I1 | SSRF via adresse peer | MEDIUM | NON CORRIGE |
+| I2 | Injection credentials rclone | MEDIUM | NON CORRIGE |
+| G5 | Bombe decompression tar | MEDIUM | NON CORRIGE |
+| Phase 8 | Tests authentifies (IDOR, privilege escalation) | - | A FAIRE |
+| Phase 9 | Tests XSS | - | A FAIRE |
+| Phase 10 | Rapport final + recommandations | - | A FAIRE |
+
+### Resume technique
+- **Go** : 1.26.0, go-sqlite3 1.14.34, x/crypto 0.48.0, x/sys 0.41.0
+- **CSRF** : double-submit cookie sur login, setup, activate, reset-password
+- **Rate limiting** : 5 tentatives / 15 min par IP, lockout 15 min
+- **Cookies** : tous Secure=true + SameSite=Strict
+- **Build OK, tests OK, deploy FR2 OK**
 
 ---
 
-## Previous Session
+## Previous Sessions
 
-**Session 23: ZFS Wizard Fix + Documentation Cleanup** - Complete ✅
+**Session 24: Audit de Securite** - Complete
+
+**Détails :** `.claude/sessions/SESSION_024_security_audit.md`
+
+**Session 23: ZFS Wizard Fix + Documentation Cleanup** - Complete
 
 **Détails :** `.claude/sessions/SESSION_023_docs_cleanup.md`
 
@@ -68,26 +90,23 @@
 
 | # | Name | Date | Status |
 |---|------|------|--------|
-| 24 | Audit de Securite | 2026-02-15 | En pause |
-| 23 | ZFS Wizard Fix + Documentation Cleanup | 2026-02-15 | Complete ✅ |
-| 22 | !BADKEY Fix + Bugfixes + Release v0.20.0-beta | 2026-02-15 | Complete ✅ |
-| 21 | OnlyOffice Auto-Config + Bugfixes | 2026-02-15 | Complete ✅ |
-| 20 | OnlyOffice Integration | 2026-02-14 | Complete ✅ |
-| 19 | Web File Browser | 2026-02-14 | Complete ✅ |
-| 18 | Dashboard Last Backup Fix + Recent Tab | 2026-02-12 | Complete ✅ |
-| 17 | Rclone Crypt Fix + !BADKEY Logs | 2026-02-11 | Complete ✅ |
-| 16 | SSH Key Bugfix | 2026-02-11 | Complete ✅ |
-| 15 | Rclone & UI Bugfixes | 2026-02-10 | Complete ✅ |
-| 14 | v2 UI Bugfixes | 2026-02-10 | Complete ✅ |
-| 13 | Cloud Backup Multi-Provider + Chiffrement | 2026-02-10 | Complete ✅ |
+| 25 | Corrections Securite Prioritaires | 2026-02-15 | Paused |
+| 24 | Audit de Securite | 2026-02-15 | Complete |
+| 23 | ZFS Wizard Fix + Documentation Cleanup | 2026-02-15 | Complete |
+| 22 | !BADKEY Fix + Bugfixes + Release v0.20.0-beta | 2026-02-15 | Complete |
+| 21 | OnlyOffice Auto-Config + Bugfixes | 2026-02-15 | Complete |
+| 20 | OnlyOffice Integration | 2026-02-14 | Complete |
+| 19 | Web File Browser | 2026-02-14 | Complete |
+| 18 | Dashboard Last Backup Fix + Recent Tab | 2026-02-12 | Complete |
+| 17 | Rclone Crypt Fix + !BADKEY Logs | 2026-02-11 | Complete |
+| 16 | SSH Key Bugfix | 2026-02-11 | Complete |
 
 ---
 
-## Next Steps
+## Next Steps (prochaine session)
 
-1. **Corrections securite** (session 25) — Go update, rate limiting, CSRF, cookies Secure, methodes HTTP
-2. **Tests authentifies** (optionnel) — IDOR, privilege escalation, XSS
-3. **V2 UI Redesign — Module E : Pages auth** (optionnel)
-4. **API REST JSON pour gestion courante** (optionnel)
+1. **Finir audit securite** — phases 8 (IDOR/privesc), 9 (XSS), 10 (rapport final)
+2. **Corriger findings HIGH restants** — G3 (timeouts HTTP), A3 (timing), A5 (race condition tokens)
+3. **Evaluer findings MEDIUM** — complexite mdp, CSP, RememberMe, SSRF
 
 Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.

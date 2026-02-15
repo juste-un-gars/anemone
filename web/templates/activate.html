@@ -59,6 +59,7 @@
             </div>
 
             <form id="activation-form" method="POST" action="/activate/{{.Token}}" class="space-y-6">
+                {{CSRFField .CSRFToken}}
                 <!-- Username (readonly) -->
                 <div>
                     <label for="username" class="block text-sm font-medium text-gray-700">

@@ -46,6 +46,7 @@ type TemplateData struct {
 	EncryptionKey string
 	SyncPassword  string // Generated sync authentication password (setup only)
 	Error         string
+	CSRFToken     string // CSRF token for forms
 	Session       *auth.Session
 	Stats         *DashboardStats
 	Users         []*users.User
@@ -94,6 +95,9 @@ func isPathTraversal(path string) bool {
 func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// Initialize session manager with database
 	auth.InitSessionManager(db)
+
+	// Initialize login rate limiter
+	auth.InitLoginRateLimiter()
 
 	// Load language from database if setup is completed
 	var dbLang string
@@ -210,6 +214,9 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 			return true
 		}
 		return false
+	}
+	funcMap["CSRFField"] = func(token string) template.HTML {
+		return template.HTML(`<input type="hidden" name="csrf_token" value="` + template.HTMLEscapeString(token) + `">`)
 	}
 	funcMap["ProviderDisplayName"] = func(providerType string) string {
 		switch providerType {
@@ -438,8 +445,8 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	// Admin routes - Consolidated backups page
 	mux.HandleFunc("/admin/backups", auth.RequireAdmin(server.handleAdminBackups))
 
-	// Apply security headers middleware to all routes
-	return securityHeadersMiddleware(mux)
+	// Apply middlewares: CSRF then security headers
+	return securityHeadersMiddleware(csrfMiddleware(mux))
 }
 
 // isSetupCompleted checks if initial setup is done
@@ -525,6 +532,27 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		// Permissions Policy - Disable unnecessary browser features
 		w.Header().Set("Permissions-Policy", "geolocation=(), microphone=(), camera=()")
 
+		next.ServeHTTP(w, r)
+	})
+}
+
+// csrfMiddleware ensures a CSRF cookie is set on GET requests.
+// CSRF validation is done per-handler on critical public forms (login, setup, activate, reset).
+// Admin routes are already protected by session auth + SameSite=Strict cookies.
+func csrfMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// On GET/HEAD: ensure CSRF cookie exists
+		if r.Method == http.MethodGet || r.Method == http.MethodHead {
+			if auth.GetCSRFFromRequest(r) == "" {
+				token, err := auth.GenerateCSRFToken()
+				if err != nil {
+					logger.Error("Failed to generate CSRF token", "error", err)
+					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+					return
+				}
+				auth.SetCSRFCookie(w, token)
+			}
+		}
 		next.ServeHTTP(w, r)
 	})
 }

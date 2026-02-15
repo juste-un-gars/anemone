@@ -39,7 +39,7 @@ func SyncShare(db *sql.DB, req *SyncRequest) error {
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to get encryption key: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Create tar.gz archive of the share directory
@@ -48,7 +48,7 @@ func SyncShare(db *sql.DB, req *SyncRequest) error {
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create archive: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Encrypt the archive
@@ -56,7 +56,7 @@ func SyncShare(db *sql.DB, req *SyncRequest) error {
 	if err := crypto.EncryptStream(&tarBuf, &encryptedBuf, encryptionKey); err != nil {
 		errMsg := fmt.Sprintf("Failed to encrypt archive: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Send encrypted archive to peer via HTTP POST
@@ -79,7 +79,7 @@ func SyncShare(db *sql.DB, req *SyncRequest) error {
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create form file: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 	io.Copy(part, &encryptedBuf)
 	writer.Close()
@@ -104,7 +104,7 @@ func SyncShare(db *sql.DB, req *SyncRequest) error {
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to send to peer: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 	defer resp.Body.Close()
 
@@ -112,7 +112,7 @@ func SyncShare(db *sql.DB, req *SyncRequest) error {
 		body, _ := io.ReadAll(resp.Body)
 		errMsg := fmt.Sprintf("Peer returned error %d: %s", resp.StatusCode, string(body))
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Update log with success

@@ -110,7 +110,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	case <-ctx.Done():
 		errMsg := fmt.Sprintf("Sync timeout: %v", ctx.Err())
 		UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	default:
 	}
 
@@ -119,7 +119,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to get encryption key: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Extract share name from path
@@ -130,7 +130,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to build local manifest: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Fetch remote manifest from peer
@@ -168,7 +168,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create manifest request: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Add authentication headers if password is provided
@@ -185,7 +185,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to read remote manifest: %v", err)
 			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-			return fmt.Errorf(errMsg)
+			return fmt.Errorf("%s", errMsg)
 		}
 
 		// Decrypt manifest
@@ -193,7 +193,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		if err := crypto.DecryptStream(bytes.NewReader(encryptedData), &decryptedBuf, encryptionKey); err != nil {
 			errMsg := fmt.Sprintf("Failed to decrypt manifest: %v", err)
 			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-			return fmt.Errorf(errMsg)
+			return fmt.Errorf("%s", errMsg)
 		}
 
 		// Unmarshal manifest
@@ -201,7 +201,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to parse remote manifest: %v", err)
 			UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-			return fmt.Errorf(errMsg)
+			return fmt.Errorf("%s", errMsg)
 		}
 	} else if resp != nil && resp.StatusCode == http.StatusNotFound {
 		// No remote manifest yet (first sync) - that's OK
@@ -210,7 +210,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		// Other error
 		errMsg := fmt.Sprintf("Failed to fetch remote manifest: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Compare manifests to get delta
@@ -218,7 +218,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to compare manifests: %v", err)
 		UpdateSyncLog(db, logID, "error", 0, 0, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Debug log for manifests
@@ -287,7 +287,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to open file %s: %v", relativePath, err)
 			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-			syncErr = fmt.Errorf(errMsg)
+			syncErr = fmt.Errorf("%s", errMsg)
 			return syncErr
 		}
 
@@ -298,7 +298,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to upload file %s: %v", relativePath, err)
 			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-			syncErr = fmt.Errorf(errMsg)
+			syncErr = fmt.Errorf("%s", errMsg)
 			return syncErr
 		}
 
@@ -337,7 +337,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to create delete request for %s: %v", relativePath, err)
 			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-			syncErr = fmt.Errorf(errMsg)
+			syncErr = fmt.Errorf("%s", errMsg)
 			return syncErr
 		}
 
@@ -351,7 +351,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		if err != nil {
 			errMsg := fmt.Sprintf("Failed to delete file %s: %v", relativePath, err)
 			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-			syncErr = fmt.Errorf(errMsg)
+			syncErr = fmt.Errorf("%s", errMsg)
 			return syncErr
 		}
 		resp.Body.Close()
@@ -359,7 +359,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 		if resp.StatusCode != http.StatusOK {
 			errMsg := fmt.Sprintf("Failed to delete file %s: status %d", relativePath, resp.StatusCode)
 			UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-			syncErr = fmt.Errorf(errMsg)
+			syncErr = fmt.Errorf("%s", errMsg)
 			return syncErr
 		}
 
@@ -374,7 +374,7 @@ func SyncShareIncremental(db *sql.DB, req *SyncRequest) error {
 	if err := uploadManifestToRemote(ctx, client, req, progressManifest, shareName, encryptionKey); err != nil {
 		errMsg := fmt.Sprintf("Failed to upload final manifest: %v", err)
 		UpdateSyncLog(db, logID, "error", uploadedCount, totalBytes, errMsg)
-		syncErr = fmt.Errorf(errMsg)
+		syncErr = fmt.Errorf("%s", errMsg)
 		return syncErr
 	}
 	logger.Info("✅ Final manifest saved successfully")

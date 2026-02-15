@@ -7,10 +7,11 @@ package web
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"github.com/juste-un-gars/anemone/internal/logger"
 	"net/http"
 
+	"github.com/juste-un-gars/anemone/internal/auth"
 	"github.com/juste-un-gars/anemone/internal/i18n"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"github.com/juste-un-gars/anemone/internal/syncauth"
 	"github.com/juste-un-gars/anemone/internal/users"
 )
@@ -27,8 +28,9 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		// Show setup form
 		data := TemplateData{
-			Lang:  lang,
-			Title: i18n.T(lang, "setup.title"),
+			Lang:      lang,
+			Title:     i18n.T(lang, "setup.title"),
+			CSRFToken: auth.GetCSRFFromRequest(r),
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "setup.html", data); err != nil {
@@ -38,6 +40,13 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		}
 
 	} else if r.Method == http.MethodPost {
+		// Validate CSRF token
+		if !auth.ValidateCSRF(r) {
+			logger.Warn("CSRF validation failed on setup")
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
 		// Process setup form
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, "Invalid form data", http.StatusBadRequest)
@@ -143,16 +152,18 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 			Value:    encryptionKey,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   false, // Set to true in production with HTTPS
-			MaxAge:   600,   // 10 minutes to complete setup
+			Secure:   true,
+			SameSite: http.SameSiteStrictMode,
+			MaxAge:   600, // 10 minutes to complete setup
 		})
 
 		// Show success page with encryption key and sync password
 		data := TemplateData{
-			Lang:         lang,
-			Title:        i18n.T(lang, "setup.success.title"),
+			Lang:          lang,
+			Title:         i18n.T(lang, "setup.success.title"),
 			EncryptionKey: encryptionKey,
-			SyncPassword: syncPassword, // Display generated sync password
+			SyncPassword:  syncPassword, // Display generated sync password
+			CSRFToken:     auth.GetCSRFFromRequest(r),
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "setup_success.html", data); err != nil {
@@ -167,6 +178,13 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSetupConfirm(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Validate CSRF token
+	if !auth.ValidateCSRF(r) {
+		logger.Warn("CSRF validation failed on setup/confirm")
+		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 

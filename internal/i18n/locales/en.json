@@ -40,6 +40,7 @@
   "login.button": "Sign In",
   "login.remember_me": "Remember me",
   "login.error": "Invalid username or password",
+  "login.rate_limited": "Too many login attempts. Please try again in 15 minutes.",
   "dashboard.title": "Dashboard",
   "dashboard.welcome": "Welcome, {{username}}!",
   "dashboard.admin.title": "Admin Dashboard",

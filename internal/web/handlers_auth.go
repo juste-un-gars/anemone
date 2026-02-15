@@ -6,14 +6,15 @@ package web
 
 import (
 	"fmt"
-	"github.com/juste-un-gars/anemone/internal/logger"
 	"net/http"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/juste-un-gars/anemone/internal/activation"
 	"github.com/juste-un-gars/anemone/internal/auth"
 	"github.com/juste-un-gars/anemone/internal/i18n"
+	"github.com/juste-un-gars/anemone/internal/logger"
 	"github.com/juste-un-gars/anemone/internal/quota"
 	"github.com/juste-un-gars/anemone/internal/reset"
 	"github.com/juste-un-gars/anemone/internal/shares"
@@ -21,15 +22,34 @@ import (
 	"github.com/juste-un-gars/anemone/internal/users"
 )
 
+// clientIP extracts the client IP from the request, stripping the port.
+func clientIP(r *http.Request) string {
+	ip := r.RemoteAddr
+	// Strip port from RemoteAddr (e.g. "192.168.1.1:12345" -> "192.168.1.1")
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
+	return ip
+}
+
 // handleLogin handles the login page
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	lang := s.getLang(r)
 
+	// Only allow GET and POST
+	if r.Method != http.MethodGet && r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	csrfToken := auth.GetCSRFFromRequest(r)
+
 	if r.Method == http.MethodGet {
 		// Show login form
 		data := TemplateData{
-			Lang:  lang,
-			Title: i18n.T(lang, "login.title"),
+			Lang:      lang,
+			Title:     i18n.T(lang, "login.title"),
+			CSRFToken: csrfToken,
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "login.html", data); err != nil {
@@ -39,6 +59,32 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		}
 
 	} else if r.Method == http.MethodPost {
+		// Validate CSRF token
+		if !auth.ValidateCSRF(r) {
+			logger.Warn("CSRF validation failed on login", "ip", clientIP(r))
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
+		// Check rate limiting
+		ip := clientIP(r)
+		rl := auth.GetLoginRateLimiter()
+		if blocked, remaining := rl.IsBlocked(ip); blocked {
+			logger.Warn("Login blocked by rate limiter", "ip", ip, "remaining", remaining.Round(time.Second))
+			data := TemplateData{
+				Lang:      lang,
+				Title:     i18n.T(lang, "login.title"),
+				Error:     i18n.T(lang, "login.rate_limited"),
+				CSRFToken: csrfToken,
+			}
+			w.WriteHeader(http.StatusTooManyRequests)
+			if err := s.templates.ExecuteTemplate(w, "login.html", data); err != nil {
+				logger.Info("Error rendering login template", "error", err)
+				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			}
+			return
+		}
+
 		// Process login
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, "Invalid form data", http.StatusBadRequest)
@@ -52,11 +98,17 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		// Get user from database
 		user, err := users.GetByUsername(s.db, username)
 		if err != nil || !user.CheckPassword(password) {
+			// Record failed attempt
+			locked := rl.RecordFailure(ip)
+			remaining := rl.RemainingAttempts(ip)
+			logger.Warn("Failed login attempt", "username", username, "ip", ip, "remaining_attempts", remaining, "locked_out", locked)
+
 			// Show error
 			data := TemplateData{
-				Lang:  lang,
-				Title: i18n.T(lang, "login.title"),
-				Error: i18n.T(lang, "login.error"),
+				Lang:      lang,
+				Title:     i18n.T(lang, "login.title"),
+				Error:     i18n.T(lang, "login.error"),
+				CSRFToken: csrfToken,
 			}
 
 			if err := s.templates.ExecuteTemplate(w, "login.html", data); err != nil {
@@ -66,12 +118,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Successful login - clear rate limit counter
+		rl.RecordSuccess(ip)
+
 		// Get client info for session tracking
 		userAgent := r.UserAgent()
 		ipAddress := r.RemoteAddr
-		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-			ipAddress = strings.Split(forwarded, ",")[0]
-		}
 
 		// Create session with remember me option
 		sm := auth.GetSessionManager()
@@ -88,7 +140,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		// Update last login
 		user.UpdateLastLogin(s.db)
 
-		logger.Info("User logged in", "username", user.Username, "is_admin", user.IsAdmin)
+		logger.Info("User logged in", "username", user.Username, "is_admin", user.IsAdmin, "ip", ip)
 
 		// Redirect to dashboard
 		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
@@ -161,17 +213,19 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
 		// Show activation form
 		data := struct {
-			Lang     string
-			Title    string
-			Username string
-			Token    string
-			Error    string
-			T        func(string) string
+			Lang      string
+			Title     string
+			Username  string
+			Token     string
+			Error     string
+			CSRFToken string
+			T         func(string) string
 		}{
-			Lang:     lang,
-			Title:    i18n.T(lang, "activate.title"),
-			Username: token.Username,
-			Token:    tokenString,
+			Lang:      lang,
+			Title:     i18n.T(lang, "activate.title"),
+			Username:  token.Username,
+			Token:     tokenString,
+			CSRFToken: auth.GetCSRFFromRequest(r),
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "activate.html", data); err != nil {
@@ -181,6 +235,13 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 		}
 
 	} else if r.Method == http.MethodPost {
+		// Validate CSRF token
+		if !auth.ValidateCSRF(r) {
+			logger.Warn("CSRF validation failed on activate")
+			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+
 		// Process activation
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, "Invalid form data", http.StatusBadRequest)
@@ -191,20 +252,24 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 		passwordConfirm := r.FormValue("password_confirm")
 
 		// Validate
+		csrfToken := auth.GetCSRFFromRequest(r)
+
 		if password != passwordConfirm {
 			data := struct {
-				Lang     string
-				Title    string
-				Username string
-				Token    string
-				Error    string
-				T        func(string) string
+				Lang      string
+				Title     string
+				Username  string
+				Token     string
+				Error     string
+				CSRFToken string
+				T         func(string) string
 			}{
-				Lang:     lang,
-				Title:    i18n.T(lang, "activate.title"),
-				Username: token.Username,
-				Token:    tokenString,
-				Error:    i18n.T(lang, "activate.errors.password_mismatch"),
+				Lang:      lang,
+				Title:     i18n.T(lang, "activate.title"),
+				Username:  token.Username,
+				Token:     tokenString,
+				Error:     i18n.T(lang, "activate.errors.password_mismatch"),
+				CSRFToken: csrfToken,
 			}
 			s.templates.ExecuteTemplate(w, "activate.html", data)
 			return
@@ -212,18 +277,20 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 
 		if len(password) < 8 {
 			data := struct {
-				Lang     string
-				Title    string
-				Username string
-				Token    string
-				Error    string
-				T        func(string) string
+				Lang      string
+				Title     string
+				Username  string
+				Token     string
+				Error     string
+				CSRFToken string
+				T         func(string) string
 			}{
-				Lang:     lang,
-				Title:    i18n.T(lang, "activate.title"),
-				Username: token.Username,
-				Token:    tokenString,
-				Error:    i18n.T(lang, "activate.errors.password_length"),
+				Lang:      lang,
+				Title:     i18n.T(lang, "activate.title"),
+				Username:  token.Username,
+				Token:     tokenString,
+				Error:     i18n.T(lang, "activate.errors.password_length"),
+				CSRFToken: csrfToken,
 			}
 			s.templates.ExecuteTemplate(w, "activate.html", data)
 			return
@@ -357,7 +424,8 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			Value:    encryptionKey,
 			Path:     "/",
 			HttpOnly: true,
-			Secure:   false,
+			Secure:   true,
+			SameSite: http.SameSiteStrictMode,
 			MaxAge:   600, // 10 minutes
 		})
 
@@ -367,12 +435,14 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			Title         string
 			Username      string
 			EncryptionKey string
+			CSRFToken     string
 			T             func(string) string
 		}{
 			Lang:          lang,
 			Title:         i18n.T(lang, "activate.success.title"),
 			Username:      token.Username,
 			EncryptionKey: encryptionKey,
+			CSRFToken:     auth.GetCSRFFromRequest(r),
 		}
 
 		if err := s.templates.ExecuteTemplate(w, "activate_success.html", data); err != nil {
@@ -387,6 +457,13 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleActivateConfirm(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Validate CSRF token
+	if !auth.ValidateCSRF(r) {
+		logger.Warn("CSRF validation failed on activate/confirm")
+		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -464,17 +541,19 @@ func (s *Server) handleResetPasswordForm(w http.ResponseWriter, r *http.Request)
 
 	// Show form
 	data := struct {
-		Lang     string
-		Title    string
-		Token    string
-		Username string
-		Error    string
+		Lang      string
+		Title     string
+		Token     string
+		Username  string
+		Error     string
+		CSRFToken string
 	}{
-		Lang:     lang,
-		Title:    i18n.T(lang, "reset.title"),
-		Token:    tokenString,
-		Username: user.Username,
-		Error:    r.URL.Query().Get("error"),
+		Lang:      lang,
+		Title:     i18n.T(lang, "reset.title"),
+		Token:     tokenString,
+		Username:  user.Username,
+		Error:     r.URL.Query().Get("error"),
+		CSRFToken: auth.GetCSRFFromRequest(r),
 	}
 
 	if err := s.templates.ExecuteTemplate(w, "reset_password.html", data); err != nil {
@@ -488,6 +567,13 @@ func (s *Server) handleResetPasswordForm(w http.ResponseWriter, r *http.Request)
 func (s *Server) handleResetPasswordSubmit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Validate CSRF token
+	if !auth.ValidateCSRF(r) {
+		logger.Warn("CSRF validation failed on reset-password")
+		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 

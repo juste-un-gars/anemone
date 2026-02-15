@@ -40,6 +40,7 @@
   "login.button": "Se connecter",
   "login.remember_me": "Rester connecté",
   "login.error": "Nom d'utilisateur ou mot de passe incorrect",
+  "login.rate_limited": "Trop de tentatives de connexion. Veuillez réessayer dans 15 minutes.",
   "dashboard.title": "Tableau de bord",
   "dashboard.welcome": "Bienvenue, {{username}} !",
   "dashboard.admin.title": "Tableau de bord administrateur",

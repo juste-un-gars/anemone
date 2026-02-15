@@ -48,6 +48,7 @@
             {{end}}
 
             <form method="POST" action="/login" class="space-y-6">
+                {{CSRFField .CSRFToken}}
                 <!-- Username -->
                 <div>
                     <label for="username" class="block text-sm font-medium text-gray-700">
