@@ -34,10 +34,8 @@
 
 ```bash
 sudo apt update
-curl -sL https://api.github.com/repos/juste-un-gars/anemone/releases/latest \
-  | grep tarball_url | cut -d '"' -f 4 \
-  | xargs curl -sL -o anemone.tar.gz
-mkdir anemone && tar xzf anemone.tar.gz -C anemone --strip-components=1
+curl -sL -o anemone.tar.gz $(curl -s https://api.github.com/repos/juste-un-gars/anemone/releases/latest | grep -o '"tarball_url": "[^"]*"' | cut -d'"' -f4)
+mkdir -p anemone && tar xzf anemone.tar.gz -C anemone --strip-components=1
 cd anemone
 sudo ./install.sh
 ```
