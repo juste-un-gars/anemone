@@ -66,11 +66,12 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Check rate limiting
 		ip := clientIP(r)
 		rl := auth.GetLoginRateLimiter()
+
+		// Check IP-based rate limiting first
 		if blocked, remaining := rl.IsBlocked(ip); blocked {
-			logger.Warn("Login blocked by rate limiter", "ip", ip, "remaining", remaining.Round(time.Second))
+			logger.Warn("Login blocked by IP rate limiter", "ip", ip, "remaining", remaining.Round(time.Second))
 			data := TemplateData{
 				Lang:      lang,
 				Title:     i18n.T(lang, "login.title"),
@@ -95,13 +96,50 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		password := r.FormValue("password")
 		rememberMe := r.FormValue("remember_me") == "on"
 
+		// Check username-based rate limiting (protects against distributed brute force)
+		if username != "" {
+			if blocked, remaining := rl.IsBlockedUser(username); blocked {
+				logger.Warn("Login blocked by account rate limiter", "username", username, "ip", ip, "remaining", remaining.Round(time.Second))
+				// Run dummy bcrypt to maintain constant response time
+				users.DummyCheckPassword(password)
+				data := TemplateData{
+					Lang:      lang,
+					Title:     i18n.T(lang, "login.title"),
+					Error:     i18n.T(lang, "login.rate_limited"),
+					CSRFToken: csrfToken,
+				}
+				w.WriteHeader(http.StatusTooManyRequests)
+				if err := s.templates.ExecuteTemplate(w, "login.html", data); err != nil {
+					logger.Info("Error rendering login template", "error", err)
+					http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+				}
+				return
+			}
+		}
+
 		// Get user from database
 		user, err := users.GetByUsername(s.db, username)
-		if err != nil || !user.CheckPassword(password) {
-			// Record failed attempt
-			locked := rl.RecordFailure(ip)
-			remaining := rl.RemainingAttempts(ip)
-			logger.Warn("Failed login attempt", "username", username, "ip", ip, "remaining_attempts", remaining, "locked_out", locked)
+
+		// Always run bcrypt comparison to prevent timing side-channel user enumeration.
+		// If user doesn't exist, compare against a dummy hash so response time is constant.
+		var passwordValid bool
+		if err != nil || user == nil {
+			// User not found: compare against dummy hash (cost 12, same as real hashes)
+			users.DummyCheckPassword(password)
+			passwordValid = false
+		} else {
+			passwordValid = user.CheckPassword(password)
+		}
+
+		if !passwordValid {
+			// Record failed attempt for both IP and username
+			lockedIP := rl.RecordFailure(ip)
+			lockedUser := rl.RecordFailureUser(username)
+			remainingIP := rl.RemainingAttempts(ip)
+			remainingUser := rl.RemainingAttemptsUser(username)
+			logger.Warn("Failed login attempt", "username", username, "ip", ip,
+				"remaining_ip", remainingIP, "locked_ip", lockedIP,
+				"remaining_user", remainingUser, "locked_user", lockedUser)
 
 			// Show error
 			data := TemplateData{
@@ -118,8 +156,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Successful login - clear rate limit counter
+		// Successful login - clear rate limit counters for both IP and username
 		rl.RecordSuccess(ip)
+		rl.RecordSuccessUser(username)
 
 		// Get client info for session tracking
 		userAgent := r.UserAgent()
@@ -296,9 +335,28 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Atomically mark token as used BEFORE activation to prevent race conditions.
+		// If another request already consumed this token, we stop here.
+		consumed, err := token.MarkAsUsed(s.db)
+		if err != nil {
+			logger.Info("Error marking token as used", "error", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		if !consumed {
+			logger.Warn("Activation token already consumed (race condition)", "token_id", token.ID)
+			data := TemplateData{
+				Lang:  lang,
+				Title: i18n.T(lang, "activate.title"),
+				Error: i18n.T(lang, "activate.errors.token_used"),
+			}
+			s.templates.ExecuteTemplate(w, "activate.html", data)
+			return
+		}
+
 		// Get master key from system config
 		var masterKey string
-		err := s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
+		err = s.db.QueryRow("SELECT value FROM system_config WHERE key = 'master_key'").Scan(&masterKey)
 		if err != nil {
 			logger.Info("Error getting master key", "error", err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -311,11 +369,6 @@ func (s *Server) handleActivate(w http.ResponseWriter, r *http.Request) {
 			logger.Info("Error activating user", "error", err)
 			http.Error(w, "Failed to activate user", http.StatusInternalServerError)
 			return
-		}
-
-		// Mark token as used
-		if err := token.MarkAsUsed(s.db); err != nil {
-			logger.Info("Error marking token as used", "error", err)
 		}
 
 		logger.Info("User activated", "username", token.Username, "user_id", token.UserID)
@@ -610,6 +663,19 @@ func (s *Server) handleResetPasswordSubmit(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Atomically mark token as used BEFORE reset to prevent race conditions
+	consumed, markErr := token.MarkAsUsed(s.db)
+	if markErr != nil {
+		logger.Info("Error marking reset token as used", "error", markErr)
+		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=Internal+error", tokenString), http.StatusSeeOther)
+		return
+	}
+	if !consumed {
+		logger.Warn("Reset token already consumed (race condition)", "token_id", token.ID)
+		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=Token+already+used", tokenString), http.StatusSeeOther)
+		return
+	}
+
 	// Get user
 	user, err := users.GetByID(s.db, token.UserID)
 	if err != nil {
@@ -633,12 +699,6 @@ func (s *Server) handleResetPasswordSubmit(w http.ResponseWriter, r *http.Reques
 		logger.Info("Error resetting password", "error", err)
 		http.Redirect(w, r, fmt.Sprintf("/reset-password?token=%s&error=Failed+to+reset+password", tokenString), http.StatusSeeOther)
 		return
-	}
-
-	// Mark token as used
-	if err := token.MarkAsUsed(s.db); err != nil {
-		logger.Info("Error marking token as used", "error", err)
-		// Non-critical, continue
 	}
 
 	logger.Info("Password reset successfully for user", "username", user.Username)

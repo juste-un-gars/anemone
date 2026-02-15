@@ -2,11 +2,12 @@
 // Copyright (C) 2025 juste-un-gars
 // Licensed under the GNU Affero General Public License v3.0
 
-// This file provides IP-based rate limiting for login attempts.
+// This file provides rate limiting for login attempts, tracked by both IP and username.
 
 package auth
 
 import (
+	"strings"
 	"sync"
 	"time"
 )
@@ -29,10 +30,11 @@ type loginAttempt struct {
 	LockedAt time.Time
 }
 
-// LoginRateLimiter provides IP-based rate limiting for login attempts
+// LoginRateLimiter provides rate limiting for login attempts by IP and username
 type LoginRateLimiter struct {
-	mu       sync.Mutex
-	attempts map[string]*loginAttempt
+	mu           sync.Mutex
+	attempts     map[string]*loginAttempt // keyed by IP
+	userAttempts map[string]*loginAttempt // keyed by username (lowercase)
 }
 
 var (
@@ -44,7 +46,8 @@ var (
 func InitLoginRateLimiter() *LoginRateLimiter {
 	rlOnce.Do(func() {
 		defaultRateLimiter = &LoginRateLimiter{
-			attempts: make(map[string]*loginAttempt),
+			attempts:     make(map[string]*loginAttempt),
+			userAttempts: make(map[string]*loginAttempt),
 		}
 		go defaultRateLimiter.cleanup()
 	})
@@ -146,6 +149,173 @@ func (rl *LoginRateLimiter) RemainingAttempts(ip string) int {
 	return remaining
 }
 
+// IsBlockedUser returns true if a username is currently locked out
+func (rl *LoginRateLimiter) IsBlockedUser(username string) (bool, time.Duration) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	key := strings.ToLower(username)
+	a, ok := rl.userAttempts[key]
+	if !ok {
+		return false, 0
+	}
+
+	if !a.LockedAt.IsZero() {
+		remaining := time.Until(a.LockedAt.Add(LockoutDuration))
+		if remaining > 0 {
+			return true, remaining
+		}
+		delete(rl.userAttempts, key)
+		return false, 0
+	}
+
+	if time.Since(a.FirstAt) > LoginWindow {
+		delete(rl.userAttempts, key)
+		return false, 0
+	}
+
+	return false, 0
+}
+
+// RecordFailureUser records a failed login attempt for a username. Returns true if now locked.
+func (rl *LoginRateLimiter) RecordFailureUser(username string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	key := strings.ToLower(username)
+	a, ok := rl.userAttempts[key]
+	if !ok {
+		rl.userAttempts[key] = &loginAttempt{
+			Count:   1,
+			FirstAt: time.Now(),
+		}
+		return false
+	}
+
+	if time.Since(a.FirstAt) > LoginWindow {
+		rl.userAttempts[key] = &loginAttempt{
+			Count:   1,
+			FirstAt: time.Now(),
+		}
+		return false
+	}
+
+	a.Count++
+	if a.Count >= MaxLoginAttempts {
+		a.LockedAt = time.Now()
+		return true
+	}
+
+	return false
+}
+
+// RecordSuccessUser clears the attempt counter for a username after successful login
+func (rl *LoginRateLimiter) RecordSuccessUser(username string) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	delete(rl.userAttempts, strings.ToLower(username))
+}
+
+// RemainingAttemptsUser returns how many attempts are left for a username
+func (rl *LoginRateLimiter) RemainingAttemptsUser(username string) int {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	key := strings.ToLower(username)
+	a, ok := rl.userAttempts[key]
+	if !ok {
+		return MaxLoginAttempts
+	}
+
+	if time.Since(a.FirstAt) > LoginWindow {
+		return MaxLoginAttempts
+	}
+
+	remaining := MaxLoginAttempts - a.Count
+	if remaining < 0 {
+		return 0
+	}
+	return remaining
+}
+
+// ClearUserLockout clears the rate limit state for a specific username (admin unlock)
+func (rl *LoginRateLimiter) ClearUserLockout(username string) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	delete(rl.userAttempts, strings.ToLower(username))
+}
+
+// GetLockedUsers returns a set of usernames that are currently locked out
+func (rl *LoginRateLimiter) GetLockedUsers() map[string]bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	locked := make(map[string]bool)
+	now := time.Now()
+	for username, a := range rl.userAttempts {
+		if !a.LockedAt.IsZero() && now.Before(a.LockedAt.Add(LockoutDuration)) {
+			locked[username] = true
+		}
+	}
+	return locked
+}
+
+// GetLockedIPs returns a map of IPs currently locked out with their remaining duration
+func (rl *LoginRateLimiter) GetLockedIPs() map[string]time.Duration {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	locked := make(map[string]time.Duration)
+	now := time.Now()
+	for ip, a := range rl.attempts {
+		if !a.LockedAt.IsZero() {
+			remaining := a.LockedAt.Add(LockoutDuration).Sub(now)
+			if remaining > 0 {
+				locked[ip] = remaining
+			}
+		}
+	}
+	return locked
+}
+
+// ClearIPLockout clears the rate limit state for a specific IP (admin unlock)
+func (rl *LoginRateLimiter) ClearIPLockout(ip string) {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	delete(rl.attempts, ip)
+}
+
+// GetLockedUsersWithDuration returns locked usernames with remaining lockout duration
+func (rl *LoginRateLimiter) GetLockedUsersWithDuration() map[string]time.Duration {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	locked := make(map[string]time.Duration)
+	now := time.Now()
+	for username, a := range rl.userAttempts {
+		if !a.LockedAt.IsZero() {
+			remaining := a.LockedAt.Add(LockoutDuration).Sub(now)
+			if remaining > 0 {
+				locked[username] = remaining
+			}
+		}
+	}
+	return locked
+}
+
+// cleanupMap removes expired entries from a map
+func cleanupMap(m map[string]*loginAttempt, now time.Time) {
+	for key, a := range m {
+		if !a.LockedAt.IsZero() && now.After(a.LockedAt.Add(LockoutDuration)) {
+			delete(m, key)
+			continue
+		}
+		if a.LockedAt.IsZero() && now.Sub(a.FirstAt) > LoginWindow {
+			delete(m, key)
+		}
+	}
+}
+
 // cleanup periodically removes expired entries
 func (rl *LoginRateLimiter) cleanup() {
 	ticker := time.NewTicker(RateLimitCleanupInterval)
@@ -154,17 +324,8 @@ func (rl *LoginRateLimiter) cleanup() {
 	for range ticker.C {
 		rl.mu.Lock()
 		now := time.Now()
-		for ip, a := range rl.attempts {
-			// Remove if lockout expired
-			if !a.LockedAt.IsZero() && now.After(a.LockedAt.Add(LockoutDuration)) {
-				delete(rl.attempts, ip)
-				continue
-			}
-			// Remove if window expired and not locked
-			if a.LockedAt.IsZero() && now.Sub(a.FirstAt) > LoginWindow {
-				delete(rl.attempts, ip)
-			}
-		}
+		cleanupMap(rl.attempts, now)
+		cleanupMap(rl.userAttempts, now)
 		rl.mu.Unlock()
 	}
 }

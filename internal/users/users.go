@@ -181,6 +181,17 @@ func (u *User) CheckPassword(password string) bool {
 	return crypto.CheckPassword(password, u.PasswordHash)
 }
 
+// dummyHash is a pre-computed bcrypt hash (cost 12) used for timing-safe login checks.
+// When a user doesn't exist, we compare against this hash so the response time
+// is indistinguishable from a real user with a wrong password.
+var dummyHash = "$2a$12$LJ3m4ys3Lg2VBe7EJDI0f.VAtO5rOFMsfJkqgjJwPxBe3WjxSBSNa"
+
+// DummyCheckPassword performs a bcrypt comparison against a dummy hash.
+// This ensures constant-time response regardless of whether a user exists.
+func DummyCheckPassword(password string) {
+	crypto.CheckPassword(password, dummyHash)
+}
+
 // UpdateLastLogin updates the user's last login timestamp
 func (u *User) UpdateLastLogin(db *sql.DB) error {
 	now := time.Now()

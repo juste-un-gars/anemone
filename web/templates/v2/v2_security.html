@@ -1,0 +1,91 @@
+{{define "content"}}
+<div class="v2-page-header">
+    <h1>{{T .Lang "security.title"}}</h1>
+</div>
+
+{{if .Success}}
+<div class="v2-alert v2-alert-success" style="margin-bottom: 1.5rem;">
+    {{T .Lang "security.unlocked"}}
+</div>
+{{end}}
+
+<p style="color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.875rem;">
+    {{T .Lang "security.rate_limit_info"}}
+</p>
+
+<!-- Locked IPs -->
+<div class="v2-card" style="margin-bottom: 1.5rem;">
+    <div class="v2-card-header">
+        <h2 style="font-size: 1.1rem; font-weight: 600;">{{T .Lang "security.locked_ips"}}</h2>
+    </div>
+    <div class="v2-card-body">
+        {{if .LockedIPs}}
+        <div class="v2-table-responsive">
+            <table class="v2-table">
+                <thead>
+                    <tr>
+                        <th>{{T .Lang "security.ip"}}</th>
+                        <th>{{T .Lang "security.remaining"}}</th>
+                        <th style="width: 120px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .LockedIPs}}
+                    <tr>
+                        <td><code>{{.IP}}</code></td>
+                        <td>{{.Remaining}}</td>
+                        <td>
+                            <form method="POST" action="/admin/security/unlock-ip" style="display:inline;" onsubmit="return confirm('{{T $.Lang "security.unlock_confirm_ip"}}')">
+                                <input type="hidden" name="ip" value="{{.IP}}">
+                                <button type="submit" class="v2-btn v2-btn-sm v2-btn-warning">{{T $.Lang "security.unlock"}}</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{else}}
+        <p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">{{T .Lang "security.no_locked_ips"}}</p>
+        {{end}}
+    </div>
+</div>
+
+<!-- Locked Users -->
+<div class="v2-card">
+    <div class="v2-card-header">
+        <h2 style="font-size: 1.1rem; font-weight: 600;">{{T .Lang "security.locked_users"}}</h2>
+    </div>
+    <div class="v2-card-body">
+        {{if .LockedUsers}}
+        <div class="v2-table-responsive">
+            <table class="v2-table">
+                <thead>
+                    <tr>
+                        <th>{{T .Lang "security.username"}}</th>
+                        <th>{{T .Lang "security.remaining"}}</th>
+                        <th style="width: 120px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .LockedUsers}}
+                    <tr>
+                        <td><strong>{{.Username}}</strong></td>
+                        <td>{{.Remaining}}</td>
+                        <td>
+                            <form method="POST" action="/admin/security/unlock-user" style="display:inline;" onsubmit="return confirm('{{T $.Lang "security.unlock_confirm_user"}}')">
+                                <input type="hidden" name="username" value="{{.Username}}">
+                                <button type="submit" class="v2-btn v2-btn-sm v2-btn-warning">{{T $.Lang "security.unlock"}}</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+        {{else}}
+        <p style="color: var(--text-muted); text-align: center; padding: 2rem 0;">{{T .Lang "security.no_locked_users"}}</p>
+        {{end}}
+    </div>
+</div>
+{{end}}

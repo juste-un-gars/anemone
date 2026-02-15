@@ -215,6 +215,7 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 		}
 		return false
 	}
+	funcMap["lower"] = strings.ToLower
 	funcMap["CSRFField"] = func(token string) template.HTML {
 		return template.HTML(`<input type="hidden" name="csrf_token" value="` + template.HTMLEscapeString(token) + `">`)
 	}
@@ -289,6 +290,11 @@ func NewRouter(db *sql.DB, cfg *config.Config) http.Handler {
 	mux.HandleFunc("/admin/settings", auth.RequireAdmin(server.handleAdminSettings))
 	mux.HandleFunc("/admin/settings/sync-password", auth.RequireAdmin(server.handleAdminSettingsSyncPassword))
 	mux.HandleFunc("/admin/settings/trash", auth.RequireAdmin(server.handleAdminSettingsTrash))
+
+	// Admin routes - Security
+	mux.HandleFunc("/admin/security", auth.RequireAdmin(server.handleAdminSecurity))
+	mux.HandleFunc("/admin/security/unlock-ip", auth.RequireAdmin(server.handleAdminSecurityUnlockIP))
+	mux.HandleFunc("/admin/security/unlock-user", auth.RequireAdmin(server.handleAdminSecurityUnlockUser))
 
 	// Admin routes - Logs
 	mux.HandleFunc("/admin/logs", auth.RequireAdmin(server.handleAdminLogs))
@@ -519,12 +525,19 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
 
 		// Content Security Policy - Restrict resource loading
-		// default-src 'self' - Only load resources from same origin
-		// style-src 'self' 'unsafe-inline' - Allow inline styles (needed for some UI)
-		// script-src 'self' - Only execute scripts from same origin
-		// frame-src 'self' - Allow iframes from same origin (OnlyOffice editor)
-		// frame-ancestors 'self' - Allow being framed by same origin only
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'self'; frame-ancestors 'self'")
+		// Note: unsafe-inline kept for script-src/style-src due to extensive inline JS in templates.
+		// unsafe-eval REMOVED (no eval/new Function usage). object-src/base-uri locked down.
+		w.Header().Set("Content-Security-Policy",
+			"default-src 'self'; "+
+				"style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; "+
+				"script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; "+
+				"img-src 'self' data:; "+
+				"font-src 'self'; "+
+				"connect-src 'self'; "+
+				"frame-src 'self'; "+
+				"frame-ancestors 'self'; "+
+				"object-src 'none'; "+
+				"base-uri 'self'")
 
 		// Referrer Policy - Don't leak referrer to external sites
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -551,6 +564,8 @@ func csrfMiddleware(next http.Handler) http.Handler {
 					return
 				}
 				auth.SetCSRFCookie(w, token)
+				// Pass token via context so handlers can use it immediately
+				r = auth.WithCSRFToken(r, token)
 			}
 		}
 		next.ServeHTTP(w, r)

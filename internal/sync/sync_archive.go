@@ -192,7 +192,14 @@ func createTarGz(buf *bytes.Buffer, sourceDir string) (int, int64, error) {
 	return fileCount, totalSize, err
 }
 
-// ExtractTarGz extracts a tar.gz archive to a destination directory
+// maxFileSize is the maximum allowed size per file during tar extraction (10 GB).
+const maxFileSize = 10 * 1024 * 1024 * 1024
+
+// maxTotalSize is the maximum allowed total extracted size (50 GB).
+const maxTotalSize = 50 * 1024 * 1024 * 1024
+
+// ExtractTarGz extracts a tar.gz archive to a destination directory.
+// It enforces per-file and total size limits to prevent decompression bombs.
 func ExtractTarGz(reader io.Reader, destDir string) error {
 	// Create destination directory if it doesn't exist
 	if err := os.MkdirAll(destDir, 0755); err != nil {
@@ -208,6 +215,8 @@ func ExtractTarGz(reader io.Reader, destDir string) error {
 
 	// Create tar reader
 	tarReader := tar.NewReader(gzipReader)
+
+	var totalWritten int64
 
 	// Extract each file
 	for {
@@ -246,6 +255,14 @@ func ExtractTarGz(reader io.Reader, destDir string) error {
 			}
 
 		case tar.TypeReg:
+			// Check declared file size against limit
+			if header.Size > maxFileSize {
+				return fmt.Errorf("file too large: %s (%d bytes, max %d)", header.Name, header.Size, maxFileSize)
+			}
+			if totalWritten+header.Size > maxTotalSize {
+				return fmt.Errorf("total extraction size exceeded limit (%d bytes)", maxTotalSize)
+			}
+
 			// Create parent directories if needed
 			if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
 				return fmt.Errorf("failed to create parent directory: %w", err)
@@ -257,12 +274,17 @@ func ExtractTarGz(reader io.Reader, destDir string) error {
 				return fmt.Errorf("failed to create file %s: %w", targetPath, err)
 			}
 
-			// Copy file content
-			if _, err := io.Copy(outFile, tarReader); err != nil {
-				outFile.Close()
+			// Copy file content with size limit
+			written, err := io.Copy(outFile, io.LimitReader(tarReader, maxFileSize+1))
+			outFile.Close()
+			if err != nil {
 				return fmt.Errorf("failed to write file %s: %w", targetPath, err)
 			}
-			outFile.Close()
+			if written > maxFileSize {
+				os.Remove(targetPath)
+				return fmt.Errorf("file exceeded size limit during extraction: %s", header.Name)
+			}
+			totalWritten += written
 
 			// Set file permissions
 			if err := os.Chmod(targetPath, os.FileMode(header.Mode)); err != nil {

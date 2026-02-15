@@ -12,7 +12,7 @@
 
 ## Current Session
 
-**Session 25: Corrections Securite Prioritaires** - Paused
+**Session 25: Corrections Securite Prioritaires** - En cours (vagues 1+2+3+4 terminees)
 
 **Détails :** `.claude/sessions/SESSION_025_security_fixes.md`
 **Rapport audit :** `SECURITY_AUDIT_2026-02-15.md` (racine, NE PAS committer)
@@ -23,9 +23,9 @@
 
 **Date:** 2026-02-15
 **Objective:** Corriger les vulns identifiees en session 24
-**Status:** Paused (corrections prioritaires faites, audit a finir plus tard)
+**Status:** En cours (vagues 1+2+3+4 done, deploy FR2 valide)
 
-### Corrections appliquees
+### Corrections appliquees (vague 1)
 | # | Correction | Statut |
 |---|-----------|--------|
 | 1 | Go 1.22.2 → 1.26.0 + deps a jour (24 vulns stdlib corrigees) | DONE |
@@ -35,36 +35,62 @@
 | 5 | Protection CSRF formulaires publics (double-submit cookie) | DONE + teste FR2 |
 | 6 | Deploy + test complet sur FR2 | DONE |
 
-### Bug resolu
-- Rate limiting + CSRF + restriction methodes ne fonctionnaient pas sur FR2
-- **Cause** : service unit `ExecStart=/home/franck/anemone/anemone`, deploiements precedents copiaient vers `/usr/local/bin/anemone` (mauvais chemin)
-- **Fix** : deployer vers `/home/franck/anemone/anemone` sur FR2
+### Corrections appliquees (vague 2)
+| # | Correction | Statut |
+|---|-----------|--------|
+| 7 | A3 : Timing side-channel — DummyCheckPassword bcrypt constant-time | DONE + teste FR2 |
+| 8 | G3 : HTTP Timeouts SlowLoris — http.Server avec timeouts | DONE + teste FR2 |
+| 9 | A5 : Race condition tokens — MarkAsUsed atomique + avant activation/reset | DONE |
+| 10 | Bug CSRF middleware — token passe via context au premier GET | DONE + teste FR2 |
 
-### Reste a faire (audit securite)
-| # | Finding | Severite | Statut |
+### Corrections appliquees (vague 3)
+| # | Correction | Statut |
+|---|-----------|--------|
+| 11 | A4 : Rate limiting par username en plus de l'IP (anti brute-force distribue) | DONE + teste FR2 |
+| 12 | A7 : Validation IP en session — mismatch = session invalidee | DONE + teste FR2 |
+| 13 | Bouton admin "Debloquer" compte dans /admin/users (badge Verrouille) | DONE + teste FR2 |
+
+### Corrections appliquees (vague 4)
+| # | Correction | Statut |
+|---|-----------|--------|
+| 14 | Page /admin/security : IPs bloquees + comptes verrouilles + deblocage | DONE + teste FR2 |
+| A10 | CSP : retrait unsafe-eval, ajout object-src 'none' + base-uri 'self' | DONE + deploy FR2 |
+| A11 | RememberMe 30j → 14j | DONE + deploy FR2 |
+| I1 | SSRF : ValidatePeerAddress() bloque loopback/link-local/metadata | DONE + deploy FR2 |
+| I2 | Injection rclone : quoteValue() sur SFTP host/user/key_file | DONE + deploy FR2 |
+| G5 | Bombe tar : limite 10Go/fichier + 50Go total + io.LimitReader | DONE + deploy FR2 |
+
+### Reste a faire (securite)
+
+#### Findings acceptes (pas de correction prevue)
+| # | Finding | Severite | Raison |
 |---|---------|----------|--------|
-| A3 | Enumeration utilisateurs (timing side-channel) | CRITICAL | NON CORRIGE |
-| A4 | Verrouillage par compte (pas seulement par IP) | HIGH | PARTIEL |
-| A5 | Race condition tokens activation | HIGH | NON CORRIGE |
-| A7 | Validation IP en session | HIGH | NON CORRIGE |
-| G2 | InsecureSkipVerify: true (14 instances) | HIGH | NON CORRIGE (attendu: certs auto-signes P2P) |
-| G3 | Timeouts HTTP (SlowLoris) | HIGH | NON CORRIGE |
-| A9 | Complexite mdp (min 8 chars seulement) | MEDIUM | NON CORRIGE |
-| A10 | CSP trop permissif (unsafe-inline/eval) | MEDIUM | NON CORRIGE |
-| A11 | RememberMe 30j trop long | MEDIUM | NON CORRIGE |
-| I1 | SSRF via adresse peer | MEDIUM | NON CORRIGE |
-| I2 | Injection credentials rclone | MEDIUM | NON CORRIGE |
-| G5 | Bombe decompression tar | MEDIUM | NON CORRIGE |
-| Phase 8 | Tests authentifies (IDOR, privilege escalation) | - | A FAIRE |
-| Phase 9 | Tests XSS | - | A FAIRE |
-| Phase 10 | Rapport final + recommandations | - | A FAIRE |
+| G2 | InsecureSkipVerify: true | HIGH | Necessaire pour certs auto-signes P2P |
+| A9 | Complexite mdp (min 8 chars) | MEDIUM | Choix utilisateur, pas de contrainte forcee |
+
+#### Phases audit restantes
+| Phase | Description | Statut |
+|-------|-------------|--------|
+| 8 | Tests authentifies (IDOR, privilege escalation) | A FAIRE |
+| 9 | Tests XSS sur champs de saisie | A FAIRE |
+| 10 | Rapport final + recommandations | A FAIRE |
 
 ### Resume technique
 - **Go** : 1.26.0, go-sqlite3 1.14.34, x/crypto 0.48.0, x/sys 0.41.0
-- **CSRF** : double-submit cookie sur login, setup, activate, reset-password
-- **Rate limiting** : 5 tentatives / 15 min par IP, lockout 15 min
+- **CSRF** : double-submit cookie avec context (fix premier GET)
+- **Rate limiting** : 5 tentatives / 15 min par IP ET par username, lockout 15 min
+- **Session IP binding** : mismatch IP = session invalidee + log
+- **Admin unlock** : bouton debloquer compte dans /admin/users + badge Verrouille
 - **Cookies** : tous Secure=true + SameSite=Strict
-- **Build OK, tests OK, deploy FR2 OK**
+- **HTTP timeouts** : ReadHeader=10s, Read=30s, Write=60s, Idle=120s
+- **Tokens** : MarkAsUsed atomique `(bool, error)`, consomme avant action
+- **CSP** : unsafe-eval retire, object-src 'none', base-uri 'self' (unsafe-inline garde : 180+ handlers inline)
+- **RememberMe** : 14 jours (etait 30j)
+- **SSRF** : ValidatePeerAddress() dans peers.go, appelee au create/update peer
+- **Rclone** : quoteValue() sur SFTP host/user/key_file dans buildSFTPRemote
+- **Tar bomb** : maxFileSize=10Go, maxTotalSize=50Go, io.LimitReader dans ExtractTarGz
+- **Page /admin/security** : handler + template + routes + i18n FR/EN + lien sidebar
+- **Build OK, tests OK, deploy FR2 OK (binaire + templates)**
 
 ---
 
@@ -90,7 +116,7 @@
 
 | # | Name | Date | Status |
 |---|------|------|--------|
-| 25 | Corrections Securite Prioritaires | 2026-02-15 | Paused |
+| 25 | Corrections Securite Prioritaires | 2026-02-15 | En cours |
 | 24 | Audit de Securite | 2026-02-15 | Complete |
 | 23 | ZFS Wizard Fix + Documentation Cleanup | 2026-02-15 | Complete |
 | 22 | !BADKEY Fix + Bugfixes + Release v0.20.0-beta | 2026-02-15 | Complete |
@@ -103,10 +129,9 @@
 
 ---
 
-## Next Steps (prochaine session)
+## Next Steps
 
-1. **Finir audit securite** — phases 8 (IDOR/privesc), 9 (XSS), 10 (rapport final)
-2. **Corriger findings HIGH restants** — G3 (timeouts HTTP), A3 (timing), A5 (race condition tokens)
-3. **Evaluer findings MEDIUM** — complexite mdp, CSP, RememberMe, SSRF
+1. **Phases 8/9/10** — Tests IDOR, XSS, rapport final
+2. **A10 full** — Refactor JS inline pour retirer unsafe-inline du CSP (optionnel, gros chantier)
 
 Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.

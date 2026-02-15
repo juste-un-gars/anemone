@@ -9,16 +9,18 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
-	"github.com/juste-un-gars/anemone/internal/logger"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/juste-un-gars/anemone/internal/logger"
 )
 
 const (
 	SessionCookieName       = "anemone_session"
 	SessionDuration         = 2 * time.Hour  // Normal session: 2 hours
-	RememberMeDuration      = 30 * 24 * time.Hour // Remember me: 30 days
+	RememberMeDuration      = 14 * 24 * time.Hour // Remember me: 14 days
 	SessionCleanupInterval  = 1 * time.Hour
 )
 
@@ -277,6 +279,17 @@ func ClearSessionCookie(w http.ResponseWriter) {
 	})
 }
 
+// extractIP strips the port from an address like "192.168.1.1:12345" or "[::1]:12345"
+func extractIP(addr string) string {
+	if addr == "" {
+		return ""
+	}
+	if idx := strings.LastIndex(addr, ":"); idx != -1 {
+		return addr[:idx]
+	}
+	return addr
+}
+
 // GetSessionFromRequest retrieves the session from the request
 func GetSessionFromRequest(r *http.Request) (*Session, error) {
 	cookie, err := r.Cookie(SessionCookieName)
@@ -292,6 +305,16 @@ func GetSessionFromRequest(r *http.Request) (*Session, error) {
 	session, err := sm.GetSession(cookie.Value)
 	if err != nil {
 		return nil, fmt.Errorf("invalid session: %w", err)
+	}
+
+	// Validate that request IP matches session creation IP (prevents session hijacking)
+	requestIP := extractIP(r.RemoteAddr)
+	sessionIP := extractIP(session.IPAddress)
+	if sessionIP != "" && requestIP != "" && requestIP != sessionIP {
+		logger.Warn("Session IP mismatch, invalidating session",
+			"username", session.Username, "session_ip", sessionIP, "request_ip", requestIP)
+		sm.DeleteSession(cookie.Value)
+		return nil, fmt.Errorf("session IP mismatch")
 	}
 
 	// Update last activity (non-blocking)

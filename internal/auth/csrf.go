@@ -7,10 +7,19 @@
 package auth
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
 )
+
+// csrfContextKey is used to pass the CSRF token via request context
+type csrfContextKey struct{}
+
+// WithCSRFToken stores the CSRF token in the request context
+func WithCSRFToken(r *http.Request, token string) *http.Request {
+	return r.WithContext(context.WithValue(r.Context(), csrfContextKey{}, token))
+}
 
 const (
 	// CSRFCookieName is the name of the CSRF cookie
@@ -44,8 +53,14 @@ func SetCSRFCookie(w http.ResponseWriter, token string) {
 	})
 }
 
-// GetCSRFFromRequest returns the CSRF token from the cookie
+// GetCSRFFromRequest returns the CSRF token, checking context first (set by middleware),
+// then falling back to the cookie.
 func GetCSRFFromRequest(r *http.Request) string {
+	// Check context first (set by middleware on first visit)
+	if token, ok := r.Context().Value(csrfContextKey{}).(string); ok && token != "" {
+		return token
+	}
+	// Fall back to cookie (set by previous visit)
 	cookie, err := r.Cookie(CSRFCookieName)
 	if err != nil {
 		return ""

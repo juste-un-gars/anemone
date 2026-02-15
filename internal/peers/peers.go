@@ -9,11 +9,49 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/juste-un-gars/anemone/internal/crypto"
 )
+
+// ValidatePeerAddress checks that a peer address is not a loopback, link-local,
+// or other dangerous internal address that could be used for SSRF attacks.
+func ValidatePeerAddress(address string) error {
+	addr := strings.TrimSpace(address)
+	if addr == "" {
+		return fmt.Errorf("peer address cannot be empty")
+	}
+
+	// Block obvious localhost names
+	lower := strings.ToLower(addr)
+	if lower == "localhost" || lower == "ip6-localhost" || lower == "ip6-loopback" {
+		return fmt.Errorf("peer address cannot be localhost")
+	}
+
+	// Block metadata endpoints (cloud SSRF)
+	if lower == "169.254.169.254" || lower == "metadata.google.internal" {
+		return fmt.Errorf("peer address cannot be a metadata endpoint")
+	}
+
+	// Try to parse as IP
+	ip := net.ParseIP(addr)
+	if ip != nil {
+		if ip.IsLoopback() {
+			return fmt.Errorf("peer address cannot be a loopback address")
+		}
+		if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+			return fmt.Errorf("peer address cannot be a link-local address")
+		}
+		if ip.IsUnspecified() {
+			return fmt.Errorf("peer address cannot be 0.0.0.0 or [::]")
+		}
+	}
+
+	return nil
+}
 
 // Peer represents a remote Anemone instance for P2P synchronization
 type Peer struct {

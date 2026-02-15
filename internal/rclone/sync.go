@@ -209,14 +209,14 @@ func buildRemoteString(backup *RcloneBackup, dataDir string) string {
 // buildSFTPRemote builds an rclone SFTP remote string.
 func buildSFTPRemote(backup *RcloneBackup, dataDir string) string {
 	parts := []string{
-		fmt.Sprintf("host=%s", backup.SFTPHost),
-		fmt.Sprintf("user=%s", backup.SFTPUser),
+		fmt.Sprintf("host=%s", quoteValue(backup.SFTPHost)),
+		fmt.Sprintf("user=%s", quoteValue(backup.SFTPUser)),
 		fmt.Sprintf("port=%d", backup.SFTPPort),
 	}
 
 	if backup.SFTPKeyPath != "" {
 		resolvedKeyPath := ResolveKeyPath(backup.SFTPKeyPath, dataDir)
-		parts = append(parts, fmt.Sprintf("key_file=%s", resolvedKeyPath))
+		parts = append(parts, fmt.Sprintf("key_file=%s", quoteValue(resolvedKeyPath)))
 	}
 
 	return fmt.Sprintf(":sftp,%s:", strings.Join(parts, ","))

@@ -5,12 +5,14 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/juste-un-gars/anemone/internal/config"
 	"github.com/juste-un-gars/anemone/internal/database"
@@ -21,7 +23,7 @@ import (
 	syncpkg "github.com/juste-un-gars/anemone/internal/sync"
 	"github.com/juste-un-gars/anemone/internal/sysconfig"
 	"github.com/juste-un-gars/anemone/internal/rclone"
-	"github.com/juste-un-gars/anemone/internal/tls"
+	anemonetls "github.com/juste-un-gars/anemone/internal/tls"
 	"github.com/juste-un-gars/anemone/internal/trash"
 	"github.com/juste-un-gars/anemone/internal/updater"
 	"github.com/juste-un-gars/anemone/internal/usbbackup"
@@ -211,13 +213,13 @@ func main() {
 
 func startHTTPSServer(cfg *config.Config, router http.Handler) {
 	// Generate or load TLS certificate
-	certCfg := &tls.CertConfig{
+	certCfg := &anemonetls.CertConfig{
 		CertPath: cfg.TLSCertPath,
 		KeyPath:  cfg.TLSKeyPath,
 		DataDir:  cfg.DataDir,
 	}
 
-	if err := tls.GenerateOrLoadCertificate(certCfg); err != nil {
+	if err := anemonetls.GenerateOrLoadCertificate(certCfg); err != nil {
 		logger.Error("Failed to setup TLS certificate", "error", err)
 		os.Exit(1)
 	}
@@ -226,7 +228,25 @@ func startHTTPSServer(cfg *config.Config, router http.Handler) {
 	logger.Info("HTTPS server listening", "address", fmt.Sprintf("https://localhost%s", addr))
 	logger.Info("Self-signed certificate warning is normal for local/private use")
 
-	if err := http.ListenAndServeTLS(addr, cfg.TLSCertPath, cfg.TLSKeyPath, router); err != nil {
+	tlsCert, err := tls.LoadX509KeyPair(cfg.TLSCertPath, cfg.TLSKeyPath)
+	if err != nil {
+		logger.Error("Failed to load TLS certificate", "error", err)
+		os.Exit(1)
+	}
+
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		TLSConfig: &tls.Config{
+			Certificates: []tls.Certificate{tlsCert},
+		},
+	}
+
+	if err := srv.ListenAndServeTLS("", ""); err != nil {
 		logger.Error("HTTPS server failed", "error", err)
 		os.Exit(1)
 	}
@@ -237,7 +257,16 @@ func startHTTPServer(cfg *config.Config, router http.Handler) {
 	logger.Warn("HTTP server listening (insecure)", "address", fmt.Sprintf("http://localhost%s", addr))
 	logger.Warn("HTTP transmits credentials in clear text. Consider ENABLE_HTTPS=true")
 
-	if err := http.ListenAndServe(addr, router); err != nil {
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
 		logger.Error("HTTP server failed", "error", err)
 		os.Exit(1)
 	}
@@ -249,7 +278,16 @@ func startDockerHTTPServer(cfg *config.Config, router http.Handler, dockerIP str
 	addr := fmt.Sprintf("%s:%s", dockerIP, cfg.Port)
 	logger.Info("Docker HTTP server listening (bridge network only)", "address", addr)
 
-	if err := http.ListenAndServe(addr, router); err != nil {
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
 		logger.Error("Docker HTTP server failed", "error", err)
 	}
 }

@@ -36,9 +36,14 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get locked usernames for display
+	rl := auth.GetLoginRateLimiter()
+	lockedUsers := rl.GetLockedUsers()
+
 	data := struct {
 		V2TemplateData
-		Users []*users.User
+		Users       []*users.User
+		LockedUsers map[string]bool
 	}{
 		V2TemplateData: V2TemplateData{
 			Lang:       lang,
@@ -46,7 +51,8 @@ func (s *Server) handleAdminUsers(w http.ResponseWriter, r *http.Request) {
 			ActivePage: "users",
 			Session:    session,
 		},
-		Users: allUsers,
+		Users:       allUsers,
+		LockedUsers: lockedUsers,
 	}
 
 	tmpl := s.loadV2Page("v2_users.html", s.funcMap)
@@ -346,6 +352,24 @@ func (s *Server) handleAdminUsersActions(w http.ResponseWriter, r *http.Request)
 		// Edit user quota
 		s.handleAdminUserQuota(w, r, userID, session, lang)
 		return
+
+	case "unlock":
+		// Unlock user account (clear rate limiter)
+		if r.Method != http.MethodPost {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		user, err := users.GetByID(s.db, userID)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		rl := auth.GetLoginRateLimiter()
+		rl.ClearUserLockout(user.Username)
+		logger.Warn("Account unlocked by admin", "username", user.Username, "admin", session.Username)
+		w.WriteHeader(http.StatusOK)
 
 	case "delete":
 		// Delete user

@@ -433,8 +433,8 @@ func TestSessionDurations(t *testing.T) {
 		t.Errorf("SessionDuration should be %v, got %v", expected, SessionDuration)
 	}
 
-	// Remember me duration should be 30 days
-	expectedRemember := 30 * 24 * time.Hour
+	// Remember me duration should be 14 days
+	expectedRemember := 14 * 24 * time.Hour
 	if RememberMeDuration != expectedRemember {
 		t.Errorf("RememberMeDuration should be %v, got %v", expectedRemember, RememberMeDuration)
 	}

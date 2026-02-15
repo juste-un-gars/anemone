@@ -199,6 +199,12 @@ func (s *Server) handleAdminPeersAdd(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Validate peer address (SSRF protection)
+		if err := peers.ValidatePeerAddress(address); err != nil {
+			s.renderPeersAddError(w, lang, session, "Adresse invalide : "+err.Error())
+			return
+		}
+
 		// Parse port
 		port := 8443
 		if portStr != "" {
@@ -427,6 +433,12 @@ func (s *Server) handleAdminPeersActions(w http.ResponseWriter, r *http.Request)
 		// Update fields
 		peer.Name = r.FormValue("name")
 		peer.Address = r.FormValue("address")
+
+		// Validate peer address (SSRF protection)
+		if err := peers.ValidatePeerAddress(peer.Address); err != nil {
+			http.Redirect(w, r, fmt.Sprintf("/admin/peers/%d/edit?error=Adresse+invalide", peerID), http.StatusSeeOther)
+			return
+		}
 
 		port, err := strconv.Atoi(r.FormValue("port"))
 		if err != nil || port < 1 || port > 65535 {

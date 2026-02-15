@@ -112,15 +112,23 @@ func (t *Token) IsValid() bool {
 	return time.Now().Before(t.ExpiresAt)
 }
 
-// MarkAsUsed marks the token as used
-func (t *Token) MarkAsUsed(db *sql.DB) error {
+// MarkAsUsed atomically marks the token as used.
+// Returns false if the token was already consumed by another request (race condition protection).
+func (t *Token) MarkAsUsed(db *sql.DB) (bool, error) {
 	now := time.Now()
-	_, err := db.Exec("UPDATE activation_tokens SET used_at = ? WHERE id = ?", now, t.ID)
+	result, err := db.Exec("UPDATE activation_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL", now, t.ID)
 	if err != nil {
-		return fmt.Errorf("failed to mark token as used: %w", err)
+		return false, fmt.Errorf("failed to mark token as used: %w", err)
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("failed to check rows affected: %w", err)
+	}
+	if rows == 0 {
+		return false, nil // Already consumed by another request
 	}
 	t.UsedAt = &now
-	return nil
+	return true, nil
 }
 
 // DeleteExpiredTokens removes expired tokens from the database
