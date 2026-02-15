@@ -40,52 +40,124 @@ echo -e "${BLUE}🪸 Anemone Server Configuration Restore${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
+# Dynamic paths - detect install directory from script location
+INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+SERVICE_USER="${SUDO_USER:-$USER}"
+
 # Detect distribution
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    DISTRO=$ID
+if [ -f /etc/fedora-release ]; then
+    DISTRO="fedora"
+    SMB_SERVICE="smb"
+    PKG_MANAGER="dnf"
+elif [ -f /etc/redhat-release ]; then
+    DISTRO="rhel"
+    SMB_SERVICE="smb"
+    PKG_MANAGER="dnf"
+elif [ -f /etc/debian_version ]; then
+    DISTRO="debian"
+    SMB_SERVICE="smbd"
+    PKG_MANAGER="apt"
 else
-    echo -e "${RED}Error: Cannot detect Linux distribution${NC}"
+    echo -e "${RED}Error: Unsupported distribution. Supported: Fedora, RHEL, Debian, Ubuntu${NC}"
     exit 1
 fi
 
 # Check and install dependencies
 echo -e "${BLUE}Checking system dependencies...${NC}"
-MISSING_DEPS=()
 
-for cmd in jq sqlite3 openssl go smbpasswd useradd; do
-    if ! command -v $cmd &> /dev/null; then
-        case $cmd in
-            go) MISSING_DEPS+=("golang-go") ;;
-            smbpasswd) MISSING_DEPS+=("samba") ;;
-            *) MISSING_DEPS+=("$cmd") ;;
-        esac
+# Install base dependencies (excluding Go, handled separately)
+echo -e "${BLUE}Installing base dependencies...${NC}"
+if [ "$PKG_MANAGER" = "dnf" ]; then
+    dnf install -y -q jq sqlite openssl samba passwd gcc curl
+elif [ "$PKG_MANAGER" = "apt" ]; then
+    apt-get update -qq
+    apt-get install -y -qq jq sqlite3 openssl samba passwd gcc build-essential curl
+fi
+echo -e "${GREEN}✓ Base dependencies installed${NC}"
+
+# Install Go with version check (same logic as install.sh)
+install_go() {
+    # Read minimum Go version from go.mod
+    REQUIRED_GO=""
+    if [ -f "$INSTALL_DIR/go.mod" ]; then
+        REQUIRED_GO=$(grep '^go ' "$INSTALL_DIR/go.mod" | awk '{print $2}')
     fi
-done
 
-if [ ${#MISSING_DEPS[@]} -ne 0 ]; then
-    echo -e "${YELLOW}Missing dependencies: ${MISSING_DEPS[*]}${NC}"
-    echo -e "${BLUE}Installing dependencies...${NC}"
+    # Check if Go is already installed and meets the minimum version
+    if command -v go &> /dev/null; then
+        GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+        if [ -n "$REQUIRED_GO" ]; then
+            GO_OK=$(printf '%s\n%s\n' "$REQUIRED_GO" "$GO_VERSION" | sort -V | head -n1)
+            if [ "$GO_OK" = "$REQUIRED_GO" ]; then
+                echo -e "${GREEN}✓ Go already installed ($GO_VERSION >= $REQUIRED_GO required)${NC}"
+                return
+            else
+                echo -e "${YELLOW}Go $GO_VERSION is too old (need >= $REQUIRED_GO), upgrading...${NC}"
+            fi
+        else
+            echo -e "${GREEN}✓ Go already installed: $GO_VERSION${NC}"
+            return
+        fi
+    else
+        echo -e "${BLUE}Installing Go...${NC}"
+    fi
 
-    case $DISTRO in
-        ubuntu|debian|linuxmint)
-            apt-get update -qq
-            apt-get install -y -qq jq sqlite3 openssl golang-go samba passwd
-            ;;
-        fedora|rhel|centos)
-            dnf install -y -q jq sqlite openssl golang samba passwd
-            ;;
+    # Detect architecture
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64)        GO_ARCH="amd64" ;;
+        aarch64|arm64) GO_ARCH="arm64" ;;
+        armv6l)        GO_ARCH="armv6l" ;;
         *)
-            echo -e "${RED}Error: Unsupported distribution: $DISTRO${NC}"
-            echo -e "${YELLOW}Please install manually: jq sqlite3 openssl golang samba${NC}"
+            echo -e "${RED}Error: Unsupported architecture: $ARCH${NC}"
             exit 1
             ;;
     esac
 
-    echo -e "${GREEN}✓ Dependencies installed${NC}"
-else
-    echo -e "${GREEN}✓ All dependencies already installed${NC}"
-fi
+    # Get latest Go version
+    LATEST_GO=$(curl -sL https://go.dev/VERSION?m=text | head -n1)
+    if [ -z "$LATEST_GO" ]; then
+        echo -e "${RED}Error: Failed to fetch latest Go version${NC}"
+        exit 1
+    fi
+
+    echo -e "${BLUE}Downloading Go $LATEST_GO...${NC}"
+    GO_TARBALL="$LATEST_GO.linux-$GO_ARCH.tar.gz"
+    GO_URL="https://go.dev/dl/$GO_TARBALL"
+
+    cd /tmp
+    curl -LO "$GO_URL"
+
+    if [ ! -f "$GO_TARBALL" ]; then
+        echo -e "${RED}Error: Failed to download Go${NC}"
+        exit 1
+    fi
+
+    # Remove old installation if exists
+    [ -d /usr/local/go ] && rm -rf /usr/local/go
+
+    # Extract and configure
+    tar -C /usr/local -xzf "$GO_TARBALL"
+    rm "$GO_TARBALL"
+
+    # Configure PATH
+    cat > /etc/profile.d/go.sh <<'GOEOF'
+export PATH=/usr/local/go/bin:$PATH
+export GOPATH=$HOME/go
+export PATH=$PATH:$GOPATH/bin
+GOEOF
+    chmod +x /etc/profile.d/go.sh
+
+    # Apply to current session
+    export PATH=/usr/local/go/bin:$PATH
+    export GOPATH=$HOME/go
+    export PATH=$PATH:$GOPATH/bin
+
+    echo -e "${GREEN}✓ Go installed: $(go version | awk '{print $3}')${NC}"
+    cd "$INSTALL_DIR"
+}
+
+install_go
 
 # Confirmation
 echo ""
@@ -514,29 +586,26 @@ fi
 rm -f /tmp/anemone-decrypt-password 2>/dev/null
 
 echo ""
-echo -e "${BLUE}[10/11] Generating TLS certificate...${NC}"
-# Generate self-signed certificate
-openssl req -new -newkey rsa:4096 -days 3650 -nodes -x509 \
-    -subj "/C=FR/ST=State/L=City/O=Anemone/CN=localhost" \
-    -keyout "$ANEMONE_DATA_DIR/certs/server.key" \
-    -out "$ANEMONE_DATA_DIR/certs/server.crt" 2>/dev/null
-chmod 600 "$ANEMONE_DATA_DIR/certs/server.key"
-chmod 644 "$ANEMONE_DATA_DIR/certs/server.crt"
-echo -e "${GREEN}✓ TLS certificate generated${NC}"
+echo -e "${BLUE}[10/11] Preparing TLS certificates directory...${NC}"
+# Anemone auto-generates an ECDSA P-256 certificate at startup if absent
+mkdir -p "$ANEMONE_DATA_DIR/certs"
+chown "$SERVICE_USER:$SERVICE_USER" "$ANEMONE_DATA_DIR/certs"
+chmod 700 "$ANEMONE_DATA_DIR/certs"
+echo -e "${GREEN}✓ TLS certificates directory ready (auto-generated at startup)${NC}"
 
 echo ""
 echo -e "${BLUE}[11/11] Compiling Anemone tools and starting services...${NC}"
 
 # Compile anemone-smbgen if not already available
-if ! command -v anemone-smbgen &> /dev/null; then
+if [ ! -f "$INSTALL_DIR/anemone-smbgen" ]; then
     echo -e "${YELLOW}  Compiling anemone-smbgen...${NC}"
-    cd "$(dirname "$0")"
+    cd "$INSTALL_DIR"
 
     # Try to compile with retries (in case of network issues)
     RETRY_COUNT=0
     MAX_RETRIES=3
     while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-        go build -o /usr/local/bin/anemone-smbgen ./cmd/anemone-smbgen 2>&1
+        go build -o "$INSTALL_DIR/anemone-smbgen" ./cmd/anemone-smbgen 2>&1
         if [ $? -eq 0 ]; then
             echo -e "${GREEN}  ✓ anemone-smbgen compiled${NC}"
             break
@@ -553,30 +622,23 @@ if ! command -v anemone-smbgen &> /dev/null; then
 fi
 
 # Generate Samba config if tool is available
-if command -v anemone-smbgen &> /dev/null; then
-    anemone-smbgen "$ANEMONE_DATA_DIR/db/anemone.db" > "$ANEMONE_DATA_DIR/smb/smb.conf.anemone"
+if [ -f "$INSTALL_DIR/anemone-smbgen" ]; then
+    "$INSTALL_DIR/anemone-smbgen" "$ANEMONE_DATA_DIR/db/anemone.db" > "$ANEMONE_DATA_DIR/smb/smb.conf.anemone"
     echo -e "${GREEN}✓ Samba configuration generated${NC}"
 else
     echo -e "${YELLOW}⚠ Samba configuration will need to be generated manually${NC}"
 fi
 
-# Copy web assets to data directory
-echo ""
-echo -e "${YELLOW}  Copying web assets...${NC}"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-cp -r "$SCRIPT_DIR/web" "$ANEMONE_DATA_DIR/"
-echo -e "${GREEN}  ✓ Web assets copied${NC}"
-
-# Compile Anemone binary
+# Compile Anemone binary (templates loaded from WorkingDirectory, no copy needed)
 echo ""
 echo -e "${YELLOW}  Compiling Anemone server...${NC}"
-cd "$SCRIPT_DIR"
+cd "$INSTALL_DIR"
 
 # Try to compile with retries (in case of network issues)
 RETRY_COUNT=0
 MAX_RETRIES=3
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    go build -o /usr/local/bin/anemone ./cmd/anemone 2>&1
+    go build -o "$INSTALL_DIR/anemone" ./cmd/anemone 2>&1
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}  ✓ Anemone server compiled${NC}"
         break
@@ -604,17 +666,20 @@ else
     cat > /etc/systemd/system/anemone.service <<EOF
 [Unit]
 Description=Anemone NAS Server
-After=network.target
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=root
-WorkingDirectory=/srv/anemone
+User=$SERVICE_USER
+Group=$SERVICE_USER
+WorkingDirectory=$INSTALL_DIR
 EnvironmentFile=-/etc/anemone/anemone.env
-Environment="ANEMONE_DATA_DIR=/srv/anemone"
-ExecStart=/usr/local/bin/anemone
+Environment="ENABLE_HTTPS=true"
+Environment="HTTPS_PORT=8443"
+ExecStart=$INSTALL_DIR/anemone
 Restart=on-failure
-RestartSec=5
+RestartSec=5s
 
 [Install]
 WantedBy=multi-user.target
@@ -637,7 +702,7 @@ else
 fi
 
 # Reload Samba
-systemctl reload smbd 2>/dev/null || systemctl restart smbd 2>/dev/null || true
+systemctl reload "$SMB_SERVICE" 2>/dev/null || systemctl restart "$SMB_SERVICE" 2>/dev/null || true
 
 echo ""
 echo -e "${GREEN}========================================${NC}"
