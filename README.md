@@ -126,3 +126,10 @@ The author shall not be held liable for:
 - Do not use as sole backup solution
 
 See AGPL v3.0 license (sections 15 and 16) for details.
+
+## Screenshots
+
+![Dashboard](docs/sc1.png)
+![Dashboard](docs/sc2.png)
+![Dashboard](docs/sc3.png)
+![Dashboard](docs/sc4.png)
