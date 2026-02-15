@@ -29,9 +29,10 @@ This file provides guidance to Claude Code when working with code in this reposi
 ## Project Context
 
 **Project Name:** Anemone v2
+**Current Version:** v0.20.0-beta
 **Tech Stack:** Go 1.21+, SQLite (CGO), Samba, HTML + Tailwind CSS
 **Primary Language(s):** Go
-**Key Dependencies:** CGO (for SQLite), Samba (SMB file sharing), Btrfs (optional, for quotas)
+**Key Dependencies:** CGO (for SQLite), Samba (SMB file sharing), Btrfs (optional, for quotas), Docker (OnlyOffice), rclone (cloud backup), WireGuard (VPN)
 **Architecture Pattern:** Monolith with internal packages
 **Development Environment:** Linux (Fedora/RHEL, Debian/Ubuntu)
 
@@ -102,17 +103,17 @@ Waiting for your validation before continuing.
 ```go
 // internal/config/config.go
 type Config struct {
-    DataDir     string // from ANEMONE_DATA_DIR or default
-    Port        int    // from ANEMONE_PORT or 8080
-    LogLevel    string // from ANEMONE_LOG_LEVEL or "info"
-}
-
-func Load() *Config {
-    return &Config{
-        DataDir:  getEnv("ANEMONE_DATA_DIR", "/srv/anemone"),
-        Port:     getEnvInt("ANEMONE_PORT", 8080),
-        LogLevel: getEnv("ANEMONE_LOG_LEVEL", "info"),
-    }
+    DataDir      string // from ANEMONE_DATA_DIR or "/srv/anemone"
+    SharesDir    string // from ANEMONE_SHARES_DIR or DataDir/shares
+    IncomingDir  string // from ANEMONE_INCOMING_DIR or DataDir/backups/incoming
+    Port         string // from PORT or "8080"
+    HTTPSPort    string // from HTTPS_PORT or "8443"
+    LogLevel     string // from ANEMONE_LOG_LEVEL or "warn"
+    LogDir       string // from ANEMONE_LOG_DIR or DataDir/logs
+    // OnlyOffice
+    OnlyOfficeEnabled bool   // from ANEMONE_OO_ENABLED
+    OnlyOfficeURL     string // from ANEMONE_OO_URL
+    OnlyOfficeSecret  string // from ANEMONE_OO_SECRET
 }
 ```
 
@@ -131,14 +132,10 @@ ERROR   → Handled errors (connection failures, validation errors)
 FATAL   → Unrecoverable errors (app crash)
 ```
 
-**Environment Variables (add to `.env.example`):**
+**Environment Variables (in `.env.example`):**
 ```env
-ANEMONE_LOG_LEVEL=info       # debug|info|warn|error|fatal
-ANEMONE_LOG_TO_FILE=false    # true = file, false = console
-ANEMONE_LOG_PATH=./logs      # Where to store log files
-ANEMONE_LOG_MAX_SIZE=10M     # Max file size before rotation
-ANEMONE_LOG_MAX_FILES=7      # Keep last N files
-ANEMONE_LOG_FORMAT=json      # json|text (json for prod monitoring)
+ANEMONE_LOG_LEVEL=info       # debug|info|warn|error (default: warn, overrides DB setting)
+ANEMONE_LOG_DIR=/srv/anemone/logs  # Log file directory (default: $DATA_DIR/logs)
 ```
 
 **What to Log:**
@@ -157,61 +154,22 @@ ANEMONE_LOG_FORMAT=json      # json|text (json for prod monitoring)
 - Full request/response bodies if they contain sensitive data
 - Database connection strings with credentials
 
-**Logger Pattern (Go):**
+**Logger Implementation (internal/logger/):**
+
+The logger uses Go's `log/slog` with dual output (stdout + file), daily rotation, and runtime level changes:
+
 ```go
-// internal/logger/logger.go
-package logger
-
-import (
-    "log/slog"
-    "os"
-)
-
-var Log *slog.Logger
-
-func Init(level, format string, toFile bool, path string) {
-    var handler slog.Handler
-    opts := &slog.HandlerOptions{Level: parseLevel(level)}
-
-    var output *os.File = os.Stdout
-    if toFile {
-        output, _ = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0640)
-    }
-
-    if format == "json" {
-        handler = slog.NewJSONHandler(output, opts)
-    } else {
-        handler = slog.NewTextHandler(output, opts)
-    }
-    Log = slog.New(handler)
-}
-
-func parseLevel(level string) slog.Level {
-    switch level {
-    case "debug": return slog.LevelDebug
-    case "warn":  return slog.LevelWarn
-    case "error": return slog.LevelError
-    default:      return slog.LevelInfo
-    }
-}
+// Usage in code — always use slog key-value format, NOT printf-style
+slog.Info("User created", "username", username, "admin", isAdmin)
+slog.Error("Failed to sync", "peer", peerName, "error", err)
+// WRONG: slog.Info("User %s created", username)  // causes !BADKEY
 ```
 
-**Production Best Practices:**
-- Use `LOG_LEVEL=info` or `warn` (not debug)
-- Enable `LOG_TO_FILE=true` with rotation
-- Use `LOG_FORMAT=json` for parsing by monitoring tools
-- Set up log shipping to centralized system (Loki, ELK, etc.)
-- Set up alerts for ERROR/FATAL levels
-- Verify log directory permissions (not world-readable)
-
-**Setup Checklist (Stage 1):**
-- [ ] Create logger package with full implementation
-- [ ] Add all LOG_* variables to `.env.example`
-- [ ] Add to `.gitignore`: `logs/`, `*.log`, `*.log.*`
-- [ ] Test all log levels
-- [ ] Test file creation and rotation
-- [ ] Verify logs NOT committed to git
-- [ ] Verify log files have proper permissions (640 on Unix)
+**Configuration:**
+- Log level configurable from web UI (Admin → System Logs) or `ANEMONE_LOG_LEVEL` env var
+- Daily log rotation with 30-day retention and 200 MB max total size
+- Log files: `$DATA_DIR/logs/anemone-YYYY-MM-DD.log`
+- Default level: WARN (reduces noise in production)
 
 ### Development Order (Enforce)
 
@@ -277,37 +235,65 @@ sudo systemctl reload smbd
 ~/anemone/                       # Source code
 ├── cmd/
 │   ├── anemone/main.go          # Main entry point
-│   └── anemone-dfree/main.go    # Samba dfree helper
+│   ├── anemone-dfree/main.go    # Samba dfree helper
+│   ├── anemone-decrypt/         # Decrypt backup files (CLI tool)
+│   ├── anemone-decrypt-password/ # Decrypt peer passwords (CLI tool)
+│   ├── anemone-encrypt-peer-password/ # Encrypt peer passwords (CLI tool)
+│   ├── anemone-migrate/         # Database migration tool
+│   ├── anemone-reencrypt-key/   # Re-encrypt user keys with new master key
+│   ├── anemone-restore-decrypt/ # Decrypt and restore files from backups
+│   └── anemone-smbgen/          # Generate Samba configuration
 ├── internal/
+│   ├── activation/              # User activation tokens
+│   ├── adminverify/             # Admin verification (rate limiting)
+│   ├── auth/                    # Authentication middleware & sessions
+│   ├── backup/                  # User file backup to peers
+│   ├── btrfs/                   # Btrfs quota utilities
+│   ├── bulkrestore/             # Bulk file restoration
 │   ├── config/                  # Configuration management
+│   ├── crypto/                  # Encryption utilities (AES-256-GCM)
 │   ├── database/                # SQLite + migrations
-│   ├── users/                   # User management & auth
-│   ├── shares/                  # SMB share management
+│   ├── i18n/                    # Internationalization (FR/EN)
+│   │   └── locales/             # JSON translation files
+│   ├── incoming/                # Incoming backups management
+│   ├── logger/                  # Structured logging with rotation
+│   ├── onlyoffice/              # OnlyOffice Docker integration
 │   ├── peers/                   # P2P peers management
+│   ├── quota/                   # Quota enforcement (Btrfs)
+│   ├── rclone/                  # Cloud backup (SFTP, S3, WebDAV, named remotes)
+│   ├── reset/                   # Password reset tokens
+│   ├── restore/                 # File restoration from backups
+│   ├── scheduler/               # Automatic sync scheduler
+│   ├── serverbackup/            # Complete server backup/restore
+│   ├── setup/                   # Setup wizard logic
+│   ├── shares/                  # SMB share management
 │   ├── smb/                     # Samba configuration
+│   ├── storage/                 # ZFS pool & disk management
 │   ├── sync/                    # P2P synchronization (incremental + manifest)
 │   ├── syncauth/                # Sync authentication
 │   ├── syncconfig/              # Sync scheduler configuration
-│   ├── scheduler/               # Automatic sync scheduler
-│   ├── incoming/                # Incoming backups management
-│   ├── crypto/                  # Encryption utilities (AES-256-GCM)
-│   ├── quota/                   # Quota enforcement (Btrfs)
-│   ├── trash/                   # Trash management
+│   ├── sysconfig/               # System-wide settings (DB-backed)
+│   ├── tls/                     # TLS certificate generation
+│   ├── trash/                   # Trash management & scheduler
 │   ├── updater/                 # Update notification system
-│   ├── i18n/                    # Internationalization (FR/EN)
-│   │   └── locales/             # JSON translation files
-│   └── web/                     # HTTP handlers
+│   ├── usbbackup/               # USB backup with scheduling
+│   ├── usermanifest/            # User share manifest generation
+│   ├── users/                   # User management & auth
+│   ├── web/                     # HTTP handlers (router, all handlers)
+│   └── wireguard/               # WireGuard VPN client
 ├── web/
 │   ├── static/                  # CSS, JS, images
-│   └── templates/               # HTML templates (Go templates)
+│   └── templates/               # HTML templates (Go templates, dark theme v2)
+├── docs/                        # Documentation
 ├── scripts/                     # Installation scripts
 └── install.sh                   # Automated installation
 
 /srv/anemone/                    # Production data directory
 ├── db/anemone.db               # SQLite database
-├── shares/                     # User shares
-├── incoming/                   # Backups from remote peers
-├── certs/                      # TLS certificates
+├── shares/                     # User shares (per-user backup/ + data/)
+├── backups/incoming/            # Backups from remote peers
+├── certs/                      # TLS certificates + rclone SSH keys
+├── logs/                       # Log files (daily rotation)
 └── smb/smb.conf                # Generated Samba config
 ```
 
@@ -710,10 +696,19 @@ sudo systemctl restart anemone
 ## Additional Resources
 
 - **README.md** - Full installation and usage guide
-- **internal/i18n/locales/README.md** - Translation guide
-- **docs/storage-setup.md** - ZFS storage configuration
+- **docs/installation.md** - Detailed installation options
+- **docs/user-guide.md** - User guide (file browser, OnlyOffice, backups, etc.)
+- **docs/rclone-backup.md** - Cloud backup (SFTP, S3, WebDAV, named remotes)
+- **docs/usb-backup.md** - USB backup guide
+- **docs/storage-setup.md** - ZFS/RAID storage configuration
+- **docs/advanced.md** - Environment variables, reverse proxy, TLS
+- **docs/API.md** - REST API reference (70+ endpoints)
+- **docs/troubleshooting.md** - Diagnostics, DB queries, maintenance
+- **docs/security.md** - Encryption, keys, architecture
+- **docs/i18n.md** - Translation guide
+- **CHANGELOG.md** - Version history
 
 ---
 
-**Last Updated:** 2026-02-03
-**Version:** 3.2.0
+**Last Updated:** 2026-02-15
+**Version:** 3.3.0
