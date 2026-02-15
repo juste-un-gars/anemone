@@ -12,7 +12,7 @@
 
 ## Current Session
 
-**Session 25: Corrections Securite Prioritaires** - En cours (vagues 1+2+3+4 terminees)
+**Session 25: Corrections Securite Prioritaires** - En cours (vagues 1-5 terminees, audit complet)
 
 **Détails :** `.claude/sessions/SESSION_025_security_fixes.md`
 **Rapport audit :** `SECURITY_AUDIT_2026-02-15.md` (racine, NE PAS committer)
@@ -23,7 +23,7 @@
 
 **Date:** 2026-02-15
 **Objective:** Corriger les vulns identifiees en session 24
-**Status:** En cours (vagues 1+2+3+4 done, deploy FR2 valide)
+**Status:** En cours (vagues 1+2+3+4+5 done, audit complet)
 
 ### Corrections appliquees (vague 1)
 | # | Correction | Statut |
@@ -60,20 +60,24 @@
 | I2 | Injection rclone : quoteValue() sur SFTP host/user/key_file | DONE + deploy FR2 |
 | G5 | Bombe tar : limite 10Go/fichier + 50Go total + io.LimitReader | DONE + deploy FR2 |
 
-### Reste a faire (securite)
+### Corrections appliquees (vague 5)
+| # | Correction | Statut |
+|---|-----------|--------|
+| A6 | X-Forwarded-For spoofable : suppression getClientIP(), utilise clientIP() (RemoteAddr only) | DONE |
+| I4 | CSP Host injection : isValidHostname() valide browserHost avant injection dans CSP | DONE |
+| Phase 8 | Audit IDOR : 10 endpoints testes, 5 sync API acceptes (design P2P + chiffrement E2E) | DONE |
+| Phase 9 | Audit XSS : 7 vecteurs testes, aucune vuln critique (html/template auto-escaping) | DONE |
+| Phase 10 | Rapport final complete dans SECURITY_AUDIT_2026-02-15.md | DONE |
 
-#### Findings acceptes (pas de correction prevue)
+### Findings acceptes (pas de correction)
 | # | Finding | Severite | Raison |
 |---|---------|----------|--------|
 | G2 | InsecureSkipVerify: true | HIGH | Necessaire pour certs auto-signes P2P |
-| A9 | Complexite mdp (min 8 chars) | MEDIUM | Choix utilisateur, pas de contrainte forcee |
-
-#### Phases audit restantes
-| Phase | Description | Statut |
-|-------|-------------|--------|
-| 8 | Tests authentifies (IDOR, privilege escalation) | A FAIRE |
-| 9 | Tests XSS sur champs de saisie | A FAIRE |
-| 10 | Rapport final + recommandations | A FAIRE |
+| A9 | Complexite mdp (min 8 chars) | MEDIUM | Choix utilisateur |
+| A12 | Token admin TTL 5 min | MEDIUM | Acceptable |
+| A14 | Timeout inactivite session | LOW | Mitigue par IP binding + 14j max |
+| ID1-5 | Acces cross-user sync API | MEDIUM | Design P2P, chiffrement E2E |
+| G4 | MD5 integrite fichiers | MEDIUM | Content-addressable, pas securite |
 
 ### Resume technique
 - **Go** : 1.26.0, go-sqlite3 1.14.34, x/crypto 0.48.0, x/sys 0.41.0
@@ -90,7 +94,11 @@
 - **Rclone** : quoteValue() sur SFTP host/user/key_file dans buildSFTPRemote
 - **Tar bomb** : maxFileSize=10Go, maxTotalSize=50Go, io.LimitReader dans ExtractTarGz
 - **Page /admin/security** : handler + template + routes + i18n FR/EN + lien sidebar
-- **Build OK, tests OK, deploy FR2 OK (binaire + templates)**
+- **IP detection** : clientIP() utilise seulement RemoteAddr (pas de proxy headers spoofables)
+- **CSP Host** : isValidHostname() valide le Host header avant usage dans CSP OnlyOffice
+- **IDOR** : Endpoints protege-session OK, sync API accepte (design P2P + chiffrement E2E)
+- **XSS** : Aucune vuln trouvee (html/template auto-escaping)
+- **Build OK, tests OK, audit securite COMPLET**
 
 ---
 
@@ -131,7 +139,7 @@
 
 ## Next Steps
 
-1. **Phases 8/9/10** — Tests IDOR, XSS, rapport final
+1. **Deploy vague 5 sur FR2** — binaire + templates
 2. **A10 full** — Refactor JS inline pour retirer unsafe-inline du CSP (optionnel, gros chantier)
 
 Commencer par `"lire SESSION_STATE.md"` puis `"continue"`.

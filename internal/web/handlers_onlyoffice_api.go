@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -29,6 +30,15 @@ import (
 	"github.com/juste-un-gars/anemone/internal/onlyoffice"
 	"github.com/juste-un-gars/anemone/internal/shares"
 )
+
+// validHostnameRe matches valid hostnames and IP addresses (no CSP-breaking chars).
+var validHostnameRe = regexp.MustCompile(`^[a-zA-Z0-9.:_-]+$`)
+
+// isValidHostname checks that a hostname/IP contains only safe characters
+// to prevent injection when used in security headers (CSP, etc.).
+func isValidHostname(host string) bool {
+	return host != "" && len(host) <= 253 && validHostnameRe.MatchString(host)
+}
 
 // handleOODownload serves a file to the OnlyOffice container.
 // Authentication is via JWT token (not session cookie) since this is server-to-server.
@@ -488,6 +498,11 @@ func (s *Server) handleFilesEdit(w http.ResponseWriter, r *http.Request) {
 	browserHost, _, err := net.SplitHostPort(r.Host)
 	if err != nil {
 		browserHost = r.Host // no port in Host header
+	}
+	// Validate browserHost to prevent CSP injection via crafted Host header
+	if !isValidHostname(browserHost) {
+		http.Error(w, "Invalid host", http.StatusBadRequest)
+		return
 	}
 	ooExternalURL := fmt.Sprintf("https://%s:%s", browserHost, ooPort)
 

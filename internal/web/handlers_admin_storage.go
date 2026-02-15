@@ -179,26 +179,6 @@ func splitPath(path string) []string {
 	return parts
 }
 
-// getClientIP extracts client IP from request
-func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header first (for reverse proxies)
-	xff := r.Header.Get("X-Forwarded-For")
-	if xff != "" {
-		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[0])
-	}
-	// Check X-Real-IP header
-	xri := r.Header.Get("X-Real-IP")
-	if xri != "" {
-		return xri
-	}
-	// Fall back to RemoteAddr
-	parts := strings.Split(r.RemoteAddr, ":")
-	if len(parts) > 0 {
-		return parts[0]
-	}
-	return r.RemoteAddr
-}
 
 // handleAdminVerifyPassword verifies admin password and returns a token
 func (s *Server) handleAdminVerifyPassword(w http.ResponseWriter, r *http.Request) {
@@ -223,7 +203,7 @@ func (s *Server) handleAdminVerifyPassword(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ip := getClientIP(r)
+	ip := clientIP(r)
 	verifier := adminverify.GetVerifier()
 
 	token, err := verifier.VerifyPassword(s.db, session.UserID, req.Password, ip)
