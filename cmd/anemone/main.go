@@ -7,6 +7,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"sync"
@@ -177,14 +178,25 @@ func main() {
 		}()
 	}
 
-	// Start HTTP server if enabled, or if OnlyOffice needs it for container communication.
-	// OnlyOffice container downloads files via HTTP (avoids self-signed cert issues with HTTPS).
-	if cfg.EnableHTTP || cfg.OnlyOfficeEnabled {
+	// Start HTTP server if explicitly enabled (public, all interfaces)
+	if cfg.EnableHTTP {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			startHTTPServer(cfg, router)
 		}()
+	} else if cfg.EnableHTTPS {
+		// Start an HTTP server on the Docker bridge interface only.
+		// Docker containers (OnlyOffice) download files via
+		// http://host.docker.internal:8080 — this avoids self-signed cert issues.
+		// Only listens on the docker0 IP (172.17.x.x), not exposed to the network.
+		if dockerIP := getDockerBridgeIP(); dockerIP != "" {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				startDockerHTTPServer(cfg, router, dockerIP)
+			}()
+		}
 	}
 
 	// If neither is enabled, this shouldn't happen due to config validation
@@ -229,6 +241,35 @@ func startHTTPServer(cfg *config.Config, router http.Handler) {
 		logger.Error("HTTP server failed", "error", err)
 		os.Exit(1)
 	}
+}
+
+// startDockerHTTPServer starts an HTTP server bound to the Docker bridge IP only.
+// This is not accessible from the external network, only from Docker containers.
+func startDockerHTTPServer(cfg *config.Config, router http.Handler, dockerIP string) {
+	addr := fmt.Sprintf("%s:%s", dockerIP, cfg.Port)
+	logger.Info("Docker HTTP server listening (bridge network only)", "address", addr)
+
+	if err := http.ListenAndServe(addr, router); err != nil {
+		logger.Error("Docker HTTP server failed", "error", err)
+	}
+}
+
+// getDockerBridgeIP returns the IPv4 address of the docker0 interface, or "" if not found.
+func getDockerBridgeIP() string {
+	iface, err := net.InterfaceByName("docker0")
+	if err != nil {
+		return ""
+	}
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return ""
+	}
+	for _, a := range addrs {
+		if ipnet, ok := a.(*net.IPNet); ok && ipnet.IP.To4() != nil {
+			return ipnet.IP.String()
+		}
+	}
+	return ""
 }
 
 // runSetupMode runs the setup wizard server
