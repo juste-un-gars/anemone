@@ -5,7 +5,8 @@
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `ANEMONE_DATA_DIR` | `/srv/anemone` | Data directory |
-| `ANEMONE_INCOMING_DIR` | `$DATA_DIR/incoming` | Incoming backups directory |
+| `ANEMONE_SHARES_DIR` | `$DATA_DIR/shares` | User shares directory (can be on separate disk, e.g., ZFS pool) |
+| `ANEMONE_INCOMING_DIR` | `$DATA_DIR/backups/incoming` | Incoming backups directory |
 | `PORT` | `8080` | HTTP port |
 | `HTTPS_PORT` | `8443` | HTTPS port |
 | `ENABLE_HTTP` | `false` | Enable HTTP server |
@@ -13,6 +14,11 @@
 | `LANGUAGE` | `fr` | Default language (fr/en) |
 | `TLS_CERT_PATH` | auto-generated | Custom TLS certificate |
 | `TLS_KEY_PATH` | auto-generated | Custom TLS key |
+| `ANEMONE_LOG_LEVEL` | `warn` | Log level: debug, info, warn, error |
+| `ANEMONE_LOG_DIR` | `$DATA_DIR/logs` | Log files directory |
+| `ANEMONE_OO_ENABLED` | `false` | Enable OnlyOffice document editing (requires Docker) |
+| `ANEMONE_OO_URL` | `http://localhost:9980` | Internal URL of OnlyOffice Document Server |
+| `ANEMONE_OO_SECRET` | auto-generated | JWT secret for OnlyOffice communication |
 
 ### Setting Variables
 

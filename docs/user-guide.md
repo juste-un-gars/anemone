@@ -212,21 +212,87 @@ Always eject before disconnecting:
 3. Wait for confirmation
 4. Remove the drive
 
+## Web File Browser
+
+Browse and manage files directly from the web interface.
+
+### Browsing Files
+
+1. Go to **Files** from the dashboard
+2. Navigate through your shares and directories
+3. Click on a file to download it
+
+### Uploading Files
+
+1. Navigate to the target directory
+2. Click **Upload** and select files
+3. Files are uploaded to the current directory
+
+### Creating Directories
+
+1. Navigate to the parent directory
+2. Click **New Folder**
+3. Enter the directory name
+
+### Renaming and Deleting
+
+- **Rename**: Click the rename icon next to a file or directory
+- **Delete**: Click the delete icon (file is moved to trash)
+
+## OnlyOffice Document Editing
+
+Edit Office documents directly in the browser using OnlyOffice.
+
+### Supported Formats
+
+- **Editable**: DOCX, XLSX, PPTX (and other formats that survive roundtrip editing)
+- **Viewable**: PDF, images (PNG, JPG, etc.)
+
+### Editing a Document
+
+1. Go to **Files** and navigate to your document
+2. Click **Edit** on a supported Office file
+3. The document opens in the OnlyOffice editor
+4. Changes are saved back to your share
+
+### Viewing PDFs and Images
+
+1. Go to **Files**
+2. Click **View** on a PDF or image file
+3. The file opens in the browser
+
+### OnlyOffice Setup (Admin)
+
+OnlyOffice is configured from the web UI:
+
+1. Go to **OnlyOffice** (admin)
+2. Click **Enable OnlyOffice**
+3. Anemone automatically pulls and configures the Docker container
+4. JWT authentication is set up automatically
+
 ## Cloud Backup (Rclone)
 
-Back up your server to remote SFTP servers using rclone.
+Back up your server to remote storage using rclone. Multiple provider types are supported.
+
+### Supported Providers
+
+| Provider | Examples |
+|----------|----------|
+| **SFTP** | Any SSH server |
+| **S3** | AWS S3, Backblaze B2, Wasabi, MinIO |
+| **WebDAV** | Nextcloud, ownCloud, SharePoint |
+| **Named Remote** | Any rclone-configured remote (Google Drive, Dropbox, pCloud...) |
 
 ### Adding a Backup Destination
 
 1. Go to **Cloud Backup** (admin)
 2. Click **Add Destination**
-3. Configure SFTP connection:
-   - Host and port (default 22)
-   - Username
-   - SSH key or password authentication
-   - Remote path for backups
+3. Select the provider type
+4. Configure provider-specific settings (host, credentials, bucket, etc.)
+5. Optionally enable **Encryption** (rclone crypt, data encrypted before upload)
+6. Click **Add Destination**
 
-### SSH Key Authentication
+### SSH Key Authentication (SFTP)
 
 1. In Cloud Backup, click **Generate SSH Key**
 2. Copy the public key displayed

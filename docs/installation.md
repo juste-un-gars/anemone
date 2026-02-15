@@ -61,7 +61,7 @@ git clone https://github.com/juste-un-gars/anemone.git
 cd anemone
 
 # Build
-CGO_ENABLED=1 go build -o anemone ./cmd/anemone
+CGO_ENABLED=1 go build -o anemone cmd/anemone/main.go
 
 # Create data directory
 sudo mkdir -p /srv/anemone

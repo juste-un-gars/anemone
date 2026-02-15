@@ -1,12 +1,13 @@
 # Rclone Cloud Backup
 
-Anemone can backup user data to remote SFTP servers using rclone. This guide explains how to configure both the Anemone server (source) and the remote server (destination).
+Anemone can backup user data to remote servers using rclone. Multiple provider types are supported. This guide explains how to configure each provider.
 
 ## Overview
 
 - **What is backed up**: All users' `backup/` directories
-- **Protocol**: SFTP (SSH File Transfer Protocol)
-- **Authentication**: SSH key (recommended) or password
+- **Providers**: SFTP, S3 (AWS, Backblaze B2, Wasabi, MinIO), WebDAV (Nextcloud, ownCloud), or any named rclone remote
+- **Authentication**: SSH key, password, access key, or pre-configured rclone remote
+- **Optional encryption**: Per-destination rclone crypt encryption (data encrypted before upload)
 - **Sync type**: Incremental (only modified files are transferred)
 
 ## Prerequisites
@@ -181,12 +182,74 @@ ssh -i /srv/anemone/certs/rclone_key anemone-backup@remote-server
 - **Use firewall rules** to limit SSH access to known IPs if possible
 - **Monitor disk space** on the remote server
 
+## S3 Provider
+
+Supports Amazon S3, Backblaze B2, Wasabi, MinIO, and other S3-compatible storage.
+
+### Add S3 Destination
+
+1. Go to **Admin Dashboard** > **Cloud Backup**
+2. Select provider type: **S3**
+3. Fill in the form:
+   - **Name**: A descriptive name (e.g., "Backblaze B2")
+   - **Endpoint**: S3-compatible endpoint URL (e.g., `s3.eu-west-1.amazonaws.com`, `s3.us-west-000.backblazeb2.com`)
+   - **Region**: Bucket region (e.g., `eu-west-1`, `us-west-000`)
+   - **Bucket**: Bucket name
+   - **Access Key ID**: Your S3 access key
+   - **Secret Access Key**: Your S3 secret key
+   - **Encryption password** (optional): Enable rclone crypt encryption
+4. Click **Add Destination**
+
+## WebDAV Provider
+
+Supports Nextcloud, ownCloud, SharePoint, and other WebDAV servers.
+
+### Add WebDAV Destination
+
+1. Go to **Admin Dashboard** > **Cloud Backup**
+2. Select provider type: **WebDAV**
+3. Fill in the form:
+   - **Name**: A descriptive name (e.g., "Nextcloud Backup")
+   - **WebDAV URL**: Full URL to the WebDAV endpoint (e.g., `https://cloud.example.com/remote.php/dav/files/user/`)
+   - **Username**: WebDAV username
+   - **Password**: WebDAV password
+   - **Encryption password** (optional): Enable rclone crypt encryption
+4. Click **Add Destination**
+
+## Named Rclone Remote
+
+Use any rclone remote you have already configured via `rclone config` (pCloud, Google Drive, Dropbox, etc.).
+
+### Add Named Remote Destination
+
+1. First, configure the remote via command line:
+   ```bash
+   rclone config
+   ```
+2. Go to **Admin Dashboard** > **Cloud Backup**
+3. Select provider type: **Named Remote**
+4. Fill in the form:
+   - **Name**: A descriptive name (e.g., "Google Drive")
+   - **Remote name**: The rclone remote name as configured (e.g., `gdrive`)
+   - **Remote path**: Path within the remote (e.g., `/anemone-backups`)
+   - **Encryption password** (optional): Enable rclone crypt encryption
+5. Click **Add Destination**
+
+## Per-Destination Encryption
+
+Any provider can optionally encrypt data before upload using rclone crypt:
+
+1. When adding or editing a destination, enter an **Encryption password**
+2. Data is encrypted client-side before upload using rclone's crypt backend
+3. The password is obscured and stored securely in the database
+4. Remote server never sees unencrypted data
+
 ## Multiple Destinations
 
-You can configure multiple SFTP destinations for redundancy:
+You can configure multiple destinations across different providers for redundancy:
 1. Add multiple destinations in the UI
 2. Each destination syncs independently
-3. Consider geographic distribution for disaster recovery
+3. Mix providers (e.g., SFTP + S3) for geographic distribution and disaster recovery
 
 ## Related Documentation
 

@@ -600,6 +600,100 @@ Error responses include a descriptive message in the body.
 
 ---
 
+## File Browser API
+
+### GET /files
+
+Browse user shares and directories.
+
+**Query Parameters:**
+- `share` - Share name (e.g., `username-backup`)
+- `path` - Directory path within share
+
+### GET /files/edit
+
+Open a document in OnlyOffice editor.
+
+**Query Parameters:**
+- `share` - Share name
+- `path` - File path
+
+### GET /api/files/download
+
+Download a file.
+
+**Query Parameters:**
+- `share` - Share name
+- `path` - File path
+
+### POST /api/files/upload
+
+Upload a file to a directory.
+
+**Form Data:**
+- `share` - Share name
+- `path` - Target directory
+- `file` - File upload (multipart)
+
+### POST /api/files/mkdir
+
+Create a new directory.
+
+**JSON Body:**
+- `share` - Share name
+- `path` - New directory path
+
+### POST /api/files/rename
+
+Rename a file or directory.
+
+**JSON Body:**
+- `share` - Share name
+- `path` - Current path
+- `new_name` - New name
+
+### POST /api/files/delete
+
+Delete a file (moves to trash).
+
+**JSON Body:**
+- `share` - Share name
+- `path` - File path
+
+---
+
+## OnlyOffice API
+
+### GET /admin/onlyoffice
+
+OnlyOffice configuration page.
+
+### POST /admin/onlyoffice/pull
+
+Pull OnlyOffice Docker image.
+
+### POST /admin/onlyoffice/start
+
+Start OnlyOffice container.
+
+### POST /admin/onlyoffice/stop
+
+Stop OnlyOffice container.
+
+### POST /admin/onlyoffice/restart
+
+Restart OnlyOffice container.
+
+### POST /admin/onlyoffice/remove
+
+Remove OnlyOffice container and image.
+
+### /onlyoffice/*
+
+Reverse proxy to OnlyOffice Document Server (dynamic routing).
+
+---
+
 ## Security Notes
 
 1. **HTTPS Required:** All production deployments should use HTTPS (port 8443)
@@ -610,5 +704,5 @@ Error responses include a descriptive message in the body.
 
 ---
 
-**Last Updated:** 2025-01-18
-**Version:** 0.9.16-beta
+**Last Updated:** 2026-02-15
+**Version:** 0.20.0-beta
