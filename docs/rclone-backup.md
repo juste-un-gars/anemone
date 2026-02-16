@@ -251,6 +251,61 @@ You can configure multiple destinations across different providers for redundanc
 2. Each destination syncs independently
 3. Mix providers (e.g., SFTP + S3) for geographic distribution and disaster recovery
 
+## Restoring from an Encrypted Backup
+
+If you downloaded encrypted backup files from a cloud provider (pCloud, S3, etc.), you can decrypt them locally using the provided script.
+
+### Prerequisites
+
+- `rclone` installed on the machine
+- The encryption password you set when configuring the backup destination
+
+### Finding Your Encryption Password
+
+The encryption password is the one you entered in the **Encryption password** field when adding the cloud backup destination in Anemone.
+
+If you no longer have it, it can be retrieved from the database (obscured format):
+```bash
+sqlite3 /srv/anemone/db/anemone.db "SELECT name, provider_config FROM rclone_backups;"
+```
+The `crypt_password` field in `provider_config` contains the rclone-obscured password.
+
+### Decrypting with the Script
+
+```bash
+# Basic usage (output goes to <directory>_decrypted)
+bash scripts/decrypt_rclone.sh 'YOUR_ENCRYPTION_PASSWORD' /path/to/encrypted/directory
+
+# With custom output directory
+bash scripts/decrypt_rclone.sh 'YOUR_ENCRYPTION_PASSWORD' /path/to/encrypted/directory /path/to/output
+```
+
+The script accepts the **plaintext** encryption password (the one you originally chose) and handles the rclone obscure step automatically.
+
+### Example
+
+```bash
+# Download encrypted backup from cloud storage
+# Then decrypt it:
+bash scripts/decrypt_rclone.sh 'MySecretPassword' ./pcloud-backup/
+
+# Decrypted files appear in ./pcloud-backup_decrypted/
+ls ./pcloud-backup_decrypted/
+```
+
+### Manual Decryption (without script)
+
+```bash
+# 1. Obscure the password first
+OBSCURED=$(rclone obscure 'YOUR_ENCRYPTION_PASSWORD')
+
+# 2. List decrypted file names
+rclone ls ":crypt,remote=/path/to/encrypted,password=$OBSCURED,filename_encryption=standard:"
+
+# 3. Copy decrypted files
+rclone copy ":crypt,remote=/path/to/encrypted,password=$OBSCURED,filename_encryption=standard:" /path/to/output
+```
+
 ## Related Documentation
 
 - [P2P Sync](p2p-sync.md) - Peer-to-peer encrypted synchronization
