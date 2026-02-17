@@ -72,12 +72,28 @@ func Create(db *sql.DB, share *Share, username string) error {
 	}
 	share.ID = int(id)
 
-	// Change owner to the share user (requires sudo)
-	// This allows the SMB user to access their own directories
+	// Change owner to the share user with anemone group (requires sudo)
+	// user:anemone allows both the SMB user and the Anemone service to access files
 	if username != "" {
-		cmd := exec.Command("sudo", "/usr/bin/chown", "-R", fmt.Sprintf("%s:%s", username, username), share.Path)
+		// Also fix the parent directory (shares/username/) which may have been
+		// created by os.MkdirAll with the wrong ownership
+		parentDir := filepath.Dir(share.Path)
+		parentChownCmd := exec.Command("sudo", "/usr/bin/chown", fmt.Sprintf("%s:anemone", username), parentDir)
+		_ = parentChownCmd.Run() // Best-effort, may fail if shared with other user
+
+		parentSgidCmd := exec.Command("sudo", "/usr/bin/chmod", "g+rwxs", parentDir)
+		_ = parentSgidCmd.Run()
+
+		cmd := exec.Command("sudo", "/usr/bin/chown", "-R", fmt.Sprintf("%s:anemone", username), share.Path)
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to set directory ownership: %w", err)
+		}
+
+		// Set setgid + group rwx on share and all subdirectories so new files/dirs
+		// inherit the anemone group and the Anemone service can write (uploads, manifests, sync)
+		chmodCmd := exec.Command("sudo", "/usr/bin/chmod", "-R", "g+rwxs", share.Path)
+		if err := chmodCmd.Run(); err != nil {
+			return fmt.Errorf("failed to set group permissions on share directory: %w", err)
 		}
 	}
 

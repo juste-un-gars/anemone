@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0-beta] - 2026-02-17
+
+### Added
+- **System group `anemone`**: All Samba users and the service user are added to a shared `anemone` group, enabling the Anemone service to read/write all user shares (manifests, uploads, sync, backups)
+- **`install.sh`**: New `create_anemone_group` step in both new install and repair modes
+- **Sudoers**: `usermod -aG anemone` allowed for the service user
+
+### Changed
+- **Share permissions**: Shares now use `user:anemone` ownership with setgid (`g+rwxs`) instead of `user:user`, so new files automatically inherit the `anemone` group
+- **Samba config**: `force group = anemone` with masks `0660/0770/0640/0750` ensuring group read/write on all files created via SMB
+- **Repair mode**: Existing shares are migrated to `user:anemone` with correct setgid and group write permissions
+
+### Fixed
+- **Permission denied on manifests** for non-service users (e.g., user `marc` shares were inaccessible to the Anemone service running as `franck`)
+- **Web upload failing** for users other than the service user (group write was missing)
+- **Parent directory ownership**: `shares/username/` directory now correctly set to `user:anemone`
+
 ## [0.21.0-beta] - 2026-02-15
 
 ### Security

@@ -29,7 +29,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 ## Project Context
 
 **Project Name:** Anemone v2
-**Current Version:** v0.21.0-beta
+**Current Version:** v0.22.0-beta
 **Tech Stack:** Go 1.21+, SQLite (CGO), Samba, HTML + Tailwind CSS
 **Primary Language(s):** Go
 **Key Dependencies:** CGO (for SQLite), Samba (SMB file sharing), Btrfs (optional, for quotas), Docker (OnlyOffice), rclone (cloud backup), WireGuard (VPN)

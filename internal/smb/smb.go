@@ -59,12 +59,12 @@ const smbConfigTemplate = `[global]
    read only = no
    browseable = yes
    hide dot files = yes
-   create mask = 0664
-   directory mask = 0775
+   create mask = 0660
+   directory mask = 0770
    force user = {{.Username}}
-   force group = {{.Username}}
-   force create mode = 0664
-   force directory mode = 0755
+   force group = anemone
+   force create mode = 0640
+   force directory mode = 0750
 
    # Quota enforcement via dfree
    {{if $.DfreePath}}dfree command = {{$.DfreePath}}{{end}}
@@ -174,6 +174,13 @@ func AddSMBUser(username, password string) error {
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to create system user: %w", err)
 		}
+	}
+
+	// Add user to anemone group (for shared file access by the service)
+	addGroupCmd := exec.Command("sudo", "/usr/sbin/usermod", "-aG", "anemone", username)
+	if err := addGroupCmd.Run(); err != nil {
+		// Non-fatal: group might not exist yet on legacy installs
+		fmt.Printf("Warning: failed to add %s to anemone group: %v\n", username, err)
 	}
 
 	// Set SMB password using smbpasswd (requires sudo)

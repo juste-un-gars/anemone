@@ -196,6 +196,9 @@ repair_installation() {
             log_info "System user already exists: $username"
         fi
 
+        # Add user to anemone group
+        usermod -aG anemone "$username" 2>/dev/null || log_warn "Failed to add $username to anemone group"
+
         # Get encrypted password from database
         PASSWORD_ENC=$(sqlite3 "$DB_PATH" "SELECT hex(password_encrypted) FROM users WHERE username='$username';" 2>/dev/null)
         MASTER_KEY=$(sqlite3 "$DB_PATH" "SELECT value FROM system_config WHERE key='master_key';" 2>/dev/null)
@@ -207,14 +210,18 @@ repair_installation() {
         fi
     done
 
-    # Fix ownership on share directories
+    # Fix ownership on share directories (use anemone group for service access)
     log_info "Fixing permissions on shares..."
     for username in $USERS; do
         USER_SHARE_DIR="$SHARES_DIR/$username"
         if [ -d "$USER_SHARE_DIR" ]; then
-            chown -R "$username:$username" "$USER_SHARE_DIR" 2>/dev/null || \
+            chown -R "$username:anemone" "$USER_SHARE_DIR" 2>/dev/null || \
             log_warn "Failed to set ownership on $USER_SHARE_DIR"
-            chmod 700 "$USER_SHARE_DIR" 2>/dev/null
+            # Set setgid + group write on directories so new files inherit anemone group
+            # and the Anemone service can write (uploads, manifests, sync)
+            find "$USER_SHARE_DIR" -type d -exec chmod g+srwx {} \; 2>/dev/null
+            # Ensure group can read/write existing files
+            find "$USER_SHARE_DIR" -type f -exec chmod g+rw {} \; 2>/dev/null
             log_info "Fixed permissions: $USER_SHARE_DIR"
         fi
     done
@@ -279,10 +286,10 @@ server role = standalone server
 obey pam restrictions = yes
 unix extensions = yes
 wide links = no
-create mask = 0600
-directory mask = 0700
-force create mode = 0600
-force directory mode = 0700
+create mask = 0660
+directory mask = 0770
+force create mode = 0640
+force directory mode = 0750
 hide dot files = no
 veto files = /._*/.DS_Store/.Thumbs.db/.desktop.ini/
 delete veto files = yes
@@ -308,10 +315,12 @@ path = $path
 valid users = $username
 read only = no
 browseable = yes
-create mask = 0600
-directory mask = 0700
+create mask = 0660
+directory mask = 0770
 force user = $username
-force group = $username
+force group = anemone
+force create mode = 0640
+force directory mode = 0750
 
 EOF
         log_info "Added share: $name -> $path"
@@ -674,6 +683,22 @@ build_binary() {
     log_info "Build complete"
 }
 
+create_anemone_group() {
+    log_info "Creating anemone system group..."
+    if ! getent group anemone &>/dev/null; then
+        groupadd --system anemone
+        log_info "Group 'anemone' created"
+    else
+        log_info "Group 'anemone' already exists"
+    fi
+
+    # Add service user to the anemone group
+    if [ -n "$SERVICE_USER" ]; then
+        usermod -aG anemone "$SERVICE_USER" 2>/dev/null || log_warn "Failed to add $SERVICE_USER to anemone group"
+        log_info "User $SERVICE_USER added to anemone group"
+    fi
+}
+
 create_data_directory() {
     log_info "Creating data directory: $DATA_DIR"
 
@@ -713,6 +738,7 @@ $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload $SMB_SERVICE.service
 # User management for Samba
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/useradd -M -s /usr/sbin/nologin *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/userdel *
+$SERVICE_USER ALL=(ALL) NOPASSWD: /usr/sbin/usermod -aG anemone *
 $SERVICE_USER ALL=(ALL) NOPASSWD: /usr/bin/smbpasswd
 
 # File operations - restricted to data directory
@@ -1027,16 +1053,19 @@ main() {
         log_step "3/6 Building Anemone..."
         build_binary
 
-        log_step "4/6 Repairing installation..."
+        log_step "4/7 Creating anemone group..."
+        create_anemone_group
+
+        log_step "5/7 Repairing installation..."
         repair_installation
         regenerate_samba_config
 
-        log_step "5/6 Configuring permissions..."
+        log_step "6/7 Configuring permissions..."
         configure_sudoers
         configure_selinux
         configure_firewall
 
-        log_step "6/6 Starting services..."
+        log_step "7/7 Starting services..."
         create_systemd_service
         enable_services
 
@@ -1063,17 +1092,20 @@ main() {
         log_step "4/8 Building Anemone..."
         build_binary
 
-        log_step "5/8 Creating data directory..."
+        log_step "5/9 Creating anemone group..."
+        create_anemone_group
+
+        log_step "6/9 Creating data directory..."
         create_data_directory
 
-        log_step "6/8 Configuring permissions..."
+        log_step "7/9 Configuring permissions..."
         configure_sudoers
         configure_selinux
 
-        log_step "7/8 Configuring firewall..."
+        log_step "8/9 Configuring firewall..."
         configure_firewall
 
-        log_step "8/8 Starting services..."
+        log_step "9/9 Starting services..."
         create_systemd_service
         enable_services
 
