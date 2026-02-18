@@ -1075,6 +1075,21 @@ function showStep(step) {
     // Show current step
     document.getElementById(`step-${step}`).classList.remove('hidden');
 
+    // Restore sub-step visibility when returning to storage step
+    if (step === 1 && selectedStorage) {
+        if (selectedStorage.type === 'zfs_new') {
+            if (zfsConfigConfirmed) {
+                document.getElementById('zfs-step-disks').classList.add('hidden');
+                document.getElementById('zfs-step-raid').classList.remove('hidden');
+            } else {
+                document.getElementById('zfs-step-disks').classList.remove('hidden');
+                document.getElementById('zfs-step-raid').classList.add('hidden');
+            }
+        } else if (selectedStorage.type === 'custom') {
+            document.getElementById('custom-path-options').classList.remove('hidden');
+        }
+    }
+
     // Update progress indicators
     for (let i = 0; i < 5; i++) {
         const indicator = document.getElementById(`step-indicator-${i}`);
