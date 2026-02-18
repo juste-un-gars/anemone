@@ -5,27 +5,36 @@
 > - Valider après chaque module avec : ✅ [Module] complete. **Test it:** [...] Waiting for validation.
 > - Ne pas continuer sans validation utilisateur
 
-**Current Version:** v0.22.0-beta
+**Current Version:** v0.23.0-beta
 **Last Updated:** 2026-02-18
 
 ---
 
 ## Current Session
 
-**Session 29: Externalisation JS Inline (CSP strict)** - En cours
-**Details :** `.claude/sessions/SESSION_029_js_externalization.md`
+**Session 30: Test Installation FR1 (depuis GitHub)** - En cours
+**Details :** `.claude/sessions/SESSION_030_install_test_fr1.md`
 
 ### Progression
 
-| Phase | Description | Statut |
-|-------|-------------|--------|
-| 1 | Infrastructure + Base templates | DONE |
-| 2 | Pages auth (login, activate, reset, setup) | DONE |
-| 3 | Pages v2 simples (users, peers, settings, logs, onlyoffice) | DONE |
-| 4 | Pages v2 moyennes (files, backups, restore, rclone, usb, wireguard) | DONE |
-| 5 | Pages admin legacy | DONE |
-| 6 | Pages complexes (storage, setup-wizard) | DONE |
-| 7 | CSP strict + test final | DONE |
+| # | Etape | Statut |
+|---|-------|--------|
+| 1 | Installation depuis GitHub | DONE |
+| 2 | Service running | DONE |
+| 3 | Setup wizard (storage default) | DONE |
+| 4 | Setup wizard (admin creation) | DONE |
+| 5 | Finalize + restart | DONE |
+| 6 | Login admin | DONE |
+| 7 | Creation utilisateurs (alice, bob) | DONE |
+| 8 | Activation utilisateurs | DONE |
+| 9 | Upload fichiers test | DONE |
+| 10 | Verification Samba + permissions | DONE |
+| 11 | Test isolation inter-utilisateurs | DONE |
+| 12 | Test Samba SMB + isolation | DONE |
+| 13 | Verification logs (0 ERROR) | DONE |
+| 14 | Installation serveur pair FR2 | DONE |
+| 15 | Setup FR2 + Config pair FR1↔FR2 | DONE |
+| 16 | Test sync P2P bidirectionnel | DONE |
 
 ### Phase 1 - Resultats
 - Cree `web/static/js/theme-init.js`, `tailwind-config.js`, `common.js`
@@ -74,6 +83,26 @@
 - `{{range .Pools}}{{.Name}},{{end}}` deplace dans page-data JSON comme poolNames
 - Build OK
 
+### Phase 2 (serveur pair) - Resultats
+
+**Etape 14 - Installation FR2 (192.168.83.37)**
+- install.sh mode 1 (new), Ubuntu 24.04
+- Go 1.26, GCC, Samba, ZFS, rclone, Docker, WireGuard
+- Groupe `anemone` cree, service actif
+
+**Etape 15 - Setup FR2 + Pairs**
+- Setup wizard : storage default, admin/Admin1234, server_name=FR2
+- Users alice (Alice1234) et bob (Bob12345) crees et actives
+- Pair FR2 ajoute sur FR1, pair FR1 ajoute sur FR2
+- Test connectivite bidirectionnel : "Connexion reussie" des 2 cotes
+- Cles de chiffrement differentes entre FR1 et FR2 (isolation crypto confirmee)
+
+**Etape 16 - Sync P2P**
+- FR1->FR2 : 6 fichiers chiffres (alice: Classeur.xlsx, qa.txt, Scenarios Thinprint.pptx / bob: debug_auth.go, gitlab.txt, SpaceMonger.exe)
+- FR2->FR1 : 4 fichiers chiffres (alice: fix_hash.go, model_CLAUDE.md / bob: import_driver.ps1, test(4).md)
+- Seuls les shares `backup_*` sont synchronises (data_* = local uniquement)
+- 0 ERROR dans les logs des 2 serveurs
+
 ### Phase 7 - Resultats
 - Corrige 6 pages manquantes : v2_users_token, v2_users_reset_token, v2_shares, v2_security, v2_system_update, v2_users_quota
 - Ajoute `copyInput` handler generique dans common.js (reutilise par token + reset_token)
@@ -91,6 +120,7 @@
 
 | # | Name | Date | Status |
 |---|------|------|--------|
+| 29 | Externalisation JS Inline (CSP strict) | 2026-02-18 | Complete |
 | 28 | Tests d'integration multi-serveurs | 2026-02-18 | Complete (95/95) |
 | 27 | Groupe Anemone + Release v0.22.0-beta | 2026-02-17 | Complete |
 | 26 | Retest Securite FR2 | 2026-02-15 | Complete (32/32) |

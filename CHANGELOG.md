@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0-beta] - 2026-02-18
+
+### Added
+- **Strict Content Security Policy**: Removed `'unsafe-inline'` from `script-src` CSP directive
+- **External JS modules**: 20+ new JS files (`common.js`, `auth.js`, `files.js`, `storage.js`, `setup_wizard.js`, etc.) replacing all inline scripts and event handlers
+- **`data-action` event delegation**: Generic handler system in `common.js` replacing all `onclick`/`onchange`/`onsubmit` inline attributes
+- **`page-data` pattern**: Server-side data passed to JS via `<script id="page-data" type="application/json">` instead of inline Go template expressions in JS
+
+### Changed
+- **All templates refactored**: Zero inline `<script>` blocks, zero inline event handlers across all 30+ templates
+- **`v2_storage.html`**: 1103 → 629 lines (584 lines of inline JS removed)
+- **`setup_wizard.html`**: 1607 → 742 lines (895 lines of inline JS removed)
+- **CSP header** (`router.go`): `script-src 'self'` only (no more `'unsafe-inline'`)
+
+### Tested
+- **Fresh install FR1** (192.168.83.20): install.sh, setup wizard, admin + 2 users, upload, Samba, isolation, 0 ERROR
+- **Fresh install FR2** (192.168.83.37): same procedure, independent encryption keys confirmed
+- **P2P sync bidirectional**: FR1→FR2 (6 encrypted files), FR2→FR1 (4 encrypted files), backup shares only
+- **Cryptographic isolation**: Same usernames on different servers have different encryption keys
+
 ## [0.22.0-beta] - 2026-02-17
 
 ### Added
