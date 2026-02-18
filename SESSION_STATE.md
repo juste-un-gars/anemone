@@ -6,106 +6,65 @@
 > - Ne pas continuer sans validation utilisateur
 
 **Current Version:** v0.22.0-beta
-**Last Updated:** 2026-02-17
+**Last Updated:** 2026-02-18
 
 ---
 
 ## Current Session
 
-**Session 26: Retest Securite FR2** - Complete
+**Session 28: Tests d'integration multi-serveurs** - Complete (95/95 PASS)
+**Details :** `.claude/sessions/SESSION_028_integration_tests.md`
+
+### Resultats
+
+| Phase | Statut | Score |
+|-------|--------|-------|
+| 1. Installation | PASS | 4/4 |
+| 2. Setup wizard | PASS | 2/2 |
+| 3. Utilisateurs | PASS | 6/6 |
+| 4. Upload/manifests | PASS | 5/5 |
+| 5. Appairage P2P | PASS | 5/5 |
+| 6. Sync P2P | PASS | 6/6 |
+| 7. Restore depuis pair | PASS | 5/5 |
+| 8. Rclone SFTP | PASS | 9/9 |
+| 9. Securite | PASS | 4/4 |
+| 11. Samba (SMB) | PASS | 6/6 |
+| 12. Sync incrementale | PASS | 3/3 |
+| 13. Corbeille (trash) | PASS | 5/5 |
+| 14. Suppression user | PASS | 6/6 |
+| 15. Logs (0 ERROR) | PASS | 3/3 |
+| 16. Changement mdp | PASS | 4/4 |
+| 17. Upload gros fichier | PASS | 2/2 |
+| 18. Restore serveur | PASS | 11/11 |
+| 19. Repair mode | PASS | 8/8 |
+| 20. Concurrence | PASS | 3/3 |
+| **TOTAL** | **ALL PASS** | **95/95** |
+
+### Serveurs de test (conserves)
+
+| Serveur | IP | Users |
+|---------|-----|-------|
+| FR1 | 192.168.83.20 | admin, alice |
+| FR3 | 192.168.83.38 | admin, alice |
+| FR4 | 192.168.83.45 | admin, charlie |
 
 ---
 
-## Session 26: Retest Securite FR2
+## Session 27: Groupe Anemone + Release v0.22.0-beta
 
-**Date:** 2026-02-15
-**Objective:** Retest complet securite sur FR2 apres reinstallation
-**Status:** Complete (32/32 tests PASS)
-
-### Resultat retest : 32/32 PASS
-
-#### 1. Reconnaissance (4/4)
-- [x] TLS TLSv1.3 + ECDSA, X25519
-- [x] Headers securite : HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
-- [x] CSP : `unsafe-eval` absent, `object-src 'none'`, `base-uri 'self'`
-- [x] HTTP :8080 = connection refused
-
-#### 2. Tests non authentifies (5/5)
-- [x] /dashboard, /admin/*, /files, /settings → 303 /login
-- [x] Sync API /api/sync/manifest sans auth = 401
-- [x] /.env, /.git/config, /debug/pprof = non exposes (303)
-- [x] Path traversal /static/../../../etc/passwd = 303
-- [x] Path traversal encode %2f = 404
-
-#### 3. Rate limiting + brute-force (3/3)
-- [x] 5 echecs /login → 6e = HTTP 429
-- [x] Rate limit par username (marc) → 6e = HTTP 429
-- [x] PUT/DELETE/PATCH/OPTIONS /login = 405
-
-#### 4. CSRF (2/2)
-- [x] POST /login sans CSRF token = 403
-- [x] Cookie CSRF : Secure + SameSite=Strict
-
-#### 5. Cookies + sessions (3/3)
-- [x] anemone_session : HttpOnly + Secure
-- [x] Session sans remember_me = ~2h
-- [x] Session avec remember_me = 14 jours
-
-#### 6. Auth timing (1/1)
-- [x] User existant ~3.6ms vs inexistant ~4.2ms (ecart <2ms, bruit reseau)
-
-#### 7. Admin (2/2)
-- [x] /admin/security accessible admin = 200, contenu OK
-- [x] Marc → /admin/* = 403
-
-#### 8. OnlyOffice (3/3)
-- [x] Config DB : oo_enabled=true, oo_url=localhost:9980
-- [x] Host `<script>` → CSP default (pas d'injection)
-- [x] Host `evil.com` → CSP default (session non reconnue)
-
-#### 9. IDOR (5/5)
-- [x] Marc → /admin/users, /security, /settings, /logs, /peers = 403
-- [x] Marc → /files?path=../../admin = erreurs (pas de fuite)
-- [x] Marc → /files?path=/ = erreurs (pas de fuite)
-- [x] Marc → /files (propres fichiers) = 200
-- [x] Marc → /api/files/list?user=admin = 303
-
-**Rapport complet :** `SECURITY_FIXES_2026-02-15.md`
-
----
-
-## Session 25: Corrections Securite Prioritaires - Complete
-
-**Date:** 2026-02-15
-**Objective:** Corriger les vulns identifiees en session 24
-**Status:** Complete (vagues 1-5 done, audit complet, retest FR2 OK)
-
-**Details :** `.claude/sessions/SESSION_025_security_fixes.md`
-**Rapport audit :** `SECURITY_AUDIT_2026-02-15.md` (racine, NE PAS committer)
+**Date:** 2026-02-17
+**Status:** Complete
+**Details :** voir ci-dessous
 
 ---
 
 ## Previous Sessions
 
-**Session 24: Audit de Securite** - Complete
-**Details :** `.claude/sessions/SESSION_024_security_audit.md`
-
-**Session 23: ZFS Wizard Fix + Documentation Cleanup** - Complete
-**Details :** `.claude/sessions/SESSION_023_docs_cleanup.md`
-
----
-
-## Bugs connus (non corriges)
-- Permission denied sur manifests marc (shares marc:marc, Anemone tourne en franck)
-- ZFS wizard : retour arriere ne re-affiche pas pool name/mountpoint (workaround : redemarrer Anemone)
-
----
-
-## Recent Sessions
-
 | # | Name | Date | Status |
 |---|------|------|--------|
-| 26 | Retest Securite FR2 | 2026-02-15 | Complete |
+| 28 | Tests d'integration multi-serveurs | 2026-02-18 | Complete (71/71) |
+| 27 | Groupe Anemone + Release v0.22.0-beta | 2026-02-17 | Complete |
+| 26 | Retest Securite FR2 | 2026-02-15 | Complete (32/32) |
 | 25 | Corrections Securite Prioritaires | 2026-02-15 | Complete |
 | 24 | Audit de Securite | 2026-02-15 | Complete |
 | 23 | ZFS Wizard Fix + Documentation Cleanup | 2026-02-15 | Complete |
@@ -116,6 +75,11 @@
 | 18 | Dashboard Last Backup Fix + Recent Tab | 2026-02-12 | Complete |
 | 17 | Rclone Crypt Fix + !BADKEY Logs | 2026-02-11 | Complete |
 | 16 | SSH Key Bugfix | 2026-02-11 | Complete |
+
+---
+
+## Bugs connus (non corriges)
+- ZFS wizard : retour arriere ne re-affiche pas pool name/mountpoint (workaround : redemarrer Anemone)
 
 ---
 
