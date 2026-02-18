@@ -38,7 +38,7 @@
                     </ul>
                 </div>
 
-                <form method="POST" action="/admin/backup/export" onsubmit="return validateForm()">
+                <form method="POST" action="/admin/backup/export" id="exportForm">
                     <div class="form-group">
                         <label for="server_name">{{T .Lang "backup.export.server_name"}} ({{T .Lang "backup.export.optional"}})</label>
                         <input type="text" id="server_name" name="server_name"
@@ -87,46 +87,9 @@
         </main>
     </div>
 
-    <script>
-        const lang = '{{.Lang}}';
-        const translations = {
-            fr: {
-                mismatch: '{{T "fr" "backup.export.alert_mismatch"}}',
-                tooShort: '{{T "fr" "backup.export.alert_too_short"}}',
-                confirm: '{{T "fr" "backup.export.alert_confirm"}}',
-                ready: '{{T "fr" "backup.export.alert_ready"}}'
-            },
-            en: {
-                mismatch: '{{T "en" "backup.export.alert_mismatch"}}',
-                tooShort: '{{T "en" "backup.export.alert_too_short"}}',
-                confirm: '{{T "en" "backup.export.alert_confirm"}}',
-                ready: '{{T "en" "backup.export.alert_ready"}}'
-            }
-        };
-
-        function validateForm() {
-            const t = translations[lang] || translations.fr;
-            const passphrase = document.getElementById('passphrase').value;
-            const passphraseConfirm = document.getElementById('passphrase_confirm').value;
-            const confirmCheckbox = document.getElementById('confirm_backup').checked;
-
-            if (passphrase !== passphraseConfirm) {
-                alert(t.mismatch);
-                return false;
-            }
-
-            if (passphrase.length < 12) {
-                alert(t.tooShort);
-                return false;
-            }
-
-            if (!confirmCheckbox) {
-                alert(t.confirm);
-                return false;
-            }
-
-            return confirm(t.ready);
-        }
+    <script type="application/json" id="page-data">
+    {"translations": {"mismatch": "{{T .Lang "backup.export.alert_mismatch"}}", "tooShort": "{{T .Lang "backup.export.alert_too_short"}}", "confirm": "{{T .Lang "backup.export.alert_confirm"}}", "ready": "{{T .Lang "backup.export.alert_ready"}}"}}
     </script>
+    <script src="/static/js/admin_export.js"></script>
 </body>
 </html>

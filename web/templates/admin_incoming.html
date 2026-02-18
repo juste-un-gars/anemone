@@ -162,10 +162,10 @@
                             {{FormatTime .LastModified $.Lang}}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <form method="POST" action="/admin/incoming/delete" class="inline"
-                                  onsubmit="return confirm('{{T $.Lang "admin.incoming.confirm_delete"}}');">
+                            <form method="POST" action="/admin/incoming/delete" class="inline">
                                 <input type="hidden" name="path" value="{{.Path}}">
-                                <button type="submit" class="text-red-600 hover:text-red-900">
+                                <button type="submit" class="text-red-600 hover:text-red-900"
+                                        data-confirm="{{T $.Lang "admin.incoming.confirm_delete"}}">
                                     {{T $.Lang "admin.incoming.action.delete"}}
                                 </button>
                             </form>
@@ -199,5 +199,6 @@
         </div>
     </div>
 </div>
+<script src="/static/js/common.js"></script>
 </body>
 </html>

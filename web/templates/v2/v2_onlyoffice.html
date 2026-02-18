@@ -56,7 +56,7 @@
         <div style="display:flex;gap:0.5rem;">
             {{if not .ImagePresent}}
             <form method="POST" action="/admin/onlyoffice/pull" style="display:inline;">
-                <button type="submit" class="v2-btn v2-btn-primary v2-btn-sm" onclick="this.disabled=true;this.textContent='Pulling...';this.form.submit();">{{T .Lang "onlyoffice.pull"}}</button>
+                <button type="submit" class="v2-btn v2-btn-primary v2-btn-sm" data-submit-disable="Pulling...">{{T .Lang "onlyoffice.pull"}}</button>
             </form>
             {{else if eq .ContainerStatus "running"}}
             <form method="POST" action="/admin/onlyoffice/restart" style="display:inline;">
@@ -70,7 +70,7 @@
                 <button type="submit" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "onlyoffice.start"}}</button>
             </form>
             <form method="POST" action="/admin/onlyoffice/remove" style="display:inline;">
-                <button type="submit" class="v2-btn v2-btn-secondary v2-btn-sm" onclick="return confirm('{{T .Lang "onlyoffice.remove_confirm"}}');">{{T .Lang "onlyoffice.remove"}}</button>
+                <button type="submit" class="v2-btn v2-btn-secondary v2-btn-sm" data-confirm="{{T .Lang "onlyoffice.remove_confirm"}}">{{T .Lang "onlyoffice.remove"}}</button>
             </form>
             {{else if .ImagePresent}}
             <form method="POST" action="/admin/onlyoffice/start" style="display:inline;">

@@ -165,8 +165,7 @@
             <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);margin-bottom:1rem;">{{T .Lang "rclone.crypt.enable"}}</div>
             <div style="margin-bottom:1rem;">
                 <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
-                    <input type="checkbox" name="crypt_enabled" id="cryptEnabled" {{if index .Backup.ProviderConfig "crypt_password"}}checked{{end}}
-                           onchange="document.getElementById('cryptFields').style.display=this.checked?'':'none'">
+                    <input type="checkbox" name="crypt_enabled" id="cryptEnabled" {{if index .Backup.ProviderConfig "crypt_password"}}checked{{end}}>
                     {{T .Lang "rclone.crypt.enable"}}
                 </label>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;margin-left:1.5rem;">{{T .Lang "rclone.crypt.password_hint"}}</div>
@@ -187,8 +186,7 @@
 
             <div style="margin-bottom:1rem;">
                 <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
-                    <input type="checkbox" name="sync_enabled" id="sync_enabled" {{if .Backup.SyncEnabled}}checked{{end}}
-                           onchange="document.getElementById('scheduleOpts').style.display=this.checked?'':'none'">
+                    <input type="checkbox" name="sync_enabled" id="sync_enabled" {{if .Backup.SyncEnabled}}checked{{end}}>
                     {{T .Lang "rclone.sync_enabled"}}
                 </label>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;margin-left:1.5rem;">{{T .Lang "rclone.sync_enabled_hint"}}</div>
@@ -197,7 +195,7 @@
             <div id="scheduleOpts" {{if not .Backup.SyncEnabled}}style="display:none"{{end}}>
                 <div style="margin-bottom:1rem;">
                     <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.375rem;">{{T .Lang "rclone.sync_frequency"}}</label>
-                    <select id="sync_frequency" name="sync_frequency" onchange="updateRcloneFields()"
+                    <select id="sync_frequency" name="sync_frequency"
                             style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
                         <option value="interval" {{if eq .Backup.SyncFrequency "interval"}}selected{{end}}>{{T .Lang "usb_backup.freq_interval"}}</option>
                         <option value="daily" {{if eq .Backup.SyncFrequency "daily"}}selected{{end}}>{{T .Lang "usb_backup.freq_daily"}}</option>
@@ -260,7 +258,7 @@
         <!-- Buttons -->
         <div style="display:flex;justify-content:space-between;align-items:center;">
             <button type="submit" formaction="/admin/rclone/{{.Backup.ID}}/delete" class="v2-btn" style="color:var(--danger);"
-                    onclick="return confirm('{{T .Lang "rclone.confirm_delete"}}');">{{T .Lang "common.delete"}}</button>
+                    data-action="confirmDelete">{{T .Lang "common.delete"}}</button>
             <div style="display:flex;gap:0.5rem;">
                 <a href="/admin/backups?tab=cloud" class="v2-btn" style="text-decoration:none;">{{T .Lang "common.cancel"}}</a>
                 <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "common.save"}}</button>
@@ -294,13 +292,11 @@
 </div>
 {{end}}
 
-<script>
-function updateRcloneFields() {
-    var f = document.getElementById('sync_frequency').value;
-    document.getElementById('intervalField').style.display = f === 'interval' ? '' : 'none';
-    document.getElementById('timeField').style.display = f !== 'interval' ? '' : 'none';
-    document.getElementById('weekdayField').style.display = f === 'weekly' ? '' : 'none';
-    document.getElementById('monthdayField').style.display = f === 'monthly' ? '' : 'none';
-}
+{{end}}
+
+{{define "pageScripts"}}
+<script type="application/json" id="page-data">
+{"translations": {"confirmDelete": "{{T .Lang "rclone.confirm_delete"}}"}}
 </script>
+<script src="/static/js/rclone_edit.js"></script>
 {{end}}

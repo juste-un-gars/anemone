@@ -1,12 +1,12 @@
 {{define "headerActions"}}
 {{if .CurrentShare}}
-<button onclick="document.getElementById('uploadModal').classList.remove('hidden')" class="v2-btn v2-btn-primary" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">
+<button data-action="openModal" data-target="uploadModal" class="v2-btn v2-btn-primary" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">
     <svg style="width:16px;height:16px;margin-right:0.25rem;vertical-align:middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
     </svg>
     {{T .Lang "files.upload"}}
 </button>
-<button onclick="document.getElementById('mkdirModal').classList.remove('hidden')" class="v2-btn" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">
+<button data-action="openModal" data-target="mkdirModal" class="v2-btn" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">
     <svg style="width:16px;height:16px;margin-right:0.25rem;vertical-align:middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
     </svg>
@@ -39,7 +39,7 @@
 <!-- Share switcher + Breadcrumb -->
 <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;">
     {{if gt (len .Shares) 1}}
-    <select id="shareSelector" onchange="switchShare(this.value)" style="padding:0.375rem 0.5rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);font-size:0.8125rem;">
+    <select id="shareSelector" style="padding:0.375rem 0.5rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-primary);font-size:0.8125rem;">
         {{range $.Shares}}
         <option value="{{.Name}}" {{if eq .Name $.CurrentShare}}selected{{end}}>{{.Name}}</option>
         {{end}}
@@ -138,10 +138,10 @@
                             {{T $.Lang "files.action.download"}}
                         </a>
                         {{end}}
-                        <button onclick="renameItem('{{$.CurrentShare}}', '{{.Path}}', '{{.Name}}')" class="v2-btn" style="font-size:0.75rem;padding:0.25rem 0.5rem;background:rgba(245,158,11,0.12);color:var(--warning);border:1px solid rgba(245,158,11,0.2);">
+                        <button data-action="renameItem" data-share="{{$.CurrentShare}}" data-path="{{.Path}}" data-name="{{.Name}}" class="v2-btn" style="font-size:0.75rem;padding:0.25rem 0.5rem;background:rgba(245,158,11,0.12);color:var(--warning);border:1px solid rgba(245,158,11,0.2);">
                             {{T $.Lang "files.action.rename"}}
                         </button>
-                        <button onclick="deleteItem('{{$.CurrentShare}}', '{{.Path}}', '{{.Name}}')" class="v2-btn" style="font-size:0.75rem;padding:0.25rem 0.5rem;background:rgba(239,68,68,0.12);color:var(--error);border:1px solid rgba(239,68,68,0.2);">
+                        <button data-action="deleteItem" data-share="{{$.CurrentShare}}" data-path="{{.Path}}" data-name="{{.Name}}" class="v2-btn" style="font-size:0.75rem;padding:0.25rem 0.5rem;background:rgba(239,68,68,0.12);color:var(--error);border:1px solid rgba(239,68,68,0.2);">
                             {{T $.Lang "files.action.delete"}}
                         </button>
                     </div>
@@ -176,7 +176,7 @@
                 <span id="uploadPercent" style="font-size:0.75rem;color:var(--text-muted);">0%</span>
             </div>
             <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
-                <button type="button" onclick="document.getElementById('uploadModal').classList.add('hidden')" class="v2-btn" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">{{T .Lang "files.cancel"}}</button>
+                <button type="button" data-action="closeModal" data-target="uploadModal" class="v2-btn" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">{{T .Lang "files.cancel"}}</button>
                 <button type="submit" class="v2-btn v2-btn-primary" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">{{T .Lang "files.upload"}}</button>
             </div>
         </form>
@@ -190,7 +190,7 @@
         <form id="mkdirForm">
             <input type="text" id="mkdirName" placeholder="{{T .Lang "files.folder_name_placeholder"}}" style="width:100%;margin-bottom:1rem;padding:0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);box-sizing:border-box;">
             <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
-                <button type="button" onclick="document.getElementById('mkdirModal').classList.add('hidden')" class="v2-btn" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">{{T .Lang "files.cancel"}}</button>
+                <button type="button" data-action="closeModal" data-target="mkdirModal" class="v2-btn" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">{{T .Lang "files.cancel"}}</button>
                 <button type="submit" class="v2-btn v2-btn-primary" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">{{T .Lang "files.create"}}</button>
             </div>
         </form>
@@ -206,133 +206,17 @@
             <input type="hidden" id="renameShare" value="">
             <input type="text" id="renameNewName" style="width:100%;margin-bottom:1rem;padding:0.5rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);box-sizing:border-box;">
             <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
-                <button type="button" onclick="document.getElementById('renameModal').classList.add('hidden')" class="v2-btn" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">{{T .Lang "files.cancel"}}</button>
+                <button type="button" data-action="closeModal" data-target="renameModal" class="v2-btn" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">{{T .Lang "files.cancel"}}</button>
                 <button type="submit" class="v2-btn v2-btn-primary" style="font-size:0.8125rem;padding:0.375rem 0.75rem;">{{T .Lang "files.rename_confirm"}}</button>
             </div>
         </form>
     </div>
 </div>
 
-<script>
-const currentShare = '{{.CurrentShare}}';
-const currentPath = '{{.CurrentPath}}';
-
-const fileI18n = {
-    confirm_delete: '{{T .Lang "files.confirm_delete"}}',
-    delete_success: '{{T .Lang "files.delete_success"}}',
-    mkdir_success: '{{T .Lang "files.mkdir_success"}}',
-    rename_success: '{{T .Lang "files.rename_success"}}',
-    upload_success: '{{T .Lang "files.upload_success"}}',
-    error: '{{T .Lang "files.error_generic"}}'
-};
-
-function switchShare(name) {
-    window.location.href = '/files?share=' + encodeURIComponent(name);
-}
-
-function renameItem(share, path, oldName) {
-    document.getElementById('renameShare').value = share;
-    document.getElementById('renameOldPath').value = path;
-    document.getElementById('renameNewName').value = oldName;
-    document.getElementById('renameModal').classList.remove('hidden');
-    document.getElementById('renameNewName').focus();
-    document.getElementById('renameNewName').select();
-}
-
-function deleteItem(share, path, name) {
-    if (!confirm(fileI18n.confirm_delete + '\n\n' + name)) return;
-    fetch('/api/files/delete', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({share: share, path: path})
-    }).then(r => r.json()).then(data => {
-        if (data.success) { window.location.reload(); }
-        else { alert(fileI18n.error + ' ' + (data.message || '')); }
-    }).catch(err => alert(fileI18n.error + ' ' + err));
-}
-
-document.getElementById('mkdirForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const name = document.getElementById('mkdirName').value.trim();
-    if (!name) return;
-    fetch('/api/files/mkdir', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({share: currentShare, path: currentPath, name: name})
-    }).then(r => r.json()).then(data => {
-        if (data.success) {
-            document.getElementById('mkdirModal').classList.add('hidden');
-            window.location.reload();
-        } else { alert(fileI18n.error + ' ' + (data.message || '')); }
-    }).catch(err => alert(fileI18n.error + ' ' + err));
-});
-
-document.getElementById('renameForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const newName = document.getElementById('renameNewName').value.trim();
-    if (!newName) return;
-    const share = document.getElementById('renameShare').value;
-    const oldPath = document.getElementById('renameOldPath').value;
-    fetch('/api/files/rename', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({share: share, path: oldPath, new_name: newName})
-    }).then(r => r.json()).then(data => {
-        if (data.success) {
-            document.getElementById('renameModal').classList.add('hidden');
-            window.location.reload();
-        } else { alert(fileI18n.error + ' ' + (data.message || '')); }
-    }).catch(err => alert(fileI18n.error + ' ' + err));
-});
-
-document.getElementById('uploadForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const files = document.getElementById('uploadFiles').files;
-    if (files.length === 0) return;
-    const formData = new FormData();
-    formData.append('share', currentShare);
-    formData.append('path', currentPath);
-    for (let i = 0; i < files.length; i++) {
-        formData.append('files', files[i]);
-    }
-    const xhr = new XMLHttpRequest();
-    const progressDiv = document.getElementById('uploadProgress');
-    const bar = document.getElementById('uploadBar');
-    const pct = document.getElementById('uploadPercent');
-    progressDiv.classList.remove('hidden');
-    xhr.upload.addEventListener('progress', function(ev) {
-        if (ev.lengthComputable) {
-            const percent = Math.round((ev.loaded / ev.total) * 100);
-            bar.style.width = percent + '%';
-            pct.textContent = percent + '%';
-        }
-    });
-    xhr.addEventListener('load', function() {
-        if (xhr.status === 200) {
-            document.getElementById('uploadModal').classList.add('hidden');
-            window.location.reload();
-        } else {
-            try {
-                const data = JSON.parse(xhr.responseText);
-                alert(fileI18n.error + ' ' + (data.message || ''));
-            } catch(e) { alert(fileI18n.error); }
-        }
-        progressDiv.classList.add('hidden');
-        bar.style.width = '0%';
-    });
-    xhr.addEventListener('error', function() {
-        alert(fileI18n.error);
-        progressDiv.classList.add('hidden');
-    });
-    xhr.open('POST', '/api/files/upload');
-    xhr.send(formData);
-});
-
-// Close modals on background click
-['uploadModal', 'mkdirModal', 'renameModal'].forEach(function(id) {
-    document.getElementById(id).addEventListener('click', function(e) {
-        if (e.target === this) this.classList.add('hidden');
-    });
-});
+{{define "pageScripts"}}
+<script type="application/json" id="page-data">
+{"currentShare": "{{.CurrentShare}}", "currentPath": "{{.CurrentPath}}", "translations": {"confirmDelete": "{{T .Lang "files.confirm_delete"}}", "deleteSuccess": "{{T .Lang "files.delete_success"}}", "mkdirSuccess": "{{T .Lang "files.mkdir_success"}}", "renameSuccess": "{{T .Lang "files.rename_success"}}", "uploadSuccess": "{{T .Lang "files.upload_success"}}", "error": "{{T .Lang "files.error_generic"}}"}}
 </script>
+<script src="/static/js/files.js"></script>
+{{end}}
 {{end}}

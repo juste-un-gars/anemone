@@ -28,7 +28,7 @@
             </h2>
             <!-- Language Selector -->
             <div class="mt-4 flex justify-center">
-                <select id="language-selector" onchange="changeLanguage()" class="block w-32 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                <select id="language-selector" data-action="changeLanguage" class="block w-32 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                     <option value="fr" {{if eq .Lang "fr"}}selected{{end}}>🇫🇷 Français</option>
                     <option value="en" {{if eq .Lang "en"}}selected{{end}}>🇬🇧 English</option>
                 </select>
@@ -125,33 +125,10 @@
     </div>
 </div>
 
-<script>
-    // Language selector
-    function changeLanguage() {
-        const lang = document.getElementById('language-selector').value;
-        const url = new URL(window.location.href);
-        url.searchParams.set('lang', lang);
-        window.location.href = url.toString();
-    }
-
-    // Client-side password validation
-    document.getElementById('activation-form').addEventListener('submit', function(e) {
-        const password = document.getElementById('password').value;
-        const passwordConfirm = document.getElementById('password_confirm').value;
-
-        if (password !== passwordConfirm) {
-            e.preventDefault();
-            alert('{{T .Lang "activate.errors.password_mismatch"}}');
-            return false;
-        }
-
-        if (password.length < 8) {
-            e.preventDefault();
-            alert('{{T .Lang "activate.errors.password_length"}}');
-            return false;
-        }
-    });
+<script type="application/json" id="page-data">
+{"translations": {"passwordMismatch": "{{T .Lang "activate.errors.password_mismatch"}}", "passwordLength": "{{T .Lang "activate.errors.password_length"}}"}}
 </script>
+<script src="/static/js/auth.js"></script>
 
 </body>
 </html>

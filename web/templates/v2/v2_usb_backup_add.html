@@ -32,7 +32,7 @@
                 {{T .Lang "usb_backup.mount_path"}} *
             </label>
             {{if .Drives}}
-            <select id="driveSelect" onchange="document.getElementById('mount_path').value=this.value"
+            <select id="driveSelect"
                     style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;margin-bottom:0.5rem;">
                 <option value="">-- {{T .Lang "usb_backup.select_drive"}} --</option>
                 {{range .Drives}}
@@ -63,12 +63,12 @@
             </label>
             <div style="display:flex;flex-direction:column;gap:0.5rem;">
                 <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
-                    <input type="radio" name="backup_type" value="config" onchange="document.getElementById('shareSelection').style.display='none'">
+                    <input type="radio" name="backup_type" value="config">
                     {{T .Lang "usb_backup.type_config"}}
                     <span style="font-size:0.75rem;color:var(--text-muted);">({{T .Lang "usb_backup.type_config_desc"}})</span>
                 </label>
                 <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
-                    <input type="radio" name="backup_type" value="full" checked onchange="document.getElementById('shareSelection').style.display=''">
+                    <input type="radio" name="backup_type" value="full" checked>
                     {{T .Lang "usb_backup.type_full"}}
                     <span style="font-size:0.75rem;color:var(--text-muted);">({{T .Lang "usb_backup.type_full_desc"}})</span>
                 </label>
@@ -111,4 +111,8 @@
         </div>
     </form>
 </div>
+{{end}}
+
+{{define "pageScripts"}}
+<script src="/static/js/usb_backup_add.js"></script>
 {{end}}

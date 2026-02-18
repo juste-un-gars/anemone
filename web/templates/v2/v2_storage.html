@@ -1,6 +1,6 @@
 {{/* Anemone v2 - Storage Management page */}}
 {{define "headerActions"}}
-<button onclick="location.reload()" class="v2-btn v2-btn-secondary v2-btn-sm">
+<button data-action="refresh" class="v2-btn v2-btn-secondary v2-btn-sm">
     <svg style="display:inline;width:14px;height:14px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
     {{T .Lang "common.refresh"}}
 </button>
@@ -34,12 +34,12 @@
 
 <!-- Tab navigation -->
 <div class="v2-tabs" id="storageTabs">
-    <button class="v2-tab active" data-tab="overview" onclick="showTab('overview')">{{T .Lang "storage.tab_overview"}}</button>
-    <button class="v2-tab" data-tab="disks" onclick="showTab('disks')">{{T .Lang "storage.tab_disks"}}</button>
-    <button class="v2-tab" data-tab="pools" onclick="showTab('pools')">{{T .Lang "storage.tab_pools"}}</button>
+    <button class="v2-tab active" data-tab="overview" data-action="showTab">{{T .Lang "storage.tab_overview"}}</button>
+    <button class="v2-tab" data-tab="disks" data-action="showTab">{{T .Lang "storage.tab_disks"}}</button>
+    <button class="v2-tab" data-tab="pools" data-action="showTab">{{T .Lang "storage.tab_pools"}}</button>
     {{if .ZFSAvailable}}
-    <button class="v2-tab" data-tab="datasets" onclick="showTab('datasets')">{{T .Lang "storage.tab_datasets"}}</button>
-    <button class="v2-tab" data-tab="snapshots" onclick="showTab('snapshots')">{{T .Lang "storage.tab_snapshots"}}</button>
+    <button class="v2-tab" data-tab="datasets" data-action="showTab">{{T .Lang "storage.tab_datasets"}}</button>
+    <button class="v2-tab" data-tab="snapshots" data-action="showTab">{{T .Lang "storage.tab_snapshots"}}</button>
     {{end}}
 </div>
 
@@ -134,19 +134,19 @@
                         <td>{{if ge .PowerOnHours 0}}{{.PowerOnHours}}h{{else}}-{{end}}</td>
                         <td>
                             <div style="display:flex;gap:0.5rem;align-items:center;">
-                                <button onclick="showSMARTDetails('{{.Name}}')" class="v2-btn v2-btn-secondary v2-btn-sm">SMART</button>
+                                <button data-action="showSMARTDetails" data-disk="{{.Name}}" class="v2-btn v2-btn-secondary v2-btn-sm">SMART</button>
                                 {{if .Mountpoint}}
-                                <button onclick="unmountDisk('{{.Mountpoint}}')" class="v2-btn v2-btn-secondary v2-btn-sm" title="{{T $.Lang "storage.unmount"}}">
+                                <button data-action="unmountDisk" data-mountpoint="{{.Mountpoint}}" class="v2-btn v2-btn-secondary v2-btn-sm" title="{{T $.Lang "storage.unmount"}}">
                                     <svg style="display:inline;width:14px;height:14px;vertical-align:middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                                 </button>
-                                <button onclick="ejectDisk('{{.Mountpoint}}')" class="v2-btn v2-btn-secondary v2-btn-sm" title="{{T $.Lang "storage.eject"}}">
+                                <button data-action="ejectDisk" data-mountpoint="{{.Mountpoint}}" class="v2-btn v2-btn-secondary v2-btn-sm" title="{{T $.Lang "storage.eject"}}">
                                     <svg style="display:inline;width:14px;height:14px;vertical-align:middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
                                 </button>
                                 {{else if .Filesystem}}
-                                <button onclick="showMountDiskModal('{{.Path}}', '{{.Name}}')" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "storage.mount"}}</button>
-                                <button onclick="showFormatDiskModal('{{.Path}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "storage.format"}}</button>
+                                <button data-action="showMountDiskModal" data-path="{{.Path}}" data-disk="{{.Name}}" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "storage.mount"}}</button>
+                                <button data-action="showFormatDiskModal" data-path="{{.Path}}" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "storage.format"}}</button>
                                 {{else}}
-                                <button onclick="showFormatDiskModal('{{.Path}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "storage.format"}}</button>
+                                <button data-action="showFormatDiskModal" data-path="{{.Path}}" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "storage.format"}}</button>
                                 {{end}}
                             </div>
                         </td>
@@ -170,8 +170,8 @@
 <div class="v2-tab-panel" id="tab-pools">
     {{if .ZFSAvailable}}
     <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-bottom:1rem;">
-        <button onclick="showImportPoolModal()" class="v2-btn v2-btn-secondary v2-btn-sm">{{T .Lang "storage.import_pool"}}</button>
-        <button onclick="showCreatePoolModal()" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "storage.create_pool"}}</button>
+        <button data-action="showImportPoolModal" class="v2-btn v2-btn-secondary v2-btn-sm">{{T .Lang "storage.import_pool"}}</button>
+        <button data-action="showCreatePoolModal" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "storage.create_pool"}}</button>
     </div>
     {{if .Pools}}
     {{range .Pools}}
@@ -182,9 +182,9 @@
                 <span class="v2-badge {{if eq .State "ONLINE"}}v2-badge-success{{else if eq .State "DEGRADED"}}v2-badge-warning{{else}}v2-badge-error{{end}}">{{.State}}</span>
             </div>
             <div style="display:flex;gap:0.375rem;">
-                <button onclick="startScrub('{{.Name}}')" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "storage.start_scrub"}}</button>
-                <button onclick="showExportPoolModal('{{.Name}}')" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "storage.export"}}</button>
-                <button onclick="showDestroyPoolModal('{{.Name}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "storage.destroy"}}</button>
+                <button data-action="startScrub" data-pool="{{.Name}}" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "storage.start_scrub"}}</button>
+                <button data-action="showExportPoolModal" data-pool="{{.Name}}" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "storage.export"}}</button>
+                <button data-action="showDestroyPoolModal" data-pool="{{.Name}}" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "storage.destroy"}}</button>
             </div>
         </div>
         <!-- Progress bar -->
@@ -249,7 +249,7 @@
 <!-- ===== Datasets Tab ===== -->
 <div class="v2-tab-panel" id="tab-datasets">
     <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
-        <button onclick="showCreateDatasetModal()" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "storage.create_dataset"}}</button>
+        <button data-action="showCreateDatasetModal" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "storage.create_dataset"}}</button>
     </div>
     <div class="v2-card">
         <div id="datasets-list">
@@ -261,7 +261,7 @@
 <!-- ===== Snapshots Tab ===== -->
 <div class="v2-tab-panel" id="tab-snapshots">
     <div style="display:flex;justify-content:flex-end;margin-bottom:1rem;">
-        <button onclick="showCreateSnapshotModal()" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "storage.create_snapshot"}}</button>
+        <button data-action="showCreateSnapshotModal" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "storage.create_snapshot"}}</button>
     </div>
     <div class="v2-card">
         <div id="snapshots-list">
@@ -276,16 +276,16 @@
     <div class="v2-card" style="width:24rem;max-width:90vw;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
             <div id="passwordModalTitle" style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.confirm_action"}}</div>
-            <button onclick="closePasswordModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+            <button data-action="closePasswordModal" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
         </div>
         <div id="passwordModalWarning" style="background:rgba(239,68,68,0.1);border:1px solid var(--error);border-radius:6px;padding:0.75rem;margin-bottom:1rem;font-size:0.8125rem;color:var(--error);"></div>
-        <form id="passwordForm" onsubmit="submitPasswordVerification(event)">
+        <form id="passwordForm">
             <div style="margin-bottom:1rem;">
                 <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "settings.password.current"}}</label>
                 <input type="password" id="verifyPassword" required style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
             </div>
             <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
-                <button type="button" onclick="closePasswordModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="button" data-action="closePasswordModal" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
                 <button type="submit" class="v2-btn v2-btn-danger">{{T .Lang "storage.confirm"}}</button>
             </div>
         </form>
@@ -297,7 +297,7 @@
     <div class="v2-card" style="width:48rem;max-width:90vw;max-height:85vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;position:sticky;top:0;background:var(--bg-card);padding-bottom:0.5rem;border-bottom:1px solid var(--border);">
             <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.smart_details"}} - <span id="smartDiskName"></span></div>
-            <button onclick="closeSMARTModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+            <button data-action="closeSMARTModal" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
         </div>
         <div id="smartContent"></div>
     </div>
@@ -308,9 +308,9 @@
     <div class="v2-card" style="width:30rem;max-width:90vw;max-height:85vh;overflow-y:auto;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
             <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.create_pool"}}</div>
-            <button onclick="closeCreatePoolModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+            <button data-action="closeCreatePoolModal" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
         </div>
-        <form id="createPoolForm" onsubmit="createPool(event)">
+        <form id="createPoolForm">
             <div style="display:flex;flex-direction:column;gap:1rem;">
                 <div>
                     <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.pool_name"}}</label>
@@ -345,7 +345,7 @@
                 </div>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.5rem;">
-                <button type="button" onclick="closeCreatePoolModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="button" data-action="closeCreatePoolModal" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
                 <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "storage.create"}}</button>
             </div>
         </form>
@@ -357,9 +357,9 @@
     <div class="v2-card" style="width:24rem;max-width:90vw;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
             <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.create_dataset"}}</div>
-            <button onclick="closeCreateDatasetModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+            <button data-action="closeCreateDatasetModal" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
         </div>
-        <form id="createDatasetForm" onsubmit="createDataset(event)">
+        <form id="createDatasetForm">
             <div style="display:flex;flex-direction:column;gap:1rem;">
                 <div>
                     <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.dataset_name"}}</label>
@@ -382,7 +382,7 @@
                 </div>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.5rem;">
-                <button type="button" onclick="closeCreateDatasetModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="button" data-action="closeCreateDatasetModal" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
                 <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "storage.create"}}</button>
             </div>
         </form>
@@ -394,9 +394,9 @@
     <div class="v2-card" style="width:24rem;max-width:90vw;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
             <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.create_snapshot"}}</div>
-            <button onclick="closeCreateSnapshotModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+            <button data-action="closeCreateSnapshotModal" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
         </div>
-        <form id="createSnapshotForm" onsubmit="createSnapshot(event)">
+        <form id="createSnapshotForm">
             <div style="display:flex;flex-direction:column;gap:1rem;">
                 <div>
                     <label style="display:block;font-size:0.8125rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "storage.dataset"}}</label>
@@ -409,7 +409,7 @@
                 </div>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.5rem;">
-                <button type="button" onclick="closeCreateSnapshotModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="button" data-action="closeCreateSnapshotModal" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
                 <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "storage.create"}}</button>
             </div>
         </form>
@@ -421,10 +421,10 @@
     <div class="v2-card" style="width:24rem;max-width:90vw;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
             <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.format_disk"}}</div>
-            <button onclick="closeFormatDiskModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+            <button data-action="closeFormatDiskModal" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
         </div>
         <div style="background:rgba(239,68,68,0.1);border:1px solid var(--error);border-radius:6px;padding:0.75rem;margin-bottom:1rem;font-size:0.8125rem;color:var(--error);">{{T .Lang "storage.format_warning"}}</div>
-        <form id="formatDiskForm" onsubmit="formatDisk(event)">
+        <form id="formatDiskForm">
             <input type="hidden" id="formatDiskDevice">
             <div style="display:flex;flex-direction:column;gap:1rem;">
                 <div>
@@ -446,7 +446,7 @@
                 </div>
                 <div style="border-top:1px solid var(--border);padding-top:1rem;">
                     <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
-                        <input type="checkbox" id="formatMount" checked onchange="toggleMountPath()">
+                        <input type="checkbox" id="formatMount" checked>
                         <span style="font-size:0.8125rem;color:var(--text-secondary);">{{T .Lang "storage.mount_after_format"}}</span>
                     </label>
                     <div id="mountPathContainer" style="margin-top:0.5rem;">
@@ -469,7 +469,7 @@
                 </div>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.5rem;">
-                <button type="button" onclick="closeFormatDiskModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="button" data-action="closeFormatDiskModal" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
                 <button type="submit" class="v2-btn v2-btn-danger">{{T .Lang "storage.format"}}</button>
             </div>
         </form>
@@ -481,9 +481,9 @@
     <div class="v2-card" style="width:24rem;max-width:90vw;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
             <div style="font-size:0.9375rem;font-weight:600;color:var(--text-primary);">{{T .Lang "storage.mount_disk"}}</div>
-            <button onclick="closeMountDiskModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
+            <button data-action="closeMountDiskModal" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.25rem;">&times;</button>
         </div>
-        <form id="mountDiskForm" onsubmit="mountDisk(event)">
+        <form id="mountDiskForm">
             <input type="hidden" id="mountDiskDevice">
             <div style="display:flex;flex-direction:column;gap:1rem;">
                 <div>
@@ -509,595 +509,121 @@
                 </div>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1.5rem;">
-                <button type="button" onclick="closeMountDiskModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="button" data-action="closeMountDiskModal" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
                 <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "storage.mount"}}</button>
             </div>
         </form>
     </div>
 </div>
 
-<script>
-var verificationToken = null;
-var pendingAction = null;
+{{end}}
 
-// Tab switching
-function showTab(tabName) {
-    document.querySelectorAll('.v2-tab-panel').forEach(function(el) { el.classList.remove('active'); });
-    document.querySelectorAll('.v2-tab').forEach(function(el) { el.classList.remove('active'); });
-    var panel = document.getElementById('tab-' + tabName);
-    if (panel) panel.classList.add('active');
-    var tab = document.querySelector('.v2-tab[data-tab="' + tabName + '"]');
-    if (tab) tab.classList.add('active');
-    if (tabName === 'datasets') loadDatasets();
-    if (tabName === 'snapshots') loadSnapshots();
-}
-
-// Password verification
-function requirePassword(title, warning, callback) {
-    pendingAction = callback;
-    document.getElementById('passwordModalTitle').textContent = title;
-    document.getElementById('passwordModalWarning').textContent = warning;
-    document.getElementById('verifyPassword').value = '';
-    document.getElementById('passwordModal').classList.remove('hidden');
-}
-function closePasswordModal() {
-    document.getElementById('passwordModal').classList.add('hidden');
-    pendingAction = null;
-}
-async function submitPasswordVerification(e) {
-    e.preventDefault();
-    var password = document.getElementById('verifyPassword').value;
-    try {
-        var resp = await fetch('/api/admin/verify-password', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({password: password})
-        });
-        var data = await resp.json();
-        if (data.success && data.token) {
-            verificationToken = data.token;
-            var action = pendingAction;
-            closePasswordModal();
-            if (action) action();
-        } else {
-            alert(data.error || '{{T .Lang "login.error"}}');
-        }
-    } catch (err) {
-        alert('{{T .Lang "common.error"}}: ' + err);
+{{define "pageScripts"}}
+<script type="application/json" id="page-data">
+{
+    "poolNames": "{{range .Pools}}{{.Name}},{{end}}",
+    "translations": {
+        "loading": "{{T .Lang "common.loading"}}",
+        "error": "{{T .Lang "common.error"}}",
+        "deleteBtn": "{{T .Lang "common.delete"}}",
+        "loginError": "{{T .Lang "login.error"}}",
+        "confirmScrub": "{{T .Lang "storage.confirm_scrub"}}",
+        "scrubStarted": "{{T .Lang "storage.scrub_started"}}",
+        "scrubError": "{{T .Lang "storage.scrub_error"}}",
+        "createPool": "{{T .Lang "storage.create_pool"}}",
+        "createPoolWarning": "{{T .Lang "storage.create_pool_warning"}}",
+        "poolCreated": "{{T .Lang "storage.pool_created"}}",
+        "destroyPool": "{{T .Lang "storage.destroy_pool"}}",
+        "destroyPoolWarning": "{{T .Lang "storage.destroy_pool_warning"}}",
+        "poolDestroyed": "{{T .Lang "storage.pool_destroyed"}}",
+        "exportPool": "{{T .Lang "storage.export_pool"}}",
+        "exportPoolWarning": "{{T .Lang "storage.export_pool_warning"}}",
+        "poolExported": "{{T .Lang "storage.pool_exported"}}",
+        "importPool": "{{T .Lang "storage.import_pool"}}",
+        "importPoolWarning": "{{T .Lang "storage.import_pool_warning"}}",
+        "poolImported": "{{T .Lang "storage.pool_imported"}}",
+        "noImportablePools": "{{T .Lang "storage.no_importable_pools"}}",
+        "selectPoolToImport": "{{T .Lang "storage.select_pool_to_import"}}",
+        "noPools": "{{T .Lang "storage.no_pools"}}",
+        "noDatasets": "{{T .Lang "storage.no_datasets"}}",
+        "noSnapshots": "{{T .Lang "storage.no_snapshots"}}",
+        "createDataset": "{{T .Lang "storage.create_dataset"}}",
+        "createDatasetWarning": "{{T .Lang "storage.create_dataset_warning"}}",
+        "datasetCreated": "{{T .Lang "storage.dataset_created"}}",
+        "deleteDataset": "{{T .Lang "storage.delete_dataset"}}",
+        "deleteDatasetWarning": "{{T .Lang "storage.delete_dataset_warning"}}",
+        "datasetDeleted": "{{T .Lang "storage.dataset_deleted"}}",
+        "snapshotCreated": "{{T .Lang "storage.snapshot_created"}}",
+        "deleteSnapshot": "{{T .Lang "storage.delete_snapshot"}}",
+        "deleteSnapshotWarning": "{{T .Lang "storage.delete_snapshot_warning"}}",
+        "snapshotDeleted": "{{T .Lang "storage.snapshot_deleted"}}",
+        "rollbackSnapshot": "{{T .Lang "storage.rollback_snapshot"}}",
+        "rollbackWarning": "{{T .Lang "storage.rollback_warning"}}",
+        "rollbackSuccess": "{{T .Lang "storage.rollback_success"}}",
+        "rollbackBtn": "{{T .Lang "storage.rollback"}}",
+        "formatDisk": "{{T .Lang "storage.format_disk"}}",
+        "formatDiskWarning": "{{T .Lang "storage.format_disk_warning"}}",
+        "diskFormatted": "{{T .Lang "storage.disk_formatted"}}",
+        "mountPathError": "{{T .Lang "storage.mount_path_error"}}",
+        "diskMounted": "{{T .Lang "storage.disk_mounted"}}",
+        "unmountConfirm": "{{T .Lang "storage.unmount_confirm"}}",
+        "diskUnmounted": "{{T .Lang "storage.disk_unmounted"}}",
+        "ejectConfirm": "{{T .Lang "storage.eject_confirm"}}",
+        "diskEjected": "{{T .Lang "storage.disk_ejected"}}",
+        "selectAtLeastOneDisk": "{{T .Lang "storage.select_at_least_one_disk"}}",
+        "noAvailableDisks": "{{T .Lang "storage.no_available_disks"}}",
+        "datasetHeader": "{{T .Lang "storage.dataset"}}",
+        "typeHeader": "{{T .Lang "storage.type"}}",
+        "usedHeader": "{{T .Lang "storage.used"}}",
+        "availableHeader": "{{T .Lang "storage.available"}}",
+        "compressionHeader": "{{T .Lang "storage.compression"}}",
+        "actionsHeader": "{{T .Lang "users.actions"}}",
+        "snapshotHeader": "{{T .Lang "storage.snapshot"}}",
+        "createdHeader": "{{T .Lang "storage.created"}}",
+        "confirmAction": "{{T .Lang "storage.confirm_action"}}",
+        "passwordLabel": "{{T .Lang "settings.password.current"}}",
+        "smartGeneralInfo": "{{T .Lang "storage.smart.general_info"}}",
+        "smartDiskErrors": "{{T .Lang "storage.smart.disk_errors"}}",
+        "smartNvmeInfo": "{{T .Lang "storage.smart.nvme_info"}}",
+        "smartSsdWear": "{{T .Lang "storage.smart.ssd_wear"}}",
+        "smartDataVolume": "{{T .Lang "storage.smart.data_volume"}}",
+        "smartAllAttributes": "{{T .Lang "storage.smart.all_attributes"}}",
+        "smartHealth": "{{T .Lang "storage.health"}}",
+        "smartTemp": "{{T .Lang "storage.temp"}}",
+        "smartPowerOn": "{{T .Lang "storage.power_on"}}",
+        "smartPowerCycles": "{{T .Lang "storage.power_cycles"}}",
+        "smartReallocated": "{{T .Lang "storage.reallocated"}}",
+        "smartPending": "{{T .Lang "storage.pending"}}",
+        "smartUncorrectable": "{{T .Lang "storage.uncorrectable"}}",
+        "smartMediaErrors": "{{T .Lang "storage.smart.media_errors"}}",
+        "smartUnsafeShutdowns": "{{T .Lang "storage.smart.unsafe_shutdowns"}}",
+        "smartAvailableSpare": "{{T .Lang "storage.smart.available_spare"}}",
+        "smartPercentageUsed": "{{T .Lang "storage.smart.percentage_used"}}",
+        "smartDataWritten": "{{T .Lang "storage.smart.data_written"}}",
+        "smartDataRead": "{{T .Lang "storage.smart.data_read"}}",
+        "smartStatusGood": "{{T .Lang "storage.smart.status.good"}}",
+        "smartStatusWarning": "{{T .Lang "storage.smart.status.warning"}}",
+        "smartStatusCritical": "{{T .Lang "storage.smart.status.critical"}}",
+        "smartNotAvailable": "{{T .Lang "storage.smart_not_available"}}",
+        "smartHelpHealth": "{{T .Lang "storage.smart.help.health"}}",
+        "smartHelpTemp": "{{T .Lang "storage.smart.help.temperature"}}",
+        "smartHelpPowerOn": "{{T .Lang "storage.smart.help.power_on_hours"}}",
+        "smartHelpPowerCycles": "{{T .Lang "storage.smart.help.power_cycles"}}",
+        "smartHelpReallocated": "{{T .Lang "storage.smart.help.reallocated"}}",
+        "smartHelpPending": "{{T .Lang "storage.smart.help.pending"}}",
+        "smartHelpUncorrectable": "{{T .Lang "storage.smart.help.uncorrectable"}}",
+        "smartHelpMediaErrors": "{{T .Lang "storage.smart.help.media_errors"}}",
+        "smartHelpUnsafeShutdowns": "{{T .Lang "storage.smart.help.unsafe_shutdowns"}}",
+        "smartHelpAvailableSpare": "{{T .Lang "storage.smart.help.available_spare"}}",
+        "smartHelpPercentageUsed": "{{T .Lang "storage.smart.help.percentage_used"}}",
+        "smartHelpDataWritten": "{{T .Lang "storage.smart.help.data_written"}}",
+        "smartHelpDataRead": "{{T .Lang "storage.smart.help.data_read"}}",
+        "smartAttrName": "{{T .Lang "storage.attr_name"}}",
+        "smartAttrValue": "{{T .Lang "storage.attr_value"}}",
+        "smartAttrWorst": "{{T .Lang "storage.attr_worst"}}",
+        "smartAttrRaw": "{{T .Lang "storage.attr_raw"}}"
     }
 }
-
-// SMART Modal
-var smartTranslations = {
-    generalInfo: '{{T .Lang "storage.smart.general_info"}}',
-    diskErrors: '{{T .Lang "storage.smart.disk_errors"}}',
-    nvmeInfo: '{{T .Lang "storage.smart.nvme_info"}}',
-    ssdWear: '{{T .Lang "storage.smart.ssd_wear"}}',
-    dataVolume: '{{T .Lang "storage.smart.data_volume"}}',
-    allAttributes: '{{T .Lang "storage.smart.all_attributes"}}',
-    health: '{{T .Lang "storage.health"}}',
-    temp: '{{T .Lang "storage.temp"}}',
-    powerOn: '{{T .Lang "storage.power_on"}}',
-    powerCycles: '{{T .Lang "storage.power_cycles"}}',
-    reallocated: '{{T .Lang "storage.reallocated"}}',
-    pending: '{{T .Lang "storage.pending"}}',
-    uncorrectable: '{{T .Lang "storage.uncorrectable"}}',
-    mediaErrors: '{{T .Lang "storage.smart.media_errors"}}',
-    unsafeShutdowns: '{{T .Lang "storage.smart.unsafe_shutdowns"}}',
-    availableSpare: '{{T .Lang "storage.smart.available_spare"}}',
-    percentageUsed: '{{T .Lang "storage.smart.percentage_used"}}',
-    dataWritten: '{{T .Lang "storage.smart.data_written"}}',
-    dataRead: '{{T .Lang "storage.smart.data_read"}}',
-    statusGood: '{{T .Lang "storage.smart.status.good"}}',
-    statusWarning: '{{T .Lang "storage.smart.status.warning"}}',
-    statusCritical: '{{T .Lang "storage.smart.status.critical"}}',
-    notAvailable: '{{T .Lang "storage.smart_not_available"}}',
-    helpHealth: '{{T .Lang "storage.smart.help.health"}}',
-    helpTemp: '{{T .Lang "storage.smart.help.temperature"}}',
-    helpPowerOn: '{{T .Lang "storage.smart.help.power_on_hours"}}',
-    helpPowerCycles: '{{T .Lang "storage.smart.help.power_cycles"}}',
-    helpReallocated: '{{T .Lang "storage.smart.help.reallocated"}}',
-    helpPending: '{{T .Lang "storage.smart.help.pending"}}',
-    helpUncorrectable: '{{T .Lang "storage.smart.help.uncorrectable"}}',
-    helpMediaErrors: '{{T .Lang "storage.smart.help.media_errors"}}',
-    helpUnsafeShutdowns: '{{T .Lang "storage.smart.help.unsafe_shutdowns"}}',
-    helpAvailableSpare: '{{T .Lang "storage.smart.help.available_spare"}}',
-    helpPercentageUsed: '{{T .Lang "storage.smart.help.percentage_used"}}',
-    helpDataWritten: '{{T .Lang "storage.smart.help.data_written"}}',
-    helpDataRead: '{{T .Lang "storage.smart.help.data_read"}}',
-    attrName: '{{T .Lang "storage.attr_name"}}',
-    attrValue: '{{T .Lang "storage.attr_value"}}',
-    attrWorst: '{{T .Lang "storage.attr_worst"}}',
-    attrRaw: '{{T .Lang "storage.attr_raw"}}'
-};
-
-function helpIcon(tip) {
-    return '<span class="help-tooltip" data-tip="' + tip.replace(/"/g, '&quot;') + '">?</span>';
-}
-function formatBytes(units) {
-    var bytes = units * 512 * 1000;
-    if (bytes >= 1e15) return (bytes / 1e15).toFixed(1) + ' PB';
-    if (bytes >= 1e12) return (bytes / 1e12).toFixed(1) + ' TB';
-    if (bytes >= 1e9) return (bytes / 1e9).toFixed(1) + ' GB';
-    return (bytes / 1e6).toFixed(1) + ' MB';
-}
-function formatHours(hours) {
-    if (hours < 24) return hours + 'h';
-    var days = Math.floor(hours / 24);
-    if (days < 365) return days + 'j (' + hours.toLocaleString() + 'h)';
-    var years = (days / 365).toFixed(1);
-    return years + ' ans (' + hours.toLocaleString() + 'h)';
-}
-function getValueClass(value, warnThresh, critThresh, inverse) {
-    if (inverse) {
-        if (value <= critThresh) return 'smart-value-critical';
-        if (value <= warnThresh) return 'smart-value-warning';
-        return 'smart-value-good';
-    } else {
-        if (value >= critThresh) return 'smart-value-critical';
-        if (value >= warnThresh) return 'smart-value-warning';
-        return 'smart-value-good';
-    }
-}
-function smartMetricRow(label, value, helpTip, valueClass) {
-    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:0.375rem 0;border-bottom:1px solid var(--border);">' +
-        '<div style="display:flex;align-items:center;font-size:0.8125rem;color:var(--text-secondary);">' + label + helpIcon(helpTip) + '</div>' +
-        '<div style="font-size:0.8125rem;font-weight:500;" class="' + (valueClass || '') + '">' + value + '</div></div>';
-}
-
-function showSMARTDetails(diskName) {
-    document.getElementById('smartDiskName').textContent = diskName;
-    document.getElementById('smartContent').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">{{T .Lang "common.loading"}}...</div>';
-    document.getElementById('smartModal').classList.remove('hidden');
-
-    fetch('/api/admin/storage/disk/' + diskName + '/smart')
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (!data.available) {
-            document.getElementById('smartContent').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">' + smartTranslations.notAvailable + '</div>';
-            return;
-        }
-        var html = '';
-        var healthClass = data.healthy ? 'background:rgba(16,185,129,0.1);border:1px solid var(--success);color:var(--success);' : 'background:rgba(239,68,68,0.1);border:1px solid var(--error);color:var(--error);';
-        var healthText = data.healthy ? smartTranslations.statusGood : smartTranslations.statusCritical;
-        html += '<div style="display:flex;align-items:center;gap:0.5rem;padding:0.75rem;border-radius:8px;margin-bottom:1rem;' + healthClass + '">';
-        html += '<span style="font-weight:500;">' + smartTranslations.health + ': ' + healthText + '</span>' + helpIcon(smartTranslations.helpHealth) + '</div>';
-
-        html += '<div class="smart-card"><div class="smart-card-title">' + smartTranslations.generalInfo + '</div>';
-        var tempClass = data.temperature > 60 ? 'smart-value-critical' : (data.temperature > 50 ? 'smart-value-warning' : 'smart-value-good');
-        html += smartMetricRow(smartTranslations.temp, data.temperature > 0 ? data.temperature + '°C' : '-', smartTranslations.helpTemp, tempClass);
-        var powerHoursClass = data.power_on_hours > 50000 ? 'smart-value-warning' : '';
-        html += smartMetricRow(smartTranslations.powerOn, data.power_on_hours > 0 ? formatHours(data.power_on_hours) : '-', smartTranslations.helpPowerOn, powerHoursClass);
-        html += smartMetricRow(smartTranslations.powerCycles, data.power_cycle_count > 0 ? data.power_cycle_count.toLocaleString() : '-', smartTranslations.helpPowerCycles, '');
-        html += '</div>';
-
-        if (data.is_nvme) {
-            html += '<div class="smart-card"><div class="smart-card-title">' + smartTranslations.nvmeInfo + '</div>';
-            html += smartMetricRow(smartTranslations.mediaErrors, data.media_errors, smartTranslations.helpMediaErrors, data.media_errors > 0 ? 'smart-value-critical' : 'smart-value-good');
-            html += smartMetricRow(smartTranslations.unsafeShutdowns, data.unsafe_shutdowns, smartTranslations.helpUnsafeShutdowns, data.unsafe_shutdowns > 100 ? 'smart-value-warning' : '');
-            html += '</div>';
-            html += '<div class="smart-card"><div class="smart-card-title">' + smartTranslations.ssdWear + '</div>';
-            html += smartMetricRow(smartTranslations.availableSpare, data.available_spare + '%', smartTranslations.helpAvailableSpare, getValueClass(data.available_spare, 20, 10, true));
-            html += smartMetricRow(smartTranslations.percentageUsed, data.percentage_used + '%', smartTranslations.helpPercentageUsed, getValueClass(data.percentage_used, 80, 100, false));
-            html += '</div>';
-            if (data.data_units_written > 0 || data.data_units_read > 0) {
-                html += '<div class="smart-card"><div class="smart-card-title">' + smartTranslations.dataVolume + '</div>';
-                html += smartMetricRow(smartTranslations.dataWritten, formatBytes(data.data_units_written), smartTranslations.helpDataWritten, '');
-                html += smartMetricRow(smartTranslations.dataRead, formatBytes(data.data_units_read), smartTranslations.helpDataRead, '');
-                html += '</div>';
-            }
-        } else {
-            var hasErrors = data.reallocated_sectors > 0 || data.pending_sectors > 0 || data.uncorrectable_sectors > 0;
-            html += '<div class="smart-card" style="' + (hasErrors ? 'border:1px solid var(--error);' : '') + '"><div class="smart-card-title">' + smartTranslations.diskErrors + '</div>';
-            html += smartMetricRow(smartTranslations.reallocated, data.reallocated_sectors, smartTranslations.helpReallocated, getValueClass(data.reallocated_sectors, 10, 100, false));
-            html += smartMetricRow(smartTranslations.pending, data.pending_sectors, smartTranslations.helpPending, data.pending_sectors > 0 ? 'smart-value-critical' : 'smart-value-good');
-            html += smartMetricRow(smartTranslations.uncorrectable, data.uncorrectable_sectors, smartTranslations.helpUncorrectable, data.uncorrectable_sectors > 0 ? 'smart-value-critical' : 'smart-value-good');
-            html += '</div>';
-        }
-
-        if (data.attributes && data.attributes.length > 0) {
-            html += '<details class="smart-card"><summary class="smart-card-title" style="cursor:pointer;">' + smartTranslations.allAttributes + ' (' + data.attributes.length + ')</summary>';
-            html += '<div style="overflow-x:auto;margin-top:0.5rem;max-height:12rem;overflow-y:auto;"><table class="v2-table" style="font-size:0.75rem;"><thead><tr>';
-            html += '<th>ID</th><th>' + smartTranslations.attrName + '</th><th style="text-align:right;">' + smartTranslations.attrValue + '</th><th style="text-align:right;">' + smartTranslations.attrWorst + '</th><th>' + smartTranslations.attrRaw + '</th></tr></thead><tbody>';
-            data.attributes.forEach(function(attr) {
-                var rowStyle = attr.status === 'failing' ? 'background:rgba(239,68,68,0.1);' : (attr.status === 'warning' ? 'background:rgba(245,158,11,0.1);' : '');
-                html += '<tr style="' + rowStyle + '"><td>' + attr.id + '</td><td>' + attr.name + '</td><td style="text-align:right;">' + attr.value + '</td><td style="text-align:right;">' + attr.worst + '</td><td style="font-family:monospace;">' + attr.raw_value + '</td></tr>';
-            });
-            html += '</tbody></table></div></details>';
-        }
-        document.getElementById('smartContent').innerHTML = html;
-    }).catch(function(err) {
-        document.getElementById('smartContent').innerHTML = '<div style="text-align:center;color:var(--error);padding:2rem;">{{T .Lang "common.error"}}: ' + err + '</div>';
-    });
-}
-function closeSMARTModal() { document.getElementById('smartModal').classList.add('hidden'); }
-
-// Pool operations
-function startScrub(poolName) {
-    if (!confirm('{{T .Lang "storage.confirm_scrub"}}')) return;
-    fetch('/api/admin/storage/pool/' + poolName + '/scrub', {method: 'POST'})
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        if (data.success) { alert('{{T .Lang "storage.scrub_started"}}'); location.reload(); }
-        else alert('{{T .Lang "storage.scrub_error"}}: ' + (data.error || 'Unknown'));
-    }).catch(function(err) { alert('{{T .Lang "storage.scrub_error"}}: ' + err); });
-}
-
-function showCreatePoolModal() {
-    loadAvailableDisks();
-    document.getElementById('createPoolModal').classList.remove('hidden');
-}
-function closeCreatePoolModal() { document.getElementById('createPoolModal').classList.add('hidden'); }
-
-async function loadAvailableDisks() {
-    try {
-        var resp = await fetch('/api/admin/storage/disks/available');
-        var disks = await resp.json();
-        var html = '';
-        disks.forEach(function(disk) {
-            var disabled = disk.in_use ? 'disabled' : '';
-            var label = disk.in_use ? disk.path + ' (' + disk.size_human + ') - ' + disk.in_use_by : disk.path + ' (' + disk.size_human + ')';
-            html += '<label style="display:flex;align-items:center;gap:0.5rem;padding:0.25rem 0;font-size:0.8125rem;color:' + (disk.in_use ? 'var(--text-muted)' : 'var(--text-primary)') + ';"><input type="checkbox" name="poolDisks" value="' + disk.path + '" ' + disabled + '>' + label + '</label>';
-        });
-        document.getElementById('poolDisksList').innerHTML = html || '<div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.8125rem;">{{T .Lang "storage.no_available_disks"}}</div>';
-    } catch (err) {
-        document.getElementById('poolDisksList').innerHTML = '<div style="text-align:center;color:var(--error);padding:1rem;font-size:0.8125rem;">{{T .Lang "common.error"}}</div>';
-    }
-}
-
-async function createPool(e) {
-    e.preventDefault();
-    var name = document.getElementById('poolName').value;
-    var vdevType = document.getElementById('poolVdevType').value;
-    var compression = document.getElementById('poolCompression').value;
-    var mountpoint = document.getElementById('poolMountpoint').value;
-    var disks = Array.from(document.querySelectorAll('input[name="poolDisks"]:checked')).map(function(el) { return el.value; });
-    if (disks.length === 0) { alert('{{T .Lang "storage.select_at_least_one_disk"}}'); return; }
-    closeCreatePoolModal();
-    requirePassword('{{T .Lang "storage.create_pool"}}', '{{T .Lang "storage.create_pool_warning"}}', async function() {
-        try {
-            var resp = await fetch('/api/admin/storage/pool', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
-                body: JSON.stringify({name: name, vdev_type: vdevType, disks: disks, compression: compression, mountpoint: mountpoint, force: true})
-            });
-            var data = await resp.json();
-            if (data.success) { alert('{{T .Lang "storage.pool_created"}}'); location.reload(); }
-            else alert('{{T .Lang "common.error"}}: ' + data.error);
-        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
-    });
-}
-
-function showDestroyPoolModal(poolName) {
-    requirePassword('{{T .Lang "storage.destroy_pool"}}: ' + poolName, '{{T .Lang "storage.destroy_pool_warning"}}', async function() {
-        try {
-            var resp = await fetch('/api/admin/storage/pool-destroy/' + poolName + '?force=true', {
-                method: 'DELETE',
-                headers: {'X-Verification-Token': verificationToken}
-            });
-            var data = await resp.json();
-            if (data.success) { alert('{{T .Lang "storage.pool_destroyed"}}'); location.reload(); }
-            else alert('{{T .Lang "common.error"}}: ' + data.error);
-        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
-    });
-}
-
-function showExportPoolModal(poolName) {
-    requirePassword('{{T .Lang "storage.export_pool"}}: ' + poolName, '{{T .Lang "storage.export_pool_warning"}}', async function() {
-        try {
-            var resp = await fetch('/api/admin/storage/pool-export/' + poolName, {
-                method: 'POST',
-                headers: {'X-Verification-Token': verificationToken}
-            });
-            var data = await resp.json();
-            if (data.success) { alert('{{T .Lang "storage.pool_exported"}}'); location.reload(); }
-            else alert('{{T .Lang "common.error"}}: ' + data.error);
-        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
-    });
-}
-
-function showImportPoolModal() {
-    fetch('/api/admin/storage/pools/importable')
-    .then(function(r) { return r.json(); })
-    .then(function(pools) {
-        if (!pools || pools.length === 0) { alert('{{T .Lang "storage.no_importable_pools"}}'); return; }
-        var poolName = prompt('{{T .Lang "storage.select_pool_to_import"}}:\n' + pools.map(function(p) { return p.name; }).join('\n'));
-        if (!poolName) return;
-        requirePassword('{{T .Lang "storage.import_pool"}}: ' + poolName, '{{T .Lang "storage.import_pool_warning"}}', async function() {
-            var resp = await fetch('/api/admin/storage/pools/import', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
-                body: JSON.stringify({name: poolName, force: true})
-            });
-            var data = await resp.json();
-            if (data.success) { alert('{{T .Lang "storage.pool_imported"}}'); location.reload(); }
-            else alert('{{T .Lang "common.error"}}: ' + data.error);
-        });
-    }).catch(function(err) { alert('{{T .Lang "common.error"}}: ' + err); });
-}
-
-// Dataset operations
-async function loadDatasets() {
-    var pools = '{{range .Pools}}{{.Name}},{{end}}';
-    var poolList = pools.split(',').filter(function(p) { return p; });
-    if (poolList.length === 0) {
-        document.getElementById('datasets-list').innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">{{T .Lang "storage.no_pools"}}</div>';
-        return;
-    }
-    var html = '';
-    for (var i = 0; i < poolList.length; i++) {
-        var pool = poolList[i];
-        try {
-            var resp = await fetch('/api/admin/storage/datasets?parent=' + pool);
-            var datasets = await resp.json();
-            if (datasets && datasets.length > 0) {
-                html += '<div style="margin-bottom:1.5rem;"><div style="font-weight:500;color:var(--text-primary);margin-bottom:0.5rem;">' + pool + '</div>';
-                html += '<div style="overflow-x:auto;"><table class="v2-table"><thead><tr>';
-                html += '<th>{{T .Lang "storage.dataset"}}</th><th>{{T .Lang "storage.type"}}</th><th style="text-align:right;">{{T .Lang "storage.used"}}</th><th style="text-align:right;">{{T .Lang "storage.available"}}</th><th>{{T .Lang "storage.compression"}}</th><th>{{T .Lang "users.actions"}}</th>';
-                html += '</tr></thead><tbody>';
-                datasets.forEach(function(ds) {
-                    html += '<tr><td>' + ds.name + '</td><td>' + ds.type + '</td><td style="text-align:right;">' + ds.used_human + '</td><td style="text-align:right;">' + ds.avail_human + '</td><td>' + ds.compression + '</td>';
-                    html += '<td><button onclick="deleteDataset(\'' + ds.name + '\')" class="v2-btn v2-btn-danger v2-btn-sm">{{T .Lang "common.delete"}}</button></td></tr>';
-                });
-                html += '</tbody></table></div></div>';
-            }
-        } catch (err) { console.error('Error loading datasets for', pool, err); }
-    }
-    document.getElementById('datasets-list').innerHTML = html || '<div style="text-align:center;color:var(--text-muted);padding:2rem;">{{T .Lang "storage.no_datasets"}}</div>';
-}
-
-function showCreateDatasetModal() { document.getElementById('createDatasetModal').classList.remove('hidden'); }
-function closeCreateDatasetModal() { document.getElementById('createDatasetModal').classList.add('hidden'); }
-
-async function createDataset(e) {
-    e.preventDefault();
-    var name = document.getElementById('datasetName').value;
-    var compression = document.getElementById('datasetCompression').value;
-    var quota = document.getElementById('datasetQuota').value;
-    closeCreateDatasetModal();
-    requirePassword('{{T .Lang "storage.create_dataset"}}', '{{T .Lang "storage.create_dataset_warning"}}', async function() {
-        try {
-            var resp = await fetch('/api/admin/storage/dataset', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
-                body: JSON.stringify({name: name, compression: compression, quota: quota})
-            });
-            var data = await resp.json();
-            if (data.success) { alert('{{T .Lang "storage.dataset_created"}}'); loadDatasets(); }
-            else alert('{{T .Lang "common.error"}}: ' + data.error);
-        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
-    });
-}
-
-function deleteDataset(name) {
-    requirePassword('{{T .Lang "storage.delete_dataset"}}: ' + name, '{{T .Lang "storage.delete_dataset_warning"}}', async function() {
-        try {
-            var resp = await fetch('/api/admin/storage/dataset-delete?name=' + encodeURIComponent(name), {
-                method: 'DELETE',
-                headers: {'X-Verification-Token': verificationToken}
-            });
-            var data = await resp.json();
-            if (data.success) { alert('{{T .Lang "storage.dataset_deleted"}}'); loadDatasets(); }
-            else alert('{{T .Lang "common.error"}}: ' + data.error);
-        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
-    });
-}
-
-// Snapshot operations
-async function loadSnapshots() {
-    try {
-        var resp = await fetch('/api/admin/storage/snapshots');
-        var snapshots = await resp.json();
-        var html = '';
-        if (snapshots && snapshots.length > 0) {
-            html = '<div style="overflow-x:auto;"><table class="v2-table"><thead><tr>';
-            html += '<th>{{T .Lang "storage.snapshot"}}</th><th>{{T .Lang "storage.dataset"}}</th><th style="text-align:right;">{{T .Lang "storage.used"}}</th><th>{{T .Lang "storage.created"}}</th><th>{{T .Lang "users.actions"}}</th>';
-            html += '</tr></thead><tbody>';
-            snapshots.forEach(function(snap) {
-                html += '<tr><td>' + snap.snap_name + '</td><td>' + snap.dataset + '</td><td style="text-align:right;">' + snap.used_human + '</td><td>' + snap.creation_str + '</td>';
-                html += '<td><button onclick="rollbackSnapshot(\'' + snap.name + '\')" class="v2-btn v2-btn-secondary v2-btn-sm" style="margin-right:0.25rem;">{{T .Lang "storage.rollback"}}</button>';
-                html += '<button onclick="deleteSnapshot(\'' + snap.name + '\')" class="v2-btn v2-btn-danger v2-btn-sm">{{T .Lang "common.delete"}}</button></td></tr>';
-            });
-            html += '</tbody></table></div>';
-        } else {
-            html = '<div style="text-align:center;color:var(--text-muted);padding:2rem;">{{T .Lang "storage.no_snapshots"}}</div>';
-        }
-        document.getElementById('snapshots-list').innerHTML = html;
-        // Populate snapshot dataset dropdown
-        var pools = '{{range .Pools}}{{.Name}},{{end}}';
-        var select = document.getElementById('snapshotDataset');
-        select.innerHTML = '';
-        var poolArr = pools.split(',').filter(function(p) { return p; });
-        for (var i = 0; i < poolArr.length; i++) {
-            try {
-                var dsResp = await fetch('/api/admin/storage/datasets?parent=' + poolArr[i]);
-                var datasets = await dsResp.json();
-                datasets.forEach(function(ds) {
-                    var opt = document.createElement('option');
-                    opt.value = ds.name;
-                    opt.textContent = ds.name;
-                    select.appendChild(opt);
-                });
-            } catch (err) { console.error(err); }
-        }
-    } catch (err) {
-        document.getElementById('snapshots-list').innerHTML = '<div style="text-align:center;color:var(--error);padding:2rem;">{{T .Lang "common.error"}}</div>';
-    }
-}
-
-function showCreateSnapshotModal() { document.getElementById('createSnapshotModal').classList.remove('hidden'); }
-function closeCreateSnapshotModal() { document.getElementById('createSnapshotModal').classList.add('hidden'); }
-
-async function createSnapshot(e) {
-    e.preventDefault();
-    var dataset = document.getElementById('snapshotDataset').value;
-    var name = document.getElementById('snapshotName').value;
-    try {
-        var resp = await fetch('/api/admin/storage/snapshot', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({dataset: dataset, name: name})
-        });
-        var data = await resp.json();
-        if (data.success) { alert('{{T .Lang "storage.snapshot_created"}}'); closeCreateSnapshotModal(); loadSnapshots(); }
-        else alert('{{T .Lang "common.error"}}: ' + data.error);
-    } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
-}
-
-function deleteSnapshot(name) {
-    requirePassword('{{T .Lang "storage.delete_snapshot"}}: ' + name, '{{T .Lang "storage.delete_snapshot_warning"}}', async function() {
-        try {
-            var resp = await fetch('/api/admin/storage/snapshot-delete?name=' + encodeURIComponent(name), {
-                method: 'DELETE',
-                headers: {'X-Verification-Token': verificationToken}
-            });
-            var data = await resp.json();
-            if (data.success) { alert('{{T .Lang "storage.snapshot_deleted"}}'); loadSnapshots(); }
-            else alert('{{T .Lang "common.error"}}: ' + data.error);
-        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
-    });
-}
-
-function rollbackSnapshot(name) {
-    requirePassword('{{T .Lang "storage.rollback_snapshot"}}: ' + name, '{{T .Lang "storage.rollback_warning"}}', async function() {
-        try {
-            var resp = await fetch('/api/admin/storage/snapshot-rollback', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
-                body: JSON.stringify({snapshot: name, destroy_recent: true})
-            });
-            var data = await resp.json();
-            if (data.success) { alert('{{T .Lang "storage.rollback_success"}}'); location.reload(); }
-            else alert('{{T .Lang "common.error"}}: ' + data.error);
-        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
-    });
-}
-
-// Disk format operations
-function showFormatDiskModal(device) {
-    document.getElementById('formatDiskDevice').value = device;
-    document.getElementById('formatDiskDeviceDisplay').textContent = device;
-    var diskName = device.replace('/dev/', '');
-    document.getElementById('formatMountPath').value = '/mnt/' + diskName;
-    document.getElementById('formatMount').checked = true;
-    document.getElementById('formatSharedAccess').checked = true;
-    document.getElementById('formatPersistent').checked = true;
-    document.getElementById('mountPathContainer').style.display = 'block';
-    document.getElementById('formatSharedAccessContainer').style.display = 'block';
-    document.getElementById('formatPersistentContainer').style.display = 'block';
-    document.getElementById('formatDiskModal').classList.remove('hidden');
-}
-function closeFormatDiskModal() { document.getElementById('formatDiskModal').classList.add('hidden'); }
-function toggleMountPath() {
-    var checked = document.getElementById('formatMount').checked;
-    document.getElementById('mountPathContainer').style.display = checked ? 'block' : 'none';
-    document.getElementById('formatSharedAccessContainer').style.display = checked ? 'block' : 'none';
-    document.getElementById('formatPersistentContainer').style.display = checked ? 'block' : 'none';
-}
-
-async function formatDisk(e) {
-    e.preventDefault();
-    var device = document.getElementById('formatDiskDevice').value;
-    var filesystem = document.getElementById('formatFilesystem').value;
-    var label = document.getElementById('formatLabel').value;
-    var mount = document.getElementById('formatMount').checked;
-    var mountPath = mount ? document.getElementById('formatMountPath').value : '';
-    var sharedAccess = mount ? document.getElementById('formatSharedAccess').checked : false;
-    var persistent = mount ? document.getElementById('formatPersistent').checked : false;
-    if (mount && mountPath) {
-        if (!mountPath.startsWith('/mnt/') && !mountPath.startsWith('/media/')) {
-            alert('{{T .Lang "storage.mount_path_error"}}');
-            return;
-        }
-    }
-    closeFormatDiskModal();
-    requirePassword('{{T .Lang "storage.format_disk"}}: ' + device, '{{T .Lang "storage.format_disk_warning"}}', async function() {
-        try {
-            var resp = await fetch('/api/admin/storage/disk/format', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Verification-Token': verificationToken},
-                body: JSON.stringify({device: device, filesystem: filesystem, label: label, force: true, mount: mount, mount_path: mountPath, shared_access: sharedAccess, persistent: persistent})
-            });
-            var data = await resp.json();
-            if (data.success) { alert('{{T .Lang "storage.disk_formatted"}}'); location.reload(); }
-            else alert('{{T .Lang "common.error"}}: ' + data.error);
-        } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
-    });
-}
-
-// Mount disk operations
-function showMountDiskModal(device, diskName) {
-    document.getElementById('mountDiskDevice').value = device;
-    document.getElementById('mountDiskDeviceDisplay').textContent = device;
-    document.getElementById('mountDiskPath').value = '/mnt/' + diskName;
-    document.getElementById('mountSharedAccess').checked = true;
-    document.getElementById('mountPersistent').checked = false;
-    document.getElementById('mountDiskModal').classList.remove('hidden');
-}
-function closeMountDiskModal() { document.getElementById('mountDiskModal').classList.add('hidden'); }
-
-async function mountDisk(e) {
-    e.preventDefault();
-    var device = document.getElementById('mountDiskDevice').value;
-    var mountPath = document.getElementById('mountDiskPath').value;
-    var sharedAccess = document.getElementById('mountSharedAccess').checked;
-    var persistent = document.getElementById('mountPersistent').checked;
-    if (!mountPath.startsWith('/mnt/') && !mountPath.startsWith('/media/')) {
-        alert('{{T .Lang "storage.mount_path_error"}}');
-        return;
-    }
-    try {
-        var resp = await fetch('/api/admin/storage/disk/mount', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({device: device, mount_path: mountPath, shared_access: sharedAccess, persistent: persistent})
-        });
-        var data = await resp.json();
-        if (data.success) { alert('{{T .Lang "storage.disk_mounted"}}'); closeMountDiskModal(); location.reload(); }
-        else alert('{{T .Lang "common.error"}}: ' + data.error);
-    } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
-}
-
-// Unmount / Eject
-async function unmountDisk(mountPath) {
-    if (!confirm('{{T .Lang "storage.unmount_confirm"}}: ' + mountPath + '?')) return;
-    try {
-        var resp = await fetch('/api/admin/storage/disk/unmount', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({mount_path: mountPath, eject: false})
-        });
-        var data = await resp.json();
-        if (data.success) { alert('{{T .Lang "storage.disk_unmounted"}}'); location.reload(); }
-        else alert('{{T .Lang "common.error"}}: ' + data.error);
-    } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
-}
-
-async function ejectDisk(mountPath) {
-    if (!confirm('{{T .Lang "storage.eject_confirm"}}: ' + mountPath + '?')) return;
-    try {
-        var resp = await fetch('/api/admin/storage/disk/unmount', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({mount_path: mountPath, eject: true})
-        });
-        var data = await resp.json();
-        if (data.success) { alert('{{T .Lang "storage.disk_ejected"}}'); location.reload(); }
-        else alert('{{T .Lang "common.error"}}: ' + data.error);
-    } catch (err) { alert('{{T .Lang "common.error"}}: ' + err); }
-}
-
-// Close modals on escape
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        closeSMARTModal();
-        closePasswordModal();
-        closeCreatePoolModal();
-        closeCreateDatasetModal();
-        closeCreateSnapshotModal();
-        closeFormatDiskModal();
-        closeMountDiskModal();
-    }
-});
 </script>
+<script src="/static/js/storage.js"></script>
 {{end}}

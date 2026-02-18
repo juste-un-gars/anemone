@@ -47,13 +47,13 @@
             <div style="display:flex;flex-direction:column;gap:0.5rem;">
                 <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
                     <input type="radio" name="backup_type" value="config"
-                           {{if eq .Backup.BackupType "config"}}checked{{end}} onchange="document.getElementById('shareSelection').style.display='none'">
+                           {{if eq .Backup.BackupType "config"}}checked{{end}}>
                     {{T .Lang "usb_backup.type_config"}}
                     <span style="font-size:0.75rem;color:var(--text-muted);">({{T .Lang "usb_backup.type_config_desc"}})</span>
                 </label>
                 <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
                     <input type="radio" name="backup_type" value="full"
-                           {{if ne .Backup.BackupType "config"}}checked{{end}} onchange="document.getElementById('shareSelection').style.display=''">
+                           {{if ne .Backup.BackupType "config"}}checked{{end}}>
                     {{T .Lang "usb_backup.type_full"}}
                     <span style="font-size:0.75rem;color:var(--text-muted);">({{T .Lang "usb_backup.type_full_desc"}})</span>
                 </label>
@@ -104,8 +104,7 @@
             <!-- Sync Enabled -->
             <div style="margin-bottom:1rem;">
                 <label style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:var(--text-primary);cursor:pointer;">
-                    <input type="checkbox" name="sync_enabled" id="sync_enabled" {{if .Backup.SyncEnabled}}checked{{end}}
-                           onchange="document.getElementById('scheduleOpts').style.display=this.checked?'':'none'">
+                    <input type="checkbox" name="sync_enabled" id="sync_enabled" {{if .Backup.SyncEnabled}}checked{{end}}>
                     {{T .Lang "usb_backup.sync_enabled"}}
                 </label>
                 <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;margin-left:1.5rem;">{{T .Lang "usb_backup.sync_enabled_hint"}}</div>
@@ -118,8 +117,7 @@
                         {{T .Lang "usb_backup.sync_frequency"}}
                     </label>
                     <select id="sync_frequency" name="sync_frequency"
-                            style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;"
-                            onchange="updateUSBFields()">
+                            style="width:100%;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-size:0.875rem;">
                         <option value="interval" {{if eq .Backup.SyncFrequency "interval"}}selected{{end}}>{{T .Lang "usb_backup.freq_interval"}}</option>
                         <option value="daily" {{if eq .Backup.SyncFrequency "daily"}}selected{{end}}>{{T .Lang "usb_backup.freq_daily"}}</option>
                         <option value="weekly" {{if eq .Backup.SyncFrequency "weekly"}}selected{{end}}>{{T .Lang "usb_backup.freq_weekly"}}</option>
@@ -227,13 +225,8 @@
 </div>
 {{end}}
 
-<script>
-function updateUSBFields() {
-    var f = document.getElementById('sync_frequency').value;
-    document.getElementById('intervalField').style.display = f === 'interval' ? '' : 'none';
-    document.getElementById('timeField').style.display = f !== 'interval' ? '' : 'none';
-    document.getElementById('weekdayField').style.display = f === 'weekly' ? '' : 'none';
-    document.getElementById('monthdayField').style.display = f === 'monthly' ? '' : 'none';
-}
-</script>
+{{end}}
+
+{{define "pageScripts"}}
+<script src="/static/js/usb_backup_edit.js"></script>
 {{end}}

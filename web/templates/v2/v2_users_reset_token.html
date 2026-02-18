@@ -28,7 +28,7 @@
     <div style="display:flex;gap:0.5rem;align-items:center;">
         <input type="text" readonly value="{{.ResetURL}}" id="reset-link"
                style="flex:1;padding:0.5rem 0.75rem;border:2px solid var(--info);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-family:monospace;font-size:0.8125rem;">
-        <button type="button" onclick="copyResetLink()" id="copy-btn" class="v2-btn v2-btn-primary" style="white-space:nowrap;">
+        <button type="button" data-action="copyInput" data-target="reset-link" id="copy-btn" class="v2-btn v2-btn-primary" style="white-space:nowrap;">
             {{T .Lang "reset.token.copy"}}
         </button>
     </div>
@@ -61,16 +61,4 @@
 <div style="display:flex;justify-content:flex-end;">
     <a href="/admin/users" class="v2-btn v2-btn-primary" style="text-decoration:none;">{{T .Lang "reset.token.done"}}</a>
 </div>
-
-<script>
-function copyResetLink() {
-    var input = document.getElementById('reset-link');
-    input.select();
-    document.execCommand('copy');
-    var btn = document.getElementById('copy-btn');
-    var orig = btn.textContent;
-    btn.textContent = '\u2713 OK';
-    setTimeout(function() { btn.textContent = orig; }, 2000);
-}
-</script>
 {{end}}

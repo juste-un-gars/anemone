@@ -42,7 +42,7 @@
     </svg>
     <div style="font-size:0.9375rem;font-weight:600;margin-bottom:0.25rem;">{{T .Lang "wireguard.not_configured"}}</div>
     <div style="font-size:0.8125rem;color:var(--text-muted);margin-bottom:1rem;">{{T .Lang "wireguard.not_configured.help"}}</div>
-    <button type="button" onclick="document.getElementById('importModal').classList.remove('hidden')" class="v2-btn v2-btn-primary">
+    <button type="button" data-action="openModal" data-target="importModal" class="v2-btn v2-btn-primary">
         {{T .Lang "wireguard.import"}}
     </button>
 </div>
@@ -154,7 +154,7 @@
         <form method="POST" action="/admin/wireguard/options" style="display:flex;align-items:center;gap:0.5rem;">
             <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
                 <input type="checkbox" name="auto_start" value="1" {{if .Config.AutoStart}}checked{{end}}
-                       onchange="this.form.submit()" style="accent-color:var(--accent);">
+                       style="accent-color:var(--accent);">
                 <span style="font-size:0.8125rem;color:var(--text-primary);">{{T .Lang "wireguard.auto_start"}}</span>
             </label>
             <span style="font-size:0.75rem;color:var(--text-muted);">{{T .Lang "wireguard.auto_start.help"}}</span>
@@ -163,13 +163,13 @@
 
     <!-- Actions -->
     <div style="padding:1rem 1.25rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
-        <button type="button" onclick="document.getElementById('importModal').classList.remove('hidden')" class="v2-btn v2-btn-secondary v2-btn-sm">
+        <button type="button" data-action="openModal" data-target="importModal" class="v2-btn v2-btn-secondary v2-btn-sm">
             {{T .Lang "wireguard.import"}}
         </button>
-        <button type="button" onclick="document.getElementById('editModal').classList.remove('hidden')" class="v2-btn v2-btn-secondary v2-btn-sm">
+        <button type="button" data-action="openModal" data-target="editModal" class="v2-btn v2-btn-secondary v2-btn-sm">
             {{T .Lang "wireguard.edit"}}
         </button>
-        <button type="button" onclick="if(confirm('{{T .Lang `wireguard.delete.confirm`}}')) document.getElementById('deleteForm').submit()" class="v2-btn v2-btn-danger v2-btn-sm">
+        <button type="button" data-action="deleteWireguard" class="v2-btn v2-btn-danger v2-btn-sm">
             {{T .Lang "wireguard.delete"}}
         </button>
         <form id="deleteForm" method="POST" action="/admin/wireguard/delete" style="display:none;"></form>
@@ -189,7 +189,7 @@
                       style="width:100%;padding:0.75rem;border:1px solid var(--border);border-radius:0.5rem;background:var(--bg-page);color:var(--text-primary);font-family:monospace;font-size:0.8125rem;resize:vertical;"
                       placeholder="{{T .Lang "wireguard.import.placeholder"}}"></textarea>
             <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;">
-                <button type="button" onclick="document.getElementById('importModal').classList.add('hidden')" class="v2-btn v2-btn-secondary">
+                <button type="button" data-action="closeModal" data-target="importModal" class="v2-btn v2-btn-secondary">
                     {{T .Lang "wireguard.cancel"}}
                 </button>
                 <button type="submit" class="v2-btn v2-btn-primary">
@@ -244,7 +244,7 @@
                 </div>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;">
-                <button type="button" onclick="document.getElementById('editModal').classList.add('hidden')" class="v2-btn v2-btn-secondary">
+                <button type="button" data-action="closeModal" data-target="editModal" class="v2-btn v2-btn-secondary">
                     {{T .Lang "wireguard.cancel"}}
                 </button>
                 <button type="submit" class="v2-btn v2-btn-primary">
@@ -255,4 +255,11 @@
     </div>
 </div>
 {{end}}
+{{end}}
+
+{{define "pageScripts"}}
+<script type="application/json" id="page-data">
+{"translations": {"deleteConfirm": "{{T .Lang "wireguard.delete.confirm"}}"}}
+</script>
+<script src="/static/js/wireguard.js"></script>
 {{end}}

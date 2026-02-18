@@ -35,9 +35,9 @@
                         <td><code>{{.IP}}</code></td>
                         <td>{{.Remaining}}</td>
                         <td>
-                            <form method="POST" action="/admin/security/unlock-ip" style="display:inline;" onsubmit="return confirm('{{T $.Lang "security.unlock_confirm_ip"}}')">
+                            <form method="POST" action="/admin/security/unlock-ip" style="display:inline;">
                                 <input type="hidden" name="ip" value="{{.IP}}">
-                                <button type="submit" class="v2-btn v2-btn-sm v2-btn-warning">{{T $.Lang "security.unlock"}}</button>
+                                <button type="submit" class="v2-btn v2-btn-sm v2-btn-warning" data-confirm="{{T $.Lang "security.unlock_confirm_ip"}}">{{T $.Lang "security.unlock"}}</button>
                             </form>
                         </td>
                     </tr>
@@ -73,9 +73,9 @@
                         <td><strong>{{.Username}}</strong></td>
                         <td>{{.Remaining}}</td>
                         <td>
-                            <form method="POST" action="/admin/security/unlock-user" style="display:inline;" onsubmit="return confirm('{{T $.Lang "security.unlock_confirm_user"}}')">
+                            <form method="POST" action="/admin/security/unlock-user" style="display:inline;">
                                 <input type="hidden" name="username" value="{{.Username}}">
-                                <button type="submit" class="v2-btn v2-btn-sm v2-btn-warning">{{T $.Lang "security.unlock"}}</button>
+                                <button type="submit" class="v2-btn v2-btn-sm v2-btn-warning" data-confirm="{{T $.Lang "security.unlock_confirm_user"}}">{{T $.Lang "security.unlock"}}</button>
                             </form>
                         </td>
                     </tr>

@@ -1,6 +1,6 @@
 {{/* Anemone v2 - System Update page */}}
 {{define "headerActions"}}
-<button onclick="checkForUpdates()" id="checkButton" class="v2-btn v2-btn-secondary v2-btn-sm">
+<button data-action="checkForUpdates" id="checkButton" class="v2-btn v2-btn-secondary v2-btn-sm">
     <svg style="display:inline;width:14px;height:14px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
     {{T .Lang "update.check_now"}}
 </button>
@@ -50,7 +50,7 @@
 
         <div style="display:flex;gap:0.5rem;align-items:center;">
             {{if .UpdateInfo.Available}}
-            <button onclick="confirmUpdate()" id="installButton" class="v2-btn v2-btn-primary">
+            <button data-action="confirmUpdate" id="installButton" class="v2-btn v2-btn-primary">
                 {{T .Lang "update.install.button"}}
             </button>
             {{end}}
@@ -90,67 +90,10 @@
     <div style="font-size:0.8125rem;color:var(--text-secondary);">{{T .Lang "update.info.auto_check"}}</div>
 </div>
 
-<script>
-async function checkForUpdates() {
-    var button = document.getElementById('checkButton');
-    var messageArea = document.getElementById('messageArea');
-    button.disabled = true;
-    button.textContent = '{{T .Lang "update.checking"}}...';
-
-    try {
-        var response = await fetch('/admin/system/update/check', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-        var data = await response.json();
-
-        if (data.success) {
-            messageArea.innerHTML = '<div class="v2-card" style="border-left:3px solid var(--success);margin-bottom:1rem;"><div style="font-size:0.875rem;color:var(--success);">' + data.updateMessage + '</div></div>';
-            if (data.updateInfo) {
-                document.getElementById('latestVersion').textContent = data.updateInfo.latest_version;
-                document.getElementById('latestVersion').style.color = data.updateInfo.available ? 'var(--success)' : 'var(--text-secondary)';
-                var now = new Date();
-                document.getElementById('lastCheckText').textContent = '{{T .Lang "update.last_check"}}: ' + now.toLocaleString();
-                if (data.updateInfo.available) { setTimeout(function() { location.reload(); }, 2000); }
-            }
-        } else {
-            messageArea.innerHTML = '<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;"><div style="font-size:0.875rem;color:var(--error);">' + data.error + '</div></div>';
-        }
-    } catch (error) {
-        messageArea.innerHTML = '<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;"><div style="font-size:0.875rem;color:var(--error);">Error: ' + error.message + '</div></div>';
-    } finally {
-        button.disabled = false;
-        button.textContent = '{{T .Lang "update.check_now"}}';
-    }
-}
-
-function confirmUpdate() {
-    if (confirm('{{T .Lang "update.install.confirm_message"}}\n\n{{T .Lang "update.install.confirm_warning"}}')) {
-        installUpdate();
-    }
-}
-
-async function installUpdate() {
-    var button = document.getElementById('installButton');
-    var messageArea = document.getElementById('messageArea');
-    button.disabled = true;
-    button.textContent = '{{T .Lang "update.install.installing"}}';
-
-    try {
-        var response = await fetch('/admin/system/update/install', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-        var data = await response.json();
-
-        if (data.success) {
-            messageArea.innerHTML = '<div class="v2-card" style="border-left:3px solid var(--success);margin-bottom:1rem;"><div style="font-size:0.875rem;color:var(--success);">' + data.message + '<br><small style="color:var(--text-muted);">{{T .Lang "update.install.restarting"}}</small></div></div>';
-            messageArea.scrollIntoView({ behavior: 'smooth' });
-            setTimeout(function() { window.location.href = '/login'; }, 30000);
-        } else {
-            messageArea.innerHTML = '<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;"><div style="font-size:0.875rem;color:var(--error);">' + data.error + '</div></div>';
-            button.disabled = false;
-            button.textContent = '{{T .Lang "update.install.button"}}';
-        }
-    } catch (error) {
-        messageArea.innerHTML = '<div class="v2-card" style="border-left:3px solid var(--error);margin-bottom:1rem;"><div style="font-size:0.875rem;color:var(--error);">Error: ' + error.message + '</div></div>';
-        button.disabled = false;
-        button.textContent = '{{T .Lang "update.install.button"}}';
-    }
-}
+{{end}}
+{{define "pageScripts"}}
+<script type="application/json" id="page-data">
+{"translations":{"checking":"{{T .Lang "update.checking"}}","checkNow":"{{T .Lang "update.check_now"}}","lastCheck":"{{T .Lang "update.last_check"}}","confirmMessage":"{{T .Lang "update.install.confirm_message"}}","confirmWarning":"{{T .Lang "update.install.confirm_warning"}}","installing":"{{T .Lang "update.install.installing"}}","installButton":"{{T .Lang "update.install.button"}}","restarting":"{{T .Lang "update.install.restarting"}}"}}
 </script>
+<script src="/static/js/system_update.js"></script>
 {{end}}

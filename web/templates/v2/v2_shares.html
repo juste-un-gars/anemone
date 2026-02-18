@@ -61,9 +61,9 @@
                 <td style="text-align:right;">
                     <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
                         {{if .SyncEnabled}}
-                        <button onclick="syncShare({{.ID}}, '{{.Name}}')" class="v2-btn v2-btn-primary v2-btn-sm">Sync</button>
+                        <button data-action="syncShare" data-id="{{.ID}}" data-name="{{.Name}}" class="v2-btn v2-btn-primary v2-btn-sm">Sync</button>
                         {{end}}
-                        <button onclick="deleteShare({{.ID}}, '{{.Name}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "shares.action.delete"}}</button>
+                        <button data-action="deleteShare" data-id="{{.ID}}" data-name="{{.Name}}" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "shares.action.delete"}}</button>
                     </div>
                 </td>
             </tr>
@@ -81,32 +81,10 @@
 </div>
 {{end}}
 
-<script>
-function deleteShare(shareID, shareName) {
-    if (!confirm('{{T .Lang "shares.delete.confirm"}}\n\n' + shareName)) return;
-    fetch('/shares/' + shareID + '/delete', { method: 'POST' })
-    .then(function(r) { if (r.ok) window.location.reload(); else alert('{{T .Lang "common.error"}}'); });
-}
-
-function syncShare(shareID, shareName) {
-    if (!confirm('Sync "' + shareName + '" ?')) return;
-    var btn = event.target.closest('button');
-    var orig = btn.innerHTML;
-    btn.disabled = true;
-    btn.textContent = 'Sync...';
-
-    fetch('/sync/share/' + shareID, { method: 'POST' })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        btn.disabled = false;
-        btn.innerHTML = orig;
-        alert(data.success ? data.message : data.message);
-    })
-    .catch(function(err) {
-        btn.disabled = false;
-        btn.innerHTML = orig;
-        alert('Error: ' + err);
-    });
-}
+{{end}}
+{{define "pageScripts"}}
+<script type="application/json" id="page-data">
+{"translations":{"deleteConfirm":"{{T .Lang "shares.delete.confirm"}}","error":"{{T .Lang "common.error"}}"}}
 </script>
+<script src="/static/js/shares.js"></script>
 {{end}}

@@ -38,22 +38,9 @@
     <div id="editor-container">
         <div class="editor-loading">{{T .Lang "editor.loading"}}</div>
     </div>
-    <script src="{{.OOURL}}/web-apps/apps/api/documents/api.js" onerror="showCertError()"></script>
-    <script>
-        function showCertError() {
-            document.getElementById('editor-container').innerHTML =
-                '<div class="editor-loading" style="flex-direction:column;gap:1rem;text-align:center;">' +
-                '<p>Cannot load OnlyOffice editor.</p>' +
-                '<p>You may need to accept the self-signed certificate:</p>' +
-                '<a href="{{.OOURL}}/healthcheck" target="_blank" style="color:#6366f1;text-decoration:underline;">Open OnlyOffice to accept certificate</a>' +
-                '<p style="font-size:0.8rem;color:#666;">After accepting, reload this page.</p>' +
-                '</div>';
-        }
-        if (typeof DocsAPI !== 'undefined') {
-            var docEditor = new DocsAPI.DocEditor("editor-container", {{.ConfigJSON}});
-        } else {
-            showCertError();
-        }
-    </script>
+    <script src="{{.OOURL}}/web-apps/apps/api/documents/api.js"></script>
+    <script type="application/json" id="page-data">{"ooURL": "{{.OOURL}}"}</script>
+    <script type="application/json" id="editor-config">{{.ConfigJSON}}</script>
+    <script src="/static/js/editor.js"></script>
 </body>
 </html>

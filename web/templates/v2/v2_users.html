@@ -51,9 +51,9 @@
                         <a href="/admin/users/{{.ID}}/quota" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "users.quota.edit"}}</a>
                         {{end}}
                         {{if index $.LockedUsers (lower .Username)}}
-                        <button onclick="unlockUser({{.ID}}, '{{.Username}}')" class="v2-btn v2-btn-warning v2-btn-sm">{{T $.Lang "users.action.unlock"}}</button>
+                        <button data-action="unlockUser" data-id="{{.ID}}" data-username="{{.Username}}" class="v2-btn v2-btn-warning v2-btn-sm">{{T $.Lang "users.action.unlock"}}</button>
                         {{end}}
-                        <button onclick="deleteUser({{.ID}}, '{{.Username}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "users.action.delete"}}</button>
+                        <button data-action="deleteUser" data-id="{{.ID}}" data-username="{{.Username}}" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "users.action.delete"}}</button>
                     </div>
                 </td>
             </tr>
@@ -72,63 +72,10 @@
 </div>
 {{end}}
 
-<script>
-const translations = {
-    deleteWarningTitle: "{{T .Lang "users.delete.warning_title"}}",
-    deleteWarningMessage: "{{T .Lang "users.delete.warning_message"}}",
-    deleteWarningPrompt: "{{T .Lang "users.delete.warning_prompt"}}",
-    deleteConfirm: "{{T .Lang "users.delete.final_confirm"}}",
-    deleteSuccess: "{{T .Lang "users.delete.success"}}",
-    deleteError: "{{T .Lang "users.delete.error"}}",
-    deleteErrorPrefix: "{{T .Lang "users.delete.error_prefix"}}",
-    deleteCancelled: "{{T .Lang "users.delete.cancelled"}}",
-    unlockConfirm: "{{T .Lang "users.unlock.confirm"}}",
-    unlockSuccess: "{{T .Lang "users.unlock.success"}}",
-    unlockError: "{{T .Lang "users.unlock.error"}}"
-};
-
-function unlockUser(userId, username) {
-    if (confirm(translations.unlockConfirm.replace('%s', username))) {
-        fetch('/admin/users/' + userId + '/unlock', {
-            method: 'POST',
-        }).then(function(response) {
-            if (response.ok) {
-                alert(translations.unlockSuccess);
-                window.location.reload();
-            } else {
-                alert(translations.unlockError);
-            }
-        }).catch(function(error) {
-            alert(translations.unlockError + error);
-        });
-    }
-}
-
-function deleteUser(userId, username) {
-    const warningMessage = translations.deleteWarningTitle + '\n\n' +
-        translations.deleteWarningMessage + '\n' + username + '\n\n' +
-        translations.deleteWarningPrompt;
-
-    const confirmation = prompt(warningMessage);
-
-    if (confirmation === username) {
-        if (confirm(translations.deleteConfirm)) {
-            fetch('/admin/users/' + userId + '/delete', {
-                method: 'POST',
-            }).then(function(response) {
-                if (response.ok) {
-                    alert(translations.deleteSuccess);
-                    window.location.reload();
-                } else {
-                    response.text().then(function(text) { alert(translations.deleteErrorPrefix + text); });
-                }
-            }).catch(function(error) {
-                alert(translations.deleteError + error);
-            });
-        }
-    } else if (confirmation !== null) {
-        alert(translations.deleteCancelled);
-    }
-}
+{{define "pageScripts"}}
+<script type="application/json" id="page-data">
+{"translations": {"deleteWarningTitle": "{{T .Lang "users.delete.warning_title"}}", "deleteWarningMessage": "{{T .Lang "users.delete.warning_message"}}", "deleteWarningPrompt": "{{T .Lang "users.delete.warning_prompt"}}", "deleteConfirm": "{{T .Lang "users.delete.final_confirm"}}", "deleteSuccess": "{{T .Lang "users.delete.success"}}", "deleteError": "{{T .Lang "users.delete.error"}}", "deleteErrorPrefix": "{{T .Lang "users.delete.error_prefix"}}", "deleteCancelled": "{{T .Lang "users.delete.cancelled"}}", "unlockConfirm": "{{T .Lang "users.unlock.confirm"}}", "unlockSuccess": "{{T .Lang "users.unlock.success"}}", "unlockError": "{{T .Lang "users.unlock.error"}}"}}
 </script>
+<script src="/static/js/users.js"></script>
+{{end}}
 {{end}}

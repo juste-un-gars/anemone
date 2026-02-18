@@ -185,13 +185,4 @@
     </form>
 </div>
 
-<script>
-document.getElementById('sync_frequency').addEventListener('change', function() {
-    var f = this.value;
-    document.getElementById('interval_section').style.display = f === 'interval' ? '' : 'none';
-    document.getElementById('sync_time_section').style.display = f === 'interval' ? 'none' : '';
-    document.getElementById('day_of_week_section').style.display = f === 'weekly' ? '' : 'none';
-    document.getElementById('day_of_month_section').style.display = f === 'monthly' ? '' : 'none';
-});
-</script>
 {{end}}

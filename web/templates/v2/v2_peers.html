@@ -65,8 +65,8 @@
                 <td style="text-align:right;">
                     <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
                         <a href="/admin/peers/{{.ID}}/edit" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "v2.backups.edit"}}</a>
-                        <button onclick="testPeer({{.ID}}, '{{.Name}}')" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "peers.action.test"}}</button>
-                        <button onclick="deletePeer({{.ID}}, '{{.Name}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "peers.action.delete"}}</button>
+                        <button data-action="testPeer" data-id="{{.ID}}" data-name="{{.Name}}" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "peers.action.test"}}</button>
+                        <button data-action="deletePeer" data-id="{{.ID}}" data-name="{{.Name}}" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "peers.action.delete"}}</button>
                     </div>
                 </td>
             </tr>
@@ -93,7 +93,7 @@
             <div style="font-size:0.8125rem;color:var(--text-secondary);">{{T .Lang "admin.sync.manual.description"}}</div>
         </div>
         <form method="POST" action="/admin/sync/force">
-            <button type="submit" onclick="return confirm('{{T .Lang "admin.sync.manual.confirm"}}')" class="v2-btn v2-btn-primary v2-btn-sm">
+            <button type="submit" data-confirm="{{T .Lang "admin.sync.manual.confirm"}}" class="v2-btn v2-btn-primary v2-btn-sm">
                 {{T .Lang "admin.sync.manual.button"}}
             </button>
         </form>
@@ -151,22 +151,10 @@
 </div>
 {{end}}
 
-<script>
-function testPeer(peerId, peerName) {
-    if (!confirm('{{T .Lang "peers.action.test"}} "' + peerName + '" ?')) return;
-    fetch('/admin/peers/' + peerId + '/test', { method: 'POST' })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-        alert(data.status === 'online' ? '{{T .Lang "peers.status.online"}}' : '{{T .Lang "peers.status.offline"}}');
-        window.location.reload();
-    })
-    .catch(function() { alert('Error'); });
-}
-
-function deletePeer(peerId, peerName) {
-    if (!confirm('{{T .Lang "peers.delete.confirm"}}\n\n' + peerName)) return;
-    fetch('/admin/peers/' + peerId + '/delete', { method: 'POST' })
-    .then(function(r) { if (r.ok) window.location.reload(); else alert('Error'); });
-}
+{{define "pageScripts"}}
+<script type="application/json" id="page-data">
+{"translations": {"testAction": "{{T .Lang "peers.action.test"}}", "statusOnline": "{{T .Lang "peers.status.online"}}", "statusOffline": "{{T .Lang "peers.status.offline"}}", "deleteConfirm": "{{T .Lang "peers.delete.confirm"}}"}}
 </script>
+<script src="/static/js/peers.js"></script>
+{{end}}
 {{end}}

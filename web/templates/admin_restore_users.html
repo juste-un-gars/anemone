@@ -61,7 +61,7 @@
             <label for="peer-select" class="block text-sm font-medium text-gray-700 mb-2">
                 {{T .Lang "admin.restore_users.select_peer"}}
             </label>
-            <select id="peer-select" onchange="filterByPeer()"
+            <select id="peer-select"
                     class="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md">
             </select>
         </div>
@@ -124,7 +124,7 @@
                                 {{FormatTime .LastModified $.Lang}}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <button onclick="restoreUser({{.UserID}}, {{.PeerID}}, '{{.ShareName}}', '{{.SourceServer}}', '{{.Username}}')"
+                                <button data-action="restoreUser" data-user-id="{{.UserID}}" data-peer-id="{{.PeerID}}" data-share-name="{{.ShareName}}" data-source-server="{{.SourceServer}}" data-username="{{.Username}}"
                                         class="text-indigo-600 hover:text-indigo-900">
                                     {{T $.Lang "admin.restore_users.action.restore"}}
                                 </button>
@@ -138,7 +138,7 @@
 
         <!-- Restore All Button -->
         <div class="mt-6">
-            <button onclick="restoreAll()" id="restore-all-btn"
+            <button data-action="restoreAll" id="restore-all-btn"
                     class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white anemone-gradient hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
                 {{T .Lang "admin.restore_users.restore_all_button"}}
             </button>
@@ -170,160 +170,11 @@
     </div>
 </div>
 
-<script>
-// Translations
-const t = {
-    confirmRestore: '{{T .Lang "admin.restore_users.confirm"}}',
-    restoring: '{{T .Lang "admin.restore_users.restoring"}}',
-    error: '{{T .Lang "admin.restore_users.error"}}',
-    errorConnection: '{{T .Lang "admin.restore_users.error_connection"}}',
-    confirmAll: '{{T .Lang "admin.restore_users.confirm_all"}}',
-    restoringAll: '{{T .Lang "admin.restore_users.restoring_all"}}',
-    successAll: '{{T .Lang "admin.restore_users.success_all"}}',
-    restoreAllFrom: '{{T .Lang "admin.restore_users.restore_all_from"}}'
-};
-
-// Current selected peer
-let selectedPeerID = null;
-let selectedPeerName = '';
-
-// Initialize peer selector
-document.addEventListener('DOMContentLoaded', function() {
-    const peerSelect = document.getElementById('peer-select');
-    const rows = document.querySelectorAll('#backups-table tr[data-peer-id]');
-
-    // Get unique peers
-    const peers = new Map();
-    rows.forEach(row => {
-        const peerID = row.getAttribute('data-peer-id');
-        const peerName = row.getAttribute('data-peer-name');
-        if (!peers.has(peerID)) {
-            peers.set(peerID, peerName);
-        }
-    });
-
-    // Populate dropdown
-    peers.forEach((name, id) => {
-        const option = document.createElement('option');
-        option.value = id;
-        option.textContent = name;
-        peerSelect.appendChild(option);
-    });
-
-    // Select first peer by default
-    if (peers.size > 0) {
-        const firstPeerID = peers.keys().next().value;
-        peerSelect.value = firstPeerID;
-        filterByPeer();
-    }
-});
-
-function filterByPeer() {
-    const peerSelect = document.getElementById('peer-select');
-    selectedPeerID = peerSelect.value;
-    selectedPeerName = peerSelect.options[peerSelect.selectedIndex].text;
-
-    const rows = document.querySelectorAll('#backups-table tr[data-peer-id]');
-    rows.forEach(row => {
-        if (row.getAttribute('data-peer-id') === selectedPeerID) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
-    });
-
-    // Update button text
-    const restoreBtn = document.getElementById('restore-all-btn');
-    restoreBtn.textContent = t.restoreAllFrom + ' ' + selectedPeerName;
-}
-
-function restoreUser(userID, peerID, shareName, sourceServer, username) {
-    if (!confirm(t.confirmRestore + ' ' + username + ' ?')) {
-        return;
-    }
-
-    const statusDiv = document.getElementById('status-message');
-    statusDiv.className = 'mb-6 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded relative';
-    statusDiv.textContent = t.restoring + ' ' + username + '...';
-    statusDiv.classList.remove('hidden');
-
-    const formData = new FormData();
-    formData.append('user_id', userID);
-    formData.append('peer_id', peerID);
-    formData.append('share_name', shareName);
-    formData.append('source_server', sourceServer);
-
-    fetch('/admin/restore-users/restore', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            statusDiv.className = 'mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded relative';
-            statusDiv.textContent = '✓ ' + data.message;
-        } else {
-            statusDiv.className = 'mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative';
-            statusDiv.textContent = '✗ ' + t.error + ': ' + data.error;
-        }
-    })
-    .catch(error => {
-        statusDiv.className = 'mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative';
-        statusDiv.textContent = '✗ ' + t.errorConnection + ': ' + error;
-    });
-}
-
-function restoreAll() {
-    if (!confirm(t.confirmAll + ' ' + selectedPeerName + ' ?')) {
-        return;
-    }
-
-    // Array of all backups
-    const allBackups = [
-        {{range $index, $backup := .Backups}}
-        {{if $index}},{{end}}{userID: {{$backup.UserID}}, peerID: {{$backup.PeerID}}, shareName: '{{$backup.ShareName}}', sourceServer: '{{$backup.SourceServer}}'}
-        {{end}}
-    ];
-
-    // Filter backups for selected peer only
-    const backupsToRestore = allBackups.filter(b => b.peerID == selectedPeerID);
-
-    let completed = 0;
-    const total = backupsToRestore.length;
-
-    const statusDiv = document.getElementById('status-message');
-    statusDiv.className = 'mb-6 bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded relative';
-    statusDiv.textContent = t.restoringAll + ' 0/' + total;
-    statusDiv.classList.remove('hidden');
-
-    // Restore each backup
-    backupsToRestore.forEach(backup => {
-        const formData = new FormData();
-        formData.append('user_id', backup.userID);
-        formData.append('peer_id', backup.peerID);
-        formData.append('share_name', backup.shareName);
-        formData.append('source_server', backup.sourceServer);
-
-        fetch('/admin/restore-users/restore', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            completed++;
-            statusDiv.textContent = t.restoringAll + ' ' + completed + '/' + total;
-            if (completed === total) {
-                statusDiv.className = 'mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded relative';
-                statusDiv.textContent = '✓ ' + t.successAll;
-            }
-        })
-        .catch(error => {
-            completed++;
-            console.error('Restore error:', error);
-        });
-    });
-}
+<script type="application/json" id="page-data">
+{"translations": {"confirmRestore": "{{T .Lang "admin.restore_users.confirm"}}", "restoring": "{{T .Lang "admin.restore_users.restoring"}}", "error": "{{T .Lang "admin.restore_users.error"}}", "errorConnection": "{{T .Lang "admin.restore_users.error_connection"}}", "confirmAll": "{{T .Lang "admin.restore_users.confirm_all"}}", "restoringAll": "{{T .Lang "admin.restore_users.restoring_all"}}", "successAll": "{{T .Lang "admin.restore_users.success_all"}}", "restoreAllFrom": "{{T .Lang "admin.restore_users.restore_all_from"}}"},
+"backups": [{{range $index, $backup := .Backups}}{{if $index}},{{end}}{"userID": {{$backup.UserID}}, "peerID": {{$backup.PeerID}}, "shareName": "{{$backup.ShareName}}", "sourceServer": "{{$backup.SourceServer}}"}{{end}}]}
 </script>
+<script src="/static/js/admin_restore.js"></script>
 
 </body>
 </html>

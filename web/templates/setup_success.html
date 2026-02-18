@@ -60,7 +60,7 @@
                 <div class="relative">
                     <input type="text" readonly value="{{.EncryptionKey}}" id="encryption-key"
                            class="mt-1 block w-full border-2 border-indigo-500 rounded-md shadow-sm py-3 px-3 bg-gray-50 font-mono text-sm">
-                    <button type="button" onclick="copyKey()"
+                    <button type="button" data-action="copyKey"
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">
                         Copier
                     </button>
@@ -78,7 +78,7 @@
                 <div class="relative">
                     <input type="text" readonly value="{{.SyncPassword}}" id="sync-password"
                            class="mt-1 block w-full border-2 border-purple-500 rounded-md shadow-sm py-3 px-3 bg-gray-50 font-mono text-sm">
-                    <button type="button" onclick="copySyncPassword()"
+                    <button type="button" data-action="copySyncPassword"
                             class="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700">
                         Copier
                     </button>
@@ -95,7 +95,7 @@
 
             <!-- Download Key Button -->
             <div class="mb-6">
-                <button type="button" onclick="downloadKey()"
+                <button type="button" data-action="downloadKey"
                         class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                     <svg class="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
@@ -135,77 +135,10 @@
     </div>
 </div>
 
-<script>
-    const confirm1 = document.getElementById('confirm1');
-    const confirm2 = document.getElementById('confirm2');
-    const continueBtn = document.getElementById('continue-btn');
-    const encryptionKeyInput = document.getElementById('encryption-key');
-
-    // Enable button only when both checkboxes are checked
-    function updateContinueButton() {
-        if (confirm1.checked && confirm2.checked) {
-            continueBtn.disabled = false;
-            continueBtn.classList.remove('bg-gray-400', 'cursor-not-allowed');
-            continueBtn.classList.add('anemone-gradient', 'hover:opacity-90');
-        } else {
-            continueBtn.disabled = true;
-            continueBtn.classList.add('bg-gray-400', 'cursor-not-allowed');
-            continueBtn.classList.remove('anemone-gradient', 'hover:opacity-90');
-        }
-    }
-
-    confirm1.addEventListener('change', updateContinueButton);
-    confirm2.addEventListener('change', updateContinueButton);
-
-    // Copy key to clipboard
-    function copyKey() {
-        encryptionKeyInput.select();
-        document.execCommand('copy');
-
-        // Visual feedback
-        const button = event.target;
-        const originalText = button.textContent;
-        button.textContent = '✓ Copié!';
-        button.classList.add('bg-green-600');
-
-        setTimeout(() => {
-            button.textContent = originalText;
-            button.classList.remove('bg-green-600');
-        }, 2000);
-    }
-
-    // Copy sync password to clipboard
-    function copySyncPassword() {
-        const syncPasswordInput = document.getElementById('sync-password');
-        syncPasswordInput.select();
-        document.execCommand('copy');
-
-        // Visual feedback
-        const button = event.target;
-        const originalText = button.textContent;
-        button.textContent = '✓ Copié!';
-        button.classList.add('bg-green-600');
-
-        setTimeout(() => {
-            button.textContent = originalText;
-            button.classList.remove('bg-green-600');
-        }, 2000);
-    }
-
-    // Download key as file
-    function downloadKey() {
-        const key = encryptionKeyInput.value;
-        const blob = new Blob([key], { type: 'text/plain' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'anemone-encryption-key.txt';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-    }
+<script type="application/json" id="page-data">
+{"translations": {"copied": "Copie !"}, "keyFilename": "anemone-encryption-key.txt"}
 </script>
+<script src="/static/js/auth.js"></script>
 
 </body>
 </html>

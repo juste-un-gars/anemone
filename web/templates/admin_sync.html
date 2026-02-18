@@ -100,7 +100,7 @@
                     <label for="interval" class="block text-sm font-medium text-gray-700 mb-2">
                         {{T .Lang "admin.sync.config.frequency"}}
                     </label>
-                    <select id="interval" name="interval" onchange="toggleFixedHour()"
+                    <select id="interval" name="interval"
                             class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm rounded-md">
                         <option value="30min" {{if eq .Config.Interval "30min"}}selected{{end}}>{{T .Lang "admin.sync.config.frequency.30min"}}</option>
                         <option value="1h" {{if eq .Config.Interval "1h"}}selected{{end}}>{{T .Lang "admin.sync.config.frequency.1h"}}</option>
@@ -146,7 +146,7 @@
                 {{T .Lang "admin.sync.manual.description"}}
             </p>
             <form method="POST" action="/admin/sync/force">
-                <button type="submit" onclick="return confirm('{{T .Lang "admin.sync.manual.confirm"}}')"
+                <button type="submit" data-confirm="{{T .Lang "admin.sync.manual.confirm"}}"
                         class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
                     <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -257,13 +257,8 @@
     </div>
 </div>
 
-<script>
-function toggleFixedHour() {
-    const interval = document.getElementById('interval').value;
-    const fixedHourDiv = document.getElementById('fixedHourDiv');
-    fixedHourDiv.style.display = (interval === 'fixed') ? 'block' : 'none';
-}
-</script>
+<script src="/static/js/common.js"></script>
+<script src="/static/js/admin_sync.js"></script>
 
 </body>
 </html>

@@ -5,20 +5,20 @@
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
         <div style="display:flex;align-items:center;gap:0.75rem;">
             <span id="selectedCount" style="font-size:0.8125rem;font-weight:600;color:var(--text-primary);">0 {{T .Lang "trash.selected_count"}}</span>
-            <button onclick="bulkRestore()" class="v2-btn v2-btn-primary" style="font-size:0.75rem;padding:0.375rem 0.75rem;">
+            <button data-action="bulkRestore" class="v2-btn v2-btn-primary" style="font-size:0.75rem;padding:0.375rem 0.75rem;">
                 <svg style="width:14px;height:14px;margin-right:0.25rem;vertical-align:middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 {{T .Lang "trash.restore_selected"}}
             </button>
-            <button onclick="bulkDelete()" class="v2-btn" style="font-size:0.75rem;padding:0.375rem 0.75rem;background:var(--error);color:white;border:none;">
+            <button data-action="bulkDelete" class="v2-btn" style="font-size:0.75rem;padding:0.375rem 0.75rem;background:var(--error);color:white;border:none;">
                 <svg style="width:14px;height:14px;margin-right:0.25rem;vertical-align:middle;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
                 {{T .Lang "trash.delete_selected"}}
             </button>
         </div>
-        <button onclick="deselectAll()" style="font-size:0.75rem;color:var(--info);background:none;border:none;cursor:pointer;">
+        <button data-action="deselectAll" style="font-size:0.75rem;color:var(--info);background:none;border:none;cursor:pointer;">
             {{T .Lang "trash.deselect_all"}}
         </button>
     </div>
@@ -30,7 +30,7 @@
         <thead>
             <tr>
                 <th style="width:40px;">
-                    <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" style="accent-color:var(--info);">
+                    <input type="checkbox" id="selectAll" style="accent-color:var(--info);">
                 </th>
                 <th>{{T .Lang "trash.column_file"}}</th>
                 <th>{{T .Lang "trash.column_share"}}</th>
@@ -46,7 +46,6 @@
                     <input type="checkbox" class="file-checkbox"
                            data-share="{{.ShareName}}"
                            data-path="{{.RelativePath}}"
-                           onchange="updateBulkActions()"
                            style="accent-color:var(--info);">
                 </td>
                 <td>
@@ -85,10 +84,10 @@
                 </td>
                 <td style="text-align:right;">
                     <div style="display:flex;align-items:center;justify-content:flex-end;gap:0.5rem;">
-                        <button onclick="restoreFile('{{.ShareName}}', '{{.RelativePath}}')" class="v2-btn" style="font-size:0.75rem;padding:0.25rem 0.5rem;background:rgba(16,185,129,0.12);color:var(--success);border:1px solid rgba(16,185,129,0.2);">
+                        <button data-action="restoreFile" data-share="{{.ShareName}}" data-path="{{.RelativePath}}" class="v2-btn" style="font-size:0.75rem;padding:0.25rem 0.5rem;background:rgba(16,185,129,0.12);color:var(--success);border:1px solid rgba(16,185,129,0.2);">
                             {{T $.Lang "trash.action_restore"}}
                         </button>
-                        <button onclick="deleteFile('{{.ShareName}}', '{{.RelativePath}}')" class="v2-btn" style="font-size:0.75rem;padding:0.25rem 0.5rem;background:rgba(239,68,68,0.12);color:var(--error);border:1px solid rgba(239,68,68,0.2);">
+                        <button data-action="deleteFile" data-share="{{.ShareName}}" data-path="{{.RelativePath}}" class="v2-btn" style="font-size:0.75rem;padding:0.25rem 0.5rem;background:rgba(239,68,68,0.12);color:var(--error);border:1px solid rgba(239,68,68,0.2);">
                             {{T $.Lang "trash.action_delete"}}
                         </button>
                     </div>
@@ -108,121 +107,11 @@
     <p style="font-size:0.8125rem;color:var(--text-muted);">{{T .Lang "trash.empty_message"}}</p>
 </div>
 {{end}}
+{{end}}
 
-<script>
-const i18n = {
-    selected_count: "{{T .Lang "trash.selected_count"}}",
-    confirm_restore: "{{T .Lang "trash.confirm_restore"}}",
-    confirm_delete: "{{T .Lang "trash.confirm_delete"}}",
-    confirm_restore_bulk: "{{T .Lang "trash.confirm_restore_bulk"}}",
-    confirm_delete_bulk: "{{T .Lang "trash.confirm_delete_bulk"}}",
-    restored_success: "{{T .Lang "trash.restored_success"}}",
-    restored_bulk: "{{T .Lang "trash.restored_bulk"}}",
-    deleted_bulk: "{{T .Lang "trash.deleted_bulk"}}",
-    failed_bulk: "{{T .Lang "trash.failed_bulk"}}",
-    restoring: "{{T .Lang "trash.restoring"}}",
-    error: "{{T .Lang "trash.error"}}"
-};
-
-function replacePlaceholders(text, params) {
-    let result = text;
-    for (const [key, value] of Object.entries(params)) {
-        result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
-    }
-    return result;
-}
-
-function toggleSelectAll() {
-    const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.file-checkbox');
-    checkboxes.forEach(cb => cb.checked = selectAll.checked);
-    updateBulkActions();
-}
-
-function updateBulkActions() {
-    const checkboxes = document.querySelectorAll('.file-checkbox:checked');
-    const bulkActions = document.getElementById('bulkActions');
-    const selectedCount = document.getElementById('selectedCount');
-    const selectAll = document.getElementById('selectAll');
-
-    if (checkboxes.length > 0) {
-        bulkActions.classList.remove('hidden');
-        selectedCount.textContent = checkboxes.length + ' ' + i18n.selected_count;
-    } else {
-        bulkActions.classList.add('hidden');
-    }
-
-    const allCheckboxes = document.querySelectorAll('.file-checkbox');
-    selectAll.checked = allCheckboxes.length > 0 && checkboxes.length === allCheckboxes.length;
-}
-
-function deselectAll() {
-    document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = false);
-    document.getElementById('selectAll').checked = false;
-    updateBulkActions();
-}
-
-function getSelectedFiles() {
-    const selected = [];
-    document.querySelectorAll('.file-checkbox:checked').forEach(cb => {
-        selected.push({ share: cb.dataset.share, path: cb.dataset.path });
-    });
-    return selected;
-}
-
-async function bulkRestore() {
-    const files = getSelectedFiles();
-    if (files.length === 0) return;
-    const msg = replacePlaceholders(i18n.confirm_restore_bulk, {count: files.length});
-    if (!confirm(msg)) return;
-    let success = 0, failed = 0;
-    for (const file of files) {
-        try {
-            const response = await fetch('/trash/restore?share=' + encodeURIComponent(file.share) + '&path=' + encodeURIComponent(file.path), { method: 'POST' });
-            if (response.ok) { success++; } else { failed++; }
-        } catch (error) { failed++; }
-    }
-    let resultMsg = replacePlaceholders(i18n.restored_bulk, {success: success});
-    if (failed > 0) { resultMsg += replacePlaceholders(i18n.failed_bulk, {failed: failed}); }
-    alert(resultMsg);
-    window.location.reload();
-}
-
-async function bulkDelete() {
-    const files = getSelectedFiles();
-    if (files.length === 0) return;
-    const msg = replacePlaceholders(i18n.confirm_delete_bulk, {count: files.length});
-    if (!confirm(msg)) return;
-    let success = 0, failed = 0;
-    for (const file of files) {
-        try {
-            const response = await fetch('/trash/delete?share=' + encodeURIComponent(file.share) + '&path=' + encodeURIComponent(file.path), { method: 'POST' });
-            if (response.ok) { success++; } else { failed++; }
-        } catch (error) { failed++; }
-    }
-    let resultMsg = replacePlaceholders(i18n.deleted_bulk, {success: success});
-    if (failed > 0) { resultMsg += replacePlaceholders(i18n.failed_bulk, {failed: failed}); }
-    alert(resultMsg);
-    window.location.reload();
-}
-
-function restoreFile(shareName, relPath) {
-    if (!confirm(i18n.confirm_restore + '\n\n' + relPath)) return;
-    const button = event.target.closest('button');
-    const originalContent = button.innerHTML;
-    button.disabled = true;
-    button.innerHTML = i18n.restoring;
-    fetch('/trash/restore?share=' + encodeURIComponent(shareName) + '&path=' + encodeURIComponent(relPath), { method: 'POST' })
-    .then(response => {
-        if (response.ok) { alert(i18n.restored_success); window.location.reload(); }
-        else { response.text().then(text => { alert(i18n.error + ' ' + text); button.disabled = false; button.innerHTML = originalContent; }); }
-    }).catch(error => { alert(i18n.error + ' ' + error); button.disabled = false; button.innerHTML = originalContent; });
-}
-
-function deleteFile(shareName, relPath) {
-    if (!confirm(i18n.confirm_delete + '\n\n' + relPath)) return;
-    fetch('/trash/delete?share=' + encodeURIComponent(shareName) + '&path=' + encodeURIComponent(relPath), { method: 'POST' })
-    .then(response => { if (response.ok) { window.location.reload(); } else { response.text().then(text => alert(i18n.error + ' ' + text)); } });
-}
+{{define "pageScripts"}}
+<script type="application/json" id="page-data">
+{"translations": {"selected_count": "{{T .Lang "trash.selected_count"}}", "confirm_restore": "{{T .Lang "trash.confirm_restore"}}", "confirm_delete": "{{T .Lang "trash.confirm_delete"}}", "confirm_restore_bulk": "{{T .Lang "trash.confirm_restore_bulk"}}", "confirm_delete_bulk": "{{T .Lang "trash.confirm_delete_bulk"}}", "restored_success": "{{T .Lang "trash.restored_success"}}", "restored_bulk": "{{T .Lang "trash.restored_bulk"}}", "deleted_bulk": "{{T .Lang "trash.deleted_bulk"}}", "failed_bulk": "{{T .Lang "trash.failed_bulk"}}", "restoring": "{{T .Lang "trash.restoring"}}", "error": "{{T .Lang "trash.error"}}"}}
 </script>
+<script src="/static/js/trash.js"></script>
 {{end}}

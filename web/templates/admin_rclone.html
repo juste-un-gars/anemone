@@ -144,7 +144,7 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{T .Lang "rclone.ssh_key.public_key"}}</label>
                         <div class="relative">
                             <textarea id="public-key" readonly rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md text-xs font-mono bg-gray-50 text-gray-700">{{.SSHKeyInfo.PublicKey}}</textarea>
-                            <button type="button" onclick="copyPublicKey()" class="absolute top-2 right-2 px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200">
+                            <button type="button" data-action="copyPublicKey" class="absolute top-2 right-2 px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200">
                                 {{T .Lang "rclone.ssh_key.copy"}}
                             </button>
                         </div>
@@ -153,7 +153,7 @@
 
                     <!-- Regenerate button -->
                     <div class="pt-2">
-                        <button type="button" onclick="confirmRegenerateKey()" class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
+                        <button type="button" data-action="regenerateKey" class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
                             {{T .Lang "rclone.ssh_key.regenerate"}}
                         </button>
                     </div>
@@ -167,7 +167,7 @@
                         </svg>
                     </div>
                     <p class="text-gray-600 mb-4">{{T .Lang "rclone.ssh_key.none"}}</p>
-                    <button type="button" onclick="generateKey()" class="px-4 py-2 text-sm font-medium text-white anemone-gradient rounded-md hover:opacity-90">
+                    <button type="button" data-action="generateKey" class="px-4 py-2 text-sm font-medium text-white anemone-gradient rounded-md hover:opacity-90">
                         {{T .Lang "rclone.ssh_key.generate"}}
                     </button>
                 </div>
@@ -241,8 +241,8 @@
                                 <a href="/admin/rclone/{{.ID}}" class="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200">
                                     {{T $.Lang "common.edit"}}
                                 </a>
-                                <form method="POST" action="/admin/rclone/{{.ID}}/delete" class="inline" onsubmit="return confirm('{{T $.Lang "rclone.confirm_delete"}}');">
-                                    <button type="submit" class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200">
+                                <form method="POST" action="/admin/rclone/{{.ID}}/delete" class="inline">
+                                    <button type="submit" data-confirm="{{T $.Lang "rclone.confirm_delete"}}" class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded hover:bg-red-200">
                                         {{T $.Lang "common.delete"}}
                                     </button>
                                 </form>
@@ -363,42 +363,10 @@
         </div>
     </div>
 </div>
-<script>
-function copyPublicKey() {
-    const textarea = document.getElementById('public-key');
-    textarea.select();
-    document.execCommand('copy');
-    alert('{{T .Lang "rclone.ssh_key.copied"}}');
-}
-
-function generateKey() {
-    if (!confirm('{{T .Lang "rclone.ssh_key.generate_confirm"}}')) {
-        return;
-    }
-
-    fetch('/admin/rclone/generate-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.error) {
-            alert('Error: ' + data.error);
-        } else {
-            window.location.href = '/admin/rclone?key_generated=1';
-        }
-    })
-    .catch(err => {
-        alert('Error: ' + err);
-    });
-}
-
-function confirmRegenerateKey() {
-    if (!confirm('{{T .Lang "rclone.ssh_key.regenerate_confirm"}}')) {
-        return;
-    }
-    generateKey();
-}
+<script src="/static/js/common.js"></script>
+<script type="application/json" id="page-data">
+{"translations": {"copied": "{{T .Lang "rclone.ssh_key.copied"}}", "generateConfirm": "{{T .Lang "rclone.ssh_key.generate_confirm"}}", "regenerateConfirm": "{{T .Lang "rclone.ssh_key.regenerate_confirm"}}"}}
 </script>
+<script src="/static/js/admin_rclone.js"></script>
 </body>
 </html>

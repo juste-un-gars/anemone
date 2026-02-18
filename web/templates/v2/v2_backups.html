@@ -10,27 +10,27 @@
 {{end}}
 <!-- Tab navigation -->
 <div class="v2-tabs" id="backupTabs">
-    <button class="v2-tab{{if eq .ActiveTab "recent"}} active{{end}}" data-tab="recent" onclick="switchTab('recent')">
+    <button class="v2-tab{{if eq .ActiveTab "recent"}} active{{end}}" data-tab="recent" data-action="switchTab">
         <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         {{T .Lang "v2.backups.recent.tab"}}
     </button>
-    <button class="v2-tab{{if eq .ActiveTab "usb"}} active{{end}}" data-tab="usb" onclick="switchTab('usb')">
+    <button class="v2-tab{{if eq .ActiveTab "usb"}} active{{end}}" data-tab="usb" data-action="switchTab">
         <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 1v3"/><path d="M15 1v3"/><path d="M9 20v3"/><path d="M15 20v3"/></svg>
         USB
     </button>
-    <button class="v2-tab{{if eq .ActiveTab "cloud"}} active{{end}}" data-tab="cloud" onclick="switchTab('cloud')">
+    <button class="v2-tab{{if eq .ActiveTab "cloud"}} active{{end}}" data-tab="cloud" data-action="switchTab">
         <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
         Cloud
     </button>
-    <button class="v2-tab{{if eq .ActiveTab "p2p"}} active{{end}}" data-tab="p2p" onclick="switchTab('p2p')">
+    <button class="v2-tab{{if eq .ActiveTab "p2p"}} active{{end}}" data-tab="p2p" data-action="switchTab">
         <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
         P2P Sync
     </button>
-    <button class="v2-tab{{if eq .ActiveTab "incoming"}} active{{end}}" data-tab="incoming" onclick="switchTab('incoming')">
+    <button class="v2-tab{{if eq .ActiveTab "incoming"}} active{{end}}" data-tab="incoming" data-action="switchTab">
         <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Incoming
     </button>
-    <button class="v2-tab{{if eq .ActiveTab "server"}} active{{end}}" data-tab="server" onclick="switchTab('server')">
+    <button class="v2-tab{{if eq .ActiveTab "server"}} active{{end}}" data-tab="server" data-action="switchTab">
         <svg style="display:inline;width:16px;height:16px;vertical-align:middle;margin-right:4px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
         Server
     </button>
@@ -251,40 +251,18 @@
             <label style="display:block;font-size:0.75rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.25rem;">{{T .Lang "rclone.ssh_key.public_key"}}</label>
             <div style="display:flex;gap:0.5rem;">
                 <textarea id="ssh-public-key" readonly rows="2" style="flex:1;padding:0.5rem;border:1px solid var(--border);border-radius:0.375rem;background:var(--bg-page);color:var(--text-primary);font-size:0.6875rem;font-family:monospace;resize:none;">{{.SSHKeyPublicKey}}</textarea>
-                <button type="button" onclick="copyPublicKey()" class="v2-btn v2-btn-secondary v2-btn-sm" style="align-self:flex-start;">{{T .Lang "rclone.ssh_key.copy"}}</button>
+                <button type="button" data-action="copyPublicKey" class="v2-btn v2-btn-secondary v2-btn-sm" style="align-self:flex-start;">{{T .Lang "rclone.ssh_key.copy"}}</button>
             </div>
             <div style="font-size:0.6875rem;color:var(--text-muted);margin-top:0.25rem;">{{T .Lang "rclone.ssh_key.copy_hint"}}</div>
         </div>
-        <button type="button" onclick="regenerateSSHKey()" class="v2-btn v2-btn-secondary v2-btn-sm">{{T .Lang "rclone.ssh_key.regenerate"}}</button>
+        <button type="button" data-action="regenerateSSHKey" class="v2-btn v2-btn-secondary v2-btn-sm">{{T .Lang "rclone.ssh_key.regenerate"}}</button>
         {{else}}
         <!-- No key: show generate button -->
         <p style="font-size:0.8125rem;color:var(--text-muted);margin-bottom:0.75rem;">{{T .Lang "rclone.ssh_key.none"}}</p>
-        <button type="button" onclick="generateSSHKey()" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "rclone.ssh_key.generate"}}</button>
+        <button type="button" data-action="generateSSHKey" class="v2-btn v2-btn-primary v2-btn-sm">{{T .Lang "rclone.ssh_key.generate"}}</button>
         {{end}}
     </div>
 
-    <script>
-    function copyPublicKey() {
-        const textarea = document.getElementById('ssh-public-key');
-        textarea.select();
-        document.execCommand('copy');
-        alert('{{T .Lang "rclone.ssh_key.copied"}}');
-    }
-    function generateSSHKey() {
-        if (!confirm('{{T .Lang "rclone.ssh_key.generate_confirm"}}')) return;
-        fetch('/admin/rclone/generate-key', { method: 'POST' })
-            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-            .then(data => { if (data.exists) location.reload(); else alert(data.error || 'Error'); })
-            .catch(err => alert('Error: ' + err));
-    }
-    function regenerateSSHKey() {
-        if (!confirm('{{T .Lang "rclone.ssh_key.regenerate_confirm"}}')) return;
-        fetch('/admin/rclone/generate-key', { method: 'POST' })
-            .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-            .then(data => { if (data.exists) location.reload(); else alert(data.error || 'Error'); })
-            .catch(err => alert('Error: ' + err));
-    }
-    </script>
 </div>
 
 <!-- ===== P2P Sync Tab ===== -->
@@ -403,9 +381,9 @@
                     <td>{{.FileCount}}</td>
                     <td>{{.TotalSizeFormatted}}</td>
                     <td>
-                        <form method="POST" action="/admin/incoming/delete" onsubmit="return confirm('{{T $.Lang "v2.backups.confirm_delete"}}');">
+                        <form method="POST" action="/admin/incoming/delete">
                             <input type="hidden" name="path" value="{{.Path}}">
-                            <button type="submit" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "v2.backups.delete"}}</button>
+                            <button type="submit" data-action="confirmDelete" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "v2.backups.delete"}}</button>
                         </form>
                     </td>
                 </tr>
@@ -449,8 +427,8 @@
                     <td style="font-size:0.8125rem;color:var(--text-secondary);">{{.Date}}</td>
                     <td>
                         <div style="display:flex;gap:0.5rem;">
-                            <button onclick="openDownloadModal('{{.Name}}')" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "v2.backups.server.download"}}</button>
-                            <button onclick="deleteServerBackup('{{.Name}}')" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "v2.backups.delete"}}</button>
+                            <button data-action="openDownloadModal" data-filename="{{.Name}}" class="v2-btn v2-btn-secondary v2-btn-sm">{{T $.Lang "v2.backups.server.download"}}</button>
+                            <button data-action="deleteServerBackup" data-filename="{{.Name}}" class="v2-btn v2-btn-danger v2-btn-sm">{{T $.Lang "v2.backups.delete"}}</button>
                         </div>
                     </td>
                 </tr>
@@ -471,7 +449,7 @@
 
 <!-- Download Modal -->
 <div id="downloadModal" class="hidden" style="position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;">
-    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.5);" onclick="closeDownloadModal()"></div>
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.5);" data-action="closeDownloadModal"></div>
     <div class="v2-card" style="position:relative;width:100%;max-width:28rem;padding:1.5rem;z-index:51;">
         <h3 style="font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:1rem;">{{T .Lang "backup.download.title"}}</h3>
         <form id="downloadForm" method="POST" action="/admin/backup/download">
@@ -497,75 +475,17 @@
                 {{T .Lang "backup.download.warning"}}
             </div>
             <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
-                <button type="button" onclick="closeDownloadModal()" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
+                <button type="button" data-action="closeDownloadModal" class="v2-btn v2-btn-secondary">{{T .Lang "common.cancel"}}</button>
                 <button type="submit" class="v2-btn v2-btn-primary">{{T .Lang "backup.action.download"}}</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- Scripts -->
-<script>
-// Server backup: download modal
-function openDownloadModal(filename) {
-    document.getElementById('downloadFilename').value = filename;
-    document.getElementById('dlPassphrase').value = '';
-    document.getElementById('dlPassphraseConfirm').value = '';
-    document.getElementById('downloadModal').classList.remove('hidden');
-}
-function closeDownloadModal() {
-    document.getElementById('downloadModal').classList.add('hidden');
-}
-document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeDownloadModal(); });
-
-var dlForm = document.getElementById('downloadForm');
-if (dlForm) {
-    dlForm.addEventListener('submit', function(e) {
-        var p = document.getElementById('dlPassphrase').value;
-        var c = document.getElementById('dlPassphraseConfirm').value;
-        if (p !== c) { e.preventDefault(); alert('{{T .Lang "backup.download.error_mismatch"}}'); return; }
-        if (p.length < 12) { e.preventDefault(); alert('{{T .Lang "backup.download.error_length"}}'); return; }
-    });
-}
-
-// Server backup: delete
-function deleteServerBackup(filename) {
-    if (!confirm('{{T .Lang "backup.delete.confirm"}}')) return;
-    fetch('/admin/backup/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'filename=' + encodeURIComponent(filename)
-    }).then(function(r) {
-        if (r.ok) { alert('{{T .Lang "backup.delete.success"}}'); location.reload(); }
-        else { r.text().then(function(t) { alert('{{T .Lang "backup.delete.error"}}' + ': ' + t); }); }
-    }).catch(function(err) { alert('{{T .Lang "backup.delete.error"}}' + ': ' + err.message); });
-}
-
-// Tab switching
-function switchTab(tab) {
-    // Update URL
-    var url = new URL(window.location);
-    url.searchParams.set('tab', tab);
-    window.history.replaceState({}, '', url);
-
-    // Update tab buttons
-    document.querySelectorAll('.v2-tab').forEach(function(t) {
-        t.classList.toggle('active', t.getAttribute('data-tab') === tab);
-    });
-
-    // Update panels
-    document.querySelectorAll('.v2-tab-panel').forEach(function(p) {
-        p.classList.toggle('active', p.id === 'tab-' + tab);
-    });
-}
-
-// Restore tab from URL on load
-(function() {
-    var params = new URLSearchParams(window.location.search);
-    var tab = params.get('tab');
-    if (tab && document.getElementById('tab-' + tab)) {
-        switchTab(tab);
-    }
-})();
+{{define "pageScripts"}}
+<script type="application/json" id="page-data">
+{"translations": {"sshKeyCopied": "{{T .Lang "rclone.ssh_key.copied"}}", "sshKeyGenerateConfirm": "{{T .Lang "rclone.ssh_key.generate_confirm"}}", "sshKeyRegenerateConfirm": "{{T .Lang "rclone.ssh_key.regenerate_confirm"}}", "downloadErrorMismatch": "{{T .Lang "backup.download.error_mismatch"}}", "downloadErrorLength": "{{T .Lang "backup.download.error_length"}}", "backupDeleteConfirm": "{{T .Lang "backup.delete.confirm"}}", "backupDeleteSuccess": "{{T .Lang "backup.delete.success"}}", "backupDeleteError": "{{T .Lang "backup.delete.error"}}", "incomingConfirmDelete": "{{T .Lang "v2.backups.confirm_delete"}}"}}
 </script>
+<script src="/static/js/backups.js"></script>
+{{end}}
 {{end}}

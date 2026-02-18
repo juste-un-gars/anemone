@@ -8,32 +8,13 @@
     <title>{{.Title}} - {{ServerName}}</title>
     <link rel="stylesheet" href="/static/v2.css">
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = { darkMode: 'class' };
-    </script>
-    <script>
-        (function() {
-            var stored = localStorage.getItem('anemone-theme');
-            function apply(mode) {
-                if (mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                    document.documentElement.classList.add('dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                }
-            }
-            apply(stored || 'dark');
-            if (!stored || stored === 'auto') {
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
-                    if ((localStorage.getItem('anemone-theme') || 'auto') === 'auto') apply('auto');
-                });
-            }
-        })();
-    </script>
+    <script src="/static/js/tailwind-config.js"></script>
+    <script src="/static/js/theme-init.js"></script>
 </head>
 <body class="v2">
 
 <!-- Mobile overlay -->
-<div class="v2-sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+<div class="v2-sidebar-overlay" id="sidebarOverlay" data-action="toggleSidebar"></div>
 
 <!-- Sidebar -->
 <aside class="v2-sidebar" id="sidebar">
@@ -90,13 +71,13 @@
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:0.75rem; padding: 0 0.25rem;">
             <span style="font-size:0.75rem; color:var(--text-muted);">{{T .Lang "v2.nav.theme"}}</span>
             <div class="v2-theme-toggle">
-                <button class="v2-theme-btn" data-theme="light" onclick="setTheme('light')" title="Light">
+                <button class="v2-theme-btn" data-action="setTheme" data-theme="light" title="Light">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                 </button>
-                <button class="v2-theme-btn" data-theme="dark" onclick="setTheme('dark')" title="Dark">
+                <button class="v2-theme-btn" data-action="setTheme" data-theme="dark" title="Dark">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                 </button>
-                <button class="v2-theme-btn" data-theme="auto" onclick="setTheme('auto')" title="Auto">
+                <button class="v2-theme-btn" data-action="setTheme" data-theme="auto" title="Auto">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 0 20V2z"/></svg>
                 </button>
             </div>
@@ -121,7 +102,7 @@
 <div class="v2-main">
     <header class="v2-header">
         <div style="display:flex;align-items:center;gap:0.75rem;">
-            <button class="v2-hamburger" onclick="toggleSidebar()">
+            <button class="v2-hamburger" data-action="toggleSidebar">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
             </button>
             <h1 style="font-size:1.125rem;font-weight:700;color:var(--text-primary);">{{.Title}}</h1>
@@ -136,31 +117,8 @@
     </main>
 </div>
 
-<script>
-function toggleSidebar() {
-    document.getElementById('sidebar').classList.toggle('open');
-    document.getElementById('sidebarOverlay').classList.toggle('open');
-}
-
-function setTheme(mode) {
-    localStorage.setItem('anemone-theme', mode);
-    if (mode === 'dark' || (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-    } else {
-        document.documentElement.classList.remove('dark');
-    }
-    document.querySelectorAll('.v2-theme-btn').forEach(function(b) {
-        b.classList.toggle('active', b.getAttribute('data-theme') === mode);
-    });
-}
-
-(function() {
-    var t = localStorage.getItem('anemone-theme') || 'dark';
-    document.querySelectorAll('.v2-theme-btn').forEach(function(b) {
-        b.classList.toggle('active', b.getAttribute('data-theme') === t);
-    });
-})();
-</script>
+<script src="/static/js/common.js"></script>
+{{block "pageScripts" .}}{{end}}
 
 </body>
 </html>

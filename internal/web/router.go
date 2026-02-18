@@ -525,12 +525,12 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 		w.Header().Set("X-XSS-Protection", "1; mode=block")
 
 		// Content Security Policy - Restrict resource loading
-		// Note: unsafe-inline kept for script-src/style-src due to extensive inline JS in templates.
-		// unsafe-eval REMOVED (no eval/new Function usage). object-src/base-uri locked down.
+		// All inline JS externalized to .js files - unsafe-inline removed from script-src.
+		// style-src keeps unsafe-inline for Tailwind CDN (generates inline styles).
 		w.Header().Set("Content-Security-Policy",
 			"default-src 'self'; "+
 				"style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com; "+
-				"script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; "+
+				"script-src 'self' https://cdn.tailwindcss.com https://unpkg.com; "+
 				"img-src 'self' data:; "+
 				"font-src 'self'; "+
 				"connect-src 'self'; "+

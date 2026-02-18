@@ -89,10 +89,10 @@
                             </div>
                         </div>
                         <div class="flex space-x-2">
-                            <button onclick="downloadBackup('{{.Filename}}')" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            <button data-action="downloadBackup" data-filename="{{.Filename}}" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                                 📥 {{T $.Lang "backup.action.download"}}
                             </button>
-                            <button onclick="deleteBackup('{{.Filename}}')" class="inline-flex items-center px-3 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50">
+                            <button data-action="deleteBackup" data-filename="{{.Filename}}" class="inline-flex items-center px-3 py-2 border border-red-300 shadow-sm text-sm font-medium rounded-md text-red-700 bg-white hover:bg-red-50">
                                 🗑️ {{T $.Lang "backup.action.delete"}}
                             </button>
                         </div>
@@ -171,7 +171,7 @@
                             </div>
 
                             <div class="flex justify-end space-x-3">
-                                <button type="button" onclick="closeModal()"
+                                <button type="button" data-action="closeModal"
                                     class="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
                                     {{T .Lang "common.cancel"}}
                                 </button>
@@ -188,77 +188,10 @@
     </div>
 </div>
 
-<script>
-    const backupTranslations = {
-        deleteConfirm: "{{T .Lang "backup.delete.confirm"}}",
-        deleteSuccess: "{{T .Lang "backup.delete.success"}}",
-        deleteError: "{{T .Lang "backup.delete.error"}}",
-        passwordMismatch: "{{T .Lang "backup.download.error_mismatch"}}",
-        passwordTooShort: "{{T .Lang "backup.download.error_length"}}"
-    };
-
-    function downloadBackup(filename) {
-        document.getElementById('downloadFilename').value = filename;
-        document.getElementById('downloadModal').classList.remove('hidden');
-        document.getElementById('passphrase').value = '';
-        document.getElementById('passphrase_confirm').value = '';
-    }
-
-    function closeModal() {
-        document.getElementById('downloadModal').classList.add('hidden');
-    }
-
-    function deleteBackup(filename) {
-        if (!confirm(backupTranslations.deleteConfirm + '\n\n' + filename)) {
-            return;
-        }
-
-        fetch('/admin/backup/delete', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: 'filename=' + encodeURIComponent(filename)
-        })
-        .then(response => {
-            if (response.ok) {
-                alert(backupTranslations.deleteSuccess);
-                location.reload();
-            } else {
-                return response.text().then(text => {
-                    throw new Error(text || backupTranslations.deleteError);
-                });
-            }
-        })
-        .catch(error => {
-            alert(backupTranslations.deleteError + ': ' + error.message);
-        });
-    }
-
-    document.getElementById('downloadForm').addEventListener('submit', function(e) {
-        const passphrase = document.getElementById('passphrase').value;
-        const confirm = document.getElementById('passphrase_confirm').value;
-
-        if (passphrase !== confirm) {
-            e.preventDefault();
-            alert(backupTranslations.passwordMismatch);
-            return;
-        }
-
-        if (passphrase.length < 12) {
-            e.preventDefault();
-            alert(backupTranslations.passwordTooShort);
-            return;
-        }
-    });
-
-    // Close modal on escape key
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape') {
-            closeModal();
-        }
-    });
+<script type="application/json" id="page-data">
+{"translations": {"deleteConfirm": "{{T .Lang "backup.delete.confirm"}}", "deleteSuccess": "{{T .Lang "backup.delete.success"}}", "deleteError": "{{T .Lang "backup.delete.error"}}", "passwordMismatch": "{{T .Lang "backup.download.error_mismatch"}}", "passwordTooShort": "{{T .Lang "backup.download.error_length"}}"}}
 </script>
+<script src="/static/js/admin_backup.js"></script>
 
 </body>
 </html>
