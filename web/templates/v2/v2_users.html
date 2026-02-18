@@ -71,11 +71,11 @@
     <a href="/admin/users/add" class="v2-btn v2-btn-primary v2-btn-sm">+ {{T .Lang "users.add"}}</a>
 </div>
 {{end}}
+{{end}}
 
 {{define "pageScripts"}}
 <script type="application/json" id="page-data">
 {"translations": {"deleteWarningTitle": "{{T .Lang "users.delete.warning_title"}}", "deleteWarningMessage": "{{T .Lang "users.delete.warning_message"}}", "deleteWarningPrompt": "{{T .Lang "users.delete.warning_prompt"}}", "deleteConfirm": "{{T .Lang "users.delete.final_confirm"}}", "deleteSuccess": "{{T .Lang "users.delete.success"}}", "deleteError": "{{T .Lang "users.delete.error"}}", "deleteErrorPrefix": "{{T .Lang "users.delete.error_prefix"}}", "deleteCancelled": "{{T .Lang "users.delete.cancelled"}}", "unlockConfirm": "{{T .Lang "users.unlock.confirm"}}", "unlockSuccess": "{{T .Lang "users.unlock.success"}}", "unlockError": "{{T .Lang "users.unlock.error"}}"}}
 </script>
 <script src="/static/js/users.js"></script>
-{{end}}
 {{end}}

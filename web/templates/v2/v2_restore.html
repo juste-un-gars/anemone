@@ -97,10 +97,11 @@
     <p style="font-size:0.8125rem;color:var(--text-muted);">{{T .Lang "restore.empty.message"}}</p>
 </div>
 
+{{end}}
+
 {{define "pageScripts"}}
 <script type="application/json" id="page-data">
 {"lang": "{{.Lang}}", "translations": {"errorLoadingBackups": "{{T .Lang "restore.error.loading"}}", "errorLoadingFiles": "{{T .Lang "restore.error.files"}}", "downloadAction": "{{T .Lang "restore.action.download"}}", "errorDownload": "{{T .Lang "restore.error.download"}}", "selectionCount": "{{T .Lang "restore.selection.count"}}", "errorSelection": "{{T .Lang "restore.error.selection"}}", "minutesAgo": "{{T .Lang "restore.time.minutes_ago"}}", "hoursAgo": "{{T .Lang "restore.time.hours_ago"}}", "daysAgo": "{{T .Lang "restore.time.days_ago"}}"}}
 </script>
 <script src="/static/js/restore.js"></script>
-{{end}}
 {{end}}

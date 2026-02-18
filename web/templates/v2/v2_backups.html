@@ -482,10 +482,11 @@
     </div>
 </div>
 
+{{end}}
+
 {{define "pageScripts"}}
 <script type="application/json" id="page-data">
 {"translations": {"sshKeyCopied": "{{T .Lang "rclone.ssh_key.copied"}}", "sshKeyGenerateConfirm": "{{T .Lang "rclone.ssh_key.generate_confirm"}}", "sshKeyRegenerateConfirm": "{{T .Lang "rclone.ssh_key.regenerate_confirm"}}", "downloadErrorMismatch": "{{T .Lang "backup.download.error_mismatch"}}", "downloadErrorLength": "{{T .Lang "backup.download.error_length"}}", "backupDeleteConfirm": "{{T .Lang "backup.delete.confirm"}}", "backupDeleteSuccess": "{{T .Lang "backup.delete.success"}}", "backupDeleteError": "{{T .Lang "backup.delete.error"}}", "incomingConfirmDelete": "{{T .Lang "v2.backups.confirm_delete"}}"}}
 </script>
 <script src="/static/js/backups.js"></script>
-{{end}}
 {{end}}

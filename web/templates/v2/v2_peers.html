@@ -151,10 +151,11 @@
 </div>
 {{end}}
 
+{{end}}
+
 {{define "pageScripts"}}
 <script type="application/json" id="page-data">
 {"translations": {"testAction": "{{T .Lang "peers.action.test"}}", "statusOnline": "{{T .Lang "peers.status.online"}}", "statusOffline": "{{T .Lang "peers.status.offline"}}", "deleteConfirm": "{{T .Lang "peers.delete.confirm"}}"}}
 </script>
 <script src="/static/js/peers.js"></script>
-{{end}}
 {{end}}

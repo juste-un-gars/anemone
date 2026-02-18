@@ -213,10 +213,11 @@
     </div>
 </div>
 
+{{end}}
+
 {{define "pageScripts"}}
 <script type="application/json" id="page-data">
 {"currentShare": "{{.CurrentShare}}", "currentPath": "{{.CurrentPath}}", "translations": {"confirmDelete": "{{T .Lang "files.confirm_delete"}}", "deleteSuccess": "{{T .Lang "files.delete_success"}}", "mkdirSuccess": "{{T .Lang "files.mkdir_success"}}", "renameSuccess": "{{T .Lang "files.rename_success"}}", "uploadSuccess": "{{T .Lang "files.upload_success"}}", "error": "{{T .Lang "files.error_generic"}}"}}
 </script>
 <script src="/static/js/files.js"></script>
-{{end}}
 {{end}}
